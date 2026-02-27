@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Suhoor to Iftar</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  background:#2e8b57;
+  color:#e0e8e4;
+  -webkit-font-smoothing:antialiased;
+}
+canvas{position:fixed;top:0;left:0;width:100vw;height:100vh;display:block;}
+
+/* Info overlay — bottom center */
+.info{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:10;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none;}
+.info>*{pointer-events:auto;}
+.ramadan-label{font-size:10px;font-weight:600;color:rgba(255,255,240,.7);text-transform:uppercase;letter-spacing:.14em;}
+.hijri{font-size:12px;font-weight:500;color:rgba(255,255,240,.6);}
+.greg{font-size:10px;color:rgba(255,255,240,.35);}
+.fast-status{font-size:13px;font-weight:500;color:rgba(255,255,240,.8);}.fast-status .tl{color:#f0e060;font-variant-numeric:tabular-nums;}
+.prayers{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:2px;}
+.pp{display:flex;align-items:center;gap:4px;font-size:9px;color:rgba(255,255,240,.4);padding:3px 8px;background:rgba(0,0,0,.08);border:1px solid rgba(255,255,240,.08);border-radius:16px;backdrop-filter:blur(4px);}
+.pp .dot{width:4px;height:4px;border-radius:50%;}
+.pp .pt{color:rgba(255,255,240,.7);font-weight:500;font-variant-numeric:tabular-nums;}
+.pp.active{border-color:rgba(255,255,240,.25);background:rgba(0,0,0,.12);}
+.pp.next{border-color:rgba(240,224,96,.3);background:rgba(240,224,96,.06);}
+.loc{font-size:9px;color:rgba(255,255,240,.25);cursor:pointer;margin-top:2px;}
+.loc:hover{color:rgba(255,255,240,.4);}
+
+/* Settings */
+.sov{display:none;position:fixed;inset:0;background:rgba(0,40,20,.6);backdrop-filter:blur(12px);z-index:100;align-items:center;justify-content:center;}
+.sov.open{display:flex;}
+.scard{background:rgba(20,60,35,.95);border:1px solid rgba(255,255,240,.1);border-radius:16px;padding:28px;width:min(90vw,340px);max-height:80vh;overflow-y:auto;}
+.scard h3{font-size:15px;font-weight:600;margin-bottom:16px;color:#f0e060;}
+.sr{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,240,.05);}
+.sr:last-child{border-bottom:none;}
+.sl{font-size:12px;color:rgba(255,255,240,.5);}
+.sv{font-size:12px;color:rgba(255,255,240,.8);background:rgba(255,255,240,.06);border:1px solid rgba(255,255,240,.1);border-radius:6px;padding:4px 10px;}
+select.sv{-webkit-appearance:none;appearance:none;padding-right:24px;background:rgba(255,255,240,.06) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,240,.4)'/%3E%3C/svg%3E") no-repeat right 8px center;}
+input.sv{width:140px;border:1px solid rgba(255,255,240,.1);color:rgba(255,255,240,.8);}
+.sbtn{margin-top:16px;width:100%;padding:10px;font-size:12px;font-weight:500;background:rgba(240,224,96,.12);border:1px solid rgba(240,224,96,.4);border-radius:8px;color:#f0e060;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div class="info">
+  <div class="ramadan-label" id="ramLabel"></div>
+  <div class="fast-status" id="fastStatus"></div>
+  <div class="prayers" id="prayers"></div>
+  <div class="hijri" id="hijri"></div>
+  <div class="greg" id="greg"></div>
+  <div class="loc" id="loc" onclick="openSettings()">📍 Loading… ⚙️</div>
+</div>
+
+<div class="sov" id="sov" onclick="if(event.target===this)closeSettings()">
+  <div class="scard">
+    <h3>☪ Settings</h3>
+    <div class="sr"><span class="sl">City</span><input class="sv" id="sCity" value="Los Angeles"></div>
+    <div class="sr"><span class="sl">Country</span><input class="sv" id="sCountry" value="US"></div>
+    <div class="sr"><span class="sl">Calculation</span>
+      <select class="sv" id="sMethod">
+        <option value="2" selected>ISNA</option><option value="1">Karachi</option>
+        <option value="3">MWL</option><option value="4">Umm Al-Qura</option>
+        <option value="5">Egyptian</option><option value="7">Tehran</option>
+        <option value="8">Gulf</option><option value="15">Moonsighting</option>
+      </select>
+    </div>
+    <div class="sr"><span class="sl">Numerals</span>
+      <select class="sv" id="sNum">
+        <option value="arabic" selected>Arabic-Indic</option>
+        <option value="western">Western</option>
+        <option value="both">Both</option>
+        <option value="none">None</option>
+      </select>
+    </div>
+    <button class="sbtn" onclick="saveSettings()">Save & Refresh</button>
+  </div>
+</div>
+
+<script>
+const cv=document.getElementById('c');
+const ctx=cv.getContext('2d');
+let dpr=window.devicePixelRatio||1;
+let W,H,cx,cy,R;
+
+// ── Settings ──
+function loadS(){try{const s=JSON.parse(localStorage.getItem('rc4')||'{}');return{city:s.city||'Los Angeles',country:s.country||'US',method:s.method||'2',numerals:s.numerals||'arabic'};}catch(e){return{city:'Los Angeles',country:'US',method:'2',numerals:'arabic'};}}
+let S=loadS();
+window.openSettings=()=>{document.getElementById('sCity').value=S.city;document.getElementById('sCountry').value=S.country;document.getElementById('sMethod').value=S.method;document.getElementById('sNum').value=S.numerals;document.getElementById('sov').classList.add('open');};
+window.closeSettings=()=>document.getElementById('sov').classList.remove('open');
+window.saveSettings=()=>{S.city=document.getElementById('sCity').value.trim()||'Los Angeles';S.country=document.getElementById('sCountry').value.trim()||'US';S.method=document.getElementById('sMethod').value;S.numerals=document.getElementById('sNum').value;localStorage.setItem('rc4',JSON.stringify(S));closeSettings();fetchPrayer();};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSettings();});
+
+// ── Prayer ──
+let PD=null,DD=null;
+const PC={Fajr:'#6ba0c4',Sunrise:'#e8c060',Dhuhr:'#f0e060',Asr:'#e0b050',Maghrib:'#d06040',Isha:'#8a7abf'};
+const PN=['Fajr','Sunrise','Dhuhr','Asr','Maghrib','Isha'];
+function pM(s){if(!s)return 0;const[h,m]=s.split(':').map(Number);return h*60+m;}
+function nM(){const d=new Date();return d.getHours()*60+d.getMinutes()+d.getSeconds()/60;}
+function f12(m){const h=Math.floor(m/60),mi=Math.floor(m%60);return`${h%12||12}:${String(mi).padStart(2,'0')}${h>=12?'p':'a'}`;}
+const MN={'1':'Karachi','2':'ISNA','3':'MWL','4':'Umm Al-Qura','5':'Egyptian','7':'Tehran','8':'Gulf','15':'Moonsighting'};
+
+async function fetchPrayer(){
+  try{const r=await fetch(`https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(S.city)}&country=${encodeURIComponent(S.country)}&method=${S.method}`);const j=await r.json();if(j.code===200){PD=j.data.timings;DD=j.data.date;updateInfo();}}catch(e){document.getElementById('loc').textContent='📍 Failed — tap ⚙️';}
+}
+function updateInfo(){
+  if(!DD)return;
+  const h=DD.hijri,g=DD.gregorian;
+  document.getElementById('hijri').textContent=`${h.day} ${h.month.en} ${h.year} AH`;
+  document.getElementById('greg').textContent=`${g.weekday.en}, ${g.day} ${g.month.en} ${g.year}`;
+  document.getElementById('loc').textContent=`📍 ${S.city} · ${MN[S.method]||'ISNA'} ⚙️`;
+  const lbl=document.getElementById('ramLabel');
+  if(h.month.number===9)lbl.textContent=`RAMADAN · DAY ${h.day}`;
+  else if(h.month.number===8){const dl=(h.month.days||30)-parseInt(h.day);lbl.textContent=dl<=15?`${dl} DAYS TO RAMADAN`:`SHA'BĀN ${h.day}`;}
+  else lbl.textContent='';
+  const now=nM();
+  const ps=PN.map(n=>({name:n,time:pM(PD[n]),color:PC[n]}));
+  let ni=ps.findIndex(p=>p.time>now);if(ni===-1)ni=0;
+  let ci=ni-1;if(ci<0)ci=ps.length-1;
+  document.getElementById('prayers').innerHTML=ps.map((p,i)=>`<div class="pp ${i===ci?'active':i===ni?'next':''}"><span class="dot" style="background:${p.color}"></span>${p.name} <span class="pt">${f12(p.time)}</span></div>`).join('');
+  const fajr=pM(PD.Fajr),mag=pM(PD.Maghrib),el=document.getElementById('fastStatus');
+  if(h.month.number===9){
+    if(now>=fajr&&now<mag){const l=mag-now;el.innerHTML=`Fasting · <span class="tl">${Math.floor(l/60)}h ${Math.floor(l%60)}m to Iftar</span>`;}
+    else if(now<fajr){const l=fajr-now;el.innerHTML=`Suhoor · <span class="tl">${Math.floor(l/60)}h ${Math.floor(l%60)}m to Fajr</span>`;}
+    else el.innerHTML=`<span style="color:#f0e060">Iftar Mubarak ☪</span>`;
+  }else{el.innerHTML=`Fajr <span class="tl">${f12(fajr)}</span> · Maghrib <span class="tl">${f12(mag)}</span>`;}
+}
+
+// ── Resize ──
+function resize(){
+  dpr=window.devicePixelRatio||1;
+  W=window.innerWidth*dpr;H=window.innerHeight*dpr;
+  cv.width=W;cv.height=H;
+  cv.style.width=window.innerWidth+'px';
+  cv.style.height=window.innerHeight+'px';
+  cx=W/2;cy=H/2;
+  R=Math.min(W,H)*0.42;
+}
+resize();
+window.addEventListener('resize',resize);
+
+// ── Colors ──
+const BG='#2e8b57';       // saturated emerald field
+const LUME='#c8e860';     // lume yellow-green
+const LUME_DIM='#6aaa50'; // dim lume for minute ticks
+const HAND_FILL='#f4f0e0';// warm cream hand fill
+const HAND_STROKE='#ffffff';
+const HAND_SHADOW='rgba(0,40,20,.25)';
+const MIN_NUM='rgba(200,232,96,.35)'; // faint minute numerals
+
+// ── Drawing ──
+const ARABIC=['١٢','١','٢','٣','٤','٥','٦','٧','٨','٩','١٠','١١'];
+const WESTERN=['12','1','2','3','4','5','6','7','8','9','10','11'];
+const MIN_LABELS=['60','','','','','05','','','','','10','','','','','15','','','','','20','','','','','25','','','','','30','','','','','35','','','','','40','','','','','45','','','','','50','','','','','55','','','',''];
+
+function drawFace(){
+  // Solid emerald background with subtle radial texture
+  const g=ctx.createRadialGradient(cx,cy-R*0.3,0,cx,cy,R*1.6);
+  g.addColorStop(0,'#35a065');
+  g.addColorStop(0.5,'#2e8b57');
+  g.addColorStop(1,'#267a4c');
+  ctx.fillStyle=g;
+  ctx.fillRect(0,0,W,H);
+
+  // Subtle noise texture (stipple)
+  ctx.globalAlpha=0.015;
+  for(let i=0;i<800;i++){
+    const x=Math.random()*W,y=Math.random()*H;
+    ctx.fillStyle=Math.random()>0.5?'#fff':'#000';
+    ctx.fillRect(x,y,dpr,dpr);
+  }
+  ctx.globalAlpha=1;
+}
+
+function drawIndices(){
+  for(let i=0;i<60;i++){
+    const ang=(i/60)*Math.PI*2-Math.PI/2;
+    const isHour=i%5===0;
+
+    if(isHour){
+      // Capsule-shaped lume indices
+      const inner=R-R*0.18;
+      const outer=R-R*0.03;
+      const capW=R*0.035;
+
+      // Shadow
+      ctx.save();
+      ctx.translate(cx+Math.cos(ang)*((inner+outer)/2)+2*dpr, cy+Math.sin(ang)*((inner+outer)/2)+3*dpr);
+      ctx.rotate(ang+Math.PI/2);
+      ctx.fillStyle=HAND_SHADOW;
+      roundRect(ctx,-capW,(outer-inner)/-2,capW*2,outer-inner,capW);
+      ctx.fill();
+      ctx.restore();
+
+      // Capsule
+      ctx.save();
+      ctx.translate(cx+Math.cos(ang)*((inner+outer)/2), cy+Math.sin(ang)*((inner+outer)/2));
+      ctx.rotate(ang+Math.PI/2);
+      // Lume glow
+      ctx.shadowColor='rgba(200,232,96,.3)';
+      ctx.shadowBlur=12*dpr;
+      ctx.fillStyle=LUME;
+      roundRect(ctx,-capW,(outer-inner)/-2,capW*2,outer-inner,capW);
+      ctx.fill();
+      ctx.shadowBlur=0;
+      // Highlight
+      ctx.fillStyle='rgba(255,255,240,.25)';
+      roundRect(ctx,-capW*0.5,(outer-inner)/-2+2*dpr,capW,outer-inner-4*dpr,capW*0.5);
+      ctx.fill();
+      ctx.restore();
+    }else{
+      // Thin minute ticks
+      const inner=R-R*0.07;
+      const outer=R-R*0.03;
+      ctx.strokeStyle=LUME_DIM;
+      ctx.lineWidth=1.5*dpr;
+      ctx.lineCap='round';
+      ctx.beginPath();
+      ctx.moveTo(cx+Math.cos(ang)*inner,cy+Math.sin(ang)*inner);
+      ctx.lineTo(cx+Math.cos(ang)*outer,cy+Math.sin(ang)*outer);
+      ctx.stroke();
+    }
+  }
+}
+
+function roundRect(c,x,y,w,h,r){
+  c.beginPath();
+  c.moveTo(x+r,y);
+  c.lineTo(x+w-r,y);
+  c.quadraticCurveTo(x+w,y,x+w,y+r);
+  c.lineTo(x+w,y+h-r);
+  c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  c.lineTo(x+r,y+h);
+  c.quadraticCurveTo(x,y+h,x,y+h-r);
+  c.lineTo(x,y+r);
+  c.quadraticCurveTo(x,y,x+r,y);
+  c.closePath();
+}
+
+function drawNumerals(){
+  if(S.numerals==='none')return;
+  const showA=S.numerals==='arabic'||S.numerals==='both';
+  const showW=S.numerals==='western'||S.numerals==='both';
+
+  // Hour numerals
+  for(let i=0;i<12;i++){
+    const ang=(i/12)*Math.PI*2-Math.PI/2;
+
+    if(showA&&showW){
+      const rA=R-R*0.3;
+      const rW=R-R*0.42;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.font=`700 ${R*0.1}px Inter,system-ui,sans-serif`;
+      ctx.fillStyle=LUME;
+      ctx.shadowColor='rgba(200,232,96,.2)';ctx.shadowBlur=8*dpr;
+      ctx.fillText(ARABIC[i],cx+Math.cos(ang)*rA,cy+Math.sin(ang)*rA);
+      ctx.shadowBlur=0;
+      ctx.font=`400 ${R*0.05}px Inter,system-ui,sans-serif`;
+      ctx.fillStyle=LUME_DIM;
+      ctx.fillText(WESTERN[i],cx+Math.cos(ang)*rW,cy+Math.sin(ang)*rW);
+    }else{
+      const r=R-R*0.32;
+      const nums=showA?ARABIC:WESTERN;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.font=`700 ${R*0.11}px Inter,system-ui,sans-serif`;
+      ctx.fillStyle=LUME;
+      ctx.shadowColor='rgba(200,232,96,.25)';ctx.shadowBlur=10*dpr;
+      ctx.fillText(nums[i],cx+Math.cos(ang)*r,cy+Math.sin(ang)*r);
+      ctx.shadowBlur=0;
+    }
+  }
+
+  // Minute numerals (faint, outside)
+  for(let i=0;i<60;i+=5){
+    const ang=(i/60)*Math.PI*2-Math.PI/2;
+    const r=R+R*0.06;
+    const label=MIN_LABELS[i];
+    if(!label)continue;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.font=`500 ${R*0.045}px Inter,system-ui,sans-serif`;
+    ctx.fillStyle=MIN_NUM;
+    ctx.fillText(label,cx+Math.cos(ang)*r,cy+Math.sin(ang)*r);
+  }
+}
+
+function drawFastingArc(){
+  if(!PD)return;
+  const fajr=pM(PD.Fajr),mag=pM(PD.Maghrib),now=nM();
+  const startAng=((fajr%720)/720)*Math.PI*2-Math.PI/2;
+  const endAng=((mag%720)/720)*Math.PI*2-Math.PI/2;
+  const arcR=R+R*0.14;
+
+  // Background arc
+  ctx.strokeStyle='rgba(240,224,96,.1)';
+  ctx.lineWidth=4*dpr;
+  ctx.lineCap='round';
+  ctx.beginPath();ctx.arc(cx,cy,arcR,startAng,endAng);ctx.stroke();
+
+  // Progress
+  if(now>=fajr&&now<=mag){
+    const nowAng=((now%720)/720)*Math.PI*2-Math.PI/2;
+    ctx.strokeStyle='rgba(240,224,96,.3)';
+    ctx.lineWidth=4*dpr;
+    ctx.lineCap='round';
+    ctx.beginPath();ctx.arc(cx,cy,arcR,startAng,nowAng);ctx.stroke();
+
+    // Tip
+    ctx.fillStyle='#f0e060';
+    ctx.shadowColor='rgba(240,224,96,.4)';ctx.shadowBlur=10*dpr;
+    ctx.beginPath();ctx.arc(cx+Math.cos(nowAng)*arcR,cy+Math.sin(nowAng)*arcR,3.5*dpr,0,Math.PI*2);ctx.fill();
+    ctx.shadowBlur=0;
+  }
+}
+
+function drawPrayerMarkers(){
+  if(!PD)return;
+  PN.forEach(name=>{
+    const mins=pM(PD[name]);
+    const ang=((mins%720)/720)*Math.PI*2-Math.PI/2;
+    const r=R+R*0.14;
+    ctx.fillStyle=PC[name];
+    ctx.globalAlpha=0.6;
+    ctx.beginPath();
+    ctx.arc(cx+Math.cos(ang)*r,cy+Math.sin(ang)*r,2.5*dpr,0,Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha=1;
+  });
+}
+
+function drawHand(angle,length,width,taperTip,tail){
+  const tipX=cx+Math.cos(angle)*length;
+  const tipY=cy+Math.sin(angle)*length;
+  const tailX=tail?cx-Math.cos(angle)*tail:cx;
+  const tailY=tail?cy-Math.sin(angle)*tail:cy;
+  const perpX=Math.cos(angle+Math.PI/2);
+  const perpY=Math.sin(angle+Math.PI/2);
+
+  // Shadow
+  ctx.save();
+  ctx.translate(2*dpr,3*dpr);
+  ctx.fillStyle=HAND_SHADOW;
+  ctx.beginPath();
+  ctx.moveTo(tailX-perpX*width,tailY-perpY*width);
+  ctx.lineTo(tipX-perpX*taperTip,tipY-perpY*taperTip);
+  ctx.lineTo(tipX+perpX*taperTip,tipY+perpY*taperTip);
+  ctx.lineTo(tailX+perpX*width,tailY+perpY*width);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // Hand body
+  ctx.fillStyle=HAND_FILL;
+  ctx.strokeStyle=HAND_STROKE;
+  ctx.lineWidth=0.5*dpr;
+  ctx.beginPath();
+  ctx.moveTo(tailX-perpX*width,tailY-perpY*width);
+  ctx.lineTo(tipX-perpX*taperTip,tipY-perpY*taperTip);
+  ctx.lineTo(tipX+perpX*taperTip,tipY+perpY*taperTip);
+  ctx.lineTo(tailX+perpX*width,tailY+perpY*width);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Lume strip (center line)
+  ctx.strokeStyle=LUME;
+  ctx.lineWidth=width*0.6;
+  ctx.lineCap='round';
+  ctx.shadowColor='rgba(200,232,96,.2)';ctx.shadowBlur=6*dpr;
+  ctx.beginPath();
+  ctx.moveTo(tailX+Math.cos(angle)*width*2,tailY+Math.sin(angle)*width*2);
+  ctx.lineTo(tipX-Math.cos(angle)*taperTip*4,tipY-Math.sin(angle)*taperTip*4);
+  ctx.stroke();
+  ctx.shadowBlur=0;
+}
+
+function drawHands(){
+  const now=new Date();
+  const h=now.getHours()%12,m=now.getMinutes(),s=now.getSeconds(),ms=now.getMilliseconds();
+  const sec=s+ms/1000;
+  const min=m+sec/60;
+  const hour=h+min/60;
+
+  const hourAng=(hour/12)*Math.PI*2-Math.PI/2;
+  const minAng=(min/60)*Math.PI*2-Math.PI/2;
+  const secAng=(sec/60)*Math.PI*2-Math.PI/2;
+
+  // Hour
+  drawHand(hourAng, R*0.52, R*0.028, R*0.008, R*0.06);
+  // Minute
+  drawHand(minAng, R*0.72, R*0.022, R*0.005, R*0.08);
+
+  // Second hand — thin, no taper
+  const secLen=R*0.78;
+  const secTailLen=R*0.18;
+  // Shadow
+  ctx.save();
+  ctx.translate(1*dpr,2*dpr);
+  ctx.strokeStyle=HAND_SHADOW;
+  ctx.lineWidth=1.5*dpr;
+  ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.moveTo(cx-Math.cos(secAng)*secTailLen,cy-Math.sin(secAng)*secTailLen);
+  ctx.lineTo(cx+Math.cos(secAng)*secLen,cy+Math.sin(secAng)*secLen);
+  ctx.stroke();
+  ctx.restore();
+  // Hand
+  ctx.strokeStyle=HAND_STROKE;
+  ctx.lineWidth=1.5*dpr;
+  ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.moveTo(cx-Math.cos(secAng)*secTailLen,cy-Math.sin(secAng)*secTailLen);
+  ctx.lineTo(cx+Math.cos(secAng)*secLen,cy+Math.sin(secAng)*secLen);
+  ctx.stroke();
+
+  // Center cap
+  ctx.save();
+  ctx.shadowColor=HAND_SHADOW;ctx.shadowBlur=8*dpr;ctx.shadowOffsetY=3*dpr;
+  ctx.fillStyle='#e8e4d8';
+  ctx.beginPath();ctx.arc(cx,cy,R*0.035,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+  ctx.fillStyle='#444';
+  ctx.beginPath();ctx.arc(cx,cy,R*0.012,0,Math.PI*2);ctx.fill();
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  drawFace();
+  drawFastingArc();
+  drawPrayerMarkers();
+  drawIndices();
+  drawNumerals();
+  drawHands();
+  requestAnimationFrame(draw);
+}
+
+// ── Init ──
+fetchPrayer();
+setInterval(fetchPrayer,30*60*1000);
+setInterval(updateInfo,1000);
+draw();
+</script>
+</body>
+</html>

@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Suhoor to Iftar</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg: #0a0a0c;
+  --face: #111114;
+  --face-border: #1a1a20;
+  --tick: #2a2a34;
+  --tick-hour: #4a4a56;
+  --hand-hour: #e8e8ed;
+  --hand-min: #e8e8ed;
+  --hand-sec: #f59e0b;
+  --text: #e8e8ed;
+  --text-sec: #6b7280;
+  --text-muted: #3a3a44;
+  --gold: #f59e0b;
+  --gold-dim: rgba(245,158,11,.15);
+  --emerald: #34d399;
+  --emerald-dim: rgba(52,211,153,.12);
+  --purple: #a78bfa;
+  --cyan: #22d3ee;
+  --fajr: #4a6fa5;
+  --sunrise: #e8a87c;
+  --dhuhr: #f5d68e;
+  --asr: #e8a87c;
+  --maghrib: #d4614e;
+  --isha: #6366f1;
+  --fast-start: rgba(74,111,165,.4);
+  --fast-end: rgba(212,97,78,.4);
+  --arc-width: 8;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-font-smoothing: antialiased;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.clock-wrap {
+  position: relative;
+  width: min(80vmin, 500px);
+  height: min(80vmin, 500px);
+}
+
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.info-bar {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.hijri-date {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gold);
+  letter-spacing: .04em;
+}
+
+.gregorian-date {
+  font-size: 11px;
+  color: var(--text-sec);
+}
+
+.fasting-status {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  margin-top: 4px;
+}
+
+.fasting-status .time-left {
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.prayer-times {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.prayer-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--text-sec);
+  padding: 4px 10px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 20px;
+}
+
+.prayer-pill .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.prayer-pill .ptime {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.prayer-pill.active {
+  border-color: var(--gold);
+  background: var(--gold-dim);
+}
+
+.prayer-pill.next {
+  border-color: var(--emerald);
+  background: var(--emerald-dim);
+}
+
+.location-bar {
+  font-size: 10px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.location-bar:hover { color: var(--text-sec); }
+
+.ramadan-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  margin-bottom: 4px;
+}
+
+/* Settings overlay */
+.settings-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.7);
+  backdrop-filter: blur(8px);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+.settings-overlay.open { display: flex; }
+.settings-card {
+  background: #14141a;
+  border: 1px solid #1e1e28;
+  border-radius: 16px;
+  padding: 28px;
+  width: min(90vw, 360px);
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.settings-card h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--gold);
+}
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.setting-row:last-child { border-bottom: none; }
+.setting-label { font-size: 12px; color: var(--text-sec); }
+.setting-value {
+  font-size: 12px;
+  color: var(--text);
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+select.setting-value {
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255,255,255,.05) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E") no-repeat right 8px center;
+  padding-right: 24px;
+}
+input.setting-value {
+  width: 140px;
+  border: 1px solid rgba(255,255,255,.08);
+  color: var(--text);
+}
+.settings-close {
+  margin-top: 16px;
+  width: 100%;
+  padding: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--gold-dim);
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  color: var(--gold);
+  cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="ramadan-label" id="ramadanLabel"></div>
+  <div class="clock-wrap">
+    <canvas id="clock"></canvas>
+  </div>
+  <div class="info-bar">
+    <div class="hijri-date" id="hijriDate"></div>
+    <div class="gregorian-date" id="gregDate"></div>
+    <div class="fasting-status" id="fastingStatus"></div>
+    <div class="prayer-times" id="prayerTimes"></div>
+    <div class="location-bar" id="locationBar" onclick="openSettings()">
+      <span id="locationText">📍 Loading location…</span>
+      <span style="font-size:9px;">⚙️</span>
+    </div>
+  </div>
+</div>
+
+<div class="settings-overlay" id="settingsOverlay" onclick="if(event.target===this)closeSettings()">
+  <div class="settings-card">
+    <h3>☪ Settings</h3>
+    <div class="setting-row">
+      <span class="setting-label">City</span>
+      <input class="setting-value" id="setCity" value="Los Angeles" placeholder="City name">
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">Country</span>
+      <input class="setting-value" id="setCountry" value="US" placeholder="Country code">
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">Calculation Method</span>
+      <select class="setting-value" id="setMethod">
+        <option value="2" selected>ISNA</option>
+        <option value="1">University of Islamic Sciences, Karachi</option>
+        <option value="3">Muslim World League</option>
+        <option value="4">Umm Al-Qura University, Makkah</option>
+        <option value="5">Egyptian General Authority</option>
+        <option value="7">Institute of Geophysics, Tehran</option>
+        <option value="8">Gulf Region</option>
+        <option value="9">Kuwait</option>
+        <option value="10">Qatar</option>
+        <option value="11">Majlis Ugama Islam Singapura</option>
+        <option value="12">UOIF (France)</option>
+        <option value="13">DIHYA (Turkey)</option>
+        <option value="14">Spiritual Administration of Muslims of Russia</option>
+        <option value="15">Moonsighting Committee</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">Dial Numerals</span>
+      <select class="setting-value" id="setNumerals">
+        <option value="none">None (ticks only)</option>
+        <option value="western">Western (1–12)</option>
+        <option value="arabic" selected>Arabic-Indic (١–١٢)</option>
+        <option value="both">Both</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">Clock Style</span>
+      <select class="setting-value" id="setStyle">
+        <option value="dark" selected>Dark</option>
+        <option value="light">Light</option>
+        <option value="midnight">Midnight</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">Smooth Seconds</span>
+      <select class="setting-value" id="setSmoothSec">
+        <option value="true" selected>Smooth</option>
+        <option value="false">Tick</option>
+      </select>
+    </div>
+    <button class="settings-close" onclick="saveSettings()">Save & Refresh</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('clock');
+const ctx = canvas.getContext('2d');
+
+// State
+let prayerData = null;
+let dateData = null;
+let settings = loadSettings();
+let dpr = window.devicePixelRatio || 1;
+let size, cx, cy, radius;
+
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('ramadan-clock-settings') || '{}');
+    return {
+      city: s.city || 'Los Angeles',
+      country: s.country || 'US',
+      method: s.method || '2',
+      style: s.style || 'dark',
+      numerals: s.numerals || 'arabic',
+      smoothSec: s.smoothSec !== false
+    };
+  } catch(e) {
+    return { city:'Los Angeles', country:'US', method:'2', style:'dark', numerals:'arabic', smoothSec:true };
+  }
+}
+
+function openSettings() {
+  document.getElementById('setCity').value = settings.city;
+  document.getElementById('setCountry').value = settings.country;
+  document.getElementById('setMethod').value = settings.method;
+  document.getElementById('setNumerals').value = settings.numerals;
+  document.getElementById('setStyle').value = settings.style;
+  document.getElementById('setSmoothSec').value = String(settings.smoothSec);
+  document.getElementById('settingsOverlay').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settingsOverlay').classList.remove('open');
+}
+
+function saveSettings() {
+  settings.city = document.getElementById('setCity').value.trim() || 'Los Angeles';
+  settings.country = document.getElementById('setCountry').value.trim() || 'US';
+  settings.method = document.getElementById('setMethod').value;
+  settings.numerals = document.getElementById('setNumerals').value;
+  settings.style = document.getElementById('setStyle').value;
+  settings.smoothSec = document.getElementById('setSmoothSec').value === 'true';
+  localStorage.setItem('ramadan-clock-settings', JSON.stringify(settings));
+  closeSettings();
+  fetchPrayerTimes();
+}
+
+// Resize
+function resize() {
+  const wrap = canvas.parentElement;
+  const w = wrap.clientWidth;
+  const h = wrap.clientHeight;
+  const s = Math.min(w, h);
+  canvas.width = s * dpr;
+  canvas.height = s * dpr;
+  canvas.style.width = s + 'px';
+  canvas.style.height = s + 'px';
+  size = s * dpr;
+  cx = size / 2;
+  cy = size / 2;
+  radius = size * 0.44;
+}
+
+// Parse HH:MM to minutes since midnight
+function parseTime(str) {
+  if (!str) return 0;
+  const [h, m] = str.split(':').map(Number);
+  return h * 60 + m;
+}
+
+// Minutes since midnight for current time
+function nowMinutes() {
+  const d = new Date();
+  return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
+}
+
+// Angle for a time on a 12h clock face (0 = top, clockwise)
+function timeToAngle12(minutes) {
+  // 12 hours = 720 minutes = full circle
+  return ((minutes % 720) / 720) * Math.PI * 2 - Math.PI / 2;
+}
+
+// Angle for a time on a 24h position on the clock (mapped to 12h dial, wraps twice)
+function timeToAngle24(minutes) {
+  return ((minutes % 720) / 720) * Math.PI * 2 - Math.PI / 2;
+}
+
+// Prayer time colors
+const prayerColors = {
+  Fajr: '#4a6fa5',
+  Sunrise: '#e8a87c',
+  Dhuhr: '#f5d68e',
+  Asr: '#e8a87c',
+  Maghrib: '#d4614e',
+  Isha: '#6366f1'
+};
+
+const prayerNames = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+
+async function fetchPrayerTimes() {
+  try {
+    const url = `https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(settings.city)}&country=${encodeURIComponent(settings.country)}&method=${settings.method}`;
+    const res = await fetch(url);
+    const json = await res.json();
+    if (json.code === 200) {
+      prayerData = json.data.timings;
+      dateData = json.data.date;
+      updateInfoBar();
+    }
+  } catch(e) {
+    console.error('Prayer times fetch failed:', e);
+    document.getElementById('locationText').textContent = '📍 Failed to load — tap to retry';
+  }
+}
+
+function updateInfoBar() {
+  if (!dateData) return;
+  const h = dateData.hijri;
+  const g = dateData.gregorian;
+  
+  document.getElementById('hijriDate').textContent = `${h.day} ${h.month.en} ${h.year} AH`;
+  document.getElementById('gregDate').textContent = `${g.weekday.en}, ${g.day} ${g.month.en} ${g.year}`;
+  document.getElementById('locationText').textContent = `📍 ${settings.city}, ${settings.country} · ${getMethodName(settings.method)}`;
+  
+  // Ramadan check (Hijri month 9)
+  const label = document.getElementById('ramadanLabel');
+  if (h.month.number === 9) {
+    label.textContent = `RAMADAN · DAY ${h.day}`;
+  } else if (h.month.number === 8) {
+    const daysLeft = (h.month.days || 30) - parseInt(h.day);
+    if (daysLeft <= 15) {
+      label.textContent = `${daysLeft} DAYS TO RAMADAN`;
+    } else {
+      label.textContent = `SHA'BĀN ${h.day}`;
+    }
+  } else {
+    label.textContent = '';
+  }
+  
+  // Prayer time pills
+  const now = nowMinutes();
+  const prayers = prayerNames.map(name => ({
+    name,
+    time: parseTime(prayerData[name]),
+    color: prayerColors[name]
+  }));
+  
+  // Find current and next prayer
+  let nextIdx = prayers.findIndex(p => p.time > now);
+  if (nextIdx === -1) nextIdx = 0; // after isha, next is fajr tomorrow
+  let currentIdx = nextIdx - 1;
+  if (currentIdx < 0) currentIdx = prayers.length - 1;
+  
+  const pillsHtml = prayers.map((p, i) => {
+    const cls = i === currentIdx ? 'active' : (i === nextIdx ? 'next' : '');
+    const h = Math.floor(p.time / 60);
+    const m = p.time % 60;
+    const ampm = h >= 12 ? 'pm' : 'am';
+    const h12 = h % 12 || 12;
+    return `<div class="prayer-pill ${cls}">
+      <span class="dot" style="background:${p.color}"></span>
+      <span>${p.name}</span>
+      <span class="ptime">${h12}:${String(Math.floor(m)).padStart(2,'0')}${ampm}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('prayerTimes').innerHTML = pillsHtml;
+  
+  // Fasting status
+  const fajr = parseTime(prayerData.Fajr);
+  const maghrib = parseTime(prayerData.Maghrib);
+  const statusEl = document.getElementById('fastingStatus');
+  
+  if (h.month.number === 9) {
+    // During Ramadan
+    if (now >= fajr && now < maghrib) {
+      const left = maghrib - now;
+      const lh = Math.floor(left / 60);
+      const lm = Math.floor(left % 60);
+      statusEl.innerHTML = `Fasting · <span class="time-left">${lh}h ${lm}m until Iftar</span>`;
+    } else if (now < fajr) {
+      const left = fajr - now;
+      const lh = Math.floor(left / 60);
+      const lm = Math.floor(left % 60);
+      statusEl.innerHTML = `Suhoor · <span class="time-left">${lh}h ${lm}m until Fajr</span>`;
+    } else {
+      statusEl.innerHTML = `<span style="color:var(--gold)">Iftar Mubarak ☪</span>`;
+    }
+  } else {
+    const daysToRamadan = h.month.number === 8 ? (h.month.days || 30) - parseInt(h.day) : '';
+    if (daysToRamadan !== '' && daysToRamadan <= 15) {
+      statusEl.innerHTML = `Fajr <span class="time-left">${formatTime12(fajr)}</span> · Maghrib <span class="time-left">${formatTime12(maghrib)}</span>`;
+    } else {
+      statusEl.innerHTML = `Fajr <span class="time-left">${formatTime12(fajr)}</span> · Maghrib <span class="time-left">${formatTime12(maghrib)}</span>`;
+    }
+  }
+}
+
+function formatTime12(mins) {
+  const h = Math.floor(mins / 60);
+  const m = Math.floor(mins % 60);
+  const ampm = h >= 12 ? 'pm' : 'am';
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')}${ampm}`;
+}
+
+function getMethodName(id) {
+  const names = {
+    '1': 'Karachi', '2': 'ISNA', '3': 'MWL', '4': 'Umm Al-Qura',
+    '5': 'Egyptian', '7': 'Tehran', '8': 'Gulf', '9': 'Kuwait',
+    '10': 'Qatar', '11': 'Singapore', '12': 'UOIF', '13': 'Turkey',
+    '14': 'Russia', '15': 'Moonsighting'
+  };
+  return names[id] || 'ISNA';
+}
+
+// ── Drawing ──
+
+function drawFace() {
+  // Outer bezel shadow (3D raised effect)
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,.6)';
+  ctx.shadowBlur = 30 * dpr;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 8 * dpr;
+  ctx.fillStyle = '#111114';
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius + 20 * dpr, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Bezel ring — subtle metallic gradient
+  const bezelGrad = ctx.createLinearGradient(cx, cy - radius - 20 * dpr, cx, cy + radius + 20 * dpr);
+  bezelGrad.addColorStop(0, '#2a2a34');
+  bezelGrad.addColorStop(0.3, '#1e1e26');
+  bezelGrad.addColorStop(0.7, '#141418');
+  bezelGrad.addColorStop(1, '#1a1a22');
+  ctx.strokeStyle = bezelGrad;
+  ctx.lineWidth = 3 * dpr;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius + 18 * dpr, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Inner bezel highlight (top-light illusion)
+  ctx.strokeStyle = 'rgba(255,255,255,.03)';
+  ctx.lineWidth = 1 * dpr;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius + 16 * dpr, -Math.PI * 0.8, -Math.PI * 0.2);
+  ctx.stroke();
+
+  // Face — radial gradient with off-center highlight for 3D dome
+  const faceGrad = ctx.createRadialGradient(cx - radius * 0.15, cy - radius * 0.2, 0, cx, cy, radius);
+  faceGrad.addColorStop(0, '#1a1a20');
+  faceGrad.addColorStop(0.5, '#141418');
+  faceGrad.addColorStop(1, '#0c0c10');
+  ctx.fillStyle = faceGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Subtle inner shadow ring (recessed face)
+  const innerShadow = ctx.createRadialGradient(cx, cy, radius - 4 * dpr, cx, cy, radius);
+  innerShadow.addColorStop(0, 'rgba(0,0,0,0)');
+  innerShadow.addColorStop(1, 'rgba(0,0,0,.3)');
+  ctx.fillStyle = innerShadow;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawTicks() {
+  for (let i = 0; i < 60; i++) {
+    const angle = (i / 60) * Math.PI * 2 - Math.PI / 2;
+    const isHour = i % 5 === 0;
+    const inner = radius - (isHour ? 22 : 12) * dpr;
+    const outer = radius - 4 * dpr;
+    const w = (isHour ? 2.5 : 1) * dpr;
+
+    // Shadow pass (offset down-right for 3D)
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,0,0,.4)';
+    ctx.lineWidth = w;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(angle) * inner + 1 * dpr, cy + Math.sin(angle) * inner + 1.5 * dpr);
+    ctx.lineTo(cx + Math.cos(angle) * outer + 1 * dpr, cy + Math.sin(angle) * outer + 1.5 * dpr);
+    ctx.stroke();
+    ctx.restore();
+
+    // Main tick
+    ctx.strokeStyle = isHour ? '#5a5a68' : '#2a2a34';
+    ctx.lineWidth = w;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(angle) * inner, cy + Math.sin(angle) * inner);
+    ctx.lineTo(cx + Math.cos(angle) * outer, cy + Math.sin(angle) * outer);
+    ctx.stroke();
+
+    // Highlight pass on hour ticks (top-left edge)
+    if (isHour) {
+      ctx.strokeStyle = 'rgba(255,255,255,.06)';
+      ctx.lineWidth = 1 * dpr;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(angle) * inner - 0.5 * dpr, cy + Math.sin(angle) * inner - 0.5 * dpr);
+      ctx.lineTo(cx + Math.cos(angle) * outer - 0.5 * dpr, cy + Math.sin(angle) * outer - 0.5 * dpr);
+      ctx.stroke();
+    }
+  }
+}
+
+const ARABIC_NUMS = ['١٢','١','٢','٣','٤','٥','٦','٧','٨','٩','١٠','١١'];
+const WESTERN_NUMS = ['12','1','2','3','4','5','6','7','8','9','10','11'];
+
+function drawNumerals() {
+  if (settings.numerals === 'none') return;
+  
+  const showArabic = settings.numerals === 'arabic' || settings.numerals === 'both';
+  const showWestern = settings.numerals === 'western' || settings.numerals === 'both';
+  
+  for (let i = 0; i < 12; i++) {
+    const angle = (i / 12) * Math.PI * 2 - Math.PI / 2;
+    
+    if (showArabic && showWestern) {
+      // Both: Arabic outer, Western inner
+      const rOuter = radius - 38 * dpr;
+      const rInner = radius - 54 * dpr;
+      const xO = cx + Math.cos(angle) * rOuter;
+      const yO = cy + Math.sin(angle) * rOuter;
+      const xI = cx + Math.cos(angle) * rInner;
+      const yI = cy + Math.sin(angle) * rInner;
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Arabic shadow + text
+      ctx.font = `500 ${13 * dpr}px 'Inter', system-ui, sans-serif`;
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      ctx.fillText(ARABIC_NUMS[i], xO + 1 * dpr, yO + 1.5 * dpr);
+      ctx.fillStyle = '#e8e8ed';
+      ctx.fillText(ARABIC_NUMS[i], xO, yO);
+
+      // Western dim
+      ctx.font = `400 ${9 * dpr}px 'Inter', system-ui, sans-serif`;
+      ctx.fillStyle = '#4a4a56';
+      ctx.fillText(WESTERN_NUMS[i], xI, yI);
+    } else {
+      const r = radius - 42 * dpr;
+      const nums = showArabic ? ARABIC_NUMS : WESTERN_NUMS;
+      const x = cx + Math.cos(angle) * r;
+      const y = cy + Math.sin(angle) * r;
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `500 ${14 * dpr}px 'Inter', system-ui, sans-serif`;
+
+      // Shadow
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      ctx.fillText(nums[i], x + 1 * dpr, y + 1.5 * dpr);
+      // Text
+      ctx.fillStyle = '#c8c8d0';
+      ctx.fillText(nums[i], x, y);
+    }
+  }
+}
+
+function drawPrayerMarkers() {
+  if (!prayerData) return;
+  
+  prayerNames.forEach(name => {
+    const mins = parseTime(prayerData[name]);
+    const angle = timeToAngle12(mins);
+    const color = prayerColors[name];
+    const r = radius + 10 * dpr;
+    
+    // Small diamond marker outside the face
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + Math.sin(angle) * r;
+    const s = 3.5 * dpr;
+    
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(x, y - s);
+    ctx.lineTo(x + s * 0.7, y);
+    ctx.lineTo(x, y + s);
+    ctx.lineTo(x - s * 0.7, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  });
+}
+
+function drawFastingArc() {
+  if (!prayerData) return;
+  
+  const fajr = parseTime(prayerData.Fajr);
+  const maghrib = parseTime(prayerData.Maghrib);
+  const now = nowMinutes();
+  
+  const startAngle = timeToAngle12(fajr);
+  const endAngle = timeToAngle12(maghrib);
+  const arcR = radius - 30 * dpr;
+  const lineW = 6 * dpr;
+  
+  // Background arc (full fasting window, dim)
+  ctx.strokeStyle = 'rgba(245,158,11,.08)';
+  ctx.lineWidth = lineW;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(cx, cy, arcR, startAngle, endAngle);
+  ctx.stroke();
+  
+  // Progress arc (how far through the fast)
+  if (now >= fajr && now <= maghrib) {
+    const progressAngle = timeToAngle12(now);
+    const gradient = ctx.createConicGradient(startAngle, cx, cy);
+    
+    // Use solid color for progress
+    ctx.strokeStyle = 'rgba(245,158,11,.35)';
+    ctx.lineWidth = lineW;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(cx, cy, arcR, startAngle, progressAngle);
+    ctx.stroke();
+    
+    // Bright tip at current position
+    const tipX = cx + Math.cos(progressAngle) * arcR;
+    const tipY = cy + Math.sin(progressAngle) * arcR;
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, 4 * dpr, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Glow
+    ctx.fillStyle = 'rgba(245,158,11,.2)';
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, 8 * dpr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  // Fajr marker (start of fast)
+  const fajrX = cx + Math.cos(startAngle) * arcR;
+  const fajrY = cy + Math.sin(startAngle) * arcR;
+  ctx.fillStyle = '#4a6fa5';
+  ctx.beginPath();
+  ctx.arc(fajrX, fajrY, 3 * dpr, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Maghrib marker (end of fast / iftar)
+  const magX = cx + Math.cos(endAngle) * arcR;
+  const magY = cy + Math.sin(endAngle) * arcR;
+  ctx.fillStyle = '#d4614e';
+  ctx.beginPath();
+  ctx.arc(magX, magY, 3 * dpr, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawHands() {
+  const now = new Date();
+  const h = now.getHours() % 12;
+  const m = now.getMinutes();
+  const s = now.getSeconds();
+  const ms = now.getMilliseconds();
+  
+  const secTotal = settings.smoothSec ? s + ms / 1000 : s;
+  const minTotal = m + secTotal / 60;
+  const hourTotal = h + minTotal / 60;
+  
+  // Hour hand
+  const hourAngle = (hourTotal / 12) * Math.PI * 2 - Math.PI / 2;
+  drawHand(hourAngle, radius * 0.5, 3.5 * dpr, '#e8e8ed');
+  
+  // Minute hand
+  const minAngle = (minTotal / 60) * Math.PI * 2 - Math.PI / 2;
+  drawHand(minAngle, radius * 0.72, 2.5 * dpr, '#e8e8ed');
+  
+  // Second hand
+  const secAngle = (secTotal / 60) * Math.PI * 2 - Math.PI / 2;
+  drawHand(secAngle, radius * 0.78, 1.2 * dpr, '#f59e0b', radius * 0.15);
+  
+  // Center dot shadow
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,.5)';
+  ctx.beginPath();
+  ctx.arc(cx + 1.5 * dpr, cy + 2 * dpr, 5.5 * dpr, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Center dot — raised metallic
+  const dotGrad = ctx.createRadialGradient(cx - 1 * dpr, cy - 1 * dpr, 0, cx, cy, 5 * dpr);
+  dotGrad.addColorStop(0, '#fbbf24');
+  dotGrad.addColorStop(0.6, '#f59e0b');
+  dotGrad.addColorStop(1, '#b45309');
+  ctx.fillStyle = dotGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4.5 * dpr, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Center pin highlight
+  ctx.fillStyle = 'rgba(255,255,255,.2)';
+  ctx.beginPath();
+  ctx.arc(cx - 1 * dpr, cy - 1 * dpr, 1.5 * dpr, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawHand(angle, length, width, color, tail) {
+  const startX = tail ? cx - Math.cos(angle) * tail : cx;
+  const startY = tail ? cy - Math.sin(angle) * tail : cy;
+  const endX = cx + Math.cos(angle) * length;
+  const endY = cy + Math.sin(angle) * length;
+
+  // Shadow
+  ctx.save();
+  ctx.strokeStyle = 'rgba(0,0,0,.45)';
+  ctx.lineWidth = width + 1 * dpr;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(startX + 2 * dpr, startY + 3 * dpr);
+  ctx.lineTo(endX + 2 * dpr, endY + 3 * dpr);
+  ctx.stroke();
+  ctx.restore();
+
+  // Main hand
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.lineTo(endX, endY);
+  ctx.stroke();
+
+  // Highlight edge (subtle top-light)
+  ctx.strokeStyle = 'rgba(255,255,255,.08)';
+  ctx.lineWidth = 0.5 * dpr;
+  ctx.beginPath();
+  ctx.moveTo(startX - 0.5 * dpr, startY - 0.5 * dpr);
+  ctx.lineTo(endX - 0.5 * dpr, endY - 0.5 * dpr);
+  ctx.stroke();
+}
+
+function drawCrescentWatermark() {
+  // Subtle crescent in center
+  const r = radius * 0.12;
+  const offset = r * 0.35;
+  ctx.globalAlpha = 0.04;
+  ctx.fillStyle = '#f59e0b';
+  ctx.beginPath();
+  ctx.arc(cx, cy - radius * 0.15, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#0e0e12';
+  ctx.beginPath();
+  ctx.arc(cx + offset, cy - radius * 0.15 - offset * 0.3, r * 0.85, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, size, size);
+  drawFace();
+  drawCrescentWatermark();
+  drawFastingArc();
+  drawTicks();
+  drawNumerals();
+  drawPrayerMarkers();
+  drawHands();
+  
+  // Update status every second
+  if (prayerData && Date.now() % 1000 < 20) {
+    updateInfoBar();
+  }
+  
+  requestAnimationFrame(draw);
+}
+
+// ── Init ──
+resize();
+fetchPrayerTimes();
+// Refresh prayer times every 30 minutes
+setInterval(fetchPrayerTimes, 30 * 60 * 1000);
+// Refresh info bar every second
+setInterval(updateInfoBar, 1000);
+draw();
+
+window.addEventListener('resize', () => {
+  dpr = window.devicePixelRatio || 1;
+  resize();
+});
+
+// Keyboard: Escape closes settings
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeSettings();
+});
+</script>
+</body>
+</html>

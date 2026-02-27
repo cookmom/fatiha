@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>kitchen — node editor</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f0f11; overflow: hidden; font-family: 'Inter', system-ui, sans-serif; color: #e0e0e0; }
+  canvas { display: block; cursor: grab; }
+  canvas.dragging { cursor: grabbing; }
+  canvas.connecting { cursor: crosshair; }
+
+  /* Floating toolbar */
+  #toolbar {
+    position: fixed; top: 16px; left: 16px; z-index: 10;
+    display: flex; gap: 6px; padding: 8px 10px;
+    background: #1a1a1eee; border: 1px solid #2a2a30; border-radius: 10px;
+    backdrop-filter: blur(8px);
+  }
+  #toolbar button {
+    background: #222228; border: 1px solid #2a2a30; border-radius: 6px;
+    color: #ccc; font-family: inherit; font-size: 11px; padding: 6px 12px;
+    cursor: pointer; transition: background .15s, border-color .15s;
+  }
+  #toolbar button:hover { background: #2a2a30; border-color: #6366f1; color: #fff; }
+
+  /* Dropdown overlays for node selectors */
+  .node-select {
+    position: fixed; z-index: 20;
+    background: #222228; border: 1px solid #2a2a30; border-radius: 6px;
+    font-family: inherit; font-size: 12px; color: #e0e0e0;
+    padding: 4px; outline: none; cursor: pointer;
+    -webkit-appearance: none;
+  }
+  .node-select option { background: #222228; color: #e0e0e0; }
+
+  /* Generate button overlay */
+  .gen-btn {
+    position: fixed; z-index: 20;
+    background: #6366f1; border: none; border-radius: 5px;
+    color: #fff; font-family: inherit; font-size: 11px; font-weight: 600;
+    padding: 5px 14px; cursor: pointer; transition: background .15s;
+  }
+  .gen-btn:hover { background: #818cf8; }
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <button onclick="addNode('inspo')">+ Inspo</button>
+  <button onclick="addNode('algo')">+ Algo</button>
+  <button onclick="addNode('concept')">+ Concept</button>
+  <button onclick="addNode('merge')">+ Merge</button>
+  <button onclick="addNode('preview')">+ Preview</button>
+</div>
+<canvas id="c"></canvas>
+<script>
+// ============================================================
+// kitchen node editor — vanilla JS + Canvas
+// ============================================================
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// --- Constants ---
+const GRID_SIZE = 20;
+const PORT_RADIUS = 5;
+const PORT_HIT = 10;
+const NODE_W = 200;
+const TITLE_H = 28;
+const PORT_COLORS = { theme: '#f59e0b', code: '#10b981', concept: '#6366f1', prompt: '#6366f1', text: '#6366f1' };
+
+// --- Data lists ---
+const INSPO_LIST = ['Klimt Gold Leaf', 'Brutalist Architecture', 'Bioluminescent Deep Sea', 'Wabi-Sabi Ceramics', 'Solarpunk Utopia'];
+const ALGO_LIST = ['Perlin Flow', 'L-Systems', 'Game of Life', 'Boids', 'Girih'];
+const CONCEPT_LIST = ['Emergence from Chaos', 'Layered Time', 'Digital Patina', 'Symbiotic Growth', 'Entropy Garden'];
+
+// --- State ---
+let cam = { x: 0, y: 0, zoom: 1 };
+let nodes = [];
+let connections = [];
+let nextId = 1;
+
+// Interaction state
+let dragging = null;       // { node, ox, oy }
+let panning = false;
+let panStart = { x: 0, y: 0 };
+let connecting = null;     // { node, port, isOutput }
+let selectedNode = null;
+let hoveredPort = null;
+
+// DOM overlays we manage
+let overlays = [];
+
+// --- Resize ---
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  draw();
+}
+window.addEventListener('resize', resize);
+
+// --- Coordinate transforms ---
+function screenToWorld(sx, sy) {
+  return { x: (sx - cam.x) / cam.zoom, y: (sy - cam.y) / cam.zoom };
+}
+function worldToScreen(wx, wy) {
+  return { x: wx * cam.zoom + cam.x, y: wy * cam.zoom + cam.y };
+}
+
+// --- Node factory ---
+function createNode(type, x, y) {
+  const id = nextId++;
+  const base = { id, type, x, y, w: NODE_W, inputs: [], outputs: [], data: {} };
+  switch (type) {
+    case 'inspo':
+      base.title = 'Inspo';
+      base.outputs = [{ name: 'theme', type: 'theme' }];
+      base.data.selected = 0;
+      base.data.list = INSPO_LIST;
+      base.h = TITLE_H + 48;
+      break;
+    case 'algo':
+      base.title = 'Algo';
+      base.outputs = [{ name: 'code', type: 'code' }];
+      base.data.selected = 0;
+      base.data.list = ALGO_LIST;
+      base.h = TITLE_H + 48;
+      break;
+    case 'concept':
+      base.title = 'Concept';
+      base.outputs = [{ name: 'concept', type: 'concept' }];
+      base.data.selected = 0;
+      base.data.list = CONCEPT_LIST;
+      base.h = TITLE_H + 48;
+      break;
+    case 'merge':
+      base.title = 'Merge';
+      base.inputs = [{ name: 'theme', type: 'theme' }, { name: 'code', type: 'code' }, { name: 'concept', type: 'concept' }];
+      base.outputs = [{ name: 'prompt', type: 'prompt' }];
+      base.h = TITLE_H + 100;
+      base.w = 280;
+      break;
+    case 'preview':
+      base.title = 'Preview';
+      base.inputs = [{ name: 'prompt', type: 'prompt' }];
+      base.h = TITLE_H + 120;
+      base.w = 280;
+      break;
+  }
+  return base;
+}
+
+// --- Port positions (world coords) ---
+function getPortPos(node, portIdx, isOutput) {
+  const ports = isOutput ? node.outputs : node.inputs;
+  const count = ports.length;
+  const bodyH = node.h - TITLE_H;
+  const spacing = bodyH / (count + 1);
+  const px = isOutput ? node.x + node.w : node.x;
+  const py = node.y + TITLE_H + spacing * (portIdx + 1);
+  return { x: px, y: py };
+}
+
+// --- Propagate values through connections ---
+function propagate() {
+  // Gather outputs from source nodes
+  nodes.forEach(n => {
+    if (n.data.list) {
+      const val = n.data.list[n.data.selected];
+      n.outputs[0].value = val;
+    }
+  });
+  // Simple multi-pass (good enough for DAGs)
+  for (let pass = 0; pass < 5; pass++) {
+    connections.forEach(c => {
+      const srcPort = c.from.node.outputs[c.from.portIdx];
+      const dstPort = c.to.node.inputs[c.to.portIdx];
+      if (srcPort && srcPort.value !== undefined) dstPort.value = srcPort.value;
+    });
+    // Merge node
+    nodes.filter(n => n.type === 'merge').forEach(n => {
+      const theme = (n.inputs[0].value || '???');
+      const code = (n.inputs[1].value || '???');
+      const concept = (n.inputs[2].value || '???');
+      n.data.prompt = `${theme} + ${code} → ${concept}`;
+      n.outputs[0].value = n.data.prompt;
+    });
+    // Preview node
+    nodes.filter(n => n.type === 'preview').forEach(n => {
+      n.data.prompt = n.inputs[0].value || '';
+    });
+  }
+}
+
+// --- Drawing ---
+function draw() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0f0f11';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid dots
+  const gs = GRID_SIZE * cam.zoom;
+  if (gs > 4) {
+    ctx.fillStyle = '#1a1a1e';
+    const offX = cam.x % gs, offY = cam.y % gs;
+    for (let x = offX; x < W; x += gs)
+      for (let y = offY; y < H; y += gs) {
+        ctx.fillRect(x - 1, y - 1, 2, 2);
+      }
+  }
+
+  propagate();
+
+  // Draw connections
+  connections.forEach(c => {
+    const p1 = getPortPos(c.from.node, c.from.portIdx, true);
+    const p2 = getPortPos(c.to.node, c.to.portIdx, false);
+    const s1 = worldToScreen(p1.x, p1.y);
+    const s2 = worldToScreen(p2.x, p2.y);
+    const dx = Math.abs(s2.x - s1.x) * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(s1.x, s1.y);
+    ctx.bezierCurveTo(s1.x + dx, s1.y, s2.x - dx, s2.y, s2.x, s2.y);
+    ctx.strokeStyle = PORT_COLORS[c.from.node.outputs[c.from.portIdx].type] || '#6366f1';
+    ctx.lineWidth = 2 * cam.zoom;
+    ctx.stroke();
+  });
+
+  // Draw in-progress connection
+  if (connecting && connecting.mouse) {
+    const p = getPortPos(connecting.node, connecting.portIdx, connecting.isOutput);
+    const s = worldToScreen(p.x, p.y);
+    const m = connecting.mouse;
+    const dx = Math.abs(m.x - s.x) * 0.5;
+    ctx.beginPath();
+    if (connecting.isOutput) {
+      ctx.moveTo(s.x, s.y);
+      ctx.bezierCurveTo(s.x + dx, s.y, m.x - dx, m.y, m.x, m.y);
+    } else {
+      ctx.moveTo(m.x, m.y);
+      ctx.bezierCurveTo(m.x + dx, m.y, s.x - dx, s.y, s.x, s.y);
+    }
+    const portType = (connecting.isOutput ? connecting.node.outputs : connecting.node.inputs)[connecting.portIdx].type;
+    ctx.strokeStyle = PORT_COLORS[portType] || '#6366f1';
+    ctx.lineWidth = 2 * cam.zoom;
+    ctx.setLineDash([6, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Draw nodes
+  nodes.forEach(n => {
+    const s = worldToScreen(n.x, n.y);
+    const w = n.w * cam.zoom, h = n.h * cam.zoom;
+    const r = 8 * cam.zoom;
+
+    // Shadow
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.4)';
+    ctx.shadowBlur = 12 * cam.zoom;
+    ctx.shadowOffsetY = 4 * cam.zoom;
+
+    // Body
+    roundRect(ctx, s.x, s.y, w, h, r);
+    ctx.fillStyle = '#1a1a1e';
+    ctx.fill();
+    ctx.restore();
+
+    // Border
+    roundRect(ctx, s.x, s.y, w, h, r);
+    if (selectedNode === n) {
+      ctx.shadowColor = '#6366f1';
+      ctx.shadowBlur = 10;
+      ctx.strokeStyle = '#6366f1';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    } else {
+      ctx.strokeStyle = '#2a2a30';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // Title bar
+    const th = TITLE_H * cam.zoom;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(s.x + r, s.y);
+    ctx.lineTo(s.x + w - r, s.y);
+    ctx.arcTo(s.x + w, s.y, s.x + w, s.y + r, r);
+    ctx.lineTo(s.x + w, s.y + th);
+    ctx.lineTo(s.x, s.y + th);
+    ctx.lineTo(s.x, s.y + r);
+    ctx.arcTo(s.x, s.y, s.x + r, s.y, r);
+    ctx.closePath();
+    ctx.fillStyle = '#222228';
+    ctx.fill();
+    ctx.restore();
+
+    // Title text
+    ctx.fillStyle = '#e0e0e0';
+    ctx.font = `600 ${12 * cam.zoom}px Inter, system-ui`;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(n.title, s.x + 12 * cam.zoom, s.y + th / 2);
+
+    // Body content text — indented past port labels
+    ctx.font = `400 ${10 * cam.zoom}px Inter, system-ui`;
+    ctx.fillStyle = '#777';
+    const portLabelW = 55 * cam.zoom; // space for port labels
+    const bodyX = s.x + portLabelW;
+    const bodyW = w - portLabelW * 2;
+    const bodyY = s.y + th + 16 * cam.zoom;
+    if (n.type === 'merge' && n.data.prompt) {
+      wrapText(ctx, n.data.prompt, bodyX, bodyY, bodyW, 13 * cam.zoom);
+    } else if (n.type === 'preview' && n.data.prompt) {
+      wrapText(ctx, n.data.prompt, bodyX, bodyY, bodyW, 13 * cam.zoom);
+    }
+
+    // Draw ports
+    const drawPorts = (ports, isOutput) => {
+      ports.forEach((p, i) => {
+        const pp = getPortPos(n, i, isOutput);
+        const sp = worldToScreen(pp.x, pp.y);
+        const isHovered = hoveredPort && hoveredPort.node === n && hoveredPort.portIdx === i && hoveredPort.isOutput === isOutput;
+        const pr = (isHovered ? PORT_RADIUS * 1.4 : PORT_RADIUS) * cam.zoom;
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, pr, 0, Math.PI * 2);
+        ctx.fillStyle = PORT_COLORS[p.type] || '#6366f1';
+        ctx.fill();
+        ctx.strokeStyle = '#0f0f11';
+        ctx.lineWidth = 2 * cam.zoom;
+        ctx.stroke();
+        // Port label
+        ctx.fillStyle = '#777';
+        ctx.font = `400 ${10 * cam.zoom}px Inter, system-ui`;
+        ctx.textBaseline = 'middle';
+        if (isOutput) {
+          ctx.textAlign = 'right';
+          ctx.fillText(p.name, sp.x - pr - 4 * cam.zoom, sp.y);
+        } else {
+          ctx.textAlign = 'left';
+          ctx.fillText(p.name, sp.x + pr + 4 * cam.zoom, sp.y);
+        }
+        ctx.textAlign = 'left';
+      });
+    };
+    drawPorts(n.inputs, false);
+    drawPorts(n.outputs, true);
+  });
+
+  updateOverlays();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
+function wrapText(ctx, text, x, y, maxW, lineH) {
+  const words = text.split(' ');
+  let line = '';
+  let cy = y;
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) {
+      ctx.fillText(line, x, cy);
+      line = w; cy += lineH;
+    } else { line = test; }
+  }
+  if (line) ctx.fillText(line, x, cy);
+}
+
+// --- HTML overlays for dropdowns and buttons ---
+function clearOverlays() {
+  overlays.forEach(el => el.remove());
+  overlays = [];
+}
+
+function updateOverlays() {
+  clearOverlays();
+  nodes.forEach(n => {
+    if (n.data.list) {
+      // Dropdown select
+      const s = worldToScreen(n.x, n.y);
+      const w = n.w * cam.zoom;
+      const th = TITLE_H * cam.zoom;
+      const sel = document.createElement('select');
+      sel.className = 'node-select';
+      sel.style.left = (s.x + 8 * cam.zoom) + 'px';
+      sel.style.top = (s.y + th + 6 * cam.zoom) + 'px';
+      sel.style.width = (w - 16 * cam.zoom) + 'px';
+      sel.style.fontSize = (11 * cam.zoom) + 'px';
+      n.data.list.forEach((item, i) => {
+        const opt = document.createElement('option');
+        opt.value = i; opt.textContent = item;
+        if (i === n.data.selected) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.addEventListener('change', () => { n.data.selected = parseInt(sel.value); draw(); });
+      // Prevent canvas events when interacting with select
+      sel.addEventListener('mousedown', e => e.stopPropagation());
+      document.body.appendChild(sel);
+      overlays.push(sel);
+    }
+    if (n.type === 'preview') {
+      const s = worldToScreen(n.x, n.y);
+      const w = n.w * cam.zoom;
+      const h = n.h * cam.zoom;
+      const btn = document.createElement('button');
+      btn.className = 'gen-btn';
+      btn.textContent = '✦ Generate';
+      const bw = 90 * cam.zoom;
+      btn.style.left = (s.x + w / 2 - bw / 2) + 'px';
+      btn.style.top = (s.y + h - 30 * cam.zoom) + 'px';
+      btn.style.width = bw + 'px';
+      btn.style.fontSize = (11 * cam.zoom) + 'px';
+      btn.addEventListener('click', () => alert('Generate coming soon — prompt: ' + (n.data.prompt || '(empty)')));
+      btn.addEventListener('mousedown', e => e.stopPropagation());
+      document.body.appendChild(btn);
+      overlays.push(btn);
+    }
+  });
+}
+
+// --- Hit testing ---
+function hitTestPort(sx, sy) {
+  for (const n of [...nodes].reverse()) {
+    for (let isOutput = 0; isOutput <= 1; isOutput++) {
+      const ports = isOutput ? n.outputs : n.inputs;
+      for (let i = 0; i < ports.length; i++) {
+        const pp = getPortPos(n, i, !!isOutput);
+        const sp = worldToScreen(pp.x, pp.y);
+        if (Math.hypot(sx - sp.x, sy - sp.y) < PORT_HIT * cam.zoom) {
+          return { node: n, portIdx: i, isOutput: !!isOutput };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function hitTestNode(sx, sy) {
+  for (const n of [...nodes].reverse()) {
+    const s = worldToScreen(n.x, n.y);
+    const w = n.w * cam.zoom, h = n.h * cam.zoom;
+    if (sx >= s.x && sx <= s.x + w && sy >= s.y && sy <= s.y + h) return n;
+  }
+  return null;
+}
+
+function hitTestConnection(sx, sy) {
+  const threshold = 8;
+  for (let ci = connections.length - 1; ci >= 0; ci--) {
+    const c = connections[ci];
+    const p1 = getPortPos(c.from.node, c.from.portIdx, true);
+    const p2 = getPortPos(c.to.node, c.to.portIdx, false);
+    const s1 = worldToScreen(p1.x, p1.y);
+    const s2 = worldToScreen(p2.x, p2.y);
+    // Sample bezier and check distance
+    const dx = Math.abs(s2.x - s1.x) * 0.5;
+    for (let t = 0; t <= 1; t += 0.02) {
+      const it = 1 - t;
+      const bx = it*it*it*s1.x + 3*it*it*t*(s1.x+dx) + 3*it*t*t*(s2.x-dx) + t*t*t*s2.x;
+      const by = it*it*it*s1.y + 3*it*it*t*s1.y + 3*it*t*t*s2.y + t*t*t*s2.y;
+      if (Math.hypot(sx - bx, sy - by) < threshold) return ci;
+    }
+  }
+  return -1;
+}
+
+// --- Event handlers ---
+canvas.addEventListener('mousedown', e => {
+  const sx = e.clientX, sy = e.clientY;
+
+  // Right click — delete connection
+  if (e.button === 2) {
+    const ci = hitTestConnection(sx, sy);
+    if (ci >= 0) {
+      // Clear the input port value
+      const c = connections[ci];
+      c.to.node.inputs[c.to.portIdx].value = undefined;
+      connections.splice(ci, 1);
+      draw();
+    }
+    return;
+  }
+
+  // Middle click or space — pan
+  if (e.button === 1) {
+    panning = true;
+    panStart = { x: sx - cam.x, y: sy - cam.y };
+    canvas.classList.add('dragging');
+    return;
+  }
+
+  // Left click
+  const port = hitTestPort(sx, sy);
+  if (port) {
+    connecting = { ...port, mouse: { x: sx, y: sy } };
+    canvas.classList.add('connecting');
+    return;
+  }
+
+  const node = hitTestNode(sx, sy);
+  if (node) {
+    selectedNode = node;
+    // Move to top
+    nodes.splice(nodes.indexOf(node), 1);
+    nodes.push(node);
+    const s = worldToScreen(node.x, node.y);
+    dragging = { node, ox: sx - s.x, oy: sy - s.y };
+    canvas.classList.add('dragging');
+    draw();
+    return;
+  }
+
+  // Click on empty space — pan
+  selectedNode = null;
+  panning = true;
+  panStart = { x: sx - cam.x, y: sy - cam.y };
+  canvas.classList.add('dragging');
+  draw();
+});
+
+canvas.addEventListener('mousemove', e => {
+  const sx = e.clientX, sy = e.clientY;
+
+  if (panning) {
+    cam.x = sx - panStart.x;
+    cam.y = sy - panStart.y;
+    draw();
+    return;
+  }
+
+  if (dragging) {
+    const wx = (sx - dragging.ox - cam.x) / cam.zoom;
+    const wy = (sy - dragging.oy - cam.y) / cam.zoom;
+    dragging.node.x = wx;
+    dragging.node.y = wy;
+    draw();
+    return;
+  }
+
+  if (connecting) {
+    connecting.mouse = { x: sx, y: sy };
+    draw();
+    return;
+  }
+
+  // Hover detection
+  const port = hitTestPort(sx, sy);
+  if (port !== hoveredPort) {
+    hoveredPort = port;
+    draw();
+  }
+});
+
+canvas.addEventListener('mouseup', e => {
+  const sx = e.clientX, sy = e.clientY;
+
+  if (connecting) {
+    const target = hitTestPort(sx, sy);
+    if (target && target.isOutput !== connecting.isOutput) {
+      const from = connecting.isOutput ? connecting : target;
+      const to = connecting.isOutput ? target : connecting;
+      // Check type compatibility & no duplicate
+      const fromType = from.node.outputs[from.portIdx].type;
+      const toType = to.node.inputs[to.portIdx].type;
+      const dup = connections.some(c =>
+        c.to.node === to.node && c.to.portIdx === to.portIdx
+      );
+      if (!dup && (fromType === toType || fromType === 'prompt' || toType === 'prompt')) {
+        connections.push({
+          from: { node: from.node, portIdx: from.portIdx },
+          to: { node: to.node, portIdx: to.portIdx }
+        });
+      }
+    }
+    connecting = null;
+    canvas.classList.remove('connecting');
+    draw();
+  }
+
+  if (dragging) { dragging = null; canvas.classList.remove('dragging'); }
+  if (panning) { panning = false; canvas.classList.remove('dragging'); }
+});
+
+// Zoom
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const sx = e.clientX, sy = e.clientY;
+  const oldZoom = cam.zoom;
+  const factor = e.deltaY < 0 ? 1.1 : 0.9;
+  cam.zoom = Math.max(0.2, Math.min(3, cam.zoom * factor));
+  // Zoom toward cursor
+  cam.x = sx - (sx - cam.x) * (cam.zoom / oldZoom);
+  cam.y = sy - (sy - cam.y) * (cam.zoom / oldZoom);
+  draw();
+}, { passive: false });
+
+// Prevent context menu
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// --- Keyboard: Delete/Backspace removes selected node ---
+window.addEventListener('keydown', e => {
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNode && document.activeElement === document.body) {
+    // Remove all connections to/from this node
+    connections = connections.filter(c => c.from.node !== selectedNode && c.to.node !== selectedNode);
+    // Remove overlay
+    if (selectedNode.overlay) { selectedNode.overlay.remove(); selectedNode.overlay = null; }
+    // Remove node
+    nodes.splice(nodes.indexOf(selectedNode), 1);
+    selectedNode = null;
+    draw();
+  }
+});
+
+// --- Add node from toolbar ---
+function addNode(type) {
+  const center = screenToWorld(canvas.width / 2, canvas.height / 2);
+  const n = createNode(type, center.x - NODE_W / 2, center.y - 50);
+  nodes.push(n);
+  selectedNode = n;
+  draw();
+}
+
+// --- Starter layout ---
+function initScene() {
+  const inspo = createNode('inspo', 100, 150);
+  const algo = createNode('algo', 100, 300);
+  const concept = createNode('concept', 100, 450);
+  const merge = createNode('merge', 420, 260);
+  const preview = createNode('preview', 750, 280);
+  nodes.push(inspo, algo, concept, merge, preview);
+
+  connections.push(
+    { from: { node: inspo, portIdx: 0 }, to: { node: merge, portIdx: 0 } },
+    { from: { node: algo, portIdx: 0 }, to: { node: merge, portIdx: 1 } },
+    { from: { node: concept, portIdx: 0 }, to: { node: merge, portIdx: 2 } },
+    { from: { node: merge, portIdx: 0 }, to: { node: preview, portIdx: 0 } }
+  );
+
+  // Center the view
+  cam.x = 80;
+  cam.y = 40;
+}
+
+// --- Boot ---
+initScene();
+resize();
+</script>
+</body>
+</html>

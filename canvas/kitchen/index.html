@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍳 kitchen v3</title>
+<style>
+:root {
+  --bg: #0a0a0b;
+  --bg-sidebar: #0e0e11;
+  --bg-card: #131316;
+  --bg-card-hover: #1a1a1f;
+  --border: #1e1e24;
+  --text: #e4e4e7;
+  --text-sec: #a1a1aa;
+  --text-muted: #52525b;
+  --indigo: #6366f1;
+  --indigo-dim: #4f46e5;
+  --amber: #f59e0b;
+  --purple: #a855f7;
+  --cyan: #06b6d4;
+  --emerald: #10b981;
+  --gray: #6b7280;
+  --gold: #eab308;
+  --red: #ef4444;
+  --chat-w: 420px;
+  --ref-w: 420px;
+  --deadline-h: 36px;
+  --radius: 8px;
+  --tr: .2s ease;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;}
+
+/* Deadline Bar */
+.deadline-bar{position:sticky;top:0;z-index:100;height:var(--deadline-h);background:#09090b;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;font-size:12px;color:var(--text-sec);cursor:pointer;user-select:none;flex-shrink:0;}
+.deadline-bar .dot{width:7px;height:7px;border-radius:50%;margin-right:8px;flex-shrink:0;}
+.deadline-bar .countdown{color:var(--text);font-weight:600;margin-right:6px;}
+.deadline-bar .chevron{margin-left:auto;font-size:9px;color:var(--text-muted);transition:transform var(--tr);}
+.deadline-bar.open .chevron{transform:rotate(180deg);}
+.deadline-expand{position:absolute;top:var(--deadline-h);left:0;right:0;background:#09090b;border-bottom:1px solid var(--border);max-height:0;overflow:hidden;transition:max-height .3s ease;z-index:99;}
+.deadline-bar.open+.deadline-expand{max-height:200px;}
+.dl-row{display:flex;align-items:center;gap:8px;padding:6px 16px;font-size:12px;color:var(--text-sec);}
+.dl-row .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.dl-row .dl-days{margin-left:auto;color:var(--text-muted);font-size:11px;}
+
+/* App Layout */
+.app{display:flex;height:calc(100vh - var(--deadline-h));overflow:hidden;}
+
+/* Code Canvas (Column 2) */
+.code-canvas{flex:1;min-width:0;background:var(--bg-sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.col-header{display:flex;align-items:center;height:40px;padding:0 14px;border-bottom:1px solid var(--border);gap:8px;flex-shrink:0;box-sizing:border-box;}
+.col-header .stage-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);}
+.code-canvas-header{display:flex;align-items:center;height:40px;padding:0 14px;border-bottom:1px solid var(--border);gap:8px;flex-shrink:0;box-sizing:border-box;}
+.code-canvas-header .stage-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);}
+.code-canvas-tabs{display:flex;gap:4px;margin-left:auto;}
+.code-canvas-tab{padding:3px 12px;border-radius:14px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);font-size:10px;font-weight:600;cursor:pointer;transition:var(--tr);}
+.code-canvas-tab:hover{color:var(--text);background:var(--bg-card-hover);}
+.code-canvas-tab.active{background:var(--gold);color:#000;border-color:var(--gold);}
+
+/* Spotlight Viewer (Column 3) */
+.spotlight-viewer{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;background:var(--bg);border-right:1px solid var(--border);}
+.spotlight-placeholder{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--text-muted);user-select:none;}
+.spotlight-placeholder .sp-icon{font-size:48px;opacity:.3;}
+.spotlight-placeholder .sp-text{font-size:13px;opacity:.5;}
+.spotlight-content{flex:1;overflow-y:auto;padding:32px;display:none;}
+.spotlight-content.active{display:block;}
+.spotlight-content .cat-pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;}
+.spotlight-content h2{font-size:22px;font-weight:700;margin-bottom:12px;}
+.spotlight-content .desc{font-size:14px;color:var(--text-sec);line-height:1.7;margin-bottom:16px;}
+.spotlight-content .source-link{color:var(--cyan);font-size:12px;text-decoration:none;}
+.spotlight-content .source-link:hover{text-decoration:underline;}
+.spotlight-content .insp-nav{display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);}
+.spotlight-content .insp-nav button{background:#1a1a1f;border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 12px;font-size:12px;cursor:pointer;transition:var(--tr);}
+.spotlight-content .insp-nav button:hover{background:var(--bg-card-hover);}
+.spotlight-content .insp-nav .back-btn{margin-left:auto;background:transparent;border:none;color:var(--text-muted);font-size:11px;cursor:pointer;}
+.spotlight-content .insp-nav .back-btn:hover{color:var(--text);}
+
+/* Chat Panel */
+.chat-panel{width:var(--chat-w);min-width:var(--chat-w);background:var(--bg-sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;}
+.chat-header{height:40px;padding:0 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;}
+.chat-header button{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;}
+.chat-messages{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:6px;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.chat-msg{max-width:90%;padding:7px 10px;border-radius:10px;font-size:12px;line-height:1.4;word-break:break-word;}
+.chat-msg.user{align-self:flex-end;background:var(--indigo);color:#fff;border-bottom-right-radius:3px;}
+.chat-msg.chef{align-self:flex-start;background:#1e1e24;color:var(--text);border-bottom-left-radius:3px;}
+.chat-msg .msg-time{display:block;font-size:9px;margin-top:3px;opacity:.5;}
+.chat-msg .link-card{display:block;margin-top:4px;padding:4px 6px;background:rgba(255,255,255,.06);border-radius:5px;color:var(--cyan);font-size:11px;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.chat-msg .link-card:hover{background:rgba(255,255,255,.1);}
+.chat-input-area{padding:10px;border-top:1px solid var(--border);display:flex;gap:6px;}
+.chat-input-area input{flex:1;background:#1a1a1f;border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:12px;outline:none;}
+.chat-input-area input:focus{border-color:var(--indigo);}
+.chat-input-area button{background:var(--indigo);border:none;border-radius:6px;color:#fff;padding:0 12px;font-size:12px;cursor:pointer;}
+
+/* Stage title shared */
+.stage-title{font-size:14px;font-weight:600;}
+
+/* Canvas pane (inside code-canvas column) */
+.canvas-view{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.canvas-view.hidden{display:none;}
+.canvas-container{flex:1;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;}
+.canvas-container iframe{border:none;background:#0a0a0b;}
+.aspect-bar{display:flex;align-items:center;gap:6px;padding:6px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);flex-shrink:0;}
+.aspect-btn{padding:3px 10px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:10px;cursor:pointer;transition:var(--tr);}
+.aspect-btn.active{background:var(--indigo);color:#fff;border-color:var(--indigo);}
+
+/* Code pane */
+.code-view{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.code-view.hidden{display:none;}
+.code-toolbar{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);flex-wrap:wrap;flex-shrink:0;}
+.code-toolbar button,.code-toolbar select,.code-toolbar label{font-size:11px;border-radius:5px;border:1px solid var(--border);background:#1a1a1f;color:var(--text);padding:4px 10px;cursor:pointer;transition:var(--tr);}
+.code-toolbar button:hover{background:var(--bg-card-hover);}
+.code-toolbar .run-btn{background:var(--emerald);color:#000;border-color:var(--emerald);font-weight:600;}
+.code-toolbar .run-btn:hover{background:#0d9668;}
+.code-toolbar .auto-toggle{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-sec);border:none;background:none;}
+.code-toolbar .auto-toggle input{accent-color:var(--gold);}
+.code-toolbar .save-name{background:#1a1a1f;border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 8px;font-size:11px;width:110px;}
+.code-editor-wrap{flex:1;position:relative;overflow:hidden;}
+.line-numbers{position:absolute;top:0;left:0;width:36px;padding:14px 6px 14px 0;text-align:right;font-family:'SF Mono','Fira Code','Consolas',monospace;font-size:12px;line-height:1.5;color:var(--text-muted);pointer-events:none;user-select:none;overflow:hidden;}
+.code-editor{width:100%;height:100%;resize:none;background:#1a1a1e;color:#e4e4e7;border:none;padding:14px 14px 14px 44px;font-family:'SF Mono','Fira Code','Consolas',monospace;font-size:12px;line-height:1.5;outline:none;tab-size:2;}
+
+/* Reference Panel */
+.ref-panel{width:var(--ref-w);min-width:var(--ref-w);background:var(--bg-sidebar);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;}
+.ref-tabs{display:flex;height:40px;border-bottom:1px solid var(--border);flex-shrink:0;box-sizing:border-box;align-items:center;}
+.ref-tab{flex:1;padding:8px 4px;text-align:center;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);cursor:pointer;transition:var(--tr);border-bottom:2px solid transparent;}
+.ref-tab:hover{color:var(--text);}
+.ref-tab.active{color:var(--gold);border-bottom-color:var(--gold);}
+.ref-content{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.ref-pane{display:none;padding:10px;}
+.ref-pane.active{display:block;}
+
+/* Inspiration cards (sidebar) */
+.insp-card-s{padding:10px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;cursor:pointer;transition:transform var(--tr),border-color var(--tr);}
+.insp-card-s:hover{transform:translateY(-1px);border-color:#2a2a32;}
+.insp-card-s .cat-pill{display:inline-block;padding:1px 7px;border-radius:12px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;}
+.insp-card-s h4{font-size:12px;font-weight:600;margin-bottom:3px;line-height:1.3;}
+.insp-card-s .desc{font-size:10px;color:var(--text-muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
+
+/* Technique cards (sidebar) */
+.tech-card-s{padding:10px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;display:flex;align-items:center;gap:8px;transition:border-color var(--tr);}
+.tech-card-s:hover{border-color:#2a2a32;}
+.tech-card-s .info{flex:1;min-width:0;}
+.tech-card-s h4{font-size:11px;font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tech-card-s .cat-pill{display:inline-block;padding:1px 6px;border-radius:12px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+.tech-card-s .load-btn{padding:3px 10px;border-radius:5px;border:1px solid var(--border);background:#1a1a1f;color:var(--text);font-size:10px;cursor:pointer;transition:var(--tr);font-weight:500;flex-shrink:0;}
+.tech-card-s .load-btn:hover{background:var(--gold);color:#000;border-color:var(--gold);}
+
+/* Concepts (sidebar) */
+.concepts-wrap{padding:10px;}
+.concepts-nav{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;}
+.concepts-nav input[type="radio"]{display:none;}
+.concepts-nav label{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--bg-card);border:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text-muted);cursor:pointer;transition:var(--tr);}
+.concepts-nav input[type="radio"]:checked+label{background:var(--gold);color:#000;border-color:var(--gold);}
+.concept-panel{display:none;background:var(--bg-card);border:1px solid var(--border);border-left:3px solid var(--gold);border-radius:var(--radius);padding:14px 16px;}
+#c1:checked~.concept-panels .cp1,#c2:checked~.concept-panels .cp2,#c3:checked~.concept-panels .cp3,#c4:checked~.concept-panels .cp4,#c5:checked~.concept-panels .cp5,#c6:checked~.concept-panels .cp6,#c7:checked~.concept-panels .cp7,#c8:checked~.concept-panels .cp8{display:block;}
+.concept-panel h3{font-size:13px;font-weight:700;margin-bottom:6px;color:var(--gold);}
+.concept-panel p{font-size:12px;color:var(--text-sec);font-style:italic;line-height:1.6;}
+
+/* Category colors */
+.cat-kinetic{background:rgba(245,158,11,.15);color:var(--amber);}
+.cat-generative{background:rgba(168,85,247,.15);color:var(--purple);}
+.cat-sound{background:rgba(6,182,212,.15);color:var(--cyan);}
+.cat-faith{background:rgba(16,185,129,.15);color:var(--emerald);}
+.cat-industry{background:rgba(107,114,128,.15);color:var(--gray);}
+.cat-noise{background:rgba(6,182,212,.15);color:var(--cyan);}
+.cat-growth{background:rgba(16,185,129,.15);color:var(--emerald);}
+.cat-cellular{background:rgba(168,85,247,.15);color:var(--purple);}
+.cat-geometry{background:rgba(245,158,11,.15);color:var(--amber);}
+.cat-physics{background:rgba(6,182,212,.15);color:var(--cyan);}
+.cat-data{background:rgba(107,114,128,.15);color:var(--gray);}
+
+/* Mobile chat FAB + sheet */
+.chat-fab{display:none;position:fixed;bottom:16px;left:16px;z-index:200;width:48px;height:48px;border-radius:50%;background:var(--indigo);border:none;color:#fff;font-size:20px;cursor:pointer;box-shadow:0 4px 16px rgba(99,102,241,.4);}
+.chat-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.5);}
+.chat-sheet{display:none;position:fixed;bottom:0;left:0;right:0;z-index:201;background:var(--bg-sidebar);border-top:1px solid var(--border);border-radius:14px 14px 0 0;transform:translateY(100%);transition:transform .3s ease;max-height:70vh;flex-direction:column;}
+.chat-sheet.open{transform:translateY(0);}
+.chat-sheet-handle{width:32px;height:4px;background:var(--border);border-radius:2px;margin:8px auto 4px;}
+.chat-sheet .chat-messages{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:6px;}
+.chat-sheet .chat-input-area{padding:10px;border-top:1px solid var(--border);display:flex;gap:6px;}
+.chat-sheet .chat-input-area input{flex:1;background:#1a1a1f;border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:12px;outline:none;}
+.chat-sheet .chat-input-area button{background:var(--indigo);border:none;border-radius:6px;color:#fff;padding:0 12px;font-size:12px;cursor:pointer;}
+
+/* Mobile bottom tab bar */
+.mobile-tabs{display:none;position:fixed;bottom:0;left:0;right:0;z-index:150;background:#09090b;border-top:1px solid var(--border);height:52px;}
+.mobile-tabs .m-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--text-muted);cursor:pointer;gap:2px;text-transform:uppercase;letter-spacing:.03em;}
+.mobile-tabs .m-tab.active{color:var(--gold);}
+.mobile-tabs .m-tab .m-icon{font-size:18px;}
+
+/* Responsive: Tablet */
+@media(max-width:1280px){
+  .chat-panel{display:none;}
+  .chat-fab{display:flex;align-items:center;justify-content:center;}
+  .chat-sheet{display:flex;}
+  .spotlight-viewer{min-width:280px;}
+}
+@media(max-width:1024px){
+  .ref-panel{width:260px;min-width:260px;}
+}
+/* Responsive: Mobile */
+@media(max-width:768px){
+  .ref-panel{display:none;}
+  .chat-panel{display:none;}
+  .code-canvas{display:none;}
+  .spotlight-viewer{display:none;}
+  .chat-fab{display:none;}
+  .mobile-tabs{display:flex;}
+  .app{height:calc(100vh - var(--deadline-h) - 52px);}
+  body.mobile-ref .ref-panel{display:flex;position:fixed;inset:0;top:var(--deadline-h);bottom:52px;width:100%;min-width:100%;z-index:50;border:none;}
+  body.mobile-chat .chat-panel{display:flex;position:fixed;inset:0;top:var(--deadline-h);bottom:52px;width:100%;min-width:100%;z-index:50;border:none;}
+  body.mobile-code .code-canvas{display:flex;position:fixed;inset:0;top:var(--deadline-h);bottom:52px;width:100%;min-width:100%;z-index:50;border:none;}
+  body.mobile-canvas .spotlight-viewer{display:flex;position:fixed;inset:0;top:var(--deadline-h);bottom:52px;width:100%;min-width:100%;z-index:50;border:none;}
+}
+
+/* Pantry date nav */
+.pantry-header{display:flex;align-items:center;height:40px;padding:0 10px;border-bottom:1px solid var(--border);gap:6px;flex-shrink:0;box-sizing:border-box;}
+.pantry-header .stage-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);white-space:nowrap;}
+.pantry-date-nav{display:flex;align-items:center;gap:4px;margin-left:auto;flex-shrink:0;}
+.pantry-date-nav button{background:none;border:1px solid var(--border);border-radius:4px;color:var(--text-muted);width:22px;height:22px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--tr);padding:0;}
+.pantry-date-nav button:hover{color:var(--text);border-color:var(--text-muted);}
+.pantry-date-nav .pantry-date-label{font-size:10px;font-weight:600;color:var(--gold);min-width:60px;text-align:center;cursor:pointer;}
+.pantry-date-nav .pantry-date-label:hover{text-decoration:underline;}
+/* NEW badge */
+.new-badge{display:inline-block;padding:1px 5px;border-radius:8px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:var(--gold);color:#000;margin-left:6px;animation:newGlow 2s ease-in-out infinite alternate;}
+@keyframes newGlow{0%{box-shadow:0 0 4px rgba(234,179,8,.3);}100%{box-shadow:0 0 10px rgba(234,179,8,.6);}}
+/* Date badge on entries */
+.date-badge{display:inline-block;padding:1px 5px;border-radius:8px;font-size:8px;font-weight:600;background:rgba(255,255,255,.06);color:var(--text-muted);margin-left:4px;}
+/* History tab date list */
+.history-date-list{padding:10px;}
+.history-date-item{padding:8px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:4px;cursor:pointer;transition:var(--tr);display:flex;align-items:center;justify-content:space-between;}
+.history-date-item:hover{border-color:var(--gold);transform:translateY(-1px);}
+.history-date-item .hd-date{font-size:12px;font-weight:600;color:var(--text);}
+.history-date-item .hd-count{font-size:10px;color:var(--text-muted);}
+.history-date-item.today{border-left:3px solid var(--gold);}
+
+::-webkit-scrollbar{width:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<!-- Deadline Bar -->
+<div class="deadline-bar" id="deadlineBar">
+  <span class="dot" id="dlDot"></span>
+  <span class="countdown" id="dlCountdown"></span>
+  <span id="dlName"></span>
+  <span class="chevron">▼</span>
+</div>
+<div class="deadline-expand" id="dlExpand"></div>
+
+<!-- App -->
+<div class="app">
+  <!-- Chat Panel -->
+  <aside class="chat-panel" id="chatPanel">
+    <div class="chat-header">💬 kitchen chat <span id="chatStatus" style="margin-left:auto">🔴</span></div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-input-area">
+      <input type="text" id="chatInput" placeholder="Send a message…" autocomplete="off">
+      <button id="chatSend">→</button>
+    </div>
+  </aside>
+
+  <!-- Code Canvas (Column 2) -->
+  <div class="code-canvas" id="codeCanvas">
+    <div class="code-canvas-header">
+      <span class="stage-title">🔥 stove</span>
+      <span class="stage-date" id="stageDate"></span>
+      <div class="code-canvas-tabs">
+        <div class="code-canvas-tab active" data-tab="canvas">Preview</div>
+        <div class="code-canvas-tab" data-tab="code">Editor</div>
+      </div>
+    </div>
+
+    <!-- Canvas View -->
+    <div class="canvas-view" id="canvasView">
+      <div class="canvas-container" id="canvasContainer">
+        <iframe id="canvasFrame" sandbox="allow-scripts"></iframe>
+      </div>
+      <div class="aspect-bar">
+        <span>Aspect:</span>
+        <button class="aspect-btn active" data-aspect="fill">Fill</button>
+        <button class="aspect-btn" data-aspect="1:1">1:1</button>
+        <button class="aspect-btn" data-aspect="9:16">9:16</button>
+        <button class="aspect-btn" data-aspect="16:9">16:9</button>
+      </div>
+    </div>
+
+    <!-- Code View -->
+    <div class="code-view hidden" id="codeView">
+      <div class="code-toolbar">
+        <button class="run-btn" id="runBtn">▶ Run</button>
+        <label class="auto-toggle"><input type="checkbox" id="autoRun"> Auto-run</label>
+        <input type="text" class="save-name" id="saveName" placeholder="Sketch name…">
+        <button id="saveBtn">Save</button>
+        <select id="loadSelect"><option value="">Load…</option></select>
+      </div>
+      <div class="code-editor-wrap">
+        <div class="line-numbers" id="lineNumbers"></div>
+        <textarea class="code-editor" id="codeEditor" spellcheck="false"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top (Column 3) -->
+  <div class="spotlight-viewer" id="spotlightViewer">
+    <div class="col-header">
+      <span class="stage-title">🍳 top</span>
+    </div>
+    <div class="spotlight-placeholder" id="spotlightPlaceholder">
+      <div class="sp-icon">🍳</div>
+      <div class="sp-text">top — select something from the reference panel</div>
+    </div>
+    <div class="spotlight-content" id="spotlightContent"></div>
+  </div>
+
+  <!-- Pantry Panel -->
+  <aside class="ref-panel" id="refPanel">
+    <div class="pantry-header">
+      <span class="stage-title">🥘 pantry</span>
+      <div class="pantry-date-nav">
+        <button id="pantryPrev" title="Previous day">◀</button>
+        <span class="pantry-date-label" id="pantryDateLabel">Today</span>
+        <button id="pantryNext" title="Next day">▶</button>
+      </div>
+    </div>
+    <div class="ref-tabs">
+      <div class="ref-tab active" data-ref="inspo">Inspo</div>
+      <div class="ref-tab" data-ref="tech">Algos</div>
+      <div class="ref-tab" data-ref="concepts">Concepts</div>
+      <div class="ref-tab" data-ref="history">History</div>
+    </div>
+    <div class="ref-content">
+      <div class="ref-pane active" data-refpane="inspo" id="inspoPane"></div>
+      <div class="ref-pane" data-refpane="tech" id="techPane"></div>
+      <div class="ref-pane" data-refpane="concepts" id="conceptsPane"></div>
+      <div class="ref-pane" data-refpane="history" id="historyPane"></div>
+    </div>
+  </aside>
+</div>
+
+<!-- Mobile: Chat FAB + Sheet -->
+<button class="chat-fab" id="chatFab">💬</button>
+<div class="chat-overlay" id="chatOverlay"></div>
+<div class="chat-sheet" id="chatSheet">
+  <div class="chat-sheet-handle"></div>
+  <div class="chat-messages" id="chatMessagesMobile"></div>
+  <div class="chat-input-area">
+    <input type="text" id="chatInputMobile" placeholder="Send a message…" autocomplete="off">
+    <button id="chatSendMobile">→</button>
+  </div>
+</div>
+
+<!-- Mobile Tab Bar -->
+<div class="mobile-tabs" id="mobileTabs">
+  <div class="m-tab active" data-mtab="canvas"><span class="m-icon">🎨</span>Preview</div>
+  <div class="m-tab" data-mtab="code"><span class="m-icon">⌨️</span>Code</div>
+  <div class="m-tab" data-mtab="spotlight"><span class="m-icon">🍳</span>Top</div>
+  <div class="m-tab" data-mtab="ref"><span class="m-icon">📚</span>Ref</div>
+  <div class="m-tab" data-mtab="chat"><span class="m-icon">💬</span>Chat</div>
+</div>
+
+<script>
+// ── Data ──
+const INSPIRATIONS = [
+  { id:'hulten', cat:'sound', title:'Love Hultén — Ferrofluid Synth Guitar', desc:'Modified Arturia MicroFreak in hand-built body with dancing ferrofluid visualizer, steel rod pitch control, magnetic sequencer. The ferrofluid shows the sound before you hear it.', link:'https://www.designboom.com/technology/love-hulten-guitar-synth-instrument-ferrofluid-09-22-2025/', img:'https://www.designboom.com/twitterimages/uploads/2025/09/love-hulten-guitar-synth-instrument-ferrofluid-designboom-fb.jpg' },
+  { id:'vtol', cat:'kinetic', title:'::vtol:: — Kinetic Code Sculptures', desc:'Electronic installations reacting to environment + viewers. "Reading My Body" turns tattoos into music. "Last Breath" — wearable mask organ. Showed at Sónar+D June 2025.', link:'https://www.designboom.com/technology/inside-world-vtol-kinetic-sculptures-robotics-code-driven-installations-dmitry-morozov-interview-08-18-2025/', img:'https://www.designboom.com/twitterimages/uploads/2025/08/inside-world-__vtol__-kinetic-sculptures-robotics-code-driven-installations-dmitry-morozov-sonarD-interview-designboom-fb.jpg' },
+  { id:'eightnote', cat:'sound', title:'EightNote — Kinetic Magnetic MIDI Controller', desc:'MIDI.org Innovation Award 2025. Magnetic balls on a sliding 8-lane panel — rhythm as physical gesture. Open-source firmware planned.', link:'https://midi.org/innovation-award/eightnote', img:'https://midi.org/wp-content/uploads/2025/07/4444-1024x559.jpg' },
+  { id:'zimoun', cat:'kinetic', title:'Zimoun — Sound Installations', desc:'Hundreds of identical motors + everyday materials = emergent sonic landscapes. New commission: Staatsschauspiel Dresden 2026.', link:'https://zimoun.net/', img:'https://zimoun.net/site/assets/files/2165/2026-dresden-1.960x640.jpg' },
+  { id:'trimpin', cat:'sound', title:'Trimpin — The OG MIDI Sculptor', desc:'30+ years of electromechanical sculptures via MIDI + microcontrollers. Building-scale instruments that play themselves.', link:'https://en.wikipedia.org/wiki/Trimpin', img:'https://upload.wikimedia.org/wikipedia/commons/9/95/Trimpin_01.jpg' },
+  { id:'diriyah', cat:'faith', title:'Diriyah Biennale — Generative Islamic Patterns', desc:'Workshop: photograph architectural motifs → AI → digital artworks with natural elements. Watch for cycle 3 open call.', link:'https://biennale.org.sa/en/program/generative-art-in-islamic-patterns', img:'https://biennale.org.sa/assets/images/logo-db.png' },
+  { id:'transient', cat:'industry', title:'Transient Labs — Creator Platform', desc:'1/1s, editions, zero seller fees. Preferred minting platform. Strong for premium pieces.', link:'https://transient.xyz', img:'https://www.transient.xyz/opengraph-image.jpg?opengraph-image.30ee4b20.jpg' },
+  { id:'fxhash', cat:'generative', title:'fxhash Protocol Update', desc:'FXH token + "art coins" + "open-form generative art." New economics for onchain generative art.', link:'https://beta.fxhash.xyz/', img:'https://www.fxhash.xyz/images/og/home.jpg' },
+];
+
+const CONCEPTS = [
+  { title:'The Callback Machine', body:'Islamic geometric patterns generated by one rule repeated. Generative piece starts as chaos, reveals the single rotation underneath. Perceptual one-way door applied to sacred geometry.' },
+  { title:'The Instrument That Watches You Back', body:"Camera tracking watching a performer's body tension/breath/posture. Instrument reacts: softens when anxious, pushes back when confident. Not AI — reactive physics. Duet discovered." },
+  { title:"Zimoun's Law", body:'One motor + one cotton ball = boring. 139 = living organism. Your art needs ONE elegant rule iterated 10,000 times. Beauty is in the moment the audience realizes the rule.' },
+  { title:"The Muezzin's Delay", body:'Adhan cascades across cities as each muezzin starts moments apart. Spatial canon written by architecture. Sound installation with speakers at cascading distances. The room becomes the instrument.' },
+  { title:'Tattoo Machine Score', body:'Generative system creates visual score, robotic arm draws it as ink in real-time. Paper = record. Drawing IS the music frozen. Frame it. Play it back with a camera.' },
+  { title:'The Prayer Rug Sequencer', body:'Prayer rug geometric patterns as step sequencer grid. Conductive thread at intersections = trigger points. Sacred geometry literally becomes music. The math that made these patterns = Euclidean rhythms.' },
+  { title:'Crown Shyness Code', body:'Particles grow and fill space but never overlap. Run it long enough and it looks like Islamic geometric patterns. Nature and sacred geometry share a codebase.' },
+  { title:'The Ferrofluid Qibla', body:"Ferrofluid cell with hidden magnet toward Mecca. Fluid perpetually reaches one direction. Visitors don't know why until the label. Liquid compass performing devotion." },
+];
+
+const DEADLINES = [
+  { emoji:'🌙', name:'Ramadan begins', date:new Date('2026-02-17'), color:'var(--purple)' },
+  { emoji:'🔴', name:'Sónar+D Barcelona', date:new Date('2026-02-19'), color:'var(--red)' },
+  { emoji:'🟡', name:'Hasselblad Masters', date:new Date('2026-02-28'), color:'var(--amber)' },
+  { emoji:'🟢', name:'Art Blocks Marfa RSVP', date:new Date('2026-03-15'), color:'var(--emerald)' },
+];
+
+const STARTER_SKETCH = `function setup() {
+  createCanvas(windowWidth, windowHeight);
+  background(10);
+  textAlign(CENTER, CENTER);
+  textFont('monospace');
+  noLoop();
+}
+
+function draw() {
+  background(10, 10, 11);
+  let size = 12;
+  let cols = floor(width / size);
+  let rows = floor(height / size);
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      let n = noise(x * 0.05, y * 0.05);
+      if (n > 0.45) {
+        let brightness = map(n, 0.45, 1, 50, 255);
+        fill(brightness);
+        noStroke();
+        text('+', x * size + size/2, y * size + size/2);
+      }
+    }
+  }
+}
+
+function mousePressed() {
+  noiseSeed(random(10000));
+  redraw();
+}`;
+
+const TECHNIQUES = [
+  { name:'Perlin Noise Flow Field', cat:'noise', desc:'Particles follow invisible vector fields created by noise functions', code:`let particles = [];
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  background(10, 10, 11);
+  for (let i = 0; i < 800; i++) particles.push(createVector(random(width), random(height)));
+  textAlign(CENTER, CENTER); textFont('monospace');
+}
+function draw() {
+  fill(10, 10, 11, 15); noStroke(); rect(0, 0, width, height);
+  let t = frameCount * 0.002;
+  for (let p of particles) {
+    let a = noise(p.x * 0.003, p.y * 0.003, t) * TWO_PI * 2;
+    p.x += cos(a) * 1.5; p.y += sin(a) * 1.5;
+    let b = map(noise(p.x*0.005, p.y*0.005), 0, 1, 60, 255);
+    fill(b); textSize(10); text('+', p.x, p.y);
+    if (p.x < 0 || p.x > width || p.y < 0 || p.y > height) {
+      p.x = random(width); p.y = random(height);
+    }
+  }
+}` },
+  { name:'L-Systems', cat:'growth', desc:'Recursive string-rewriting rules that generate organic branching structures', code:`let sentence, rules, angle, len;
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  background(10, 10, 11);
+  angle = radians(25); len = max(height * 0.22, 60);
+  sentence = 'F'; rules = [{a:'F', b:'FF+[+F-F-F]-[-F+F+F]'}];
+  for (let i = 0; i < 4; i++) generate();
+  drawTree();
+}
+function generate() {
+  let next = '';
+  for (let c of sentence) {
+    let found = rules.find(r => r.a === c);
+    next += found ? found.b : c;
+  }
+  sentence = next;
+}
+function drawTree() {
+  background(10, 10, 11);
+  stroke(80, 200, 120); strokeWeight(1); noFill();
+  resetMatrix(); translate(width/2, height);
+  let l = len * pow(0.5, 4);
+  for (let c of sentence) {
+    if (c === 'F') { line(0,0,0,-l); translate(0,-l); }
+    else if (c === '+') rotate(angle);
+    else if (c === '-') rotate(-angle);
+    else if (c === '[') push();
+    else if (c === ']') pop();
+  }
+}
+function mousePressed() { noiseSeed(random(10000)); angle = radians(random(15,35)); sentence='F'; for(let i=0;i<4;i++) generate(); drawTree(); }` },
+  { name:"Conway's Game of Life", cat:'cellular', desc:'Simple birth/death rules on a grid produce emergent complexity', code:`let grid, cols, rows, sz = 10;
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  textAlign(CENTER, CENTER); textFont('monospace'); textSize(sz);
+  cols = floor(width/sz); rows = floor(height/sz);
+  grid = Array.from({length:cols}, ()=>Array.from({length:rows}, ()=>random()>.7?1:0));
+}
+function draw() {
+  background(10, 10, 11);
+  fill(168, 85, 247);
+  for (let x=0; x<cols; x++) for (let y=0; y<rows; y++) {
+    if (grid[x][y]) text('+', x*sz+sz/2, y*sz+sz/2);
+  }
+  let next = Array.from({length:cols}, ()=>Array(rows).fill(0));
+  for (let x=0; x<cols; x++) for (let y=0; y<rows; y++) {
+    let s = 0;
+    for (let dx=-1; dx<=1; dx++) for (let dy=-1; dy<=1; dy++) {
+      if (dx===0&&dy===0) continue;
+      let nx=(x+dx+cols)%cols, ny=(y+dy+rows)%rows;
+      s += grid[nx][ny];
+    }
+    if (grid[x][y]) next[x][y] = (s===2||s===3)?1:0;
+    else next[x][y] = s===3?1:0;
+  }
+  grid = next;
+}` },
+  { name:'Voronoi Tessellation', cat:'geometry', desc:"Space partitioned by nearest-neighbor distance — nature's tiling algorithm", code:`let pts = [];
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  for (let i = 0; i < 30; i++) pts.push({x:random(width),y:random(height),vx:random(-0.5,0.5),vy:random(-0.5,0.5)});
+  noStroke(); textAlign(CENTER,CENTER); textFont('monospace');
+}
+function draw() {
+  background(10,10,11);
+  let step = 8;
+  for (let px=0; px<width; px+=step) for (let py=0; py<height; py+=step) {
+    let minD=Infinity, ci=0;
+    for (let i=0;i<pts.length;i++) {
+      let d=dist(px,py,pts[i].x,pts[i].y);
+      if (d<minD){minD=d; ci=i;}
+    }
+    let h = (ci*37)%360;
+    fill(h,40,max(20,70-minD*0.15));
+    textSize(step); text('+', px, py);
+  }
+  for (let p of pts) {
+    p.x+=p.vx; p.y+=p.vy;
+    if(p.x<0||p.x>width) p.vx*=-1;
+    if(p.y<0||p.y>height) p.vy*=-1;
+  }
+}` },
+  { name:'Circle Packing', cat:'geometry', desc:'Fill space with non-overlapping circles — crown shyness in 2D', code:`let circles = [];
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  background(10,10,11);
+  textAlign(CENTER,CENTER); textFont('monospace');
+}
+function draw() {
+  background(10,10,11);
+  for (let i = 0; i < 10; i++) {
+    let c = {x:random(width),y:random(height),r:2,growing:true};
+    let ok = true;
+    for (let o of circles) if (dist(c.x,c.y,o.x,o.y)<o.r+c.r+2) { ok=false; break; }
+    if (ok && circles.length < 500) circles.push(c);
+  }
+  for (let c of circles) {
+    if (!c.growing) continue;
+    c.r += 0.4;
+    if (c.x-c.r<0||c.x+c.r>width||c.y-c.r<0||c.y+c.r>height) { c.growing=false; continue; }
+    for (let o of circles) {
+      if (o===c) continue;
+      if (dist(c.x,c.y,o.x,o.y)<c.r+o.r+2) { c.growing=false; break; }
+    }
+  }
+  noStroke();
+  for (let c of circles) {
+    let b = map(c.r, 2, 80, 40, 220);
+    fill(b); textSize(max(6, c.r*0.6));
+    let n = max(1, floor(c.r/6));
+    for (let j=0; j<n; j++) {
+      let a=j*(TWO_PI/n), d=c.r*0.5;
+      text('+', c.x+cos(a)*d, c.y+sin(a)*d);
+    }
+  }
+}` },
+  { name:'Diffusion Limited Aggregation', cat:'growth', desc:'Random walkers that stick on contact — grows coral, lightning, and city maps', code:`let tree, walkers;
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  background(10,10,11);
+  textAlign(CENTER,CENTER); textFont('monospace'); textSize(6);
+  tree = [{x:floor(width/2),y:floor(height/2)}];
+  walkers = [];
+  for (let i=0;i<200;i++) walkers.push(rndEdge());
+  noLoop();
+}
+function rndEdge() {
+  let s=floor(random(4));
+  if(s===0) return {x:random(width),y:0};
+  if(s===1) return {x:width,y:random(height)};
+  if(s===2) return {x:random(width),y:height};
+  return {x:0,y:random(height)};
+}
+function draw() {
+  for (let step=0;step<2000;step++) {
+    for (let i=walkers.length-1;i>=0;i--) {
+      let w=walkers[i];
+      w.x+=random(-3,3); w.y+=random(-3,3);
+      let stuck=false;
+      for (let t of tree) if (dist(w.x,w.y,t.x,t.y)<5) { stuck=true; break; }
+      if (stuck) { tree.push(w); walkers.splice(i,1); walkers.push(rndEdge()); }
+    }
+  }
+  background(10,10,11);
+  for (let i=0;i<tree.length;i++) {
+    let b=map(i,0,tree.length,50,220);
+    fill(16,b,129); text('+',tree[i].x,tree[i].y);
+  }
+  if (tree.length < 1500) redraw();
+}` },
+  { name:'Boids / Flocking', cat:'physics', desc:'Three simple rules (separate, align, cohere) produce lifelike swarm behavior', code:`let boids = [];
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  for (let i=0; i<150; i++) boids.push({
+    x:random(width),y:random(height),vx:random(-2,2),vy:random(-2,2)
+  });
+  textAlign(CENTER,CENTER); textFont('monospace');
+}
+function draw() {
+  background(10,10,11,40);
+  for (let b of boids) {
+    let sx=0,sy=0,ax=0,ay=0,cx=0,cy=0,sc=0,ac=0,cc=0;
+    for (let o of boids) {
+      if(o===b) continue;
+      let d=dist(b.x,b.y,o.x,o.y);
+      if(d<20){sx+=b.x-o.x;sy+=b.y-o.y;sc++;}
+      if(d<50){ax+=o.vx;ay+=o.vy;ac++;}
+      if(d<80){cx+=o.x;cy+=o.y;cc++;}
+    }
+    if(sc){b.vx+=sx/sc*0.05;b.vy+=sy/sc*0.05;}
+    if(ac){b.vx+=(ax/ac-b.vx)*0.05;b.vy+=(ay/ac-b.vy)*0.05;}
+    if(cc){b.vx+=(cx/cc-b.x)*0.001;b.vy+=(cy/cc-b.y)*0.001;}
+    let spd=sqrt(b.vx*b.vx+b.vy*b.vy);
+    if(spd>3){b.vx=b.vx/spd*3;b.vy=b.vy/spd*3;}
+    b.x+=b.vx; b.y+=b.vy;
+    if(b.x<0)b.x=width; if(b.x>width)b.x=0;
+    if(b.y<0)b.y=height; if(b.y>height)b.y=0;
+    fill(6,182,212); textSize(10); text('+',b.x,b.y);
+  }
+}` },
+  { name:'Islamic Star Patterns (Girih)', cat:'geometry', desc:'One rotation rule reflected and repeated fills an infinite plane', code:`function setup() {
+  createCanvas(windowWidth, windowHeight);
+  background(10,10,11);
+  noFill(); stroke(245,158,11,180); strokeWeight(1);
+  let s = 60, cols = ceil(width/s)+1, rows = ceil(height/(s*0.866))+1;
+  for (let row=0; row<rows; row++) for (let col=0; col<cols; col++) {
+    let cx = col*s + (row%2)*s/2, cy = row*s*0.866;
+    drawStar(cx, cy, s*0.45, 8);
+  }
+  noLoop();
+}
+function drawStar(cx, cy, r, points) {
+  let inner = r * 0.4;
+  beginShape();
+  for (let i=0; i<points*2; i++) {
+    let a = i*PI/points - HALF_PI;
+    let rad = i%2===0 ? r : inner;
+    vertex(cx+cos(a)*rad, cy+sin(a)*rad);
+  }
+  endShape(CLOSE);
+  for (let i=0; i<points; i++) {
+    let a = i*TWO_PI/points - HALF_PI;
+    line(cx+cos(a)*inner, cy+sin(a)*inner, cx+cos(a+PI/points)*inner, cy+sin(a+PI/points)*inner);
+  }
+}
+function mousePressed() { background(10,10,11); let s=random(40,80); let pts=floor(random(5,12)); let cols=ceil(width/s)+1, rows=ceil(height/(s*0.866))+1; noFill(); stroke(245,158,11,180); for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){let cx=c*s+(r%2)*s/2,cy=r*s*0.866; drawStar(cx,cy,s*0.45,pts);} }` },
+  { name:'Survivor Bias Visualization', cat:'data', desc:"What you don't see defines the pattern — the missing data tells the story", code:`let dots = [];
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  textAlign(CENTER,CENTER); textFont('monospace');
+  for (let i=0;i<500;i++) dots.push({
+    x:random(width),y:random(height),alive:true,
+    strength:random(1),fade:255
+  });
+}
+function draw() {
+  background(10,10,11);
+  let cx=width/2,cy=height/2,maxD=dist(0,0,cx,cy);
+  for (let d of dots) {
+    if (!d.alive) { d.fade = max(0, d.fade-2); }
+    else {
+      let dd = dist(d.x,d.y,cx,cy)/maxD;
+      if (random() < dd*0.02 && d.strength < dd) d.alive = false;
+    }
+    if (d.fade > 0) {
+      let c = d.alive ? [107,114,128] : [239,68,68];
+      fill(c[0],c[1],c[2], d.fade * (d.alive?1:0.4));
+      textSize(d.alive ? 10 : 8);
+      text('+', d.x, d.y);
+    }
+  }
+  fill(255,60); textSize(11);
+  text('survivors cluster at center — selection bias revealed', width/2, 24);
+}` },
+  { name:'Domain Warping', cat:'noise', desc:'Feed noise into noise — simple recursion creates alien organic landscapes', code:`function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1); noLoop();
+}
+function draw() {
+  loadPixels();
+  let s = 0.004, t = millis()*0.0001;
+  for (let y=0; y<height; y++) for (let x=0; x<width; x++) {
+    let qx = noise(x*s, y*s, t);
+    let qy = noise(x*s+5.2, y*s+1.3, t);
+    let rx = noise((x+qx*80)*s, (y+qy*80)*s, t+1.7);
+    let ry = noise((x+qx*80)*s+9.2, (y+qy*80)*s+3.4, t+2.1);
+    let v = noise((x+rx*80)*s, (y+ry*80)*s, t);
+    let i = (y*width+x)*4;
+    pixels[i] = v*20; pixels[i+1] = v*100+40; pixels[i+2] = v*180+50; pixels[i+3] = 255;
+  }
+  updatePixels();
+}
+function mousePressed() { noiseSeed(random(10000)); redraw(); }` },
+];
+
+// ── Pantry Data Store ──
+const PANTRY_STORE_KEY='chef-pantry-data';
+const TODAY_STR=new Date().toISOString().slice(0,10);
+
+// Seed data: move hardcoded arrays into dated buckets
+const SEED_PANTRY={
+  '2026-02-13':{
+    inspo: INSPIRATIONS.map(i=>({...i})),
+    concepts: CONCEPTS.map(c=>({...c}))
+  }
+};
+
+function getPantryData(){
+  try{
+    const stored=JSON.parse(localStorage.getItem(PANTRY_STORE_KEY)||'null');
+    if(stored) return stored;
+  }catch(e){}
+  // Initialize from seed
+  localStorage.setItem(PANTRY_STORE_KEY,JSON.stringify(SEED_PANTRY));
+  return JSON.parse(JSON.stringify(SEED_PANTRY));
+}
+function savePantryData(data){localStorage.setItem(PANTRY_STORE_KEY,JSON.stringify(data));}
+
+// Get all dates that have entries, sorted descending
+function getPantryDates(){
+  const data=getPantryData();
+  return Object.keys(data).sort().reverse();
+}
+
+// Get items for a specific date and category
+function getPantryItems(date,category){
+  const data=getPantryData();
+  return (data[date]&&data[date][category])||[];
+}
+
+// Get ALL items for a category across all dates (for "all" view)
+function getAllPantryItems(category){
+  const data=getPantryData();
+  const items=[];
+  for(const date of Object.keys(data).sort().reverse()){
+    const dayItems=data[date]&&data[date][category];
+    if(dayItems) dayItems.forEach(item=>items.push({...item,_date:date}));
+  }
+  return items;
+}
+
+// Add items — callable via WS message system
+function addPantryItems(date,category,items){
+  const data=getPantryData();
+  if(!data[date]) data[date]={};
+  if(!data[date][category]) data[date][category]=[];
+  data[date][category].push(...items);
+  savePantryData(data);
+  // Re-render if currently viewing this date or "all"
+  if(pantryViewDate===date||pantryViewDate==='all') renderPantryView();
+}
+window.addPantryItems=addPantryItems;
+
+// Current pantry view state
+let pantryViewDate=TODAY_STR;
+
+function formatPantryDate(dateStr){
+  if(dateStr===TODAY_STR) return 'Today';
+  const d=new Date(dateStr+'T12:00:00');
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+
+function pantryNavigate(direction){
+  const dates=getPantryDates();
+  if(!dates.length) return;
+  if(pantryViewDate==='all'){
+    pantryViewDate=dates[0]; // go to most recent
+  } else {
+    const idx=dates.indexOf(pantryViewDate);
+    if(direction==='prev'&&idx<dates.length-1) pantryViewDate=dates[idx+1];
+    else if(direction==='next'&&idx>0) pantryViewDate=dates[idx-1];
+    else if(direction==='next'&&idx===0) pantryViewDate=dates[0]; // stay at newest
+  }
+  renderPantryView();
+}
+
+function renderPantryView(){
+  const dateLabel=$('#pantryDateLabel');
+  if(dateLabel) dateLabel.textContent=formatPantryDate(pantryViewDate);
+  renderInspoPane();
+  renderConceptsPane();
+  renderHistoryPane();
+}
+
+function isToday(dateStr){return dateStr===TODAY_STR;}
+
+// ── Helpers ──
+const $=s=>document.querySelector(s);
+const $$=s=>document.querySelectorAll(s);
+const now=new Date();
+function daysBetween(a,b){return Math.ceil((b-a)/86400000);}
+function formatTime(d){return new Date(d).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function urlify(text){
+  const re=/(https?:\/\/[^\s]+)/g;let out='',m,last=0;
+  while((m=re.exec(text))!==null){
+    if(m.index>last) out+=esc(text.slice(last,m.index));
+    out+=`<a class="link-card" href="${esc(m[1])}" target="_blank" rel="noopener">${esc(m[1])}</a>`;
+    last=re.lastIndex;
+  }
+  if(last<text.length) out+=esc(text.slice(last));
+  return out;
+}
+
+// ── Date ──
+$('#stageDate').textContent=now.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+
+// ── Deadlines ──
+(function(){
+  const sorted=[...DEADLINES].sort((a,b)=>a.date-b.date);
+  const nearest=sorted.find(d=>d.date>=now)||sorted[sorted.length-1];
+  const days=daysBetween(now,nearest.date);
+  const dotColor=days<7?'var(--red)':days<30?'var(--amber)':'var(--emerald)';
+  $('#dlDot').style.background=dotColor;
+  $('#dlCountdown').textContent=days+'d';
+  $('#dlName').textContent=nearest.emoji+' '+nearest.name;
+  $('#dlExpand').innerHTML=sorted.map(d=>{
+    const dd=daysBetween(now,d.date);
+    const c=dd<7?'var(--red)':dd<30?'var(--amber)':'var(--emerald)';
+    return `<div class="dl-row"><span class="dot" style="background:${c}"></span><span>${d.emoji} ${esc(d.name)}</span><span class="dl-days">${d.date.toLocaleDateString('en-US',{month:'short',day:'numeric'})} · ${dd}d</span></div>`;
+  }).join('');
+  $('#deadlineBar').addEventListener('click',()=>$('#deadlineBar').classList.toggle('open'));
+})();
+
+// ── Code Canvas Tabs (Preview/Editor) ──
+function switchStageTab(tab){
+  $$('.code-canvas-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+  $('#canvasView').classList.toggle('hidden',tab!=='canvas');
+  $('#codeView').classList.toggle('hidden',tab!=='code');
+}
+$$('.code-canvas-tab').forEach(t=>t.addEventListener('click',()=>switchStageTab(t.dataset.tab)));
+
+// ── Reference Tabs ──
+function switchRefTab(tab){
+  $$('.ref-tab').forEach(t=>t.classList.toggle('active',t.dataset.ref===tab));
+  $$('.ref-pane').forEach(p=>p.classList.toggle('active',p.dataset.refpane===tab));
+}
+$$('.ref-tab').forEach(t=>t.addEventListener('click',()=>switchRefTab(t.dataset.ref)));
+
+// ── Code Editor ──
+const codeEditor=$('#codeEditor');
+const canvasFrame=$('#canvasFrame');
+const lineNumbers=$('#lineNumbers');
+codeEditor.value=STARTER_SKETCH;
+updateLineNumbers();
+
+function updateLineNumbers(){
+  const lines=codeEditor.value.split('\n').length;
+  lineNumbers.textContent=Array.from({length:lines},(_,i)=>i+1).join('\n');
+}
+codeEditor.addEventListener('input',()=>{
+  updateLineNumbers();
+  if($('#autoRun').checked){clearTimeout(codeEditor._d);codeEditor._d=setTimeout(runCode,500);}
+});
+codeEditor.addEventListener('scroll',()=>{lineNumbers.style.transform=`translateY(-${codeEditor.scrollTop}px)`;});
+codeEditor.addEventListener('keydown',e=>{
+  if(e.key==='Tab'){e.preventDefault();const s=codeEditor.selectionStart,end=codeEditor.selectionEnd;codeEditor.value=codeEditor.value.substring(0,s)+'  '+codeEditor.value.substring(end);codeEditor.selectionStart=codeEditor.selectionEnd=s+2;updateLineNumbers();}
+});
+
+// ── Canvas ──
+let currentAspect='fill';
+
+function updateCanvasSize(){
+  const container=$('#canvasContainer');
+  const cw=container.clientWidth;
+  const ch=container.clientHeight;
+  const frame=canvasFrame;
+  if(currentAspect==='fill'){
+    frame.style.width='100%';frame.style.height='100%';
+  } else {
+    let ratio;
+    if(currentAspect==='1:1') ratio=1;
+    else if(currentAspect==='9:16') ratio=9/16;
+    else ratio=16/9;
+    let w=cw,h=cw/ratio;
+    if(h>ch){h=ch;w=ch*ratio;}
+    frame.style.width=w+'px';frame.style.height=h+'px';
+  }
+}
+
+function runCode(){
+  const code=codeEditor.value;
+  updateCanvasSize();
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;overflow:hidden;background:#0a0a0b;width:100%;height:100%;}canvas{display:block;}</style><script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"><\/script></head><body><script>${code}<\/script></body></html>`;
+  canvasFrame.srcdoc=html;
+}
+
+$('#runBtn').addEventListener('click',()=>{switchStageTab('canvas');runCode();});
+
+$$('.aspect-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    $$('.aspect-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentAspect=btn.dataset.aspect;
+    updateCanvasSize();
+  });
+});
+
+// Save/Load
+const SK_KEY='chef-workspace-sketches';
+function getSketches(){try{return JSON.parse(localStorage.getItem(SK_KEY)||'[]');}catch(e){return[];}}
+function saveSketches(a){localStorage.setItem(SK_KEY,JSON.stringify(a));}
+function refreshLoad(){
+  const sel=$('#loadSelect');const sk=getSketches();
+  sel.innerHTML='<option value="">Load…</option>'+sk.map((s,i)=>`<option value="${i}">${esc(s.name)}</option>`).join('');
+}
+refreshLoad();
+$('#saveBtn').addEventListener('click',()=>{
+  const name=$('#saveName').value.trim()||('Sketch '+new Date().toLocaleTimeString());
+  const sk=getSketches();sk.push({name,code:codeEditor.value,timestamp:Date.now()});
+  saveSketches(sk);refreshLoad();$('#saveName').value='';
+});
+$('#loadSelect').addEventListener('change',e=>{
+  const idx=e.target.value;if(idx==='')return;
+  const sk=getSketches();if(sk[idx]){codeEditor.value=sk[idx].code;updateLineNumbers();switchStageTab('canvas');runCode();}
+  e.target.value='';
+});
+
+// Run on load
+setTimeout(()=>{updateCanvasSize();runCode();},100);
+window.addEventListener('resize',()=>{updateCanvasSize();});
+
+// ── Inspiration Panel (Pantry-aware) ──
+let currentInspoItems=[];
+
+function renderInspoPane(){
+  const items=pantryViewDate==='all'?getAllPantryItems('inspo'):getPantryItems(pantryViewDate,'inspo');
+  currentInspoItems=items;
+  $('#inspoPane').innerHTML=items.length?items.map((item,i)=>`
+    <div class="insp-card-s" onclick="showInspDetail(${i})" style="display:flex;gap:8px;align-items:flex-start;">
+      ${item.img ? '<img src="'+item.img+'" style="width:48px;height:36px;object-fit:cover;border-radius:4px;flex-shrink:0;margin-top:2px;">' : ''}
+      <div style="min-width:0;">
+        <span class="cat-pill cat-${item.cat}">${item.cat}</span>
+        ${isToday(item._date||pantryViewDate)?'<span class="new-badge">new</span>':''}
+        ${item._date?'<span class="date-badge">'+item._date+'</span>':''}
+        <h4>${esc(item.title)}</h4>
+        <div class="desc">${esc(item.desc)}</div>
+      </div>
+    </div>
+  `).join(''):'<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center;">No entries for this date</div>';
+}
+renderInspoPane();
+
+function showInspDetail(idx){
+  const item=currentInspoItems[idx];
+  const sameCat=currentInspoItems.map((it,i)=>({...it,idx:i})).filter(it=>it.cat===item.cat);
+  const pos=sameCat.findIndex(it=>it.idx===idx);
+  const prev=sameCat[(pos-1+sameCat.length)%sameCat.length].idx;
+  const next=sameCat[(pos+1)%sameCat.length].idx;
+
+  const sc=$('#spotlightContent');
+  sc.innerHTML=`
+    ${item.img ? '<img src="'+item.img+'" style="width:100%;max-height:300px;object-fit:cover;border-radius:8px;margin-bottom:12px;">' : ''}
+    <span class="cat-pill cat-${item.cat}">${item.cat}</span>
+    <h2>${esc(item.title)}</h2>
+    <div class="desc">${esc(item.desc)}</div>
+    <a class="source-link" href="${esc(item.link)}" target="_blank" rel="noopener">View source ↗</a>
+    <div class="insp-nav">
+      <button onclick="showInspDetail(${prev})">← prev</button>
+      <button onclick="showInspDetail(${next})">next →</button>
+      <button class="back-btn" onclick="hideSpotlight()">✕ Close</button>
+    </div>
+  `;
+  sc.classList.add('active');
+  $('#spotlightPlaceholder').style.display='none';
+
+  // Track
+  try{
+    const interactions=JSON.parse(localStorage.getItem('chef-kitchen-interactions')||'{}');
+    interactions[item.id]=(interactions[item.id]||0)+1;
+    interactions._lastClick={id:item.id,time:Date.now()};
+    localStorage.setItem('chef-kitchen-interactions',JSON.stringify(interactions));
+  }catch(e){}
+}
+window.showInspDetail=showInspDetail;
+
+function hideSpotlight(){
+  $('#spotlightContent').classList.remove('active');
+  $('#spotlightPlaceholder').style.display='';
+}
+window.hideSpotlight=hideSpotlight;
+
+// ── Techniques Panel ──
+$('#techPane').innerHTML=TECHNIQUES.map((t,i)=>`
+  <div class="tech-card-s">
+    <div class="info">
+      <span class="cat-pill cat-${t.cat}">${t.cat}</span>
+      <h4>${esc(t.name)}</h4>
+    </div>
+    <button class="load-btn" onclick="loadTechnique(${i})">Load</button>
+  </div>
+`).join('');
+
+function loadTechnique(idx){
+  const t=TECHNIQUES[idx];
+  codeEditor.value=t.code;
+  updateLineNumbers();
+  switchStageTab('canvas');
+  runCode();
+}
+window.loadTechnique=loadTechnique;
+
+// ── Concepts Panel (Pantry-aware) ──
+function renderConceptsPane(){
+  const items=pantryViewDate==='all'?getAllPantryItems('concepts'):getPantryItems(pantryViewDate,'concepts');
+  if(!items.length){
+    $('#conceptsPane').innerHTML='<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center;">No concepts for this date</div>';
+    return;
+  }
+  let html='<div class="concepts-wrap"><div class="concepts-nav">';
+  items.forEach((_,i)=>{
+    const ch=i===0?'checked':'';
+    html+=`<input type="radio" name="concept" id="c${i+1}" ${ch}><label for="c${i+1}">${i+1}</label>`;
+  });
+  html+='<div class="concept-panels">';
+  items.forEach((c,i)=>{
+    const dateBadge=(c._date||pantryViewDate);
+    const badge=isToday(dateBadge)?'<span class="new-badge" style="margin-left:0;margin-bottom:4px;">new</span> ':'';
+    html+=`<div class="concept-panel cp${i+1}">${badge}<h3>"${esc(c.title)}"</h3><p>${esc(c.body)}</p></div>`;
+  });
+  html+='</div></div></div>';
+  $('#conceptsPane').innerHTML=html;
+}
+renderConceptsPane();
+
+// ── History Pane ──
+function renderHistoryPane(){
+  const dates=getPantryDates();
+  if(!dates.length){
+    $('#historyPane').innerHTML='<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center;">No pantry history yet</div>';
+    return;
+  }
+  const data=getPantryData();
+  $('#historyPane').innerHTML='<div class="history-date-list">'+dates.map(d=>{
+    const dayData=data[d]||{};
+    const inspoCount=(dayData.inspo||[]).length;
+    const conceptCount=(dayData.concepts||[]).length;
+    const total=inspoCount+conceptCount;
+    const todayCls=isToday(d)?'today':'';
+    return `<div class="history-date-item ${todayCls}" onclick="pantryJumpToDate('${d}')">
+      <span class="hd-date">${isToday(d)?'🥘 Today — ':''} ${new Date(d+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'})}</span>
+      <span class="hd-count">${inspoCount} inspo · ${conceptCount} concepts</span>
+    </div>`;
+  }).join('')+'</div>';
+}
+renderHistoryPane();
+
+function pantryJumpToDate(dateStr){
+  pantryViewDate=dateStr;
+  // Switch to inspo tab to show entries
+  switchRefTab('inspo');
+  renderPantryView();
+}
+window.pantryJumpToDate=pantryJumpToDate;
+
+// ── Pantry date nav buttons ──
+$('#pantryPrev').addEventListener('click',()=>pantryNavigate('prev'));
+$('#pantryNext').addEventListener('click',()=>pantryNavigate('next'));
+$('#pantryDateLabel').addEventListener('click',()=>{
+  pantryViewDate=TODAY_STR;
+  renderPantryView();
+});
+
+// ── Chat (OpenClaw WebSocket) ──
+const CHAT_KEY='chef-kitchen-chat';
+const GW_URL='ws://localhost:18789';
+// Token is safe here — gateway binds to loopback only (127.0.0.1)
+const GW_TOKEN='ea37aa65c6e799a551a5145a36eaa0d0015daf6c2739d313';
+let ws=null, wsReady=false, currentRunId=null, streamBuffer='';
+let chatMsgs=[];  // in-memory store (no localStorage dependency for file://)
+
+// Extract text from message content (handles string and array formats)
+function extractText(msg){
+  if(!msg)return null;
+  if(typeof msg==='string')return msg;
+  if(typeof msg.content==='string')return msg.content;
+  if(Array.isArray(msg.content)){
+    return msg.content.filter(c=>c.type==='text').map(c=>c.text||'').join('');
+  }
+  if(Array.isArray(msg)){
+    return msg.filter(c=>c.type==='text').map(c=>c.text||'').join('');
+  }
+  return null;
+}
+function loadMsgs(){return chatMsgs;}
+function saveMsgs(m){chatMsgs=m.slice(-200);}
+function renderMsgs(){
+  const msgs=loadMsgs();
+  const html=msgs.map(m=>{
+    const cls=m.sender==='user'?'user':'chef';
+    return `<div class="chat-msg ${cls}">${urlify(m.text)}<span class="msg-time">${formatTime(m.timestamp)}</span></div>`;
+  }).join('');
+  const el=$('#chatMessages');if(el){el.innerHTML=html;el.scrollTop=el.scrollHeight;}
+  const el2=$('#chatMessagesMobile');if(el2){el2.innerHTML=html;el2.scrollTop=el2.scrollHeight;}
+}
+function addChefMsg(text){
+  const msgs=loadMsgs();
+  msgs.push({text,timestamp:Date.now(),sender:'chef'});
+  saveMsgs(msgs);renderMsgs();
+}
+function updateLastChefMsg(text){
+  const msgs=loadMsgs();
+  const lastChef=msgs.findLastIndex(m=>m.sender==='chef');
+  if(lastChef>=0){msgs[lastChef].text=text;saveMsgs(msgs);renderMsgs();}
+  else addChefMsg(text);
+}
+
+function wsConnect(){
+  const token=GW_TOKEN;
+  
+  try{ ws=new WebSocket(GW_URL); }catch(e){ console.error('WS create failed:',e); addChefMsg('❌ WebSocket failed: '+e.message); return; }
+  ws.onopen=()=>{
+    console.log('WS open, sending connect...');
+    ws.send(JSON.stringify({type:'req',method:'connect',id:'c1',params:{auth:{token},minProtocol:3,maxProtocol:3,client:{id:'webchat-ui',version:'0.3',platform:'web',mode:'webchat'}}}));
+  };
+  ws.onmessage=(e)=>{
+    try{
+      const msg=JSON.parse(e.data);
+      console.log('WS msg:',msg.type,msg.method||msg.event||msg.id,msg.error||'');
+      // Connection error
+      if(msg.type==='res'&&msg.id==='c1'&&msg.error){
+        addChefMsg('❌ Gateway: '+(msg.error.message||JSON.stringify(msg.error)));
+        updateChatStatus('error');
+        return;
+      }
+      // Connection ack
+      if(msg.type==='res'&&msg.id==='c1'){
+        wsReady=true;
+        updateChatStatus('connected');
+        // Load history
+        ws.send(JSON.stringify({type:'req',method:'chat.history',id:'h1',params:{sessionKey:'agent:main:main',limit:50}}));
+      }
+      // Chat history response
+      const resData=msg.result||msg.payload;
+      if(msg.type==='res'&&(msg.id==='h1'||msg.id==='h2')&&resData&&resData.messages){
+        const stored=[];
+        resData.messages.forEach(m=>{
+          const text = typeof m.content==='string' ? m.content : 
+            (Array.isArray(m.content) ? m.content.filter(c=>c.type==='text').map(c=>c.text).join('') : '');
+          if(!text)return;
+          if(m.role==='user') stored.push({text,timestamp:m.ts||Date.now(),sender:'user'});
+          else if(m.role==='assistant'&&!text.match(/^(NO_REPLY|HEARTBEAT_OK)$/)) stored.push({text,timestamp:m.ts||Date.now(),sender:'chef'});
+        });
+        if(msg.id==='h2'&&stored.length){
+          // After a response, just update the last chef message
+          const lastChef=stored.filter(s=>s.sender==='chef').pop();
+          if(lastChef) updateLastChefMsg(lastChef.text);
+        } else if(stored.length){
+          saveMsgs(stored);renderMsgs();
+        }
+      }
+      // chat.send ack
+      if(msg.type==='res'&&msg.id==='s1'){
+        const sendRes=msg.result||msg.payload;
+        currentRunId=sendRes?.runId||null;
+        if(sendRes?.status==='started'){streamBuffer='';addChefMsg('⏳...');}
+      }
+      // Pantry push via WS (from cron sub-agents)
+      if(msg.type==='event'&&msg.event==='pantry.add'){
+        const d=msg.payload||msg.data||{};
+        if(d.date&&d.category&&d.items){
+          addPantryItems(d.date,d.category,d.items);
+        }
+      }
+      // Streaming chat events (matches control UI protocol)
+      if(msg.type==='event'&&msg.event==='chat'){
+        const d=msg.payload||msg.data||{};
+        console.log('chat event:',JSON.stringify(d).slice(0,200));
+        // Delta state — extract text from message content
+        if(d.state==='delta'){
+          const text=extractText(d.message);
+          if(text){streamBuffer=text;updateLastChefMsg(streamBuffer);}
+        }
+        // Final state — fetch latest from history if no streamed content
+        if(d.state==='final'){
+          const text=extractText(d.message);
+          if(text)updateLastChefMsg(text);
+          else if(streamBuffer)updateLastChefMsg(streamBuffer);
+          else { fetchLastResponse(); }
+          streamBuffer='';currentRunId=null;
+        }
+        // Error/aborted
+        if(d.state==='error'||d.state==='aborted'){
+          if(d.errorMessage)updateLastChefMsg('❌ '+d.errorMessage);
+          else if(streamBuffer)updateLastChefMsg(streamBuffer);
+          streamBuffer='';currentRunId=null;
+        }
+        // Legacy format fallback
+        if(d.kind==='text-delta'&&d.delta){streamBuffer+=d.delta;updateLastChefMsg(streamBuffer);}
+        if(d.kind==='text-done'&&d.text){updateLastChefMsg(d.text);streamBuffer='';currentRunId=null;}
+        if(d.kind==='done'){if(streamBuffer)updateLastChefMsg(streamBuffer);streamBuffer='';currentRunId=null;}
+      }
+    }catch(err){console.error('WS parse error',err);}
+  };
+  ws.onclose=()=>{wsReady=false;updateChatStatus('disconnected');setTimeout(()=>wsConnect(),5000);};
+  ws.onerror=()=>{wsReady=false;updateChatStatus('error');};
+}
+
+function updateChatStatus(s){
+  const dot=s==='connected'?'🟢':s==='disconnected'?'🔴':'🟡';
+  const el=$('#chatStatus');if(el)el.textContent=dot;
+  const el2=$('#chatStatusMobile');if(el2)el2.textContent=dot;
+}
+
+function fetchLastResponse(){
+  if(!wsReady||!ws)return;
+  ws.send(JSON.stringify({type:'req',method:'chat.history',id:'h2',params:{sessionKey:'agent:main:main',limit:5}}));
+}
+
+function sendMsg(text){
+  if(!text.trim())return;
+  const msgs=loadMsgs();
+  msgs.push({text:text.trim(),timestamp:Date.now(),sender:'user'});
+  saveMsgs(msgs);renderMsgs();
+  
+  if(wsReady&&ws){
+    ws.send(JSON.stringify({type:'req',method:'chat.send',id:'s1',params:{message:text.trim(),sessionKey:'agent:main:main',deliver:true,idempotencyKey:'k-'+Date.now()}}));
+  } else {
+    addChefMsg("⚠️ Not connected to gateway. Paste token in chat or check that OpenClaw is running on localhost:18789");
+  }
+}
+
+// Auto-connect on load
+wsConnect();
+$('#chatSend').addEventListener('click',()=>{sendMsg($('#chatInput').value);$('#chatInput').value='';});
+$('#chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){sendMsg($('#chatInput').value);$('#chatInput').value='';}});
+$('#chatFab').addEventListener('click',()=>{$('#chatSheet').classList.add('open');$('#chatOverlay').style.display='block';renderMsgs();});
+$('#chatOverlay').addEventListener('click',()=>{$('#chatSheet').classList.remove('open');$('#chatOverlay').style.display='none';});
+$('#chatSendMobile').addEventListener('click',()=>{sendMsg($('#chatInputMobile').value);$('#chatInputMobile').value='';});
+$('#chatInputMobile').addEventListener('keydown',e=>{if(e.key==='Enter'){sendMsg($('#chatInputMobile').value);$('#chatInputMobile').value='';}});
+renderMsgs();
+
+// ── Mobile Tabs ──
+$$('.m-tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    $$('.m-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    const t=tab.dataset.mtab;
+    document.body.classList.remove('mobile-ref','mobile-chat','mobile-code','mobile-canvas');
+    if(t==='ref') document.body.classList.add('mobile-ref');
+    else if(t==='chat') document.body.classList.add('mobile-chat');
+    else if(t==='code'){document.body.classList.add('mobile-code');switchStageTab('code');}
+    else if(t==='spotlight') document.body.classList.add('mobile-canvas');
+    else {document.body.classList.add('mobile-code');switchStageTab('canvas');}
+  });
+});
+</script>
+</body>
+</html>
