@@ -474,6 +474,54 @@ mesh.receiveShadow = true;
 decorMesh.castShadow = false; // Small objects often don't need to cast
 ```
 
+## ⚠️ Gotcha: Layers Do NOT Isolate Lights
+
+Three.js `layers` control **camera visibility** (what the camera renders), NOT light influence. Setting `light.layers.set(1)` and `mesh.layers.enable(1)` does **not** mean only that mesh receives light from that light. All objects in the scene still receive illumination from all lights regardless of layer assignment.
+
+**If you need light isolation** (e.g., a light that only affects one object):
+- Use an **FBO/render-target approach**: render the object in its own scene with its own lights, composite the result
+- Use **per-face emissive materials** on BoxGeometry (material array) to fake directional lighting without adding lights
+- Use **ShaderMaterial** with custom uniforms to manually control which lights affect which objects
+- Use **separate scenes** rendered to textures
+
+```javascript
+// WRONG — layers don't isolate light influence
+cubeLight.layers.set(2);
+cube.layers.enable(2);
+// ❌ cubeLight still illuminates ALL objects in the scene
+
+// RIGHT — per-face emissive on BoxGeometry (6 materials, one per face)
+// BoxGeometry face order: +X, -X, +Y, -Y, +Z, -Z
+const materials = [
+  new THREE.MeshBasicMaterial({ color: 0x000000 }), // +X (right)
+  new THREE.MeshBasicMaterial({ color: 0x000000 }), // -X (left)
+  new THREE.MeshBasicMaterial({ color: 0x4060a0 }), // +Y (top) — glowing
+  new THREE.MeshBasicMaterial({ color: 0x000000 }), // -Y (bottom)
+  new THREE.MeshBasicMaterial({ color: 0x000000 }), // +Z (front)
+  new THREE.MeshBasicMaterial({ color: 0x203050 }), // -Z (back) — dim glow
+];
+const box = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), materials);
+// ✅ Each face has independent emission — no extra lights, no scene pollution
+```
+
+## Additive Glow Stacking Under Objects
+
+When multiple additive-blend emissive planes (prayer discs, glow effects) overlap under a transparent/refractive object, their combined brightness blows out the object's bottom face.
+
+**Fix: center-hole technique** — add a `smoothstep` ramp to the disc shader that creates a dark zone at the center (directly under the object):
+
+```glsl
+// Prayer disc fragment shader — world-space r
+float r = length(vPos);
+// Original (blows out under cube):
+float radial = exp(-r / uOuterRadius * 2.2);
+// Fixed (dark hole under cube, glow starts further out):
+float radial = exp(-r / uOuterRadius * 2.2) * smoothstep(0.0, 1.5, r);
+// 1.5 = world units — size the hole to match the object's footprint
+```
+
+**Key insight:** The hole radius should match the object's footprint in the disc's coordinate space. A 1.2-unit cube needs ~1.5-unit hole for clean separation. Too small (0.15) = still blows out. Too large = visible gap in the glow pattern.
+
 ## See Also
 
 - `threejs-materials` - Material light response

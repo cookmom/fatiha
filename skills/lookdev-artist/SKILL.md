@@ -1602,3 +1602,36 @@ Saturated: `0x6b4a38` (amber), `0xc07030` (orange), any high-chroma color → gl
 - Cool RIM light separates silhouette from background
 - Background stays near-neutral so the glass can breathe
 - The floor can be slightly warmer than background (Turrell ground warmth) but stay desaturated (`0x857870`, not `0x9a8060`)
+
+## Critical Lesson: Additive Glow Stacking Under Glass (2026-03-02)
+
+### The problem
+Multiple additive-blend emissive planes (prayer discs, glow effects) overlapping directly under a refractive glass object. Each disc contributes full brightness at r≈0. With 3-5 discs stacking, the cube bottom clips to pure white — reads as a light bulb, not glass.
+
+### The fix: center-hole technique
+Add a `smoothstep(0.0, R, r)` ramp to every additive disc shader, where R matches the object's footprint radius in the disc's coordinate space:
+
+```glsl
+// World-space disc (e.g. prayer window, radius ~9 world units)
+// Cube footprint ≈ 0.6 world units → hole radius 1.5 for clean separation
+float radial = exp(-r / uOuterRadius * 2.2) * smoothstep(0.0, 1.5, r);
+
+// UV-space disc (0→1 normalized, e.g. prism fan, radius 12 world units)
+// Cube footprint ≈ 0.6/12 = 0.05 → hole radius ~0.08-0.20
+float radial = smoothstep(0.08, 0.20, r) * exp(-r * r * 3.0);
+```
+
+### Why this works
+- The hole is invisible to the viewer (it's directly under an opaque-ish object)
+- Prayer windows / glow features still read perfectly — the glow just starts further from center
+- No changes needed to the glass shader or lighting — it's purely a disc-side fix
+- Much cleaner than reducing cubeSun intensity (which kills the rainbow)
+
+### Combined approach (when center hole alone isn't enough)
+1. **Center hole** on additive discs (eliminates stacking)
+2. **cubeSun reduction** 85→55 (reduces direct bottom-face hit)
+3. **Bottom-face attenuation** in glass shader via `Nw.y` (per-face control)
+4. **Bottom-face glow** in glass shader (subtle emission to separate from dark podium)
+
+### Key insight: coordinate spaces matter
+The center hole radius must be specified in the disc's own coordinate space. A 1.2-unit cube sitting on a 9-unit-radius world-space disc needs r≈1.5. The same cube on a UV-normalized disc needs r≈0.08. Getting this wrong = either no effect (too small) or visible hole in the glow (too large).

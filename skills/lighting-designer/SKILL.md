@@ -1199,3 +1199,21 @@ new RGBELoader().load('studio.hdr', (hdr) => {
 - [ ] Background has some luminance (not pure black) for visible refraction
 - [ ] `RectAreaLightUniformsLib.init()` called if using RectAreaLight
 - [ ] `renderer.physicallyCorrectLights` = false (deprecated) → use `renderer.useLegacyLights = false` (r152+)
+- [ ] **CubeSun intensity vs bottom blowout** — see sweet spot notes below
+
+### CubeSun Positioning & Intensity Sweet Spots (FBO Dichroic Glass)
+
+When using a PointLight behind a cube to drive FBO chromatic-aberration refraction:
+
+| Intensity | Position | Result |
+|-----------|----------|--------|
+| 85 | (0, 1.0, -2.0) | 🔴 Nuclear blowout on bottom face, clips to white |
+| 75 | (0, 0.4, -2.5) | 🟡 Better but still blows out with additive disc glow |
+| 55 | (0, 0.2, -2.8) | ✅ Sweet spot — rich rainbow, no blowout, glass reads as crystal |
+| 45 | (0, 0.2, -2.8) | 🟡 Too dim — rainbow fades, bottom merges with dark podium |
+
+**Key principles:**
+- **Lower Y = less direct bottom-face hit.** Moving cubeSun from y=1.0 to y=0.2 shifts refraction from "through the bottom" to "through the back faces"
+- **Further back (-Z) = softer spread.** Moving from z=-2.0 to z=-2.8 reduces intensity falloff gradient across the cube
+- **Rainbow comes from IOR split, not raw intensity.** You can cut intensity 85→55 (35% reduction) and the chromatic dispersion still works because it's driven by per-channel IOR differences (1.50/1.56/1.63), not brightness
+- **Combine with bottom-face attenuation in shader** for per-face control without losing overall brightness (see threejs-materials skill)

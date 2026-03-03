@@ -513,6 +513,47 @@ function getMaterial(color) {
 material.dispose();
 ```
 
+## Per-Face Materials on BoxGeometry
+
+BoxGeometry supports a **material array** (6 entries, one per face) for independent per-face appearance. Face order: `+X, -X, +Y, -Y, +Z, -Z`.
+
+This is invaluable for:
+- **Faking directional lighting** without adding scene lights (use emissive colors per face)
+- **Isolated face glow** (e.g., glowing top face on a podium without polluting other objects)
+- **Contact shadows** (darken the -Y face to fake AO at the base)
+
+```javascript
+// Podium with glowing top, dark sides, no extra lights needed
+const podiumMats = [
+  new THREE.MeshStandardMaterial({ color: 0x101020 }), // +X
+  new THREE.MeshStandardMaterial({ color: 0x101020 }), // -X
+  new THREE.MeshStandardMaterial({ color: 0x203050, emissive: 0x0a1530 }), // +Y top glow
+  new THREE.MeshStandardMaterial({ color: 0x080810 }), // -Y bottom (dark)
+  new THREE.MeshStandardMaterial({ color: 0x101020 }), // +Z
+  new THREE.MeshStandardMaterial({ color: 0x0c0c18 }), // -Z
+];
+const podium = new THREE.Mesh(new THREE.BoxGeometry(2, 0.5, 2), podiumMats);
+```
+
+**Why not use lights?** Lights in Three.js affect ALL objects in the scene (layers don't isolate light influence — see `threejs-lighting` gotcha). Per-face materials give you isolated control.
+
+## Per-Face Normal Control in ShaderMaterial (FBO Glass)
+
+For FBO refraction glass, the bottom face receives the strongest direct light transmission (cubeSun shines through). Use `vWorldNormal.y` to selectively attenuate:
+
+```glsl
+// Bottom-face attenuation: tame cubeSun direct hit without killing rainbow
+vec3 Nw = normalize(vWorldNormal);
+float bottomAtten = 1.0 - 0.25 * smoothstep(-0.3, -0.95, Nw.y);
+vec3 col = refracted * tint * brightness * bottomAtten;
+
+// Bottom-face glow: subtle emission to separate from dark podium
+float bottomFace = smoothstep(-0.5, -0.92, Nw.y);
+col += vec3(0.35, 0.45, 0.7) * bottomFace * 0.25;
+```
+
+**Gotcha:** View-dependent effects like `edgeCatch = pow(1.0 - NdotV, 4.5)` don't work for bottom-face separation when the camera looks down at the cube — the bottom face is nearly perpendicular to the view vector, so NdotV ≈ 1 and edgeCatch ≈ 0. Use **normal-based** (Nw.y) effects instead for bottom-face work.
+
 ## See Also
 
 - `threejs-textures` - Texture loading and configuration

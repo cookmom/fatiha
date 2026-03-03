@@ -1,0 +1,28 @@
+Object: Classic glazed ring donut with pink strawberry icing and multicolor sprinkles.
+
+Shape & Proportions:
+- Torus shape, major radius ~1.0, minor radius ~0.38 (slightly fatter than standard)
+- Flat bottom, slightly puffy top
+- Icing covers entire top surface and drapes slightly over the outer edge
+- Icing thickness: thin flat coat ~0.04 units
+- Visible cream/white filling layer at the equator seam (cream filling sandwich style)
+
+Materials:
+1. Donut dough: warm golden-brown (hex #C8854A), roughness 0.8, slight subsurface scattering (SSS weight 0.2, radius warm orange)
+2. Pink icing: soft pink (hex #F4A8C7), roughness 0.3, slight sheen/gloss, flat matte-satin finish
+3. Sprinkles: cylindrical, small (length ~0.08, radius ~0.012), multicolor — red (#E8332A), orange (#F5821F), yellow (#FFD700), green (#4CAF50), blue (#2196F3), purple (#9C27B0), white (#FFFFFF)
+4. Cream filling: off-white (#F5F0E8), roughness 0.9, very matte
+
+Sprinkles:
+- ~60-80 sprinkles scattered randomly across icing surface
+- Standing upright at random angles on icing
+
+Lighting:
+- Soft studio setup, light from upper-left
+- White background (#FFFFFF)
+- Soft diffuse shadow beneath donut
+- No harsh specular highlights
+
+Camera:
+- Slightly elevated angle (~25-30 degrees above horizon)
+- Centered on donut, slight front-facing perspective
