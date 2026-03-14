@@ -4,10 +4,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>fatiha.app — Three.js Garden v9</title>
+<title>fatiha.app — Three.js Garden (fresh)</title>
 <style>
 *{margin:0;padding:0}
-body{background:#0d0d12;overflow:hidden}
+body{background:#0d0d0d;overflow:hidden}
 canvas{display:block}
 #play-btn{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
   background:transparent;border:1px solid rgba(255,255,255,0.12);
@@ -29,9 +29,9 @@ import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
 import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
 import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-// ═══════════════════════════════════════════════════
-// CONSTANTS
-// ═══════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════
+   CONSTANTS — matching 2D v43
+   ═══════════════════════════════════════════════════ */
 const W=window.innerWidth, H=window.innerHeight;
 const dpr=Math.min(window.devicePixelRatio,2);
 const GOLDEN_ANGLE=137.508*Math.PI/180;
@@ -40,30 +40,26 @@ const FIB=[3,5,8,5,3,8,2,5,8,3,5,1,8,5,3];
 const WEAVE_FREQ=4.5;
 const TOTAL_DUR=6.0;
 
-// Seeded random for deterministic growth
-let _seed=42;
-function srand(s){_seed=s;}
-function rand(){_seed=(_seed*16807+0)%2147483647;return(_seed-1)/2147483646;}
-
-// ═══════════════════════════════════════════════════
-// SCENE
-// ═══════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════
+   THREE.JS SCENE
+   ═══════════════════════════════════════════════════ */
 const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x0d0d12);
-const camera=new THREE.OrthographicCamera(0,W,0,H,-1000,1000);
+scene.background=new THREE.Color(0x0d0d0d);
+const camera=new THREE.OrthographicCamera(0,W*dpr,0,H*dpr,-1000,1000);
 camera.position.z=500;
 const renderer=new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(W,H);renderer.setPixelRatio(dpr);
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 document.body.appendChild(renderer.domElement);
+
 const composer=new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene,camera));
-const bloom=new UnrealBloomPass(new THREE.Vector2(W,H),0.3,0.2,0.9);
+const bloom=new UnrealBloomPass(new THREE.Vector2(W,H),0.35,0.25,0.88);
 composer.addPass(bloom);
 
-// ═══════════════════════════════════════════════════
-// BEZIER CURVE
-// ═══════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════
+   BEZIER CURVE — identical to 2D v43
+   ═══════════════════════════════════════════════════ */
 const SEGS=[
   {p0:{x:.92,y:.96},p1:{x:.82,y:.95},p2:{x:.72,y:.92},p3:{x:.65,y:.86}},
   {p0:{x:.65,y:.86},p1:{x:.55,y:.78},p2:{x:.50,y:.70},p3:{x:.35,y:.66}},
@@ -77,13 +73,14 @@ function cubicBez(a,b,c,d,t){
   return{x:u*u*u*a.x+3*u*u*t*b.x+3*u*t*t*c.x+t*t*t*d.x,
          y:u*u*u*a.y+3*u*u*t*b.y+3*u*t*t*c.y+t*t*t*d.y};
 }
+const WD=W*dpr, HD=H*dpr;
 const curvePoints=[];
 for(const s of SEGS){
-  const p0={x:s.p0.x*W,y:s.p0.y*H},p1={x:s.p1.x*W,y:s.p1.y*H},
-        p2={x:s.p2.x*W,y:s.p2.y*H},p3={x:s.p3.x*W,y:s.p3.y*H};
+  const p0={x:s.p0.x*WD,y:s.p0.y*HD},p1={x:s.p1.x*WD,y:s.p1.y*HD},
+        p2={x:s.p2.x*WD,y:s.p2.y*HD},p3={x:s.p3.x*WD,y:s.p3.y*HD};
   for(let i=0;i<150;i++) curvePoints.push(cubicBez(p0,p1,p2,p3,i/150));
 }
-{const L=SEGS[5];curvePoints.push(cubicBez({x:L.p0.x*W,y:L.p0.y*H},{x:L.p1.x*W,y:L.p1.y*H},{x:L.p2.x*W,y:L.p2.y*H},{x:L.p3.x*W,y:L.p3.y*H},1));}
+{const L=SEGS[5];curvePoints.push(cubicBez({x:L.p0.x*WD,y:L.p0.y*HD},{x:L.p1.x*WD,y:L.p1.y*HD},{x:L.p2.x*WD,y:L.p2.y*HD},{x:L.p3.x*WD,y:L.p3.y*HD},1));}
 const CL=curvePoints.length;
 function getNormal(i){
   const ni=Math.min(i+1,CL-1),pi=Math.max(i-1,0);
@@ -92,249 +89,64 @@ function getNormal(i){
   return{x:-dy/l,y:dx/l};
 }
 
-// ═══════════════════════════════════════════════════
-// PALETTE
-// ═══════════════════════════════════════════════════
-const PAL=[[0,.545,.102,.227],[.15,.761,.094,.357],[.30,.910,.243,.424],
-  [.45,1,.420,.541],[.60,1,.557,.447],[.75,1,.667,.361],
-  [.90,.910,.486,.369],[1,.761,.322,.322]];
+/* ═══════════════════════════════════════════════════
+   PALETTE — identical to 2D v43
+   ═══════════════════════════════════════════════════ */
 function pathColor(t){
-  let i=0;while(i<PAL.length-1&&PAL[i+1][0]<t)i++;
-  if(i>=PAL.length-1)return new THREE.Color(PAL[7][1],PAL[7][2],PAL[7][3]);
-  const a=PAL[i],b=PAL[i+1],f=(t-a[0])/(b[0]-a[0]);
-  return new THREE.Color(a[1]+(b[1]-a[1])*f,a[2]+(b[2]-a[2])*f,a[3]+(b[3]-a[3])*f);
+  const s=[[0,0x8B,0x1A,0x3A],[.15,0xC2,0x18,0x5B],[.30,0xE8,0x3E,0x6C],
+    [.45,0xFF,0x6B,0x8A],[.60,0xFF,0x8E,0x72],[.75,0xFF,0xAA,0x5C],
+    [.90,0xE8,0x7C,0x5E],[1,0xC2,0x52,0x52]];
+  let i=0;while(i<s.length-1&&s[i+1][0]<t)i++;
+  if(i>=s.length-1)return[s[7][1],s[7][2],s[7][3]];
+  const a=s[i],b=s[i+1],f=(t-a[0])/(b[0]-a[0]);
+  return[a[1]+(b[1]-a[1])*f,a[2]+(b[2]-a[2])*f,a[3]+(b[3]-a[3])*f];
 }
 
-// ═══════════════════════════════════════════════════
-// TEXTURES — high quality procedural
-// ═══════════════════════════════════════════════════
-const maxAniso=renderer.capabilities.getMaxAnisotropy();
-function finishTex(cv){
-  const tex=new THREE.CanvasTexture(cv);
-  tex.generateMipmaps=true;tex.minFilter=THREE.LinearMipmapLinearFilter;
-  tex.magFilter=THREE.LinearFilter;tex.anisotropy=maxAniso;
-  tex.needsUpdate=true;return tex;
-}
+/* ═══════════════════════════════════════════════════
+   2D CANVAS RENDERER — same draw functions as v43
+   This is the key insight: use an offscreen 2D canvas
+   for all the garden drawing (identical to v43),
+   then upload it as a Three.js texture each frame.
+   Three.js only adds bloom post-processing.
+   ═══════════════════════════════════════════════════ */
+const offscreen=document.createElement('canvas');
+offscreen.width=WD;offscreen.height=HD;
+const ctx=offscreen.getContext('2d');
 
-// ═══════════════════════════════════════════════════
-// DRAWING HELPERS — used in texture generation
-// ═══════════════════════════════════════════════════
-function _drawPetal(c,s,cols,angle){
-  c.save();c.rotate(angle||0);
-  c.beginPath();c.moveTo(0,-s*.8);
-  c.bezierCurveTo(s*.65,-s*.3, s*.6,s*.35, 0,s*.55);
-  c.bezierCurveTo(-s*.6,s*.35, -s*.65,-s*.3, 0,-s*.8);c.closePath();
-  const g=c.createRadialGradient(0,-s*.1,0, 0,0,s*.75);
-  g.addColorStop(0,cols[0]);g.addColorStop(0.5,cols[1]);g.addColorStop(1,cols[2]);
-  c.fillStyle=g;c.fill();
-  c.globalAlpha=0.06;c.beginPath();c.moveTo(0,-s*.65);c.lineTo(0,s*.35);
-  c.strokeStyle='rgba(255,200,200,0.5)';c.lineWidth=1;c.stroke();
-  c.globalAlpha=1;c.restore();
-}
+const offTex=new THREE.CanvasTexture(offscreen);
+offTex.minFilter=THREE.LinearFilter;offTex.magFilter=THREE.LinearFilter;
+const quadGeo=new THREE.PlaneGeometry(WD,HD);
+const quadMat=new THREE.MeshBasicMaterial({map:offTex,transparent:false});
+const quad=new THREE.Mesh(quadGeo,quadMat);
+quad.position.set(WD/2,HD/2,0);
+scene.add(quad);
 
-// PRE-RENDERED COMPLETE ROSE (single texture, concentric rings)
-function makeRoseTex(type){
-  const sz=256,cv=document.createElement('canvas');cv.width=sz;cv.height=sz;
-  const c=cv.getContext('2d');c.translate(sz/2,sz/2);
-  const R=sz*.42;
-  const rings=type==='golden'?[
-    {n:7,d:.72,s:.38,a:.55,c:['#FFF5D0','#EBC44D','#A07820']},
-    {n:5,d:.48,s:.34,a:.7,c:['#FFF8D8','#F0D060','#B89030']},
-    {n:4,d:.25,s:.28,a:.85,c:['#FFFCE8','#F5DD7A','#C8A040']},
-    {n:3,d:.08,s:.18,a:1,c:['#FFFFF0','#FFF0A0','#DDB850']},
-  ]:[
-    {n:7,d:.72,s:.38,a:.5,c:['#E8B0BC','#C42A55','#7A1230']},
-    {n:5,d:.48,s:.34,a:.65,c:['#F0BEC8','#D43A62','#8B1A3A']},
-    {n:4,d:.25,s:.28,a:.8,c:['#F5D0D8','#E54A72','#A52050']},
-    {n:3,d:.08,s:.18,a:1,c:['#FFE8EE','#FF8AA0','#D04068']},
-  ];
-  for(const ring of rings){
-    const off=ring.d*1.7;
-    for(let i=0;i<ring.n;i++){
-      const a=off+i*(Math.PI*2/ring.n);
-      c.save();c.translate(Math.cos(a)*R*ring.d,Math.sin(a)*R*ring.d);
-      c.globalAlpha=ring.a;
-      _drawPetal(c,R*ring.s,ring.c,a+Math.PI*.45);
-      c.restore();
-    }
-  }
-  c.globalAlpha=1;
-  const cg=c.createRadialGradient(0,0,0,0,0,R*.08);
-  cg.addColorStop(0,type==='golden'?'#FFFFF0':'#FFE0E8');
-  cg.addColorStop(1,type==='golden'?'#DDB850':'#E83E6C');
-  c.fillStyle=cg;c.beginPath();c.arc(0,0,R*.08,0,Math.PI*2);c.fill();
-  return finishTex(cv);
-}
-
-// Small rosette (fill scale — simpler, reads well small)
-function makeRosetteTex(){
-  const sz=128,cv=document.createElement('canvas');cv.width=sz;cv.height=sz;
-  const c=cv.getContext('2d');c.translate(sz/2,sz/2);
-  const r=sz*.4;
-  const bg=c.createRadialGradient(0,0,0,0,0,r*1.1);
-  bg.addColorStop(0,'rgba(232,62,108,0.25)');bg.addColorStop(1,'rgba(232,62,108,0)');
-  c.fillStyle=bg;c.beginPath();c.arc(0,0,r*1.1,0,Math.PI*2);c.fill();
-  const L=[
-    {n:5,d:.6,s:.4,c:'rgba(180,30,70,0.5)'},
-    {n:5,d:.35,s:.35,c:'rgba(220,50,90,0.7)'},
-    {n:4,d:.12,s:.25,c:'rgba(255,120,160,0.85)'},
-  ];
-  for(const l of L){
-    for(let i=0;i<l.n;i++){
-      const a=i*Math.PI*2/l.n+l.d;
-      c.save();c.translate(Math.cos(a)*r*l.d,Math.sin(a)*r*l.d);
-      c.rotate(a+Math.PI/2);c.scale(1,1.4);
-      c.beginPath();c.arc(0,0,r*l.s,0,Math.PI*2);
-      c.fillStyle=l.c;c.fill();c.restore();
-    }
-  }
-  c.beginPath();c.arc(0,0,r*.12,0,Math.PI*2);c.fillStyle='#FFD5E0';c.fill();
-  return finishTex(cv);
-}
-
-// Single falling petal (wider, matte)
-function makeFallingPetalTex(cols){
-  const sz=128,cv=document.createElement('canvas');cv.width=sz;cv.height=sz;
-  const c=cv.getContext('2d');c.translate(sz/2,sz/2);
-  const s=sz*.38;
-  c.beginPath();c.moveTo(0,-s*.8);
-  c.bezierCurveTo(s*.65,-s*.3, s*.6,s*.35, 0,s*.55);
-  c.bezierCurveTo(-s*.6,s*.35, -s*.65,-s*.3, 0,-s*.8);c.closePath();
-  const g=c.createRadialGradient(0,-s*.1,0, 0,0,s*.7);
-  g.addColorStop(0,cols[0]);g.addColorStop(0.5,cols[1]);g.addColorStop(1,cols[2]);
-  c.fillStyle=g;c.fill();
-  return finishTex(cv);
-}
-
-// Leaf — clean with veins
-function makeLeafTex(){
-  const sz=256,cv=document.createElement('canvas');cv.width=sz;cv.height=sz;
-  const c=cv.getContext('2d');c.translate(sz*.15,sz*.5);
-  const s=sz*.6;
-  c.beginPath();c.moveTo(0,0);
-  c.bezierCurveTo(s*.25,-s*.25, s*.6,-s*.2, s*.82,-s*.02);
-  c.bezierCurveTo(s*.6,s*.2, s*.25,s*.15, 0,0);c.closePath();
-  const g=c.createLinearGradient(0,0,s*.8,0);
-  g.addColorStop(0,'#1a4a12');g.addColorStop(0.5,'#2d6b1e');g.addColorStop(1,'#3a8828');
-  c.fillStyle=g;c.fill();
-  c.strokeStyle='rgba(100,160,60,0.35)';c.lineWidth=1.5;
-  c.beginPath();c.moveTo(s*.05,0);c.quadraticCurveTo(s*.4,0,s*.75,-0.01*s);c.stroke();
-  c.lineWidth=.6;c.strokeStyle='rgba(80,130,45,0.2)';
-  for(let v=0;v<4;v++){
-    const xp=s*(.1+v*.14);
-    c.beginPath();c.moveTo(xp,0);c.lineTo(xp+s*.06,-s*.08);c.stroke();
-    c.beginPath();c.moveTo(xp,0);c.lineTo(xp+s*.05,s*.06);c.stroke();
-  }
-  return finishTex(cv);
-}
-
-// Bud — oval/teardrop shape like a real closed flower bud
-function makeBudTex(){
-  const sz=128,cv=document.createElement('canvas');cv.width=sz;cv.height=sz;
-  const c=cv.getContext('2d');c.translate(sz/2,sz/2);
-  const r=sz*.35;
-  // Main bud body — rounded teardrop pointing up
-  c.beginPath();c.moveTo(0,-r*.9);
-  c.bezierCurveTo(r*.5,-r*.4, r*.4,r*.3, 0,r*.6);
-  c.bezierCurveTo(-r*.4,r*.3, -r*.5,-r*.4, 0,-r*.9);c.closePath();
-  const g=c.createLinearGradient(0,-r,0,r*.5);
-  g.addColorStop(0,'#FFD0D8');g.addColorStop(0.4,'#E83E6C');g.addColorStop(1,'#8B1A3A');
-  c.fillStyle=g;c.fill();
-  // Sepal (green base)
-  c.beginPath();c.moveTo(-r*.25,r*.3);
-  c.quadraticCurveTo(0,r*.7, r*.25,r*.3);
-  c.quadraticCurveTo(0,r*.45, -r*.25,r*.3);c.closePath();
-  c.fillStyle='#2d5a1e';c.globalAlpha=0.6;c.fill();
-  // Subtle center line
-  c.globalAlpha=0.08;c.beginPath();c.moveTo(0,-r*.7);c.lineTo(0,r*.4);
-  c.strokeStyle='rgba(255,220,220,0.5)';c.lineWidth=1;c.stroke();
-  c.globalAlpha=1;
-  return finishTex(cv);
-}
-
-// Thorn
-function makeThornTex(){
-  const sz=64,cv=document.createElement('canvas');cv.width=sz;cv.height=sz;
-  const c=cv.getContext('2d');c.translate(sz/2,sz/2);
-  c.beginPath();c.moveTo(0,-sz*.38);c.lineTo(sz*.08,-sz*.05);
-  c.lineTo(0,sz*.38);c.lineTo(-sz*.08,-sz*.05);c.closePath();
-  const g=c.createLinearGradient(0,-sz*.38,0,sz*.38);
-  g.addColorStop(0,'rgba(110,85,60,0.9)');g.addColorStop(1,'rgba(60,40,25,0.6)');
-  c.fillStyle=g;c.fill();
-  return finishTex(cv);
-}
-
-// Generate textures
-const roseTex=makeRoseTex('pink');
-const goldenRoseTex=makeRoseTex('golden');
-const rosetteTex=makeRosetteTex();
-const FALLING_COLS=[['#FFD0D8','#E83E6C','#8B1A3A'],['#FFDDD0','#FF6B8A','#C2185B'],
+/* ═══════════════════════════════════════════════════
+   PETAL TEXTURES — identical to 2D v43
+   ═══════════════════════════════════════════════════ */
+const petalCanvases=[];
+const PETAL_HUES=[['#FFD0D8','#E83E6C','#8B1A3A'],['#FFDDD0','#FF6B8A','#C2185B'],
   ['#FFE0E8','#FF8E72','#E87C5E'],['#FFC8D0','#E83E6C','#A01040'],['#FFD8C0','#FFAA5C','#C25252']];
-const fallingPetalTextures=FALLING_COLS.map(c=>makeFallingPetalTex(c));
-const leafTex=makeLeafTex();
-const budTex=makeBudTex();
-const thornTex=makeThornTex();
+for(let v=0;v<5;v++){
+  const pc=document.createElement('canvas');
+  const sz=Math.round(64*dpr);pc.width=sz;pc.height=sz;
+  const c=pc.getContext('2d');c.translate(sz/2,sz/2);c.rotate(v*0.5-1.2);
+  const s=sz*0.38;c.beginPath();c.moveTo(0,-s);
+  const bx=s*(0.5+v*0.06),by=s*0.3;
+  c.bezierCurveTo(bx,-by,bx,by*1.5,0,s*0.7);c.bezierCurveTo(-bx,by*1.5,-bx,-by,0,-s);c.closePath();
+  const g=c.createRadialGradient(0,-s*0.15,s*0.1,0,s*0.1,s);
+  g.addColorStop(0,PETAL_HUES[v][0]);g.addColorStop(0.5,PETAL_HUES[v][1]);g.addColorStop(1,PETAL_HUES[v][2]);
+  c.fillStyle=g;c.fill();
+  c.beginPath();c.moveTo(0,-s*0.8);c.lineTo(0,s*0.5);
+  c.strokeStyle='rgba(255,255,255,0.15)';c.lineWidth=1;c.stroke();
+  petalCanvases.push(pc);
+}
 
-// ═══════════════════════════════════════════════════
-// INSTANCED MESHES
-// ═══════════════════════════════════════════════════
-const MAX_ROSES=500,MAX_ROSETTES=1000,MAX_LEAVES=2000,MAX_BUDS=800,MAX_THORNS=400,MAX_FALLING=3000;
-const planeGeo=new THREE.PlaneGeometry(1,1);
-
-// Rose (whole flower as single sprite)
-const roseMat=new THREE.MeshBasicMaterial({map:roseTex,transparent:true,depthWrite:false,side:THREE.DoubleSide});
-const roseMesh=new THREE.InstancedMesh(planeGeo,roseMat,MAX_ROSES);
-roseMesh.count=0;roseMesh.frustumCulled=false;scene.add(roseMesh);
-
-// Golden rose
-const goldenRoseMat=new THREE.MeshBasicMaterial({map:goldenRoseTex,transparent:true,depthWrite:false,side:THREE.DoubleSide});
-const goldenRoseMesh=new THREE.InstancedMesh(planeGeo,goldenRoseMat,MAX_ROSES);
-goldenRoseMesh.count=0;goldenRoseMesh.frustumCulled=false;scene.add(goldenRoseMesh);
-
-// Small rosette (fill)
-const rosetteMat=new THREE.MeshBasicMaterial({map:rosetteTex,transparent:true,depthWrite:false,side:THREE.DoubleSide});
-const rosetteMesh=new THREE.InstancedMesh(planeGeo,rosetteMat,MAX_ROSETTES);
-rosetteMesh.count=0;rosetteMesh.frustumCulled=false;scene.add(rosetteMesh);
-
-const leafMat=new THREE.MeshBasicMaterial({map:leafTex,transparent:true,depthWrite:false,side:THREE.DoubleSide});
-const leafMesh=new THREE.InstancedMesh(planeGeo,leafMat,MAX_LEAVES);
-leafMesh.count=0;leafMesh.frustumCulled=false;scene.add(leafMesh);
-
-const budMat=new THREE.MeshBasicMaterial({map:budTex,transparent:true,depthWrite:false,side:THREE.DoubleSide});
-const budMesh=new THREE.InstancedMesh(planeGeo,budMat,MAX_BUDS);
-budMesh.count=0;budMesh.frustumCulled=false;scene.add(budMesh);
-
-const thornMat=new THREE.MeshBasicMaterial({map:thornTex,transparent:true,depthWrite:false,side:THREE.DoubleSide});
-const thornMesh=new THREE.InstancedMesh(planeGeo,thornMat,MAX_THORNS);
-thornMesh.count=0;thornMesh.frustumCulled=false;scene.add(thornMesh);
-
-// Falling petals — 5 color variants
-const fallingMats=fallingPetalTextures.map(t=>new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,side:THREE.DoubleSide}));
-const fallingMeshes=fallingMats.map(m=>{const im=new THREE.InstancedMesh(planeGeo,m,MAX_FALLING/5);im.count=0;im.frustumCulled=false;scene.add(im);return im;});
-
-// Stems — batched line segments
-const MAX_STEM_VERTS=12000;
-const stemPos=new Float32Array(MAX_STEM_VERTS*3);
-const stemCol=new Float32Array(MAX_STEM_VERTS*3);
-const stemGeo=new THREE.BufferGeometry();
-stemGeo.setAttribute('position',new THREE.BufferAttribute(stemPos,3));
-stemGeo.setAttribute('color',new THREE.BufferAttribute(stemCol,3));
-const stemMat=new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.55});
-const stemLines=new THREE.LineSegments(stemGeo,stemMat);
-stemLines.frustumCulled=false;scene.add(stemLines);
-
-// Main stalks — ribbon mesh for tapering width
-const stalkGeo1=new THREE.BufferGeometry();
-const stalkGeo2=new THREE.BufferGeometry();
-const stalkMat=new THREE.MeshBasicMaterial({color:0x2d5a1e,transparent:true,opacity:0.7,side:THREE.DoubleSide});
-const stalkMat2=new THREE.MeshBasicMaterial({color:0x234b19,transparent:true,opacity:0.65,side:THREE.DoubleSide});
-let stalkMesh1=null,stalkMesh2=null;
-
-// ═══════════════════════════════════════════════════
-// AUDIO
-// ═══════════════════════════════════════════════════
-let audioCtx,analyser,audio,timeData,isPlaying=false;
-let smoothAmp=0,waveformData=null;
+/* ═══════════════════════════════════════════════════
+   AUDIO — identical to 2D v43
+   ═══════════════════════════════════════════════════ */
+let audioCtx,analyser,audio,timeData,isPlaying=false,smoothAmp=0;
+let waveformData=null;
 fetch('bismillah-wave.json').then(r=>r.json()).then(d=>{waveformData=d;});
 function getAmp(){
   if(analyser&&timeData){
@@ -349,9 +161,9 @@ function getAmp(){
   return 0;
 }
 
-// ═══════════════════════════════════════════════════
-// TAJWEED
-// ═══════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════
+   TAJWEED — identical to 2D v43
+   ═══════════════════════════════════════════════════ */
 const TAJWEED=[
   {t:0.05,type:'bud',size:0.35,side:-1},{t:0.15,type:'leaf',size:0.3,side:1},
   {t:0.28,type:'thorn',size:0.35,side:1},{t:0.38,type:'leaf',size:0.25,side:-1},
@@ -379,500 +191,326 @@ const TAJWEED=[
   {t:5.50,type:'leaf',size:0.1,side:-1},
 ];
 
-// ═══════════════════════════════════════════════════
-// GARDEN STATE
-// ═══════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════
+   GARDEN STATE — identical to 2D v43
+   ═══════════════════════════════════════════════════ */
 const garden=[];
-const travelingDots=[];
-const fallingPetals=[];
-const glowLights=[];
-let tajweedIdx=0,lastDotT=-1,_lastFillT=0,_fibIdx=0;
-const _occ=[];
+const glows=[];
+let tajweedIdx=0;
 
-function weavePos(ci,side,d){
-  ci=Math.min(ci,CL-1);
-  const pt=curvePoints[ci],n=getNormal(ci);
-  const wt=ci/(CL-1),phase=side>0?0:Math.PI;
-  const w=Math.sin(wt*Math.PI*2*WEAVE_FREQ+phase);
-  return{x:pt.x+n.x*d*w,y:pt.y+n.y*d*w};
-}
-
-// ═══════════════════════════════════════════════════
-// SPAWN — store ALL random values at creation time (deterministic rendering)
-// ═══════════════════════════════════════════════════
-function spawn(evt,progress){
+function spawnGardenElement(evt,progress){
   const ci=Math.min(Math.floor(progress*(CL-1)),CL-1);
   const col=pathColor(progress);
-  srand(Math.floor(progress*100000)); // deterministic seed per element
-  const rot=rand()*Math.PI*2;
-  const base={ci,side:evt.side,born:progress,col,rot};
-
+  const base={ci,side:evt.side,born:progress,col,baseRot:Math.random()*Math.PI*2};
   switch(evt.type){
-    case 'golden_rose':case 'rose':{
-      const golden=evt.type==='golden_rose';
-      // SMALL roses — 8-15px radius, not 40-80
-      const maxR=Math.min((golden?(8+evt.size*6):(5+evt.size*5))*dpr, 12*dpr);
-      const petalN=golden?12:Math.floor(5+evt.size*6);
-      const stemLen=(golden?(25+evt.size*20):(15+evt.size*15))*dpr;
-      // Deterministic stem curve params
-      const stemSway=rand()*0.3-0.15;
-      const stemDroop=0.08+rand()*0.08;
-      const stemLift=0.04+rand()*0.04;
-      garden.push({...base,kind:'rose',maxR,petalN,stemLen,golden,
-        stemSway,stemDroop,stemLift,growDur:golden?0.08:0.06});
-      if(golden){
-        const light=new THREE.PointLight(0xffd850,0,100);
-        light.position.set(0,0,50);scene.add(light);
-        glowLights.push({light,ci,side:evt.side,maxI:1.5,born:progress,dur:0.2,persist:true});
-      }
-      break;
-    }
-    case 'bud':{
-      const maxR=(4+evt.size*5)*dpr;
-      const stemLen=(8+evt.size*10)*dpr;
-      const stemSway=rand()*0.2-0.1,stemDroop=0.06+rand()*0.06,stemLift=0.03+rand()*0.03;
-      garden.push({...base,kind:'bud',maxR,stemLen,stemSway,stemDroop,stemLift,growDur:0.04});
-      break;
-    }
-    case 'thorn':{
-      garden.push({...base,kind:'thorn',len:(5+evt.size*8)*dpr,growDur:0.03});
-      break;
-    }
-    case 'vine':{
-      const maxLen=(40+evt.size*120)*dpr;
-      const leafCount=Math.floor(2+evt.size*5);
-      // Pre-compute vine path deterministically
-      const branchAngle=rand()*0.4-0.2;
-      const swayAmp=0.08+rand()*0.08;
-      const droopAmp=0.12+rand()*0.1;
-      garden.push({...base,kind:'vine',maxLen,leafCount,branchAngle,swayAmp,droopAmp,growDur:0.08+evt.size*0.06});
-      break;
-    }
-    case 'leaf':{
-      garden.push({...base,kind:'leaf',leafSize:(5+evt.size*12)*dpr,growDur:0.03});
-      break;
-    }
-    case 'ghunnah':{
-      const light=new THREE.PointLight(new THREE.Color(col.r,col.g,col.b),0,100);
-      light.position.set(0,0,30);scene.add(light);
-      glowLights.push({light,ci,side:evt.side,maxI:1.0,born:progress,dur:0.12});
-      break;
-    }
-    case 'bloom':{
-      for(const g of garden)if(g.kind==='rose')g.forceBloom=progress;
-      break;
-    }
+    case 'golden_rose':
+      garden.push({...base,kind:'rose',maxR:(55+evt.size*70)*dpr,petalCount:Math.floor(26+evt.size*24),
+        stemLen:(60+evt.size*80)*dpr,stemW:(3.5+evt.size*3)*dpr,golden:true,growDur:0.08});break;
+    case 'rose':
+      garden.push({...base,kind:'rose',maxR:(30+evt.size*50)*dpr,petalCount:Math.floor(14+evt.size*22),
+        stemLen:(35+evt.size*60)*dpr,stemW:(2.5+evt.size*3)*dpr,golden:false,growDur:0.06});break;
+    case 'bud':
+      garden.push({...base,kind:'bud',maxR:(8+evt.size*12)*dpr,stemLen:(12+evt.size*18)*dpr,
+        stemW:(1+evt.size)*dpr,growDur:0.04});break;
+    case 'thorn':
+      garden.push({...base,kind:'thorn',len:(10+evt.size*15)*dpr,growDur:0.03});break;
+    case 'vine':
+      garden.push({...base,kind:'vine',maxLen:(100+evt.size*300)*dpr,width:(2+evt.size*3)*dpr,
+        growDur:0.10+evt.size*0.08,leafCount:Math.floor(4+evt.size*10)});break;
+    case 'leaf':
+      garden.push({...base,kind:'leaf',leafSize:(10+evt.size*20)*dpr,
+        leafAngle:base.baseRot+evt.side*0.5,growDur:0.03});break;
+    case 'ghunnah':
+      glows.push({ci,born:progress,maxR:(40+evt.size*60)*dpr,col,dur:0.12});break;
+    case 'bloom':
+      for(const g of garden)if(g.kind==='rose'||g.kind==='bud')g.forceBloom=progress;break;
   }
 }
 
-// Continuous fill — spawns one element, called N times per frame
+/* ═══════════════════════════════════════════════════
+   2D DRAW FUNCTIONS — copied verbatim from v43
+   ═══════════════════════════════════════════════════ */
+function drawRose(x,y,maxR,petalCount,bl,baseRot,col,golden){
+  const petals=Math.floor(petalCount*bl);if(petals<1)return;
+  for(let i=0;i<petals;i++){
+    const angle=i*GOLDEN_ANGLE+baseRot,frac=i/petalCount;
+    const dist=maxR*Math.sqrt(frac)*bl;
+    const px=x+Math.cos(angle)*dist,py=y+Math.sin(angle)*dist;
+    const petalR=maxR*(0.12+frac*0.22)*bl;
+    let r,g,b;
+    if(golden){r=Math.round(255-frac*40);g=Math.round(200-frac*60);b=Math.round(80+frac*30);}
+    else{const lf=frac;r=Math.round(col[0]+(255-col[0])*(1-lf)*0.4);g=Math.round(col[1]+(255-col[1])*(1-lf)*0.3);b=Math.round(col[2]+(255-col[2])*(1-lf)*0.3);}
+    ctx.save();ctx.translate(px,py);ctx.rotate(angle+Math.PI*0.3);
+    const s=petalR;ctx.beginPath();ctx.moveTo(0,-s);
+    const bx2=s*0.55,by2=s*0.35;
+    ctx.bezierCurveTo(bx2,-by2,bx2,by2*1.4,0,s*0.65);ctx.bezierCurveTo(-bx2,by2*1.4,-bx2,-by2,0,-s);ctx.closePath();
+    ctx.globalAlpha=0.7+0.3*(1-frac);ctx.fillStyle=`rgb(${r},${g},${b})`;ctx.fill();ctx.restore();
+  }
+  if(bl>0.4){ctx.beginPath();ctx.arc(x,y,maxR*0.07*bl,0,Math.PI*2);
+    ctx.fillStyle=golden?`rgba(255,240,180,${0.9*bl})`:`rgba(255,220,180,${0.8*bl})`;ctx.fill();}
+  if(golden&&bl>0.3){const grad=ctx.createRadialGradient(x,y,0,x,y,maxR*1.3*bl);
+    grad.addColorStop(0,`rgba(255,215,80,${0.15*bl})`);grad.addColorStop(1,'rgba(255,215,80,0)');
+    ctx.fillStyle=grad;ctx.beginPath();ctx.arc(x,y,maxR*1.3*bl,0,Math.PI*2);ctx.fill();}
+}
+function drawStem(fx,fy,tx,ty,thick,bl){
+  if(bl<0.05)return;
+  const dx=tx-fx,dy=ty-fy;
+  const mx=(fx+tx)/2-dy*0.12,my=(fy+ty)/2+dx*0.12;
+  ctx.beginPath();ctx.moveTo(fx,fy);ctx.quadraticCurveTo(mx,my,fx+(tx-fx)*bl,fy+(ty-fy)*bl);
+  ctx.strokeStyle=`rgba(70,110,55,${0.55*bl})`;ctx.lineWidth=thick;ctx.stroke();
+}
+function drawLeaf(x,y,angle,size,bl){
+  if(bl<0.2)return;ctx.save();ctx.translate(x,y);ctx.rotate(angle);
+  const s=size*bl;ctx.beginPath();ctx.moveTo(0,0);
+  ctx.bezierCurveTo(s*0.4,-s*0.3,s*0.9,-s*0.1,s*0.75,s*0.12);
+  ctx.bezierCurveTo(s*0.5,s*0.3,s*0.2,s*0.15,0,0);
+  ctx.fillStyle=`rgba(65,105,45,${0.5*bl})`;ctx.fill();
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(s*0.6,s*0.02);
+  ctx.strokeStyle=`rgba(90,140,60,${0.3*bl})`;ctx.lineWidth=0.8*dpr;ctx.stroke();ctx.restore();
+}
+function drawBud(x,y,maxR,bl,col){
+  for(let i=0;i<3;i++){
+    const f=i/3,angle=i*0.8+bl*0.3,r=maxR*(0.5+f*0.5)*Math.min(1,bl*1.5);
+    ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.beginPath();
+    const s=r;ctx.moveTo(0,-s);ctx.bezierCurveTo(s*0.4,-s*0.2,s*0.4,s*0.3,0,s*0.5);
+    ctx.bezierCurveTo(-s*0.4,s*0.3,-s*0.4,-s*0.2,0,-s);ctx.closePath();
+    const lr=Math.round(col[0]+(255-col[0])*(1-f)*0.3),lg=Math.round(col[1]+(255-col[1])*(1-f)*0.2),lb=Math.round(col[2]+(255-col[2])*(1-f)*0.2);
+    ctx.globalAlpha=0.6+f*0.3;ctx.fillStyle=`rgb(${lr},${lg},${lb})`;ctx.fill();ctx.restore();
+  }
+}
+function drawThorn(x,y,len,angle,bl){
+  if(bl<0.1)return;ctx.save();ctx.translate(x,y);ctx.rotate(angle);
+  const l=len*bl;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(l*0.15,-l*0.3);ctx.lineTo(0,-l);ctx.lineTo(-l*0.15,-l*0.3);ctx.closePath();
+  ctx.fillStyle=`rgba(100,80,60,${0.6*bl})`;ctx.fill();ctx.restore();
+}
+function drawVine(cx,cy,normal,side,maxLen,width,bl,leafCount,baseRot,col){
+  if(bl<0.05)return;const len=maxLen*bl;const steps=30;ctx.beginPath();const pts=[];
+  for(let i=0;i<=steps;i++){const f=i/steps,along=len*f;
+    const sway=Math.sin(f*Math.PI*2+baseRot)*along*0.15;
+    const vx=cx+normal.x*along*side+normal.y*sway,vy=cy+normal.y*along*side-normal.x*sway;
+    pts.push({x:vx,y:vy});i===0?ctx.moveTo(vx,vy):ctx.lineTo(vx,vy);}
+  ctx.strokeStyle=`rgba(65,105,45,${0.5*bl})`;ctx.lineWidth=width*(1.2-bl*0.3);ctx.stroke();
+  for(let i=0;i<leafCount;i++){const f=(i+1)/(leafCount+1);
+    const bloomF=Math.max(0,Math.min(1,(bl-f*0.3)*2.5));if(bloomF<0.1)continue;
+    const pi=Math.floor(f*(pts.length-1)),p=pts[pi];
+    drawLeaf(p.x,p.y,baseRot+i*GOLDEN_ANGLE+Math.PI*side*0.3,(8+i*3)*dpr,bloomF);}
+  if(bl>0.6){const tip=pts[pts.length-1];drawBud(tip.x,tip.y,6*dpr,Math.min(1,(bl-0.6)*3),col);}
+}
+
+/* ═══════════════════════════════════════════════════
+   TRAVELING DOTS + FALLING PETALS — from v43
+   ═══════════════════════════════════════════════════ */
+let dots=[],lastT=-1,fallingPetals=[];
+
+/* ═══════════════════════════════════════════════════
+   CONTINUOUS FILL — from v43
+   ═══════════════════════════════════════════════════ */
+let _lastFillT=0,_fibIdx=0,_occ=[];
+
 function continuousFill(progress,energy){
-  // Rate limiting now handled by caller (loop count per frame)
-  // Distribute fills — weighted toward recent growth but covers whole path
-  srand(Math.floor(progress*100000)+_fibIdx*7919+garden.length*31);
-  // 50% near tip, 50% along whole path — even out density
-  const fillProgress=rand()<0.5 ? progress*(0.6+rand()*0.4) : rand()*progress;
-  const ci=Math.min(Math.floor(fillProgress*(CL-1)),CL-1);
-  const col=pathColor(fillProgress);
+  const fillRate=0.000015-energy*0.000012;
+  if(progress-_lastFillT<fillRate)return;
+  const ci=Math.min(Math.floor(progress*(CL-1)),CL-1);
+  const col=pathColor(progress);
   let up=0,dn=0;
   for(const o of _occ)if(Math.abs(o.ci-ci)<25){if(o.s>0)up++;else dn++;}
-  let side;if(up>dn+2)side=-1;else if(dn>up+2)side=1;else side=rand()>.5?1:-1;
+  let side;if(up>dn+2)side=-1;else if(dn>up+2)side=1;else side=Math.random()>.5?1:-1;
   const fibS=FIB[_fibIdx%FIB.length]/4;_fibIdx++;
   let nearD=Infinity,nearR=0;
   for(const o of _occ){const d=Math.abs(o.ci-ci);if(o.s===side&&d<nearD){nearD=d;nearR=o.r;}}
   let sv;
-  if(nearD<5&&nearR>0){sv=(nearR/(10*dpr))/PHI+0.3;sv=Math.max(0.2,Math.min(3,sv));}
-  else if(nearD<20){sv=fibS*(0.5+energy*2);}
-  else{sv=fibS*PHI*(0.4+energy*2.5);}
+  if(nearD<5&&nearR>0){sv=(nearR/(10*dpr))/PHI+0.3;sv=Math.max(0.2,Math.min(5,sv));}
+  else if(nearD<20){sv=fibS*(0.6+energy*3.0);}
+  else{sv=fibS*PHI*(0.5+energy*3.5);}
+  const propR=(6+energy*18)*dpr*sv;
   let crowded=false;for(const o of _occ)if(o.s===side&&Math.abs(o.ci-ci)<3){crowded=true;break;}
   if(crowded)sv*=0.4;
-  const rot=rand()*Math.PI*2;
-  const base={ci,side,born:progress,col,rot};
-  const roll=rand();let newR;
-  if(roll<0.62){ // 62% leaves — real vines are mostly green
-    const ls=Math.max(12*dpr, (8+energy*30+rand()*15)*dpr*sv);newR=ls*.5;
-    garden.push({...base,kind:'leaf',leafSize:ls,growDur:0.012+rand()*.015});
-  }else if(roll<0.72){
-    const mr=Math.min((4+energy*8+rand()*4)*dpr*sv, 8*dpr);newR=mr;
-    const ss=rand()*0.2-0.1,sd=0.06+rand()*0.06,sl=0.03+rand()*0.03;
-    garden.push({...base,kind:'bud',maxR:mr,stemLen:mr*PHI,stemSway:ss,stemDroop:sd,stemLift:sl,growDur:0.02});
-  }else if(roll<0.82){
-    // Small rosette (fill flowers — single stamp, no stem)
-    const mr=Math.min((4+energy*8)*dpr*sv, 10*dpr);newR=mr;
-    garden.push({...base,kind:'rosette',maxR:mr,growDur:0.02});
-  }else if(roll<0.88){
-    const mr=Math.min((5+energy*10)*dpr*sv, 12*dpr);newR=mr;
-    const ss=rand()*0.2-0.1,sd=0.06+rand()*0.06,sl=0.03+rand()*0.03;
-    garden.push({...base,kind:'rose',maxR:mr,petalN:Math.floor(4+rand()*6),
-      stemLen:mr*PHI,stemSway:ss,stemDroop:sd,stemLift:sl,golden:false,growDur:0.025});
-  }else if(roll<0.95){
-    const tl=(4+energy*10)*dpr*sv;newR=tl;
-    garden.push({...base,kind:'thorn',len:tl,growDur:0.015});
+  const roll=Math.random();let newR=propR;
+  if(roll<0.55){
+    const ls=(8+energy*35+Math.random()*20)*dpr*sv;newR=ls*0.5;
+    garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
+      kind:'leaf',leafSize:ls,leafAngle:Math.random()*Math.PI*2,growDur:0.012+Math.random()*0.015});
+  }else if(roll<0.78){
+    const mr=(6+energy*20+Math.random()*14)*dpr*sv;newR=mr;
+    garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
+      kind:'bud',maxR:mr,stemLen:mr*PHI,stemW:(0.8+energy*1.5)*dpr,growDur:0.02});
+  }else if(roll<0.93){
+    const mr=(8+energy*22)*dpr*sv;newR=mr;
+    garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
+      kind:'rose',maxR:mr,petalCount:Math.floor(4+Math.random()*7),
+      stemLen:mr*PHI,stemW:(0.8+energy*1.2)*dpr,golden:false,growDur:0.025});
   }else{
-    const vl=(30+energy*60)*dpr*sv;newR=vl*.3;
-    const ba=rand()*0.4-0.2,sa=0.08+rand()*0.08,da=0.12+rand()*0.1;
-    garden.push({...base,kind:'vine',maxLen:vl,leafCount:Math.floor(1+rand()*3),
-      branchAngle:ba,swayAmp:sa,droopAmp:da,growDur:0.04+rand()*.04});
+    const tl=(5+energy*15)*dpr*sv;newR=tl;
+    garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
+      kind:'thorn',len:tl,growDur:0.015});
   }
   _occ.push({ci,s:side,r:newR});if(_occ.length>500)_occ.shift();
+  _lastFillT=progress;
 }
 
-// ═══════════════════════════════════════════════════
-// STEM CURVE — deterministic cubic bezier (no Math.random per frame)
-// ═══════════════════════════════════════════════════
-function stemCurve(bx,by,tx,ty,sway,droop,lift,t){
-  const dx=tx-bx,dy=ty-by,len=Math.sqrt(dx*dx+dy*dy);
-  if(len<1)return{x:tx,y:ty};
-  const px=-dy/len,py=dx/len;
-  const c1x=bx+dx*.3+px*len*sway,c1y=by+dy*.3+len*droop;
-  const c2x=bx+dx*.7-px*len*sway*.5,c2y=by+dy*.7-len*lift;
-  const u=1-t;
-  return{x:u*u*u*bx+3*u*u*t*c1x+3*u*t*t*c2x+t*t*t*tx,
-         y:u*u*u*by+3*u*u*t*c1y+3*u*t*t*c2y+t*t*t*ty};
-}
-
-// ═══════════════════════════════════════════════════
-// RIBBON MESH — tapering stalk
-// ═══════════════════════════════════════════════════
-function buildStalkRibbon(points,baseWidth,tipWidth){
-  const n=points.length;if(n<2)return null;
-  const verts=new Float32Array(n*2*3);
-  const indices=[];
-  for(let i=0;i<n;i++){
-    const t=i/(n-1);
-    const w=(baseWidth+(tipWidth-baseWidth)*t)/2;
-    // Normal at this point
-    const ni=Math.min(i+1,n-1),pi=Math.max(i-1,0);
-    const dx=points[ni].x-points[pi].x,dy=points[ni].y-points[pi].y;
-    const l=Math.sqrt(dx*dx+dy*dy)||1;
-    const nx=-dy/l*w,ny=dx/l*w;
-    const i6=i*6;
-    verts[i6]=points[i].x+nx;verts[i6+1]=points[i].y+ny;verts[i6+2]=1;
-    verts[i6+3]=points[i].x-nx;verts[i6+4]=points[i].y-ny;verts[i6+5]=1;
-    if(i<n-1){
-      const a=i*2,b=a+1,c=a+2,d=a+3;
-      indices.push(a,b,c, b,d,c);
-    }
-  }
-  const geo=new THREE.BufferGeometry();
-  geo.setAttribute('position',new THREE.BufferAttribute(verts,3));
-  geo.setIndex(indices);
-  return geo;
-}
-
-// ═══════════════════════════════════════════════════
-// ANIMATION
-// ═══════════════════════════════════════════════════
-const dummy=new THREE.Object3D();
-const tmpC=new THREE.Color();
-
+/* ═══════════════════════════════════════════════════
+   MAIN ANIMATION LOOP
+   ═══════════════════════════════════════════════════ */
 function animate(){
   requestAnimationFrame(animate);
+  ctx.fillStyle='#0d0d0d';ctx.fillRect(0,0,WD,HD);
   const time=(typeof window._synthTime==='number')?window._synthTime:(audio?audio.currentTime:0);
   const progress=Math.min(time/TOTAL_DUR,1);
   if(typeof window._synthTime==='number')isPlaying=true;
   const rawAmp=isPlaying?getAmp():0;
   smoothAmp+=(rawAmp-smoothAmp)*0.12;
   const energy=Math.min(1,smoothAmp*3);
-  // V4-style weave: constant gap, helix sine wave does the separation
-  const SPLIT_GAP=15*dpr; // consistent gap — helix modulates position
-  const disp=new Float32Array(CL);
-  for(let i=0;i<CL;i++){
-    const t=i/(CL-1);
-    disp[i]=t<progress?SPLIT_GAP:0;
+
+  // Tajweed events
+  while(tajweedIdx<TAJWEED.length&&time>=TAJWEED[tajweedIdx].t){
+    spawnGardenElement(TAJWEED[tajweedIdx],TAJWEED[tajweedIdx].t/TOTAL_DUR);tajweedIdx++;}
+
+  // Dot-presence displacement — from v43
+  const splitGap=(60+energy*180)*dpr;
+  const dotPresence=new Float32Array(CL);
+  for(const d of dots){const ci=Math.min(d.ci,CL-1),age=(progress-d.born)/0.09,str=Math.max(0,1-age);
+    for(let j=-40;j<=40;j++){const idx=ci+j;if(idx>=0&&idx<CL)dotPresence[idx]=Math.max(dotPresence[idx],str*(1-Math.abs(j)/40)**2);}}
+  for(let pass=0;pass<3;pass++)for(let i=2;i<CL-2;i++)
+    dotPresence[i]=dotPresence[i]*.4+(dotPresence[i-1]+dotPresence[i+1])*.2+(dotPresence[i-2]+dotPresence[i+2])*.1;
+  const disp=[];
+  for(let i=0;i<CL;i++)disp.push(splitGap*dotPresence[i]);
+
+  // Ghunnah glows
+  for(let i=glows.length-1;i>=0;i--){
+    const g=glows[i],age=progress-g.born,alpha=Math.max(0,1-age/g.dur);
+    if(alpha<=0){glows.splice(i,1);continue;}
+    const p=curvePoints[Math.min(g.ci,CL-1)];
+    const grad=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,g.maxR*alpha);
+    grad.addColorStop(0,`rgba(${g.col[0]},${g.col[1]},${g.col[2]},${0.12*alpha})`);
+    grad.addColorStop(0.5,`rgba(${g.col[0]},${g.col[1]},${g.col[2]},${0.05*alpha})`);
+    grad.addColorStop(1,`rgba(${g.col[0]},${g.col[1]},${g.col[2]},0)`);
+    ctx.fillStyle=grad;ctx.beginPath();ctx.arc(p.x,p.y,g.maxR*alpha,0,Math.PI*2);ctx.fill();
   }
 
-  // Tajweed
-  while(tajweedIdx<TAJWEED.length&&time>=TAJWEED[tajweedIdx].t){spawn(TAJWEED[tajweedIdx],TAJWEED[tajweedIdx].t/TOTAL_DUR);tajweedIdx++;}
-  if(isPlaying&&progress>0&&energy>0.02){
-    // ~3-8 elements per frame depending on energy
-    const count=Math.floor(10+energy*15);
-    for(let fi=0;fi<count&&garden.length<3000;fi++)continuousFill(progress,energy);
+  // Garden elements
+  for(const g of garden){
+    const elapsed=progress-g.born,ci=Math.min(g.ci,CL-1),n=getNormal(ci),d=disp[ci]||0;
+    const wt=ci/(CL-1),wp=g.side>0?0:Math.PI,w=Math.sin(wt*Math.PI*2*WEAVE_FREQ+wp);
+    const bx=curvePoints[ci].x+n.x*d*w,by=curvePoints[ci].y+n.y*d*w;
+    let bl=Math.min(1,elapsed/(g.growDur||0.06));
+    if(g.forceBloom!==undefined)bl=Math.max(bl,Math.min(1,(progress-g.forceBloom)/0.04));
+    switch(g.kind){
+      case 'rose':{
+        const tx=bx+n.x*g.stemLen*g.side,ty=by+n.y*g.stemLen*g.side;
+        const sB=Math.min(1,bl*2),rB=Math.max(0,bl*2-1);
+        drawStem(bx,by,tx,ty,g.stemW,sB);
+        if(sB>0.5){const lx=bx+(tx-bx)*0.4,ly=by+(ty-by)*0.4;
+          drawLeaf(lx,ly,Math.atan2(ty-by,tx-bx)+0.5*g.side,g.stemW*5,sB);}
+        const rx=bx+(tx-bx)*sB,ry=by+(ty-by)*sB;
+        drawRose(rx,ry,g.maxR,g.petalCount,rB,g.baseRot,g.col,g.golden);break;}
+      case 'bud':{
+        const tx=bx+n.x*g.stemLen*g.side,ty=by+n.y*g.stemLen*g.side;
+        drawStem(bx,by,tx,ty,g.stemW,bl);
+        drawBud(bx+(tx-bx)*bl,by+(ty-by)*bl,g.maxR,bl,g.col);break;}
+      case 'thorn':drawThorn(bx,by,g.len,Math.atan2(n.y*g.side,n.x*g.side),bl);break;
+      case 'vine':drawVine(bx,by,n,g.side,g.maxLen,g.width,bl,g.leafCount,g.baseRot,g.col);break;
+      case 'leaf':drawLeaf(bx,by,g.leafAngle,g.leafSize,bl);break;
+    }
   }
+
+  // Growing vine stalks
+  const growCI=Math.min(Math.floor(progress*(CL-1)),CL-1);
+  for(let strand=0;strand<2;strand++){
+    const phase=strand===0?0:Math.PI;
+    ctx.beginPath();
+    for(let i=0;i<=growCI;i++){const t=i/(CL-1),w=Math.sin(t*Math.PI*2*WEAVE_FREQ+phase);
+      const n=getNormal(i),dd=disp[i]||0;
+      const px=curvePoints[i].x+n.x*dd*w,py=curvePoints[i].y+n.y*dd*w;
+      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}
+    ctx.strokeStyle=strand===0?'rgba(45,90,30,0.7)':'rgba(35,75,25,0.65)';
+    ctx.lineWidth=2.5*dpr;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
+    ctx.beginPath();
+    for(let i=0;i<=growCI;i++){const t=i/(CL-1),w=Math.sin(t*Math.PI*2*WEAVE_FREQ+phase);
+      const n=getNormal(i),dd=disp[i]||0;
+      const px=curvePoints[i].x+n.x*dd*w,py=curvePoints[i].y+n.y*dd*w;
+      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}
+    ctx.strokeStyle='rgba(80,140,50,0.35)';ctx.lineWidth=1.5*dpr;ctx.stroke();
+  }
+
+  // Continuous fill
+  if(isPlaying&&progress>0&&energy>0.02)continuousFill(progress,energy);
 
   // Traveling dots
   if(isPlaying&&progress>0){
     const spacing=0.005+Math.random()*0.004;
-    if(lastDotT<0||progress-lastDotT>=spacing){
-      const ci=Math.min(Math.floor(progress*(CL-1)),CL-1),col=pathColor(progress);
-      const minR=2*dpr,maxR=8*dpr,r=Math.min(maxR,Math.max(minR,minR+energy*(maxR-minR)*3));
-      for(const s of[1,-1])
-        travelingDots.push({ci,side:s,offX:(Math.random()-.5)*6*dpr,offY:(Math.random()-.5)*6*dpr,
-          r:Math.min(maxR,r*(0.5+Math.random()*.7)),col,born:progress,rot:Math.random()*Math.PI*2,petal:(Math.random()*5)|0});
-      lastDotT=progress;
+    if(lastT<0||progress-lastT>=spacing){
+      const col=pathColor(progress),ci=Math.min(Math.floor(progress*(CL-1)),CL-1);
+      const minR=4*dpr,maxR=28*dpr,r=Math.min(maxR,Math.max(minR,minR+energy*(maxR-minR)*4));
+      const sp=4+energy*10;
+      for(const s of[1,-1])dots.push({ci,side:s,offX:(Math.random()-.5)*sp*dpr,offY:(Math.random()-.5)*sp*dpr,
+        r:Math.min(maxR,r*(0.5+Math.random()*.7)),col:[...col],born:progress,rot:Math.random()*Math.PI*2,petal:(Math.random()*5)|0});
+      lastT=progress;
     }
     const alive=[];
-    for(const d of travelingDots){
+    for(const d of dots){
       if(progress-d.born>=0.09){
-        const ci=Math.min(d.ci,CL-1),pos=weavePos(ci,d.side,disp[ci]);
-        const da=Math.atan2(1,0)+Math.PI+(Math.random()-.5)*1.4;
-        const ds=(0.3+Math.random()*.8)*dpr;
-        fallingPetals.push({x:pos.x+d.offX,y:pos.y+d.offY,vx:Math.cos(da)*ds,vy:Math.sin(da)*ds+0.15*dpr,
-          rot:d.rot,r:d.r*0.5,col:d.col,petal:d.petal,alpha:0.35,age:0,startR:d.r*0.5,
-          wf:0.015+Math.random()*.05,wa:(0.3+Math.random()*1.5)*dpr,wp:Math.random()*Math.PI*2,ts:0.02+Math.random()*0.12});
+        const ci=Math.min(d.ci,CL-1),n=getNormal(ci),dd=disp[ci]||0;
+        const fwt=ci/(CL-1),fwv=Math.sin(fwt*Math.PI*2*WEAVE_FREQ+(d.side>0?0:Math.PI));
+        const da=Math.atan2(1,0)+Math.PI+(Math.random()-.5)*1.4,ds=(0.5+Math.random()*1.2)*dpr;
+        fallingPetals.push({x:curvePoints[ci].x+n.x*dd*fwv+d.offX,y:curvePoints[ci].y+n.y*dd*fwv+d.offY,
+          vx:Math.cos(da)*ds,vy:Math.sin(da)*ds+0.2*dpr,rot:d.rot,r:d.r*(0.2+Math.random()*0.35),
+          col:d.col,petal:d.petal,alpha:0.5,age:0,startR:0,
+          wf:0.02+Math.random()*0.07,wa:(0.4+Math.random()*2)*dpr,wp:Math.random()*Math.PI*2,ts:0.03+Math.random()*0.18});
+        fallingPetals[fallingPetals.length-1].startR=fallingPetals[fallingPetals.length-1].r;
       }else alive.push(d);
     }
-    travelingDots.length=0;travelingDots.push(...alive);
+    dots=alive;
+  }
+
+  // Draw traveling dots
+  for(const d of dots){
+    const age=(progress-d.born)/0.09,alpha=Math.max(0,1-age*age);
+    const ci=Math.min(d.ci,CL-1),n=getNormal(ci),dd=disp[ci]||0;
+    const dwt=ci/(CL-1),dwv=Math.sin(dwt*Math.PI*2*WEAVE_FREQ+(d.side>0?0:Math.PI));
+    const px=curvePoints[ci].x+n.x*dd*dwv+d.offX,py=curvePoints[ci].y+n.y*dd*dwv+d.offY;
+    const sz=d.r*2.2;
+    ctx.save();ctx.translate(px,py);ctx.rotate(d.rot+age*0.8);ctx.globalAlpha=alpha*0.85;
+    ctx.drawImage(petalCanvases[d.petal],-sz/2,-sz/2,sz,sz);ctx.restore();
   }
 
   // Falling petals
   for(let i=fallingPetals.length-1;i>=0;i--){
     const f=fallingPetals[i];f.age++;
-    f.vy+=0.008*dpr; // gentler gravity
+    f.vy+=0.01033*dpr;
     const wave=Math.sin(f.age*f.wf+f.wp)*f.wa;
-    f.x+=f.vx+Math.cos(Math.atan2(f.vy,f.vx)+Math.PI/2)*wave*.3;
-    f.y+=f.vy+Math.sin(Math.atan2(f.vy,f.vx)+Math.PI/2)*wave*.3;
-    f.vx*=0.994;f.vy*=0.994;f.rot+=f.ts;
-    const floorY=H*.95,dist=Math.max(0,floorY-f.y),total=floorY-H*.1;
+    const wave2=Math.sin(f.age*f.wf*0.37+f.wp*2.1)*f.wa*0.4;
+    const da=Math.atan2(f.vy,f.vx);
+    f.x+=f.vx+Math.cos(da+Math.PI/2)*(wave+wave2);f.y+=f.vy+Math.sin(da+Math.PI/2)*(wave+wave2);
+    f.vx*=0.992;f.vy*=0.992;f.rot+=f.ts;f.ts+=(Math.random()-0.5)*0.004;
+    const floorY=HD*0.95,dist=Math.max(0,floorY-f.y),total=floorY-HD*0.1;
     const life=Math.max(0,dist/total);
-    f.r=f.startR*(.7+life*.3); // maintain 70-100% size — petals don't shrink drastically
-    f.alpha=Math.max(0,.05+life*.4); // gentle fade only
-    if(life<.02||f.y>floorY)fallingPetals.splice(i,1);
+    f.r=f.startR*(0.30+life*0.70);f.alpha=0.15+life*0.45;
+    if(life<0.02||f.y>floorY){fallingPetals.splice(i,1);continue;}
+    const sz=f.r*2.2;
+    ctx.save();ctx.translate(f.x,f.y);ctx.rotate(f.rot);ctx.globalAlpha=f.alpha;
+    ctx.drawImage(petalCanvases[f.petal],-sz/2,-sz/2,sz,sz);ctx.restore();
   }
 
-  // Glow lights
-  for(let i=glowLights.length-1;i>=0;i--){
-    const g=glowLights[i],age=progress-g.born;
-    const alpha=g.persist?Math.min(1,age/(g.dur*.3)):Math.max(0,1-age/g.dur);
-    if(!g.persist&&alpha<=0){scene.remove(g.light);glowLights.splice(i,1);continue;}
-    g.light.intensity=g.maxI*alpha;
-    const pos=weavePos(g.ci,g.side,disp[g.ci]||0);
-    g.light.position.set(pos.x,pos.y,50);
+  // Leading dot
+  if(isPlaying&&progress>0&&progress<1){
+    const fi=progress*(CL-1),idx=Math.floor(fi),frac=fi-idx;
+    const a=curvePoints[Math.min(idx,CL-1)],b=curvePoints[Math.min(idx+1,CL-1)];
+    const px=a.x+(b.x-a.x)*frac,py=a.y+(b.y-a.y)*frac;
+    ctx.beginPath();ctx.arc(px,py,4*dpr,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,0.6)';ctx.fill();
   }
 
-  // ═══════════════════════════════════════════════════
-  // RENDER
-  // ═══════════════════════════════════════════════════
-  const growCI=Math.min(Math.floor(progress*(CL-1)),CL-1);
-
-  // Tapering stalk ribbons
-  if(stalkMesh1){scene.remove(stalkMesh1);stalkMesh1.geometry.dispose();}
-  if(stalkMesh2){scene.remove(stalkMesh2);stalkMesh2.geometry.dispose();}
-  stalkMesh1=stalkMesh2=null;
-  if(growCI>2){
-    for(let strand=0;strand<2;strand++){
-      const phase=strand===0?0:Math.PI;
-      const pts=[];
-      for(let i=0;i<=growCI;i+=3){ // every 3rd point for performance
-        const t=i/(CL-1),w=Math.sin(t*Math.PI*2*WEAVE_FREQ+phase);
-        const n=getNormal(i),d=disp[i]||0;
-        pts.push({x:curvePoints[i].x+n.x*d*w,y:curvePoints[i].y+n.y*d*w});
-      }
-      if(pts.length>=2){
-        const baseW=4*dpr,tipW=0.8*dpr;
-        const geo=buildStalkRibbon(pts,baseW,tipW);
-        if(geo){
-          const mesh=new THREE.Mesh(geo,strand===0?stalkMat:stalkMat2);
-          mesh.frustumCulled=false;scene.add(mesh);
-          if(strand===0)stalkMesh1=mesh;else stalkMesh2=mesh;
-        }
-      }
-    }
-  }
-
-  // Stems + garden elements
-  let stemVCount=0,rIdx=0,grIdx=0,rtIdx=0,lIdx=0,bIdx=0,tIdx=0;
-
-  function addStemSeg(x0,y0,x1,y1,r,g,b){
-    if(stemVCount+2>MAX_STEM_VERTS)return;
-    const i=stemVCount*3;
-    stemPos[i]=x0;stemPos[i+1]=y0;stemPos[i+2]=3;
-    stemPos[i+3]=x1;stemPos[i+4]=y1;stemPos[i+5]=3;
-    stemCol[i]=r;stemCol[i+1]=g;stemCol[i+2]=b;
-    stemCol[i+3]=r*.8;stemCol[i+4]=g*.8;stemCol[i+5]=b*.8;
-    stemVCount+=2;
-  }
-
-  for(const g of garden){
-    const elapsed=progress-g.born;
-    let bl=Math.min(1,elapsed/(g.growDur||0.05));
-    if(g.forceBloom!==undefined)bl=Math.max(bl,Math.min(1,(progress-g.forceBloom)/.04));
-    if(bl<0.05)continue;
-    const ci=Math.min(g.ci,CL-1),d=disp[ci]||0;
-    const pos=weavePos(ci,g.side,d);
-    const n=getNormal(ci);
-
-    switch(g.kind){
-      case 'rose':{
-        // Curved stem
-        const stemB=Math.min(1,bl*2);
-        const rawTX=pos.x+n.x*(g.stemLen||20)*g.side;
-        const rawTY=pos.y+n.y*(g.stemLen||20)*g.side;
-        for(let si=0;si<6;si++){
-          const t0=si/6*stemB,t1=(si+1)/6*stemB;
-          const p0=stemCurve(pos.x,pos.y,rawTX,rawTY,g.stemSway||0,g.stemDroop||.08,g.stemLift||.04,t0);
-          const p1=stemCurve(pos.x,pos.y,rawTX,rawTY,g.stemSway||0,g.stemDroop||.08,g.stemLift||.04,t1);
-          addStemSeg(p0.x,p0.y,p1.x,p1.y,.22,.38,.18);
-        }
-        const tip=stemCurve(pos.x,pos.y,rawTX,rawTY,g.stemSway||0,g.stemDroop||.08,g.stemLift||.04,stemB*.97);
-
-        // Single rose sprite (pre-rendered concentric rings)
-        const roseB=Math.max(0,bl*2-1);
-        if(roseB>0.05){
-          const sz=g.maxR*2*roseB;
-          dummy.position.set(tip.x,tip.y,g.golden?20:10);
-          dummy.rotation.set(0,0,g.rot);
-          dummy.scale.set(sz,sz,1);dummy.updateMatrix();
-          if(g.golden&&grIdx<MAX_ROSES){
-            goldenRoseMesh.setMatrixAt(grIdx,dummy.matrix);
-            tmpC.setRGB(1,1,1);goldenRoseMesh.setColorAt(grIdx,tmpC);grIdx++;
-          }else if(!g.golden&&rIdx<MAX_ROSES){
-            roseMesh.setMatrixAt(rIdx,dummy.matrix);
-            tmpC.setRGB(1,1,1);roseMesh.setColorAt(rIdx,tmpC);rIdx++;
-          }
-        }
-
-        // Leaf on stem
-        if(stemB>.4&&lIdx<MAX_LEAVES){
-          const lp=stemCurve(pos.x,pos.y,rawTX,rawTY,g.stemSway||0,g.stemDroop||.08,g.stemLift||.04,.35);
-          const la=Math.atan2(tip.y-pos.y,tip.x-pos.x)+.4*g.side;
-          const lsz=Math.max(4,g.maxR*.8)*stemB;
-          dummy.position.set(lp.x,lp.y,5);dummy.rotation.set(0,0,la);
-          dummy.scale.set(lsz,lsz*.7,1);dummy.updateMatrix();
-          leafMesh.setMatrixAt(lIdx,dummy.matrix);tmpC.set(0x3a6b24);
-          leafMesh.setColorAt(lIdx,tmpC);lIdx++;
-        }
-        break;
-      }
-      case 'bud':{
-        const rawTX=pos.x+n.x*(g.stemLen||8)*g.side*bl;
-        const rawTY=pos.y+n.y*(g.stemLen||8)*g.side*bl;
-        for(let si=0;si<4;si++){
-          const t0=si/4,t1=(si+1)/4;
-          const p0=stemCurve(pos.x,pos.y,rawTX,rawTY,g.stemSway||0,g.stemDroop||.06,g.stemLift||.03,t0);
-          const p1=stemCurve(pos.x,pos.y,rawTX,rawTY,g.stemSway||0,g.stemDroop||.06,g.stemLift||.03,t1);
-          addStemSeg(p0.x,p0.y,p1.x,p1.y,.22,.38,.18);
-        }
-        const tip=stemCurve(pos.x,pos.y,rawTX,rawTY,g.stemSway||0,g.stemDroop||.06,g.stemLift||.03,.95);
-        if(bIdx<MAX_BUDS){
-          const sz=(g.maxR||5)*2*bl;
-          dummy.position.set(tip.x,tip.y,8);dummy.rotation.set(0,0,g.rot);
-          dummy.scale.set(sz,sz*1.3,1);dummy.updateMatrix();
-          budMesh.setMatrixAt(bIdx,dummy.matrix);tmpC.setRGB(g.col.r,g.col.g,g.col.b);
-          budMesh.setColorAt(bIdx,tmpC);bIdx++;
-        }
-        break;
-      }
-      case 'thorn':{
-        if(tIdx<MAX_THORNS){
-          const len=(g.len||6)*bl;
-          const angle=Math.atan2(n.y*g.side,n.x*g.side);
-          dummy.position.set(pos.x+n.x*2*g.side,pos.y+n.y*2*g.side,4);
-          dummy.rotation.set(0,0,angle);dummy.scale.set(len*.3,len,1);dummy.updateMatrix();
-          thornMesh.setMatrixAt(tIdx,dummy.matrix);tmpC.setRGB(.35,.27,.2);
-          thornMesh.setColorAt(tIdx,tmpC);tIdx++;
-        }
-        break;
-      }
-      case 'vine':{
-        const len=(g.maxLen||80)*bl;
-        const brAngle=Math.atan2(n.y*g.side,n.x*g.side)+(g.branchAngle||0);
-        const bx=Math.cos(brAngle),by=Math.sin(brAngle);
-        const vinePts=[];
-        for(let vi=0;vi<=10;vi++){
-          const f=vi/10,along=len*f;
-          const sway=Math.sin(f*Math.PI*1.5+g.rot*.5)*along*(g.swayAmp||.1);
-          const droop=Math.sin(f*Math.PI)*along*(g.droopAmp||.12);
-          const lift=f*f*along*-.04;
-          vinePts.push({x:pos.x+bx*along+by*sway,y:pos.y+by*along-bx*sway+droop+lift});
-        }
-        for(let vi=1;vi<vinePts.length;vi++)
-          addStemSeg(vinePts[vi-1].x,vinePts[vi-1].y,vinePts[vi].x,vinePts[vi].y,.2,.36,.15);
-        const steps=Math.min(g.leafCount||3,6);
-        for(let vi=0;vi<steps&&lIdx<MAX_LEAVES;vi++){
-          const f=(vi+1)/(steps+1);
-          const bloomF=Math.max(0,Math.min(1,(bl-f*.3)*2.5));
-          if(bloomF<.1)continue;
-          const pi=Math.min(Math.floor(f*(vinePts.length-1)),vinePts.length-1);
-          const vp=vinePts[pi];
-          const lsz=(4+vi*1.5)*dpr*bloomF;
-          dummy.position.set(vp.x,vp.y,6);dummy.rotation.set(0,0,g.rot+vi*GOLDEN_ANGLE+Math.PI*g.side*.3);
-          dummy.scale.set(lsz,lsz*.7,1);dummy.updateMatrix();
-          leafMesh.setMatrixAt(lIdx,dummy.matrix);tmpC.set(0x3a6b24);tmpC.multiplyScalar(.4+bloomF*.6);
-          leafMesh.setColorAt(lIdx,tmpC);lIdx++;
-        }
-        if(bl>.5&&bIdx<MAX_BUDS){
-          const vt=vinePts[vinePts.length-1];
-          dummy.position.set(vt.x,vt.y,7);dummy.rotation.set(0,0,g.rot);
-          dummy.scale.set(3*dpr*bl,4*dpr*bl,1);dummy.updateMatrix();
-          budMesh.setMatrixAt(bIdx,dummy.matrix);tmpC.setRGB(g.col.r,g.col.g,g.col.b);
-          budMesh.setColorAt(bIdx,tmpC);bIdx++;
-        }
-        break;
-      }
-      case 'rosette':{
-        if(rtIdx<MAX_ROSETTES){
-          const sz=(g.maxR||8)*2*bl;
-          dummy.position.set(pos.x,pos.y,8);dummy.rotation.set(0,0,g.rot);
-          dummy.scale.set(sz,sz,1);dummy.updateMatrix();
-          rosetteMesh.setMatrixAt(rtIdx,dummy.matrix);
-          tmpC.setRGB(1,1,1);rosetteMesh.setColorAt(rtIdx,tmpC);rtIdx++;
-        }
-        break;
-      }
-      case 'leaf':{
-        if(lIdx<MAX_LEAVES){
-          const sz=(g.leafSize||8)*bl;
-          dummy.position.set(pos.x,pos.y,5);dummy.rotation.set(0,0,g.rot);
-          dummy.scale.set(sz,sz*.7,1);dummy.updateMatrix();
-          leafMesh.setMatrixAt(lIdx,dummy.matrix);tmpC.set(0x3a6b24);tmpC.multiplyScalar(.5+bl*.5);
-          leafMesh.setColorAt(lIdx,tmpC);lIdx++;
-        }
-        break;
-      }
-    }
-  }
-
-  // Traveling dots — render as rosettes
-  for(const d of travelingDots){
-    if(rtIdx>=MAX_ROSETTES)break;
-    const age=(progress-d.born)/.09,alpha=Math.max(0,1-age*age);
-    const ci=Math.min(d.ci,CL-1),pos=weavePos(ci,d.side,disp[ci]);
-    const sz=d.r*2;
-    dummy.position.set(pos.x+d.offX,pos.y+d.offY,10);dummy.rotation.set(0,0,d.rot+age*.8);
-    dummy.scale.set(sz,sz,1);dummy.updateMatrix();
-    rosetteMesh.setMatrixAt(rtIdx,dummy.matrix);
-    tmpC.setRGB(d.col.r*alpha,d.col.g*alpha,d.col.b*alpha);
-    rosetteMesh.setColorAt(rtIdx,tmpC);rtIdx++;
-  }
-
-  roseMesh.count=rIdx;roseMesh.instanceMatrix.needsUpdate=true;
-  if(roseMesh.instanceColor)roseMesh.instanceColor.needsUpdate=true;
-  goldenRoseMesh.count=grIdx;goldenRoseMesh.instanceMatrix.needsUpdate=true;
-  if(goldenRoseMesh.instanceColor)goldenRoseMesh.instanceColor.needsUpdate=true;
-  rosetteMesh.count=rtIdx;rosetteMesh.instanceMatrix.needsUpdate=true;
-  if(rosetteMesh.instanceColor)rosetteMesh.instanceColor.needsUpdate=true;
-  leafMesh.count=lIdx;leafMesh.instanceMatrix.needsUpdate=true;
-  if(leafMesh.instanceColor)leafMesh.instanceColor.needsUpdate=true;
-  budMesh.count=bIdx;budMesh.instanceMatrix.needsUpdate=true;
-  if(budMesh.instanceColor)budMesh.instanceColor.needsUpdate=true;
-  thornMesh.count=tIdx;thornMesh.instanceMatrix.needsUpdate=true;
-  if(thornMesh.instanceColor)thornMesh.instanceColor.needsUpdate=true;
-  stemGeo.setDrawRange(0,stemVCount);stemGeo.attributes.position.needsUpdate=true;stemGeo.attributes.color.needsUpdate=true;
-
-  // Falling petals
-  const fC=[0,0,0,0,0];
-  for(const f of fallingPetals){
-    const ti=f.petal||0;if(fC[ti]>=MAX_FALLING/5)continue;
-    const sz=f.r*2;
-    dummy.position.set(f.x,f.y,2);dummy.rotation.set(0,0,f.rot);
-    dummy.scale.set(sz,sz*1.2,1);dummy.updateMatrix();
-    fallingMeshes[ti].setMatrixAt(fC[ti],dummy.matrix);
-    tmpC.setRGB(f.col.r*f.alpha,f.col.g*f.alpha,f.col.b*f.alpha);
-    fallingMeshes[ti].setColorAt(fC[ti],tmpC);fC[ti]++;
-  }
-  for(let i=0;i<5;i++){
-    fallingMeshes[i].count=fC[i];fallingMeshes[i].instanceMatrix.needsUpdate=true;
-    if(fallingMeshes[i].instanceColor)fallingMeshes[i].instanceColor.needsUpdate=true;
-  }
-
+  // Upload to Three.js and render with bloom
+  offTex.needsUpdate=true;
   composer.render();
 }
 
+/* ═══════════════════════════════════════════════════
+   START
+   ═══════════════════════════════════════════════════ */
 document.getElementById('play-btn').addEventListener('click',async()=>{
   document.getElementById('play-btn').style.display='none';
   audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-  analyser=audioCtx.createAnalyser();analyser.fftSize=2048;analyser.smoothingTimeConstant=.85;
+  analyser=audioCtx.createAnalyser();analyser.fftSize=2048;analyser.smoothingTimeConstant=0.85;
   timeData=new Uint8Array(analyser.fftSize);
   audio=new Audio('bismillah.mp3');
   const src=audioCtx.createMediaElementSource(audio);src.connect(analyser);analyser.connect(audioCtx.destination);
