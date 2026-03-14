@@ -313,8 +313,8 @@ function drawPencFlower(x,y,R,n,bl,baseRot,col,golden){
     const cr=r*0.12;
     const sN=Math.floor(14+petalN);
     for(let i=0;i<sN;i++){
-      const sa=baseRot+i*(Math.PI*2/sN)*1.15; // golden-ish spiral
-      const sd=cr*(0.15+i/sN*0.8);
+      const sa=rng()*Math.PI*2; // random scatter, no spiral
+      const sd=rng()*cr*0.85;
       const sr=cr*(0.05+rng()*0.04);
       ctx.beginPath();ctx.arc(x+Math.cos(sa)*sd,y+Math.sin(sa)*sd,sr,0,Math.PI*2);
       ctx.globalAlpha=bl*0.75;
@@ -606,11 +606,11 @@ function animate(){
       if(progress-d.born>=0.09){
         const ci=Math.min(d.ci,CL-1),n=getNormal(ci),dd=disp[ci]||0;
         const fwt=ci/(CL-1),fwv=Math.sin(fwt*Math.PI*2*WEAVE_FREQ+(d.side>0?0:Math.PI));
-        const da=Math.atan2(1,0)+Math.PI+(Math.random()-.5)*1.4,ds=(0.5+Math.random()*1.2)*dpr;
+        const da=Math.atan2(1,0)+Math.PI+(Math.random()-.5)*1.0,ds=(0.15+Math.random()*0.4)*dpr;
         fallingPetals.push({x:curvePoints[ci].x+n.x*dd*fwv+d.offX,y:curvePoints[ci].y+n.y*dd*fwv+d.offY,
-          vx:Math.cos(da)*ds,vy:Math.sin(da)*ds+0.2*dpr,rot:d.rot,r:d.r*(0.2+Math.random()*0.35),
-          col:d.col,petal:d.petal,alpha:0.5,age:0,startR:0,
-          wf:0.02+Math.random()*0.07,wa:(0.4+Math.random()*2)*dpr,wp:Math.random()*Math.PI*2,ts:0.03+Math.random()*0.18});
+          vx:Math.cos(da)*ds,vy:Math.sin(da)*ds+0.08*dpr,rot:d.rot,r:d.r*(0.25+Math.random()*0.3),
+          col:d.col,petal:d.petal,alpha:0.45,age:0,startR:0,
+          wf:0.008+Math.random()*0.025,wa:(0.3+Math.random()*1.2)*dpr,wp:Math.random()*Math.PI*2,ts:0.008+Math.random()*0.04});
         fallingPetals[fallingPetals.length-1].startR=fallingPetals[fallingPetals.length-1].r;
       }else alive.push(d);
     }
@@ -631,12 +631,12 @@ function animate(){
   // Falling petals
   for(let i=fallingPetals.length-1;i>=0;i--){
     const f=fallingPetals[i];f.age++;
-    f.vy+=0.01033*dpr;
+    f.vy+=0.004*dpr; // gentle gravity — petals float, not swarm
     const wave=Math.sin(f.age*f.wf+f.wp)*f.wa;
     const wave2=Math.sin(f.age*f.wf*0.37+f.wp*2.1)*f.wa*0.4;
     const da=Math.atan2(f.vy,f.vx);
     f.x+=f.vx+Math.cos(da+Math.PI/2)*(wave+wave2);f.y+=f.vy+Math.sin(da+Math.PI/2)*(wave+wave2);
-    f.vx*=0.992;f.vy*=0.992;f.rot+=f.ts;f.ts+=(Math.sin(f.born*99999+i*7)-0.5)*0.004;
+    f.vx*=0.985;f.vy*=0.985;f.rot+=f.ts; // more drag, gentle spin
     const floorY=HD*0.95,dist=Math.max(0,floorY-f.y),total=floorY-HD*0.1;
     const life=Math.max(0,dist/total);
     f.r=f.startR*(0.30+life*0.70);f.alpha=0.15+life*0.45;
