@@ -1067,8 +1067,10 @@ function animate(){
     const a=curvePoints[Math.min(idx,CL-1)],b=curvePoints[Math.min(idx+1,CL-1)];
     const px=a.x+(b.x-a.x)*frac,py=a.y+(b.y-a.y)*frac;
     ctx.beginPath();ctx.arc(px,py,4*dpr,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,0.6)';ctx.fill();
-    // Tracking box around leading edge zone
-    const boxW=120*dpr,boxH=120*dpr;
+    // Tracking box — breathes with the weave split displacement
+    const leadDisp=disp[Math.min(idx,CL-1)]||0;
+    const breathe=60*dpr+leadDisp*1.8; // expands with the split, contracts when settled
+    const boxW=breathe,boxH=breathe;
     const bx=px-boxW/2,by=py-boxH/2;
     const cSz=6*dpr; // corner square size
     ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=0.8*dpr;
