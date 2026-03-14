@@ -120,83 +120,7 @@ const offTex=new THREE.CanvasTexture(offscreen);
 offTex.minFilter=THREE.LinearFilter;offTex.magFilter=THREE.LinearFilter;
 offTex.flipY=false; // canvas Y=0 is top, camera bottom=HD top=0 — both inverted = correct
 const quadGeo=new THREE.PlaneGeometry(WD,HD);
-
-/* ═══════════════════════════════════════════════════
-   PBR EXPLORATION — Sobel-derived normals + Phong lighting
-   Derives a normal map from the color canvas in the fragment shader
-   (luminance-as-height via 3x3 Sobel), then applies:
-     • Warm directional light (upper-left)
-     • Cool fill light (lower-right, blue-purple)
-     • Blinn-Phong specular highlights
-   No 2D draw modifications needed — fully additive.
-   ═══════════════════════════════════════════════════ */
-const litUniforms={
-  uColor:{value:offTex},
-  uResolution:{value:new THREE.Vector2(WD,HD)},
-};
-const litVert=`
-varying vec2 vUv;
-void main(){
-  vUv=uv;
-  gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);
-}`;
-const litFrag=`
-uniform sampler2D uColor;
-uniform vec2 uResolution;
-varying vec2 vUv;
-
-float lum(vec3 c){return dot(c,vec3(0.299,0.587,0.114));}
-
-void main(){
-  vec4 col=texture2D(uColor,vUv);
-  vec2 px=1.0/uResolution;
-
-  // 3x3 Sobel — derive normals from luminance height field
-  float tl=lum(texture2D(uColor,vUv+vec2(-px.x, px.y)).rgb);
-  float tc=lum(texture2D(uColor,vUv+vec2( 0.0,  px.y)).rgb);
-  float tr=lum(texture2D(uColor,vUv+vec2( px.x, px.y)).rgb);
-  float ml=lum(texture2D(uColor,vUv+vec2(-px.x, 0.0)).rgb);
-  float mr=lum(texture2D(uColor,vUv+vec2( px.x, 0.0)).rgb);
-  float bl=lum(texture2D(uColor,vUv+vec2(-px.x,-px.y)).rgb);
-  float bc=lum(texture2D(uColor,vUv+vec2( 0.0, -px.y)).rgb);
-  float br=lum(texture2D(uColor,vUv+vec2( px.x,-px.y)).rgb);
-
-  float dX=(tr+2.0*mr+br)-(tl+2.0*ml+bl);
-  float dY=(tl+2.0*tc+tr)-(bl+2.0*bc+br);
-
-  float hScale=4.0; // bump intensity
-  vec3 N=normalize(vec3(-dX*hScale,-dY*hScale,1.0));
-
-  // Warm directional — upper-left
-  vec3 Ld=normalize(vec3(-0.4,0.6,1.0));
-  vec3 Lc=vec3(1.0,0.95,0.85);
-  float NdL=max(dot(N,Ld),0.0);
-
-  // Cool fill — lower-right, blue-purple
-  vec3 Fd=normalize(vec3(0.3,-0.5,0.7));
-  vec3 Fc=vec3(0.35,0.3,0.55);
-  float NdF=max(dot(N,Fd),0.0);
-
-  // Blinn-Phong specular
-  vec3 V=vec3(0.0,0.0,1.0);
-  vec3 H=normalize(Ld+V);
-  float spec=pow(max(dot(N,H),0.0),48.0);
-
-  // Content mask — skip background
-  float mask=smoothstep(0.04,0.10,lum(col.rgb));
-
-  // Compose
-  vec3 ambient=vec3(0.20,0.17,0.19);
-  vec3 lit=col.rgb*(ambient+Lc*NdL*0.72+Fc*NdF*0.28)
-          +vec3(1.0,0.97,0.92)*spec*0.14*mask;
-
-  gl_FragColor=vec4(mix(col.rgb,lit,mask),1.0);
-}`;
-const quadMat=new THREE.ShaderMaterial({
-  uniforms:litUniforms,
-  vertexShader:litVert,
-  fragmentShader:litFrag,
-});
+const quadMat=new THREE.MeshBasicMaterial({map:offTex,transparent:false});
 const quad=new THREE.Mesh(quadGeo,quadMat);
 quad.position.set(WD/2,HD/2,0);
 scene.add(quad);
@@ -637,7 +561,7 @@ function drawStem(fx,fy,tx,ty,thick,bl){
   const c2x=fx+dx*0.7+dy*0.08,c2y=fy+dy*0.7-dx*0.08;
   const ex=fx+(tx-fx)*bl,ey=fy+(ty-fy)*bl;
   ctx.beginPath();ctx.moveTo(fx,fy);ctx.bezierCurveTo(c1x,c1y,c2x,c2y,ex,ey);
-  ctx.strokeStyle=`rgba(70,110,55,${0.9*bl})`;ctx.lineWidth=thick;ctx.stroke();
+  ctx.strokeStyle=`rgba(70,110,55,${0.55*bl})`;ctx.lineWidth=thick;ctx.stroke();
 }
 function drawLeaf(x,y,angle,size,bl){
   if(bl<0.2)return;
@@ -709,13 +633,13 @@ function drawLeaf(x,y,angle,size,bl){
 
   // Gradient fill: darker at base, lighter at tip
   const grad=ctx.createLinearGradient(0,0,len,0);
-  grad.addColorStop(0,`rgba(40,80,30,${0.95*bl})`);
-  grad.addColorStop(0.4,`rgba(58,108,40,${0.92*bl})`);
-  grad.addColorStop(1,`rgba(82,138,52,${0.85*bl})`);
+  grad.addColorStop(0,`rgba(40,80,30,${0.65*bl})`);
+  grad.addColorStop(0.4,`rgba(58,108,40,${0.55*bl})`);
+  grad.addColorStop(1,`rgba(82,138,52,${0.4*bl})`);
   ctx.fillStyle=grad;ctx.fill();
 
-  // Outline
-  ctx.strokeStyle=`rgba(35,70,25,${0.55*bl})`;
+  // Subtle outline
+  ctx.strokeStyle=`rgba(35,70,25,${0.25*bl})`;
   ctx.lineWidth=Math.max(0.5,0.5*dpr);ctx.stroke();
 
   // Central vein (curved line along spine)
@@ -1064,14 +988,14 @@ function animate(){
       const n=getNormal(i),dd=disp[i]||0;
       const px=curvePoints[i].x+n.x*dd*w,py=curvePoints[i].y+n.y*dd*w;
       i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}
-    ctx.strokeStyle=strand===0?'rgba(45,90,30,1.0)':'rgba(35,75,25,1.0)';
+    ctx.strokeStyle=strand===0?'rgba(45,90,30,0.7)':'rgba(35,75,25,0.65)';
     ctx.lineWidth=2.5*dpr;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
     ctx.beginPath();
     for(let i=0;i<=growCI;i++){const t=i/(CL-1),w=Math.sin(t*Math.PI*2*WEAVE_FREQ+phase);
       const n=getNormal(i),dd=disp[i]||0;
       const px=curvePoints[i].x+n.x*dd*w,py=curvePoints[i].y+n.y*dd*w;
       i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}
-    ctx.strokeStyle='rgba(80,140,50,0.6)';ctx.lineWidth=1.5*dpr;ctx.stroke();
+    ctx.strokeStyle='rgba(80,140,50,0.35)';ctx.lineWidth=1.5*dpr;ctx.stroke();
   }
 
   // Continuous fill
