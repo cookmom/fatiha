@@ -226,7 +226,7 @@ function spawnGardenElement(evt,progress){
         growDur:0.10+evt.size*0.08,leafCount:Math.floor(4+evt.size*10)});break;
     case 'leaf':
       garden.push({...base,kind:'leaf',leafSize:(10+evt.size*20)*dpr,
-        leafAngle:base.baseRot+evt.side*0.5,growDur:0.03});break;
+        leafAngle:base.baseRot+evt.side*0.5,growDur:0.08});break;
     case 'ghunnah':
       glows.push({ci,born:progress,maxR:(40+evt.size*60)*dpr,col,dur:0.12});break;
     case 'bloom':
@@ -896,7 +896,7 @@ function continuousFill(progress,energy){
   if(roll<0.55){
     const ls=(8+energy*35+Math.random()*20)*dpr*sv;newR=ls*0.5;
     garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
-      kind:'leaf',leafSize:ls,leafAngle:Math.random()*Math.PI*2,growDur:0.012+Math.random()*0.015});
+      kind:'leaf',leafSize:ls,leafAngle:Math.random()*Math.PI*2,growDur:0.06+Math.random()*0.05});
   }else if(roll<0.78){
     const mr=Math.max(10*dpr,(6+energy*20+Math.random()*14)*dpr*sv);newR=mr;
     garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
@@ -975,7 +975,11 @@ function animate(){
       case 'vine':drawVine(bx,by,n,g.side,g.maxLen,g.width,bl,g.leafCount,g.baseRot,g.col);break;
       case 'leaf':{
         const leafRot=tangentAngle+g.side*(0.6+jitter);
-        drawLeaf(bx,by,leafRot,g.leafSize,bl);break;}
+        // Smooth ease-out growth: starts fast, decelerates
+        const leafBl=1-Math.pow(1-bl,2.5);
+        // Slight rotation during growth — unfurling from curled
+        const unfurlRot=leafRot+(1-leafBl)*0.4*g.side;
+        drawLeaf(bx,by,unfurlRot,g.leafSize,leafBl);break;}
     }
   }
 
