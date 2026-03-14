@@ -55,8 +55,9 @@ document.body.appendChild(renderer.domElement);
 
 const composer=new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene,camera));
-const bloom=new UnrealBloomPass(new THREE.Vector2(W,H),0.35,0.25,0.88);
-composer.addPass(bloom);
+// Bloom disabled — get structure right first
+// const bloom=new UnrealBloomPass(new THREE.Vector2(W,H),0.35,0.25,0.88);
+// composer.addPass(bloom);
 
 /* ═══════════════════════════════════════════════════
    BEZIER CURVE — identical to 2D v43
@@ -304,12 +305,8 @@ function drawRose(x,y,maxR,petalCount,bl,baseRot,col,golden){
     ctx.strokeStyle=golden?'rgba(180,140,50,0.3)':'rgba(40,80,35,0.4)';
     ctx.lineWidth=0.5*dpr;ctx.beginPath();ctx.arc(x,y,cr,0,Math.PI*2);ctx.stroke();
   }
-  // Golden glow
-  if(golden&&bl>0.3){
-    const grad=ctx.createRadialGradient(x,y,0,x,y,R*1.4);
-    grad.addColorStop(0,`rgba(255,215,80,${0.18*bl})`);grad.addColorStop(1,'rgba(255,215,80,0)');
-    ctx.fillStyle=grad;ctx.beginPath();ctx.arc(x,y,R*1.4,0,Math.PI*2);ctx.fill();
-  }
+  // Golden glow disabled — structure first
+  // if(golden&&bl>0.3){...}
 }
 function drawStem(fx,fy,tx,ty,thick,bl){
   if(bl<0.05)return;
@@ -435,17 +432,8 @@ function animate(){
   const disp=[];
   for(let i=0;i<CL;i++)disp.push(BASE_GAP+splitGap*dotPresence[i]);
 
-  // Ghunnah glows
-  for(let i=glows.length-1;i>=0;i--){
-    const g=glows[i],age=progress-g.born,alpha=Math.max(0,1-age/g.dur);
-    if(alpha<=0){glows.splice(i,1);continue;}
-    const p=curvePoints[Math.min(g.ci,CL-1)];
-    const grad=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,g.maxR*alpha);
-    grad.addColorStop(0,`rgba(${g.col[0]},${g.col[1]},${g.col[2]},${0.12*alpha})`);
-    grad.addColorStop(0.5,`rgba(${g.col[0]},${g.col[1]},${g.col[2]},${0.05*alpha})`);
-    grad.addColorStop(1,`rgba(${g.col[0]},${g.col[1]},${g.col[2]},0)`);
-    ctx.fillStyle=grad;ctx.beginPath();ctx.arc(p.x,p.y,g.maxR*alpha,0,Math.PI*2);ctx.fill();
-  }
+  // Ghunnah glows disabled — structure first
+  // glows rendering removed
 
   // Garden elements
   for(const g of garden){
