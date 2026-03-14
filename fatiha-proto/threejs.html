@@ -60,74 +60,62 @@ composer.addPass(new RenderPass(scene,camera));
 // composer.addPass(bloom);
 
 /* ═══════════════════════════════════════════════════
-   GOLDEN RATIO SPIRAL — replaces bezier curve
-   Golden rectangle subdivisions with inscribed quarter-circle arcs
+   GOLDEN RATIO SPIRAL — matching reference image exactly
+   Portrait: bottom = large square, top subdivides inward
+   Spiral sweeps from bottom-left → up → curls into top-right
    ═══════════════════════════════════════════════════ */
-const SPIRAL_LEVELS=10; // number of golden rectangle subdivisions
 
-// Golden rectangle subdivisions with inscribed quarter-circle arcs
-// Canvas is y-flipped (scale(1,-1)): y=0 = screen bottom, y=HD = screen top
-// Vine grows top→bottom on screen = high-y → low-y in draw coords
-// Spiral starts at high y (top of screen) and winds inward toward golden eye
+// Build golden rectangles: portrait canvas, first cut = bottom square
 const goldenRects=[];
-const spiralArcs=[]; // {cx,cy,radius,startAngle,endAngle}
+const spiralArcs=[];
 {
-  // Work in draw-coords: (0,0) bottom-left after flip, (WD,HD) top-right
   let x=0, y=0, w=WD, h=HD;
-  // Direction of square cut: cycles through 4 sides
-  // 0=top (high-y side), 1=right, 2=bottom (low-y side), 3=left
-  for(let i=0;i<SPIRAL_LEVELS;i++){
+  const LEVELS=10;
+  // Cycle: 0=bottom, 1=right, 2=top, 3=left
+  for(let i=0;i<LEVELS;i++){
     goldenRects.push({x,y,w,h});
-    const sq=Math.min(w,h); // square side = shorter dimension
-    const d=i%4;
-    if(d===0){
-      // Cut square from TOP: square at (x, y+h-sq) to (x+sq, y+h)
-      // Arc center at bottom-left of square, sweeps from right to top
-      const cx=x, cy=y+h-sq;
-      spiralArcs.push({cx,cy,r:sq,sa:Math.PI*0.5,ea:0}); // 90°→0° (top→right)
-      h-=sq;
-    }else if(d===1){
-      // Cut square from RIGHT: square at (x+w-sq, y) to (x+w, y+sq)
-      const cx=x+w-sq, cy=y+sq;
-      spiralArcs.push({cx,cy,r:sq,sa:0,ea:-Math.PI*0.5}); // 0°→-90° (right→bottom)
-      w-=sq;
-    }else if(d===2){
-      // Cut square from BOTTOM: square at (x+w-sq, y) to (x+w, y+sq)
-      const cx=x+w, cy=y+sq;
-      spiralArcs.push({cx,cy,r:sq,sa:-Math.PI*0.5,ea:-Math.PI}); // -90°→-180°
-      y+=sq; h-=sq;
+    const dir=i%4;
+    const sq=dir%2===0?Math.min(w,h):Math.min(w,h);
+    if(dir===0){
+      // Square from bottom
+      const s=w;if(s>h)break;
+      spiralArcs.push({cx:x+s, cy:y+s, r:s, sa:Math.PI, ea:Math.PI*0.5});
+      y+=s; h-=s;
+    }else if(dir===1){
+      // Square from right
+      const s=h;if(s>w)break;
+      spiralArcs.push({cx:x+w-s, cy:y+s, r:s, sa:Math.PI*0.5, ea:0});
+      w-=s;
+    }else if(dir===2){
+      // Square from top
+      const s=w;if(s>h)break;
+      spiralArcs.push({cx:x+w-s, cy:y+h-s, r:s, sa:0, ea:-Math.PI*0.5});
+      h-=s;
     }else{
-      // Cut square from LEFT: square at (x, y+h-sq) to (x+sq, y+h)
-      const cx=x+sq, cy=y+h-sq;
-      spiralArcs.push({cx,cy,r:sq,sa:Math.PI,ea:Math.PI*0.5}); // 180°→90°
-      x+=sq; w-=sq;
+      // Square from left
+      const s=h;if(s>w)break;
+      spiralArcs.push({cx:x+s, cy:y+h-s, r:s, sa:-Math.PI*0.5, ea:-Math.PI});
+      x+=s; w-=s;
     }
   }
 }
 
-// Sample curvePoints along the spiral arcs (outer → inner)
-// Target ~900 total points distributed across arcs
+// Sample curvePoints along spiral arcs
 const curvePoints=[];
-const totalArcTarget=900;
 {
-  // Weight points by arc radius (larger arcs get more points)
+  const TARGET=900;
   let totalR=0;
   for(const a of spiralArcs) totalR+=a.r;
-  for(let i=0;i<spiralArcs.length;i++){
-    const arc=spiralArcs[i];
-    const nPts=Math.max(10,Math.round(totalArcTarget*arc.r/totalR));
-    for(let j=0;j<nPts;j++){
-      const t=j/nPts;
+  for(const arc of spiralArcs){
+    const n=Math.max(8,Math.round(TARGET*arc.r/totalR));
+    for(let j=0;j<n;j++){
+      const t=j/n;
       const angle=arc.sa+(arc.ea-arc.sa)*t;
-      curvePoints.push({
-        x:arc.cx+Math.cos(angle)*arc.r,
-        y:arc.cy+Math.sin(angle)*arc.r
-      });
+      curvePoints.push({x:arc.cx+Math.cos(angle)*arc.r, y:arc.cy+Math.sin(angle)*arc.r});
     }
   }
-  // Final point of last arc
   const last=spiralArcs[spiralArcs.length-1];
-  curvePoints.push({x:last.cx+Math.cos(last.ea)*last.r,y:last.cy+Math.sin(last.ea)*last.r});
+  curvePoints.push({x:last.cx+Math.cos(last.ea)*last.r, y:last.cy+Math.sin(last.ea)*last.r});
 }
 const CL=curvePoints.length;
 function getNormal(i){
