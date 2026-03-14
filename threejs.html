@@ -120,7 +120,83 @@ const offTex=new THREE.CanvasTexture(offscreen);
 offTex.minFilter=THREE.LinearFilter;offTex.magFilter=THREE.LinearFilter;
 offTex.flipY=false; // canvas Y=0 is top, camera bottom=HD top=0 — both inverted = correct
 const quadGeo=new THREE.PlaneGeometry(WD,HD);
-const quadMat=new THREE.MeshBasicMaterial({map:offTex,transparent:false});
+
+/* ═══════════════════════════════════════════════════
+   PBR EXPLORATION — Sobel-derived normals + Phong lighting
+   Derives a normal map from the color canvas in the fragment shader
+   (luminance-as-height via 3x3 Sobel), then applies:
+     • Warm directional light (upper-left)
+     • Cool fill light (lower-right, blue-purple)
+     • Blinn-Phong specular highlights
+   No 2D draw modifications needed — fully additive.
+   ═══════════════════════════════════════════════════ */
+const litUniforms={
+  uColor:{value:offTex},
+  uResolution:{value:new THREE.Vector2(WD,HD)},
+};
+const litVert=`
+varying vec2 vUv;
+void main(){
+  vUv=uv;
+  gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);
+}`;
+const litFrag=`
+uniform sampler2D uColor;
+uniform vec2 uResolution;
+varying vec2 vUv;
+
+float lum(vec3 c){return dot(c,vec3(0.299,0.587,0.114));}
+
+void main(){
+  vec4 col=texture2D(uColor,vUv);
+  vec2 px=1.0/uResolution;
+
+  // 3x3 Sobel — derive normals from luminance height field
+  float tl=lum(texture2D(uColor,vUv+vec2(-px.x, px.y)).rgb);
+  float tc=lum(texture2D(uColor,vUv+vec2( 0.0,  px.y)).rgb);
+  float tr=lum(texture2D(uColor,vUv+vec2( px.x, px.y)).rgb);
+  float ml=lum(texture2D(uColor,vUv+vec2(-px.x, 0.0)).rgb);
+  float mr=lum(texture2D(uColor,vUv+vec2( px.x, 0.0)).rgb);
+  float bl=lum(texture2D(uColor,vUv+vec2(-px.x,-px.y)).rgb);
+  float bc=lum(texture2D(uColor,vUv+vec2( 0.0, -px.y)).rgb);
+  float br=lum(texture2D(uColor,vUv+vec2( px.x,-px.y)).rgb);
+
+  float dX=(tr+2.0*mr+br)-(tl+2.0*ml+bl);
+  float dY=(tl+2.0*tc+tr)-(bl+2.0*bc+br);
+
+  float hScale=4.0; // bump intensity
+  vec3 N=normalize(vec3(-dX*hScale,-dY*hScale,1.0));
+
+  // Warm directional — upper-left
+  vec3 Ld=normalize(vec3(-0.4,0.6,1.0));
+  vec3 Lc=vec3(1.0,0.95,0.85);
+  float NdL=max(dot(N,Ld),0.0);
+
+  // Cool fill — lower-right, blue-purple
+  vec3 Fd=normalize(vec3(0.3,-0.5,0.7));
+  vec3 Fc=vec3(0.35,0.3,0.55);
+  float NdF=max(dot(N,Fd),0.0);
+
+  // Blinn-Phong specular
+  vec3 V=vec3(0.0,0.0,1.0);
+  vec3 H=normalize(Ld+V);
+  float spec=pow(max(dot(N,H),0.0),48.0);
+
+  // Content mask — skip background
+  float mask=smoothstep(0.04,0.10,lum(col.rgb));
+
+  // Compose
+  vec3 ambient=vec3(0.20,0.17,0.19);
+  vec3 lit=col.rgb*(ambient+Lc*NdL*0.72+Fc*NdF*0.28)
+          +vec3(1.0,0.97,0.92)*spec*0.14*mask;
+
+  gl_FragColor=vec4(mix(col.rgb,lit,mask),1.0);
+}`;
+const quadMat=new THREE.ShaderMaterial({
+  uniforms:litUniforms,
+  vertexShader:litVert,
+  fragmentShader:litFrag,
+});
 const quad=new THREE.Mesh(quadGeo,quadMat);
 quad.position.set(WD/2,HD/2,0);
 scene.add(quad);
