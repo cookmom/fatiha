@@ -89,20 +89,25 @@ const curvePoints=window._cp=[];
       cx=rx; cy=ry; // arc center = top-left of square... no
       // Arc: quarter circle in the square, center at appropriate corner
       // For bottom square: center is at top-left, sweeps from bottom-right to top-right
-      // Bottom: center=BL=(rx,ry). Y-flipped: sweep PI/2→0 (screen: up→right)
-      spiralArcs.push({cx:rx, cy:ry, r:sq, sa:Math.PI/2, ea:0});
+      // Bottom: center=BL=(rx,ry). sa=0 (BR), ea=PI/2 (TL)
+      spiralArcs.push({cx:rx, cy:ry, r:sq, sa:0, ea:Math.PI/2});
       ry+=sq; rh-=sq;
     }else if(dir===1){
-      // Left: center=TL=(rx,ry+rh). Y-flipped: sweep 0→-PI/2
-      spiralArcs.push({cx:rx, cy:ry+rh, r:sq, sa:0, ea:-Math.PI/2});
+      // Left: center=TL=(rx,ry+rh). sa=3PI/2 (BL), ea=0 (TR)... 
+      // BL relative to TL center: angle = atan2(ry-(ry+rh), rx-rx) = atan2(-rh,0) = -PI/2
+      // TR relative to TL: atan2((ry+rh)-(ry+rh), (rx+sq)-rx) = atan2(0,sq) = 0
+      spiralArcs.push({cx:rx, cy:ry+rh, r:sq, sa:-Math.PI/2, ea:0});
       rx+=sq; rw-=sq;
     }else if(dir===2){
-      // Top: center=TR=(rx+rw,ry+rh). Y-flipped: sweep PI/2→PI
-      spiralArcs.push({cx:rx+rw, cy:ry+rh, r:sq, sa:Math.PI/2, ea:Math.PI});
+      // Top: center=TR=(rx+rw,ry+rh). 
+      // TL relative: atan2(0, -(rw)) = PI. BR relative: atan2(-rh, 0) = -PI/2
+      // But we want short arc PI→PI/2 (not through -PI/2)
+      spiralArcs.push({cx:rx+rw, cy:ry+rh, r:sq, sa:Math.PI, ea:Math.PI/2});
       rh-=sq;
     }else{
-      // Right: center=BR=(rx+rw,ry). Y-flipped: sweep PI→PI*1.5
-      spiralArcs.push({cx:rx+rw, cy:ry, r:sq, sa:Math.PI, ea:Math.PI*1.5});
+      // Right: center=BR=(rx+rw,ry).
+      // TR relative: atan2(rh, 0) = PI/2. BL relative: atan2(0, -rw) = PI
+      spiralArcs.push({cx:rx+rw, cy:ry, r:sq, sa:Math.PI/2, ea:Math.PI});
       rw-=sq;
     }
   }
@@ -1145,9 +1150,7 @@ function animate(){
   ctx.beginPath();
   for(let i=0;i<spiralArcs.length;i++){
     const a=spiralArcs[i];
-    // ctx.arc handles the canvas transform automatically
-    // We need counterclockwise=true because canvas y-flip reverses arc direction
-    ctx.arc(a.cx, a.cy, a.r, a.sa, a.ea, true);
+    ctx.arc(a.cx, a.cy, a.r, a.sa, a.ea, false);
   }
   ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=1;ctx.stroke();
 
