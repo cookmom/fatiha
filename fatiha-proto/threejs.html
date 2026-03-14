@@ -521,7 +521,10 @@ function animate(){
   for(let pass=0;pass<3;pass++)for(let i=2;i<CL-2;i++)
     dotPresence[i]=dotPresence[i]*.4+(dotPresence[i-1]+dotPresence[i+1])*.2+(dotPresence[i-2]+dotPresence[i+2])*.1;
   // Track if a point has ever been visited (settled)
-  if(!window._everVisited)window._everVisited=new Float32Array(CL);
+  if(!window._everVisited||window._everVisited.length!==CL)window._everVisited=new Float32Array(CL);
+  // Reset visited state when synthTime jumps backward (new capture)
+  if(window._lastSynthTime!==undefined&&time<window._lastSynthTime-0.1)window._everVisited=new Float32Array(CL);
+  window._lastSynthTime=time;
   for(let i=0;i<CL;i++)if(dotPresence[i]>0.05)window._everVisited[i]=1;
   const disp=[];
   for(let i=0;i<CL;i++){
