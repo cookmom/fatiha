@@ -83,6 +83,20 @@ for(const s of SEGS){
 }
 {const L=SEGS[5];curvePoints.push(cubicBez({x:L.p0.x*WD,y:L.p0.y*HD},{x:L.p1.x*WD,y:L.p1.y*HD},{x:L.p2.x*WD,y:L.p2.y*HD},{x:L.p3.x*WD,y:L.p3.y*HD},1));}
 const CL=curvePoints.length;
+// Arc-length reparameterization — even visual speed
+const arcLens=[0];
+for(let i=1;i<CL;i++){
+  const dx=curvePoints[i].x-curvePoints[i-1].x,dy=curvePoints[i].y-curvePoints[i-1].y;
+  arcLens.push(arcLens[i-1]+Math.sqrt(dx*dx+dy*dy));
+}
+const totalArc=arcLens[CL-1];
+// Map uniform 0→1 progress to curve index via arc-length
+function arcToIndex(t){
+  const target=t*totalArc;
+  let lo=0,hi=CL-1;
+  while(lo<hi){const mid=(lo+hi)>>1;arcLens[mid]<target?lo=mid+1:hi=mid;}
+  return lo;
+}
 function getNormal(i){
   const ni=Math.min(i+1,CL-1),pi=Math.max(i-1,0);
   const dx=curvePoints[ni].x-curvePoints[pi].x,dy=curvePoints[ni].y-curvePoints[pi].y;
@@ -553,7 +567,9 @@ function animate(){
   }
 
   // Growing vine stalks
-  const growCI=Math.min(Math.floor(progress*(CL-1)),CL-1);
+  const growCI=Math.min(arcToIndex(progress),CL-1);
+  window._dbg={progress,growCI,dotsN:dots.length,gardenN:garden.length,time,CL,
+    cp0:curvePoints[0],cp450:curvePoints[450],cp900:curvePoints[CL-1],WD,HD};
   for(let strand=0;strand<2;strand++){
     const phase=strand===0?0:Math.PI;
     ctx.beginPath();
