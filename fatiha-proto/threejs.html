@@ -672,95 +672,176 @@ function drawLeaf(x,y,angle,size,bl){
 }
 function drawBud(x,y,maxR,bl,col,baseRot){
   if(bl<0.05)return;
-  // Seeded PRNG for stable variant selection — use baseRot (fixed at spawn) not position
+  // Seeded PRNG — stable variant from baseRot
   function srand(s){return function(){s=(s*9301+49297)%233280;return s/233280;};}
   const rng=srand(Math.floor((baseRot||0)*10000));
-  const variant=Math.floor(rng()*3); // 0=tight closed, 1=half-open, 2=small rosette
+  const variant=Math.floor(rng()*3); // 0=tight, 1=opening, 2=rosebud
   const r=maxR*Math.min(1,bl*1.4);
   const lineW=Math.max(0.5,0.7*dpr);
-  const darkR=Math.round(col[0]*0.5),darkG=Math.round(col[1]*0.4),darkB=Math.round(col[2]*0.4);
-  const lineCol=`rgba(${darkR},${darkG},${darkB},0.7)`;
+  // Light direction for per-element shading (light from upper-left)
+  const lightAng=-Math.PI*0.3;
+
+  // Color helpers
+  function shade(c,amt){return[Math.round(c[0]*amt),Math.round(c[1]*amt),Math.round(c[2]*amt)];}
+  function tint(c,amt){return[Math.min(255,Math.round(c[0]+(255-c[0])*amt)),Math.min(255,Math.round(c[1]+(255-c[1])*amt)),Math.min(255,Math.round(c[2]+(255-c[2])*amt))];}
+  function rgb(c){return`rgb(${c[0]},${c[1]},${c[2]})`;}
+  function rgba(c,a){return`rgba(${c[0]},${c[1]},${c[2]},${a})`;}
+  // Shading factor based on angle relative to light
+  function shadeFactor(ang){const d=Math.cos(ang-lightAng);return d*0.5+0.5;} // 0=dark side, 1=light side
+
+  // Sepal/calyx colors
+  const sepalBase=[55,110,50];
+  const sepalDark=shade(sepalBase,0.6);
+  const sepalLight=tint(sepalBase,0.3);
+  const petalDark=shade(col,0.55);
+  const petalLine=rgba(petalDark,0.6);
+  const sepalLine=rgba(shade(sepalBase,0.4),0.6);
+
+  // ── Draw calyx sepals (shared by all variants) ──
+  function drawCalyx(sepalCount,sepalH,spreadAng){
+    for(let i=0;i<sepalCount;i++){
+      const a=(i-((sepalCount-1)*0.5))*spreadAng;
+      const sf=shadeFactor(a);
+      const sc=sf>0.5?tint(sepalBase,(sf-0.5)*0.5):shade(sepalBase,0.7+sf*0.6);
+      const sw=r*0.22*(0.9+rng()*0.2);
+      const sh=sepalH*(0.9+rng()*0.15);
+      ctx.save();ctx.translate(x,y);ctx.rotate(a);
+      ctx.beginPath();
+      // Pointed sepal — narrow base, widens, then sharp tip (Ottoman style)
+      ctx.moveTo(0,r*0.05);
+      ctx.bezierCurveTo(sw*0.3,r*0.02, sw*0.9,-sh*0.25, sw*0.7,-sh*0.5);
+      ctx.bezierCurveTo(sw*0.4,-sh*0.8, sw*0.1,-sh*0.95, 0,-sh);
+      ctx.bezierCurveTo(-sw*0.1,-sh*0.95, -sw*0.4,-sh*0.8, -sw*0.7,-sh*0.5);
+      ctx.bezierCurveTo(-sw*0.9,-sh*0.25, -sw*0.3,r*0.02, 0,r*0.05);
+      ctx.closePath();
+      ctx.globalAlpha=bl*0.85;
+      ctx.fillStyle=rgb(sc);ctx.fill();
+      ctx.strokeStyle=sepalLine;ctx.lineWidth=lineW*0.7;ctx.globalAlpha=bl*0.5;ctx.stroke();
+      // Center vein on sepal
+      ctx.beginPath();ctx.moveTo(0,r*0.02);ctx.lineTo(0,-sh*0.85);
+      ctx.strokeStyle=rgba(sepalDark,0.4*bl);ctx.lineWidth=lineW*0.5;ctx.stroke();
+      ctx.restore();
+    }
+  }
 
   if(variant===0){
-    // Tight closed bud — 3 petals tightly wrapped around each other
-    for(let i=0;i<3;i++){
-      const f=i/3;
-      const a=i*Math.PI*2/3+bl*0.2;
-      const wrapTight=0.25+f*0.12; // each petal wraps tighter
-      const h=r*(0.7+f*0.3);
-      ctx.save();ctx.translate(x,y);ctx.rotate(a);
-      ctx.beginPath();
-      ctx.moveTo(0,r*0.1);
-      ctx.bezierCurveTo(r*wrapTight,-h*0.3, r*wrapTight*0.8,-h*0.8, 0,-h);
-      ctx.bezierCurveTo(-r*wrapTight*0.8,-h*0.8, -r*wrapTight,-h*0.3, 0,r*0.1);
-      ctx.closePath();
-      const lr=Math.round(col[0]+(255-col[0])*(1-f)*0.25);
-      const lg=Math.round(col[1]+(255-col[1])*(1-f)*0.2);
-      const lb=Math.round(col[2]+(255-col[2])*(1-f)*0.15);
-      ctx.globalAlpha=bl*(0.6+f*0.3);
-      ctx.fillStyle=`rgb(${lr},${lg},${lb})`;ctx.fill();
-      ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.globalAlpha=bl*0.5;ctx.stroke();
-      ctx.restore();
-    }
-    // Tiny tip highlight
-    ctx.beginPath();ctx.arc(x,y-r*0.6,r*0.08,0,Math.PI*2);
-    ctx.globalAlpha=bl*0.6;ctx.fillStyle=`rgb(${Math.min(255,col[0]+60)},${Math.min(255,col[1]+40)},${Math.min(255,col[2]+30)})`;ctx.fill();
+    // ── TIGHT BUD — fully closed, pointed tip, sepals dominant ──
+    // Calyx first (behind bud body)
+    drawCalyx(3,r*0.75,0.55);
+
+    // Bud body — teardrop/ovoid, no petals showing
+    ctx.save();ctx.translate(x,y);
+    ctx.beginPath();
+    const bw=r*0.32, bh=r*0.85;
+    ctx.moveTo(0,r*0.08);
+    ctx.bezierCurveTo(bw,r*0.02, bw*1.1,-bh*0.4, 0,-bh);
+    ctx.bezierCurveTo(-bw*1.1,-bh*0.4, -bw,r*0.02, 0,r*0.08);
+    ctx.closePath();
+    // Gradient from light side to dark side
+    const grd=ctx.createLinearGradient(-bw,0,bw,0);
+    grd.addColorStop(0,rgb(tint(col,0.25)));
+    grd.addColorStop(0.5,rgb(col));
+    grd.addColorStop(1,rgb(shade(col,0.65)));
+    ctx.globalAlpha=bl*0.9;ctx.fillStyle=grd;ctx.fill();
+    ctx.strokeStyle=petalLine;ctx.lineWidth=lineW;ctx.globalAlpha=bl*0.5;ctx.stroke();
+    // Tight seam line down center
+    ctx.beginPath();ctx.moveTo(0,r*0.0);ctx.lineTo(0,-bh*0.9);
+    ctx.strokeStyle=rgba(petalDark,0.3*bl);ctx.lineWidth=lineW*0.5;ctx.stroke();
+    // Pointed tip highlight
+    ctx.beginPath();ctx.arc(0,-bh*0.85,r*0.06,0,Math.PI*2);
+    ctx.globalAlpha=bl*0.5;ctx.fillStyle=rgb(tint(col,0.45));ctx.fill();
+    ctx.restore();
+
   }else if(variant===1){
-    // Half-open bud — petals starting to separate at tip
-    const petalN=4;
-    for(let i=0;i<petalN;i++){
-      const f=i/petalN;
-      const a=i*Math.PI*2/petalN+rng()*0.3;
-      const spread=bl*0.35; // tips spread as bloom increases
-      const h=r*(0.6+f*0.35);
-      ctx.save();ctx.translate(x,y);ctx.rotate(a);
+    // ── OPENING BUD — sepals parting, 2-3 petal tips peeking ──
+    // Calyx with wider spread (sepals opening)
+    drawCalyx(3,r*0.6,0.7);
+
+    // Bud body — wider ovoid
+    ctx.save();ctx.translate(x,y);
+    const bw=r*0.38, bh=r*0.75;
+    ctx.beginPath();
+    ctx.moveTo(0,r*0.08);
+    ctx.bezierCurveTo(bw*1.1,r*0.0, bw*1.2,-bh*0.35, 0,-bh*0.7);
+    ctx.bezierCurveTo(-bw*1.2,-bh*0.35, -bw*1.1,r*0.0, 0,r*0.08);
+    ctx.closePath();
+    const grd=ctx.createLinearGradient(-bw,0,bw,0);
+    grd.addColorStop(0,rgb(tint(col,0.2)));
+    grd.addColorStop(0.6,rgb(col));
+    grd.addColorStop(1,rgb(shade(col,0.6)));
+    ctx.globalAlpha=bl*0.85;ctx.fillStyle=grd;ctx.fill();
+    ctx.strokeStyle=petalLine;ctx.lineWidth=lineW;ctx.globalAlpha=bl*0.45;ctx.stroke();
+    ctx.restore();
+
+    // Petal tips peeking out at top (2-3 tips above bud body)
+    const tipN=2+Math.floor(rng()*2);
+    for(let i=0;i<tipN;i++){
+      const a=(i-(tipN-1)*0.5)*0.45+rng()*0.15-0.07;
+      const sf=shadeFactor(a);
+      const pc=sf>0.5?tint(col,(sf-0.5)*0.4):shade(col,0.7+sf*0.5);
+      const tipH=r*(0.2+rng()*0.12);
+      const tipW=r*(0.1+rng()*0.06);
+      const ty=-r*0.55-tipH*0.3; // positioned at top of bud body
+      ctx.save();ctx.translate(x,y+ty);ctx.rotate(a*0.5);
       ctx.beginPath();
-      ctx.moveTo(0,r*0.15);
-      // Base is tight, tip fans out
-      const baseW=r*0.18;
-      const tipW=r*(0.08+spread*0.3);
-      const tipOff=spread*r*0.25; // tip offset outward
-      ctx.bezierCurveTo(baseW,-h*0.3, tipW+tipOff,-h*0.7, tipOff,-h);
-      ctx.bezierCurveTo(-tipW+tipOff,-h*0.7, -baseW,-h*0.3, 0,r*0.15);
+      ctx.moveTo(-tipW*0.5,tipH*0.3);
+      ctx.bezierCurveTo(-tipW*0.3,-tipH*0.2, -tipW*0.1,-tipH*0.7, 0,-tipH);
+      ctx.bezierCurveTo(tipW*0.1,-tipH*0.7, tipW*0.3,-tipH*0.2, tipW*0.5,tipH*0.3);
       ctx.closePath();
-      const lr=Math.round(col[0]+(255-col[0])*f*0.2);
-      const lg=Math.round(col[1]+(255-col[1])*f*0.15);
-      const lb=Math.round(col[2]+(255-col[2])*f*0.1);
-      ctx.globalAlpha=bl*(0.55+f*0.35);
-      ctx.fillStyle=`rgb(${lr},${lg},${lb})`;ctx.fill();
-      ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.globalAlpha=bl*0.5;ctx.stroke();
+      ctx.globalAlpha=bl*0.8;ctx.fillStyle=rgb(pc);ctx.fill();
+      ctx.strokeStyle=petalLine;ctx.lineWidth=lineW*0.6;ctx.globalAlpha=bl*0.4;ctx.stroke();
       ctx.restore();
     }
+
   }else{
-    // Small rosette bud — tiny version of rose with fewer petals
-    const petalN=Math.floor(3+rng()*2);
-    for(let ring=0;ring<2;ring++){
-      const ringR=r*(ring===0?0.85:0.5);
-      const ringN=ring===0?petalN:Math.max(2,petalN-1);
-      const rotOff=ring*0.4+rng()*0.3;
-      for(let i=0;i<ringN;i++){
-        const a=rotOff+i*Math.PI*2/ringN;
-        const len=ringR*(0.8+rng()*0.3);
-        const w=len*(0.28+rng()*0.1);
-        ctx.save();ctx.translate(x,y);ctx.rotate(a);
-        ctx.beginPath();
-        ctx.moveTo(0,0);
-        ctx.bezierCurveTo(w*0.6,-len*0.3, w*0.7,-len*0.7, 0,-len);
-        ctx.bezierCurveTo(-w*0.7,-len*0.7, -w*0.6,-len*0.3, 0,0);
-        ctx.closePath();
-        const bright=ring===0?0:0.2;
-        const lr=Math.min(255,Math.round(col[0]+bright*60));
-        const lg=Math.min(255,Math.round(col[1]+bright*40));
-        const lb=Math.min(255,Math.round(col[2]+bright*30));
-        ctx.globalAlpha=bl*(0.6+ring*0.25);
-        ctx.fillStyle=`rgb(${lr},${lg},${lb})`;ctx.fill();
-        ctx.strokeStyle=lineCol;ctx.lineWidth=lineW*0.8;ctx.globalAlpha=bl*0.45;ctx.stroke();
-        ctx.restore();
-      }
-    }
-    // Center dot
-    ctx.beginPath();ctx.arc(x,y,r*0.1,0,Math.PI*2);
-    ctx.globalAlpha=bl*0.7;ctx.fillStyle=`rgb(${darkR},${darkG},${darkB})`;ctx.fill();
+    // ── ROSEBUD — spiral of wrapped petals, sepals curled back ──
+    // Sepals curled back (drawn first, shorter and wider spread)
+    drawCalyx(4,r*0.5,0.85);
+
+    // Outer wrap petal (back)
+    ctx.save();ctx.translate(x,y);
+    const ow=r*0.42, oh=r*0.8;
+    ctx.beginPath();
+    ctx.moveTo(0,r*0.06);
+    ctx.bezierCurveTo(ow*1.1,-oh*0.1, ow*0.9,-oh*0.65, ow*0.15,-oh*0.85);
+    ctx.bezierCurveTo(-ow*0.1,-oh*0.9, -ow*0.8,-oh*0.5, -ow*0.3,-oh*0.15);
+    ctx.bezierCurveTo(-ow*0.6,oh*0.0, -ow*0.2,r*0.05, 0,r*0.06);
+    ctx.closePath();
+    ctx.globalAlpha=bl*0.8;ctx.fillStyle=rgb(shade(col,0.75));ctx.fill();
+    ctx.strokeStyle=petalLine;ctx.lineWidth=lineW*0.7;ctx.globalAlpha=bl*0.4;ctx.stroke();
+    ctx.restore();
+
+    // Middle wrap petal
+    ctx.save();ctx.translate(x,y);
+    const mw=r*0.35, mh=r*0.75;
+    ctx.beginPath();
+    ctx.moveTo(0,r*0.04);
+    ctx.bezierCurveTo(-mw*0.9,-mh*0.1, -mw*1.0,-mh*0.55, -mw*0.1,-mh*0.8);
+    ctx.bezierCurveTo(mw*0.3,-mh*0.85, mw*0.8,-mh*0.4, mw*0.2,-mh*0.05);
+    ctx.bezierCurveTo(mw*0.4,r*0.02, mw*0.1,r*0.04, 0,r*0.04);
+    ctx.closePath();
+    ctx.globalAlpha=bl*0.85;ctx.fillStyle=rgb(col);ctx.fill();
+    ctx.strokeStyle=petalLine;ctx.lineWidth=lineW*0.6;ctx.globalAlpha=bl*0.4;ctx.stroke();
+    ctx.restore();
+
+    // Inner spiral petal (lightest, most visible)
+    ctx.save();ctx.translate(x,y);
+    const iw=r*0.22, ih=r*0.65;
+    ctx.beginPath();
+    ctx.moveTo(0,r*0.0);
+    ctx.bezierCurveTo(iw*0.8,-ih*0.2, iw*1.0,-ih*0.55, iw*0.1,-ih*0.75);
+    ctx.bezierCurveTo(-iw*0.2,-ih*0.8, -iw*0.6,-ih*0.35, 0,r*0.0);
+    ctx.closePath();
+    ctx.globalAlpha=bl*0.9;ctx.fillStyle=rgb(tint(col,0.3));ctx.fill();
+    ctx.strokeStyle=petalLine;ctx.lineWidth=lineW*0.5;ctx.globalAlpha=bl*0.35;ctx.stroke();
+    ctx.restore();
+
+    // Spiral center curl
+    ctx.save();ctx.translate(x,y-r*0.45);
+    ctx.beginPath();
+    ctx.arc(r*0.04,0,r*0.08,Math.PI*0.3,Math.PI*1.8);
+    ctx.strokeStyle=rgba(petalDark,0.4*bl);ctx.lineWidth=lineW*0.6;ctx.stroke();
+    ctx.restore();
   }
   ctx.globalAlpha=1;
 }
