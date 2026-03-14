@@ -1143,25 +1143,12 @@ function animate(){
     // ctx.fillRect(bx+boxW-cSz/2,by+boxH-cSz/2,cSz,cSz);
   }
 
-  // ── GOLDEN RECTANGLE FRAME (drawn LAST so it's on top) ──
-  ctx.strokeStyle='rgba(255,255,255,0.30)';ctx.lineWidth=1;
-  for(const r of goldenRects) ctx.strokeRect(r.x,r.y,r.w,r.h);
-  // ── GOLDEN SPIRAL LINE — manual sampling, negate y-component for flip ──
-  ctx.beginPath();
-  let first=true;
-  for(const arc of spiralArcs){
-    const steps=Math.max(20, Math.round(arc.r*0.15));
-    for(let j=0;j<=steps;j++){
-      const t=j/steps;
-      // Negate the sin component to account for y-flip
-      const angle=arc.sa+(arc.ea-arc.sa)*t;
-      const px=arc.cx+Math.cos(angle)*arc.r;
-      const py=arc.cy-Math.sin(angle)*arc.r; // NEGATE sin for y-flip
-      first?ctx.moveTo(px,py):ctx.lineTo(px,py);
-      first=false;
-    }
+  // ── OVERLAY FROM REFERENCE IMAGE ──
+  if(window._overlayImg&&window._overlayImg.complete){
+    ctx.globalAlpha=0.3;
+    ctx.drawImage(window._overlayImg,0,0,WD,HD);
+    ctx.globalAlpha=1;
   }
-  ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=1;ctx.stroke();
 
   // Upload to Three.js and render
   offTex.needsUpdate=true;
@@ -1180,6 +1167,10 @@ document.getElementById('play-btn').addEventListener('click',async()=>{
   const src=audioCtx.createMediaElementSource(audio);src.connect(analyser);analyser.connect(audioCtx.destination);
   await audio.play();isPlaying=true;
 });
+
+// Load overlay reference image
+window._overlayImg=new Image();
+window._overlayImg.src='overlay.png'; // white-on-transparent version of reference
 animate();
 </script>
 </body>
