@@ -68,51 +68,41 @@ const curvePoints=window._cp=[];
 {
   const PHI=1.618033988749;
   const M=24*dpr;
-  // Fit a golden rectangle (ratio PHI:1) centered in the canvas
-  // Width = canvas width - margins, height = width * PHI
   let gw=WD-M*2, gh=gw*PHI;
   if(gh>HD-M*2){gh=HD-M*2; gw=gh/PHI;}
   const gx=(WD-gw)/2, gy=(HD-gh)/2;
 
-  // Recursive golden subdivision — exactly like reference
-  // Each step: cut a square from the current rect, remainder is new rect
-  // Direction cycles: bottom, right, top, left (matching reference image)
+  // Recursive golden subdivision — exact match to gen_overlay.py
+  // Direction cycle: 0=bottom, 1=left, 2=top, 3=right
   let rx=gx, ry=gy, rw=gw, rh=gh;
   const LEVELS=9;
+  const squares=[];
   for(let i=0;i<LEVELS;i++){
-    goldenRects.push({x:rx,y:ry,w:rw,h:rh});
-    const sq=Math.min(rw,rh); // square side = shorter dimension
-    const dir=i%4; // 0=bottom, 1=left, 2=top, 3=right
-    let cx,cy;
-    if(dir===0){
-      // Cut square from BOTTOM — square at bottom, remainder on top
-      cx=rx; cy=ry; // arc center = top-left of square... no
-      // Arc: quarter circle in the square, center at appropriate corner
-      // For bottom square: center is at top-left, sweeps from bottom-right to top-right
-      // Bottom: center=BL=(rx,ry). sa=0 (BR), ea=PI/2 (TL)
-      spiralArcs.push({cx:rx, cy:ry, r:sq, sa:0, ea:Math.PI/2});
-      ry+=sq; rh-=sq;
-    }else if(dir===1){
-      // Left: center=TL=(rx,ry+rh). sa=3PI/2 (BL), ea=0 (TR)... 
-      // BL relative to TL center: angle = atan2(ry-(ry+rh), rx-rx) = atan2(-rh,0) = -PI/2
-      // TR relative to TL: atan2((ry+rh)-(ry+rh), (rx+sq)-rx) = atan2(0,sq) = 0
-      spiralArcs.push({cx:rx, cy:ry+rh, r:sq, sa:-Math.PI/2, ea:0});
-      rx+=sq; rw-=sq;
-    }else if(dir===2){
-      // Top: center=TR=(rx+rw,ry+rh). 
-      // TL relative: atan2(0, -(rw)) = PI. BR relative: atan2(-rh, 0) = -PI/2
-      // But we want short arc PI→PI/2 (not through -PI/2)
-      spiralArcs.push({cx:rx+rw, cy:ry+rh, r:sq, sa:Math.PI, ea:Math.PI/2});
-      rh-=sq;
-    }else{
-      // Right: center=BR=(rx+rw,ry).
-      // TR relative: atan2(rh, 0) = PI/2. BL relative: atan2(0, -rw) = PI
-      spiralArcs.push({cx:rx+rw, cy:ry, r:sq, sa:Math.PI/2, ea:Math.PI});
-      rw-=sq;
-    }
+    const sq=Math.min(rw,rh);
+    const d=i%4;
+    let sx,sy;
+    if(d===0){sx=rx;sy=ry+rh-sq;rh-=sq;}
+    else if(d===1){sx=rx;sy=ry;rx+=sq;rw-=sq;}
+    else if(d===2){sx=rx;sy=ry;ry+=sq;rh-=sq;}
+    else{sx=rx+rw-sq;sy=ry;rw-=sq;}
+    squares.push({sx,sy,sq});
+    goldenRects.push({x:sx,y:sy,w:sq,h:sq});
   }
 
-  // Sample curvePoints along arcs
+  // Arc parameters — identical to gen_overlay.py PIL arcs
+  // PIL angles (CW from east): point at θ → x=cx+r·cos(θ), y=cy+r·sin(θ) (screen coords)
+  for(let i=0;i<squares.length;i++){
+    const{sx,sy,sq}=squares[i];
+    const d=i%4;
+    let cx,cy,sa,ea;
+    if(d===0){cx=sx+sq;cy=sy;sa=90;ea=180;}       // center=TR
+    else if(d===1){cx=sx+sq;cy=sy+sq;sa=180;ea=270;} // center=BR
+    else if(d===2){cx=sx;cy=sy+sq;sa=270;ea=360;}   // center=BL
+    else{cx=sx;cy=sy;sa=0;ea=90;}                    // center=TL
+    spiralArcs.push({cx,cy,r:sq,sa:sa*Math.PI/180,ea:ea*Math.PI/180});
+  }
+
+  // Sample ~900 curvePoints along arcs (starts bottom-right, spirals inward)
   const TARGET=900;
   let totalR=0;
   for(const a of spiralArcs) totalR+=a.r;
@@ -121,14 +111,13 @@ const curvePoints=window._cp=[];
     for(let j=0;j<n;j++){
       const t=j/n;
       const angle=arc.sa+(arc.ea-arc.sa)*t;
-      curvePoints.push({x:arc.cx+Math.cos(angle)*arc.r, y:arc.cy-Math.sin(angle)*arc.r});
+      curvePoints.push({x:arc.cx+Math.cos(angle)*arc.r, y:arc.cy+Math.sin(angle)*arc.r});
     }
   }
   if(spiralArcs.length>0){
     const last=spiralArcs[spiralArcs.length-1];
-    curvePoints.push({x:last.cx+Math.cos(last.ea)*last.r, y:last.cy-Math.sin(last.ea)*last.r});
+    curvePoints.push({x:last.cx+Math.cos(last.ea)*last.r, y:last.cy+Math.sin(last.ea)*last.r});
   }
-  curvePoints.reverse(); // start from screen-bottom-right (outer), spiral inward
 }
 const CL=curvePoints.length;
 function getNormal(i){
