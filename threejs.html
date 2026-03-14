@@ -83,20 +83,6 @@ for(const s of SEGS){
 }
 {const L=SEGS[5];curvePoints.push(cubicBez({x:L.p0.x*WD,y:L.p0.y*HD},{x:L.p1.x*WD,y:L.p1.y*HD},{x:L.p2.x*WD,y:L.p2.y*HD},{x:L.p3.x*WD,y:L.p3.y*HD},1));}
 const CL=curvePoints.length;
-// Arc-length reparameterization — even visual speed
-const arcLens=[0];
-for(let i=1;i<CL;i++){
-  const dx=curvePoints[i].x-curvePoints[i-1].x,dy=curvePoints[i].y-curvePoints[i-1].y;
-  arcLens.push(arcLens[i-1]+Math.sqrt(dx*dx+dy*dy));
-}
-const totalArc=arcLens[CL-1];
-// Map uniform 0→1 progress to curve index via arc-length
-function arcToIndex(t){
-  const target=t*totalArc;
-  let lo=0,hi=CL-1;
-  while(lo<hi){const mid=(lo+hi)>>1;arcLens[mid]<target?lo=mid+1:hi=mid;}
-  return lo;
-}
 function getNormal(i){
   const ni=Math.min(i+1,CL-1),pi=Math.max(i-1,0);
   const dx=curvePoints[ni].x-curvePoints[pi].x,dy=curvePoints[ni].y-curvePoints[pi].y;
@@ -254,191 +240,78 @@ function spawnGardenElement(evt,progress){
    ═══════════════════════════════════════════════════ */
 
 function drawPencFlower(x,y,R,n,bl,baseRot,col,golden){
-  // Penç v15: ranunculus center (dense tiny ruffled petals), wavy organic outer petals
+  // Penç v7: Single scalloped outline — 5 lobes with V-notches between
+  // Draw the WHOLE flower as one closed path, then fill + stroke
   if(bl<0.05)return;
   const r=R*bl;
   const petalN=n||5;
-  const lineW=Math.max(0.8,1.0*dpr);
-  const fillR=golden?235:col[0], fillG=golden?210:col[1], fillB=golden?120:col[2];
-  const darkR=golden?160:Math.round(col[0]*0.45), darkG=golden?120:Math.round(col[1]*0.35), darkB=golden?40:Math.round(col[2]*0.35);
-  const lineCol=golden?`rgba(120,90,20,${0.65*bl})`:`rgba(${darkR},${darkG},${darkB},${0.65*bl})`;
-  function srand(s){return function(){s=(s*9301+49297)%233280;return s/233280;};}
-  const rng=srand(Math.floor(baseRot*10000+petalN*777));
+  const lineW=Math.max(0.5,0.8*dpr);
+  const fillR=golden?220:col[0], fillG=golden?190:col[1], fillB=golden?80:col[2];
+  const darkR=golden?180:Math.round(col[0]*0.6), darkG=golden?140:Math.round(col[1]*0.5), darkB=golden?40:Math.round(col[2]*0.5);
+  const lineCol=golden?'rgba(140,100,30,0.7)':`rgba(${darkR},${darkG},${darkB},0.7)`;
+  const centerR=r*0.22;
+  const outerR=r*0.85;
+  const notchR=r*0.52; // how far in the notch dips (between lobes)
+  const sliceA=Math.PI*2/petalN;
 
-  // --- Wavy cupped petal (outer layers) ---
-  // Extra control-point perturbations for organic wavy edges
-  function wavyPetal(px,py,angle,len,wid,fillCol,strokeA,waveSeed){
-    const w=wid*0.5;
-    const wr=srand(waveSeed);
-    // 8 wave factors for organic edge wobble (2-3 perturbations per side)
-    const wf=[];for(let i=0;i<12;i++)wf.push(1+(wr()*0.22-0.11));
-    ctx.save();ctx.translate(px,py);ctx.rotate(angle);
-    ctx.beginPath();ctx.moveTo(0,0);
-    // Left side — 3-segment wavy edge with bumps
-    ctx.bezierCurveTo(-w*0.45*wf[0],-len*0.10, -w*1.05*wf[1],-len*0.22, -w*1.18*wf[2],-len*0.38);
-    // Left mid-bulge (extra perturbation point)
-    ctx.bezierCurveTo(-w*1.25*wf[3],-len*0.48, -w*1.20*wf[4],-len*0.58, -w*1.08*wf[5],-len*0.68);
-    // Left shoulder to top — wavy cup
-    ctx.bezierCurveTo(-w*0.92*wf[6],-len*0.84, -w*0.50*wf[7],-len*1.04, -w*0.10,-len*0.97);
-    // Top notch
-    ctx.quadraticCurveTo(0,-len*0.92, w*0.10,-len*0.97);
-    // Right shoulder
-    ctx.bezierCurveTo(w*0.50*wf[8],-len*1.04, w*0.92*wf[9],-len*0.84, w*1.08*wf[10],-len*0.68);
-    // Right mid-bulge
-    ctx.bezierCurveTo(w*1.20*wf[5],-len*0.58, w*1.25*wf[3],-len*0.48, w*1.18*wf[11],-len*0.38);
-    // Right side back down
-    ctx.bezierCurveTo(w*1.05*wf[0],-len*0.22, w*0.45*wf[2],-len*0.10, 0,0);
-    ctx.closePath();
-    ctx.globalAlpha=Math.max(0.82,bl*0.93);ctx.fillStyle=fillCol;ctx.fill();
-    ctx.globalAlpha=strokeA;ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
-    ctx.restore();
-  }
+  // Build scalloped outline as one continuous path
+  ctx.beginPath();
+  for(let i=0;i<petalN;i++){
+    if(i>=bl*(petalN+0.5))break;
+    const a=baseRot+i*sliceA;
+    const aNext=baseRot+(i+1)*sliceA;
+    // Lobe apex (outermost point of this petal)
+    const apexX=x+Math.cos(a)*outerR;
+    const apexY=y+Math.sin(a)*outerR;
+    // Notch between this petal and next (valley)
+    const notchA=a+sliceA*0.5;
+    const notchX=x+Math.cos(notchA)*notchR;
+    const notchY=y+Math.sin(notchA)*notchR;
+    // Control points for the rounded lobe
+    const cpLA=a-sliceA*0.25;
+    const cpLx=x+Math.cos(cpLA)*outerR*1.05;
+    const cpLy=y+Math.sin(cpLA)*outerR*1.05;
+    const cpRA=a+sliceA*0.25;
+    const cpRx=x+Math.cos(cpRA)*outerR*1.05;
+    const cpRy=y+Math.sin(cpRA)*outerR*1.05;
 
-  // --- Ruffled mini-petal for ranunculus center ---
-  // Small, curved, overlapping — each one slightly cupped/curling
-  function ruffledMiniPetal(px,py,angle,len,wid,fillCol,strokeA,waveSeed){
-    const w=wid*0.5;
-    const wr=srand(waveSeed);
-    const w1=1+wr()*0.18-0.09, w2=1+wr()*0.20-0.10, w3=1+wr()*0.16-0.08;
-    const curl=1+wr()*0.15; // asymmetric curl factor
-    ctx.save();ctx.translate(px,py);ctx.rotate(angle);
-    ctx.beginPath();ctx.moveTo(0,0);
-    // Left side — asymmetric curve for cupping effect
-    ctx.bezierCurveTo(-w*0.7*w1*curl,-len*0.15, -w*1.1*w2,-len*0.45, -w*0.7*w3,-len*0.78);
-    // Rounded top (not pointed!)
-    ctx.bezierCurveTo(-w*0.35,-len*0.95, -w*0.08,-len*1.02, 0,-len*0.98);
-    // Right side — slightly different curve for asymmetry
-    ctx.bezierCurveTo(w*0.08,-len*1.02, w*0.35,-len*0.95, w*0.7*w1,-len*0.78);
-    ctx.bezierCurveTo(w*1.1*w3,-len*0.45, w*0.7*w2/curl,-len*0.15, 0,0);
-    ctx.closePath();
-    ctx.globalAlpha=Math.max(0.78,bl*0.90);ctx.fillStyle=fillCol;ctx.fill();
-    ctx.globalAlpha=strokeA;ctx.strokeStyle=lineCol;ctx.lineWidth=lineW*0.7;ctx.stroke();
-    ctx.restore();
-  }
-
-  // --- Transitional petal (mid layers) --- wavy edges
-  function midPetal(px,py,angle,len,wid,fillCol,strokeA,waveSeed){
-    const w=wid*0.5;
-    const wr=srand(waveSeed);
-    const wf=[];for(let i=0;i<8;i++)wf.push(1+(wr()*0.18-0.09));
-    ctx.save();ctx.translate(px,py);ctx.rotate(angle);
-    ctx.beginPath();ctx.moveTo(0,0);
-    // Left — wavy moderate bulge
-    ctx.bezierCurveTo(-w*0.55*wf[0],-len*0.14, -w*1.0*wf[1],-len*0.35, -w*0.95*wf[2],-len*0.55);
-    ctx.bezierCurveTo(-w*0.82*wf[3],-len*0.75, -w*0.42*wf[4],-len*0.95, 0,-len*0.96);
-    // Right side
-    ctx.bezierCurveTo(w*0.42*wf[5],-len*0.95, w*0.82*wf[6],-len*0.75, w*0.95*wf[7],-len*0.55);
-    ctx.bezierCurveTo(w*1.0*wf[0],-len*0.35, w*0.55*wf[1],-len*0.14, 0,0);
-    ctx.closePath();
-    ctx.globalAlpha=Math.max(0.82,bl*0.93);ctx.fillStyle=fillCol;ctx.fill();
-    ctx.globalAlpha=strokeA;ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
-    ctx.restore();
-  }
-
-  // === OUTER LAYERS: 3 layers of wavy cupped petals ===
-  const outerLayers=[
-    {pc:petalN,   rF:1.0,  lF:0.75, wF:1.0,  dF:0.22, minBl:0.0,  fn:wavyPetal},   // L0: outer
-    {pc:petalN+1, rF:0.88, lF:0.60, wF:0.88, dF:0.15, minBl:0.10, fn:wavyPetal},   // L1: mid-outer
-    {pc:petalN+2, rF:0.74, lF:0.48, wF:0.72, dF:0.10, minBl:0.22, fn:midPetal},    // L2: transitional
-  ];
-
-  for(let li=0;li<outerLayers.length;li++){
-    const L=outerLayers[li];
-    if(bl<L.minBl)continue;
-    const layerBl=Math.min(1,(bl-L.minBl)/(1-L.minBl));
-    const ln=L.pc;
-    const len=r*L.lF;
-    const wid=len*L.wF;
-    const dist=r*L.dF;
-    const strokeA=bl*(0.48+li*0.07);
-    const t=li/Math.max(1,outerLayers.length-1);
-    const cR=Math.max(0,Math.min(255,Math.round(fillR+35-t*50)));
-    const cG=Math.max(0,Math.min(255,Math.round(fillG+28-t*40)));
-    const cB=Math.max(0,Math.min(255,Math.round(fillB+22-t*35)));
-    const fcol=`rgb(${cR},${cG},${cB})`;
-    // Larger spiral offset for more obvious overlap between layers
-    const spiralOff=li*Math.PI/(petalN*1.3);
-
-    for(let i=0;i<ln;i++){
-      if(i>=layerBl*(ln+0.5))break;
-      // Bigger angle jitter for silhouette-breaking
-      const aJitter=(rng()-0.5)*0.38;
-      const a=baseRot+i*(Math.PI*2/ln)+aJitter+spiralOff;
-      // More aggressive size variation
-      const pLen=len*(0.78+rng()*0.44);
-      const pWid=wid*(0.80+rng()*0.40);
-      const dJitter=dist*(0.6+rng()*0.8);
-      const waveSeed=Math.floor(baseRot*1000+li*100+i*13);
-      L.fn(
-        x+Math.cos(a)*dJitter, y+Math.sin(a)*dJitter,
-        a-Math.PI*0.5, pLen, pWid, fcol, strokeA, waveSeed
-      );
+    if(i===0){
+      // Start from the notch before first petal
+      const prevNotchA=a-sliceA*0.5;
+      ctx.moveTo(x+Math.cos(prevNotchA)*notchR, y+Math.sin(prevNotchA)*notchR);
     }
+    // Curve up to lobe apex
+    ctx.quadraticCurveTo(cpLx, cpLy, apexX, apexY);
+    // Curve down to next notch
+    ctx.quadraticCurveTo(cpRx, cpRy, notchX, notchY);
+  }
+  ctx.closePath();
+
+  // Fill
+  ctx.globalAlpha=bl*0.85;
+  ctx.fillStyle=`rgb(${fillR},${fillG},${fillB})`;ctx.fill();
+  // Tahrir outline
+  ctx.globalAlpha=bl;
+  ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
+
+  // Internal petal division lines (radial lines from center to notches)
+  for(let i=0;i<petalN;i++){
+    if(i>=bl*(petalN+0.5))break;
+    const notchA=baseRot+i*sliceA+sliceA*0.5;
+    ctx.beginPath();
+    ctx.moveTo(x+Math.cos(notchA)*centerR, y+Math.sin(notchA)*centerR);
+    ctx.lineTo(x+Math.cos(notchA)*notchR, y+Math.sin(notchA)*notchR);
+    ctx.strokeStyle=lineCol;ctx.lineWidth=lineW*0.7;ctx.globalAlpha=bl*0.6;ctx.stroke();
   }
 
-  // === RANUNCULUS CENTER: many tiny ruffled overlapping petals spiraling inward ===
-  if(bl>0.30){
-    const centerBl=Math.min(1,(bl-0.30)/0.70);
-    // 4 concentric rings of tiny petals, getting smaller toward center
-    const rings=[
-      {count:petalN+4, radFrac:0.38, lenFrac:0.28, widFrac:0.55, minBl:0.0},
-      {count:petalN+5, radFrac:0.28, lenFrac:0.20, widFrac:0.50, minBl:0.15},
-      {count:petalN+4, radFrac:0.18, lenFrac:0.14, widFrac:0.48, minBl:0.30},
-      {count:petalN+3, radFrac:0.10, lenFrac:0.09, widFrac:0.45, minBl:0.50},
-    ];
-    for(let ri=0;ri<rings.length;ri++){
-      const ring=rings[ri];
-      if(centerBl<ring.minBl)continue;
-      const ringBl=Math.min(1,(centerBl-ring.minBl)/(1-ring.minBl));
-      const rCount=ring.count;
-      const rDist=r*ring.radFrac;
-      const rLen=r*ring.lenFrac;
-      const rWid=rLen*ring.widFrac;
-      // Progressively darker/richer toward center
-      const ct=(ri+3)/(rings.length+3);
-      const cR=Math.max(0,Math.min(255,Math.round(fillR+15-ct*95)));
-      const cG=Math.max(0,Math.min(255,Math.round(fillG+10-ct*75)));
-      const cB=Math.max(0,Math.min(255,Math.round(fillB+8-ct*60)));
-      const fcol=`rgb(${cR},${cG},${cB})`;
-      const strokeA=bl*(0.55+ri*0.08);
-      // Golden angle offset between rings for natural spiral packing
-      const ringOff=ri*2.3999;
-
-      for(let i=0;i<rCount;i++){
-        if(i>=ringBl*(rCount+0.5))break;
-        const aJitter=(rng()-0.5)*0.45;
-        const a=baseRot+ringOff+i*(Math.PI*2/rCount)+aJitter;
-        const pLen=rLen*(0.75+rng()*0.50);
-        const pWid=rWid*(0.75+rng()*0.50);
-        const dJitter=rDist*(0.65+rng()*0.70);
-        const waveSeed=Math.floor(baseRot*1000+50+ri*100+i*17);
-        ruffledMiniPetal(
-          x+Math.cos(a)*dJitter, y+Math.sin(a)*dJitter,
-          a-Math.PI*0.5, pLen, pWid, fcol, strokeA, waveSeed
-        );
-      }
-    }
-  }
-
-  // === STAMEN CENTER: tiny dots nestled in the innermost petals ===
-  if(bl>0.55){
-    const cr=r*0.09;
-    const sN=Math.max(10,Math.min(16,Math.floor(12+petalN)));
-    const stamCol=golden?'rgb(255,240,150)':`rgb(${Math.min(255,fillR+55)},${Math.min(255,fillG+45)},${Math.min(255,fillB+35)})`;
-    const stamDark=golden?'rgb(180,150,50)':`rgb(${Math.max(0,fillR-30)},${Math.max(0,fillG-25)},${Math.max(0,fillB-20)})`;
-    for(let i=0;i<sN;i++){
-      const ring=i<5?0:i<11?1:2;
-      const ringR=cr*(ring===0?0.22:ring===1?0.50:0.78);
-      const ringOff=ring*1.5;
-      const sa=baseRot+ringOff+i*(Math.PI*2/(ring===0?5:ring===1?6:sN-11))+(rng()-0.5)*0.6;
-      const sd=ringR*(0.7+rng()*0.5);
-      const sr=cr*(0.04+rng()*0.03);
-      const sx=x+Math.cos(sa)*sd, sy=y+Math.sin(sa)*sd;
-      ctx.beginPath();ctx.arc(sx,sy,sr,0,Math.PI*2);
-      ctx.globalAlpha=bl*0.80;ctx.fillStyle=stamCol;ctx.fill();
-      ctx.globalAlpha=bl*0.50;ctx.strokeStyle=stamDark;ctx.lineWidth=lineW*0.35;ctx.stroke();
-    }
-  }
+  // Center circle
+  ctx.beginPath();ctx.arc(x,y,centerR,0,Math.PI*2);
+  ctx.globalAlpha=bl*0.95;
+  ctx.fillStyle=golden?'rgb(200,170,60)':`rgb(${darkR},${darkG},${darkB})`;ctx.fill();
+  ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
+  // Inner dot
+  ctx.beginPath();ctx.arc(x,y,centerR*0.4,0,Math.PI*2);
+  ctx.fillStyle=golden?'rgb(240,220,120)':`rgb(${fillR},${fillG},${fillB})`;ctx.fill();
 }
 
 function drawCarnation(x,y,R,bl,baseRot,col){
@@ -448,21 +321,20 @@ function drawCarnation(x,y,R,bl,baseRot,col){
   const lineW=Math.max(0.5,0.8*dpr);
   const darkR=Math.round(col[0]*0.55), darkG=Math.round(col[1]*0.45), darkB=Math.round(col[2]*0.45);
   const lineCol=`rgba(${darkR},${darkG},${darkB},0.7)`;
-  // Serrated petal mass — seeded random to prevent flicker
-  function srand(s){return function(){s=(s*9301+49297)%233280;return s/233280;};}
-  const rng=srand(Math.floor(baseRot*10000));
+  // Serrated petal mass — irregular curved top edge
   const petalCount=Math.floor(8+bl*6);
   for(let i=0;i<petalCount;i++){
     const frac=i/petalCount;
     const a=baseRot+frac*Math.PI*2;
-    const dist=r*(0.4+rng()*0.3);
+    const dist=r*(0.4+Math.random()*0.3);
     const px=x+Math.cos(a)*dist;
     const py=y+Math.sin(a)*dist;
-    const s=r*(0.15+rng()*0.15);
+    const s=r*(0.15+Math.random()*0.15);
+    // Small ruffled petal — jagged edge
     ctx.beginPath();
     ctx.moveTo(px,py);
-    const tipA=a+(-0.15+rng()*0.3);
-    const tipDist=s*(0.8+rng()*0.4);
+    const tipA=a+(-0.15+Math.random()*0.3);
+    const tipDist=s*(0.8+Math.random()*0.4);
     const tx=px+Math.cos(tipA)*tipDist, ty=py+Math.sin(tipA)*tipDist;
     // Serrated edge via small zigzag
     const perpA=tipA+Math.PI*0.5;
@@ -605,17 +477,13 @@ function continuousFill(progress,energy){
       kind:'leaf',leafSize:ls,leafAngle:Math.random()*Math.PI*2,growDur:0.012+Math.random()*0.015});
   }else if(roll<0.78){
     const mr=Math.max(10*dpr,(6+energy*20+Math.random()*14)*dpr*sv);newR=mr;
-    // Stalk length proportional to bud size — bigger bud = longer stalk
-    const budStemLen=mr*(PHI*0.8+0.5);
     garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
-      kind:'bud',maxR:mr,stemLen:budStemLen,stemW:Math.max(1*dpr,mr*0.08),growDur:0.02});
+      kind:'bud',maxR:mr,stemLen:mr*PHI,stemW:(0.8+energy*1.5)*dpr,growDur:0.02});
   }else if(roll<0.93){
     const mr=Math.max(14*dpr,(8+energy*22)*dpr*sv);newR=mr;
-    // Stalk length proportional to rose size
-    const roseStemLen=mr*(PHI*0.9+0.8);
     garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
       kind:'rose',maxR:mr,petalCount:Math.floor(4+Math.random()*7),
-      stemLen:roseStemLen,stemW:Math.max(1.2*dpr,mr*0.09),golden:false,growDur:0.025});
+      stemLen:mr*PHI,stemW:(0.8+energy*1.2)*dpr,golden:false,growDur:0.025});
   }else{
     const tl=(5+energy*15)*dpr*sv;newR=tl;
     garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
@@ -643,14 +511,13 @@ function animate(){
     spawnGardenElement(TAJWEED[tajweedIdx],TAJWEED[tajweedIdx].t/TOTAL_DUR);tajweedIdx++;}
 
   // Dot-presence displacement — from v43
-  // Split displacement — wide at front, settling behind
-  const splitGap=2*dpr;
-  const BASE_GAP=2*dpr;
+  const splitGap=2*dpr; // tight weave — 2px apart
   const dotPresence=new Float32Array(CL);
   for(const d of dots){const ci=Math.min(d.ci,CL-1),age=(progress-d.born)/0.09,str=Math.max(0,1-age);
     for(let j=-40;j<=40;j++){const idx=ci+j;if(idx>=0&&idx<CL)dotPresence[idx]=Math.max(dotPresence[idx],str*(1-Math.abs(j)/40)**2);}}
   for(let pass=0;pass<3;pass++)for(let i=2;i<CL-2;i++)
     dotPresence[i]=dotPresence[i]*.4+(dotPresence[i-1]+dotPresence[i+1])*.2+(dotPresence[i-2]+dotPresence[i+2])*.1;
+  const BASE_GAP=2*dpr; // always 2px apart even without dots
   const disp=[];
   for(let i=0;i<CL;i++)disp.push(BASE_GAP+splitGap*dotPresence[i]);
 
@@ -685,8 +552,6 @@ function animate(){
 
   // Growing vine stalks
   const growCI=Math.min(Math.floor(progress*(CL-1)),CL-1);
-  window._dbg={progress,growCI,dotsN:dots.length,gardenN:garden.length,time,CL,
-    cp0:curvePoints[0],cp450:curvePoints[450],cp900:curvePoints[CL-1],WD,HD};
   for(let strand=0;strand<2;strand++){
     const phase=strand===0?0:Math.PI;
     ctx.beginPath();
@@ -745,7 +610,7 @@ function animate(){
     ctx.drawImage(petalCanvases[d.petal],-sz/2,-sz/2,sz,sz);ctx.restore();
   }
 
-  // Falling petals — exact v7 physics
+  // Falling petals
   for(let i=fallingPetals.length-1;i>=0;i--){
     const f=fallingPetals[i];f.age++;
     f.vy+=0.01033*dpr;
@@ -757,7 +622,7 @@ function animate(){
     const floorY=HD*0.95,dist=Math.max(0,floorY-f.y),total=floorY-HD*0.1;
     const life=Math.max(0,dist/total);
     f.r=f.startR*(0.30+life*0.70);f.alpha=0.15+life*0.45;
-    if(life<0.02||f.by>floorY){fallingPetals.splice(i,1);continue;}
+    if(life<0.02||f.y>floorY){fallingPetals.splice(i,1);continue;}
     const sz=f.r*2.2;
     ctx.save();ctx.translate(f.x,f.y);ctx.rotate(f.rot);ctx.globalAlpha=f.alpha;
     ctx.drawImage(petalCanvases[f.petal],-sz/2,-sz/2,sz,sz);ctx.restore();
