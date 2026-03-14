@@ -406,11 +406,11 @@ function drawRose(x,y,maxR,petalCount,bl,baseRot,col,golden){
 
   const lineW=Math.max(0.5,0.8*dpr);
   // Per-flower color tint shift for variety
-  const tintShift=((rng()-0.5)*14)|0;
-  const fillR=golden?240:Math.min(255,Math.max(0,col[0]+tintShift)), fillG=golden?210:Math.min(255,Math.max(0,col[1]+((rng()-0.5)*10)|0)), fillB=golden?100:Math.min(255,Math.max(0,col[2]+((rng()-0.5)*10)|0));
-  const darkR=golden?170:Math.round(fillR*0.65), darkG=golden?130:Math.round(fillG*0.55), darkB=golden?50:Math.round(fillB*0.55);
-  const midR=golden?225:Math.min(255,Math.round(fillR*0.95+20)), midG=golden?195:Math.min(255,Math.round(fillG*0.95+15)), midB=golden?90:Math.min(255,Math.round(fillB*0.95+10));
-  const litR=golden?252:Math.min(255,Math.round(fillR*0.8+60)), litG=golden?238:Math.min(255,Math.round(fillG*0.8+50)), litB=golden?150:Math.min(255,Math.round(fillB*0.8+40));
+  const tintShift=((rng()-0.5)*10)|0;
+  const fillR=golden?245:Math.min(255,Math.max(0,col[0]+tintShift)), fillG=golden?215:Math.min(255,Math.max(0,col[1]+((rng()-0.5)*8)|0)), fillB=golden?110:Math.min(255,Math.max(0,col[2]+((rng()-0.5)*8)|0));
+  const darkR=golden?180:Math.round(fillR*0.72), darkG=golden?140:Math.round(fillG*0.62), darkB=golden?55:Math.round(fillB*0.62);
+  const midR=golden?230:Math.min(255,fillR), midG=golden?200:Math.min(255,fillG), midB=golden?95:Math.min(255,fillB);
+  const litR=golden?253:Math.min(255,Math.round(fillR*0.82+55)), litG=golden?240:Math.min(255,Math.round(fillG*0.82+45)), litB=golden?155:Math.min(255,Math.round(fillB*0.82+35));
   const lineCol=golden?'rgba(140,100,30,0.75)':`rgba(${darkR},${darkG},${darkB},0.75)`;
   // Per-flower variation: petal width factor, layer rotation offsets
   const widVar=0.8+rng()*0.4; // ±20% petal width variation
@@ -1067,10 +1067,12 @@ function animate(){
     const a=curvePoints[Math.min(idx,CL-1)],b=curvePoints[Math.min(idx+1,CL-1)];
     const px=a.x+(b.x-a.x)*frac,py=a.y+(b.y-a.y)*frac;
     ctx.beginPath();ctx.arc(px,py,4*dpr,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,0.6)';ctx.fill();
-    // Tracking box — breathes with the weave split displacement
+    // Tracking box — breathes with smoothed weave displacement
     const leadDisp=disp[Math.min(idx,CL-1)]||0;
-    const breathe=60*dpr+leadDisp*1.8; // expands with the split, contracts when settled
-    const boxW=breathe,boxH=breathe;
+    const breatheTarget=60*dpr+leadDisp*1.8;
+    if(!window._smoothBreath)window._smoothBreath=breatheTarget;
+    window._smoothBreath+=(breatheTarget-window._smoothBreath)*0.08; // smooth interpolation
+    const boxW=window._smoothBreath,boxH=window._smoothBreath;
     const bx=px-boxW/2,by=py-boxH/2;
     const cSz=6*dpr; // corner square size
     ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=0.8*dpr;
