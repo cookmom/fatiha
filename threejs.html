@@ -121,12 +121,12 @@ const curvePoints=window._cp=[];
     for(let j=0;j<n;j++){
       const t=j/n;
       const angle=arc.sa+(arc.ea-arc.sa)*t;
-      curvePoints.push({x:arc.cx+Math.cos(angle)*arc.r, y:arc.cy+Math.sin(angle)*arc.r});
+      curvePoints.push({x:arc.cx+Math.cos(angle)*arc.r, y:arc.cy-Math.sin(angle)*arc.r});
     }
   }
   if(spiralArcs.length>0){
     const last=spiralArcs[spiralArcs.length-1];
-    curvePoints.push({x:last.cx+Math.cos(last.ea)*last.r, y:last.cy+Math.sin(last.ea)*last.r});
+    curvePoints.push({x:last.cx+Math.cos(last.ea)*last.r, y:last.cy-Math.sin(last.ea)*last.r});
   }
   curvePoints.reverse(); // start from screen-bottom-right (outer), spiral inward
 }
@@ -1146,12 +1146,20 @@ function animate(){
   // ── GOLDEN RECTANGLE FRAME (drawn LAST so it's on top) ──
   ctx.strokeStyle='rgba(255,255,255,0.30)';ctx.lineWidth=1;
   for(const r of goldenRects) ctx.strokeRect(r.x,r.y,r.w,r.h);
-  // ── GOLDEN SPIRAL LINE — drawn with ctx.arc for y-flip correctness ──
+  // ── GOLDEN SPIRAL LINE — manual sampling, negate y-component for flip ──
   ctx.beginPath();
-  for(let i=0;i<spiralArcs.length;i++){
-    const a=spiralArcs[i];
-    // Swap sa/ea and use clockwise to get correct screen direction with y-flip
-    ctx.arc(a.cx, a.cy, a.r, a.ea, a.sa, false);
+  let first=true;
+  for(const arc of spiralArcs){
+    const steps=Math.max(20, Math.round(arc.r*0.15));
+    for(let j=0;j<=steps;j++){
+      const t=j/steps;
+      // Negate the sin component to account for y-flip
+      const angle=arc.sa+(arc.ea-arc.sa)*t;
+      const px=arc.cx+Math.cos(angle)*arc.r;
+      const py=arc.cy-Math.sin(angle)*arc.r; // NEGATE sin for y-flip
+      first?ctx.moveTo(px,py):ctx.lineTo(px,py);
+      first=false;
+    }
   }
   ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=1;ctx.stroke();
 
