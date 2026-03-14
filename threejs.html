@@ -684,7 +684,7 @@ function animate(){
   }
 
   // Growing vine stalks
-  const growCI=Math.min(arcToIndex(progress),CL-1);
+  const growCI=Math.min(Math.floor(progress*(CL-1)),CL-1);
   window._dbg={progress,growCI,dotsN:dots.length,gardenN:garden.length,time,CL,
     cp0:curvePoints[0],cp450:curvePoints[450],cp900:curvePoints[CL-1],WD,HD};
   for(let strand=0;strand<2;strand++){
