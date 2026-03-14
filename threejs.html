@@ -89,21 +89,20 @@ const curvePoints=window._cp=[];
       cx=rx; cy=ry; // arc center = top-left of square... no
       // Arc: quarter circle in the square, center at appropriate corner
       // For bottom square: center is at top-left, sweeps from bottom-right to top-right
-      // Bottom: center=BL=(rx,ry). Entry=BR at angle 0, exit=TL at angle PI/2
-      spiralArcs.push({cx:rx, cy:ry, r:sq, sa:0, ea:Math.PI/2});
+      // Bottom: center=BL=(rx,ry). Y-flipped: sweep PI/2→0 (screen: up→right)
+      spiralArcs.push({cx:rx, cy:ry, r:sq, sa:Math.PI/2, ea:0});
       ry+=sq; rh-=sq;
     }else if(dir===1){
-      // Left: center=TL=(rx,ry+rh). Entry=BL at angle -PI/2, exit=TR at angle 0
-      spiralArcs.push({cx:rx, cy:ry+rh, r:sq, sa:-Math.PI/2, ea:0});
+      // Left: center=TL=(rx,ry+rh). Y-flipped: sweep 0→-PI/2
+      spiralArcs.push({cx:rx, cy:ry+rh, r:sq, sa:0, ea:-Math.PI/2});
       rx+=sq; rw-=sq;
     }else if(dir===2){
-      // Top: center=TR=(rx+rw,ry+rh). Entry=TL at angle PI, exit=BR at angle -PI/2
-      // But PI→-PI/2 is a big sweep. We want the SHORT 90° arc: PI → PI/2
-      spiralArcs.push({cx:rx+rw, cy:ry+rh, r:sq, sa:Math.PI, ea:Math.PI/2});
+      // Top: center=TR=(rx+rw,ry+rh). Y-flipped: sweep PI/2→PI
+      spiralArcs.push({cx:rx+rw, cy:ry+rh, r:sq, sa:Math.PI/2, ea:Math.PI});
       rh-=sq;
     }else{
-      // Right: center=BR=(rx+rw,ry). Entry=TR at angle PI/2, exit=BL at angle PI
-      spiralArcs.push({cx:rx+rw, cy:ry, r:sq, sa:Math.PI/2, ea:Math.PI});
+      // Right: center=BR=(rx+rw,ry). Y-flipped: sweep PI→PI*1.5
+      spiralArcs.push({cx:rx+rw, cy:ry, r:sq, sa:Math.PI, ea:Math.PI*1.5});
       rw-=sq;
     }
   }
