@@ -723,11 +723,14 @@ function animate(){
       if(progress-d.born>=0.09){
         const ci=Math.min(d.ci,CL-1),n=getNormal(ci),dd=disp[ci]||0;
         const fwt=ci/(CL-1),fwv=Math.sin(fwt*Math.PI*2*WEAVE_FREQ+(d.side>0?0:Math.PI));
-        const da=Math.atan2(1,0)+Math.PI+(Math.random()-.5)*1.0,ds=(0.15+Math.random()*0.4)*dpr;
+        const da=Math.atan2(1,0)+Math.PI+(Math.random()-.5)*1.6,ds=(0.25+Math.random()*0.6)*dpr; // wider scatter at launch
+        const isWide=Math.random()<0.2; // 20% get wide sway
+        const wa_val=(isWide?(0.8+Math.random()*1.5):(0.15+Math.random()*0.5))*dpr;
+        const gravScale=isWide?0.4:(0.7+Math.random()*0.6); // wide sway = slow fall, narrow = faster
         fallingPetals.push({x:curvePoints[ci].x+n.x*dd*fwv+d.offX,y:curvePoints[ci].y+n.y*dd*fwv+d.offY,
           vx:Math.cos(da)*ds,vy:Math.sin(da)*ds+0.08*dpr,rot:d.rot,r:d.r*(0.25+Math.random()*0.3),
-          col:d.col,petal:d.petal,alpha:0.45,age:0,startR:0,
-          wf:0.005+Math.random()*0.035,wa:(Math.random()<0.2?(0.8+Math.random()*1.5):(0.15+Math.random()*0.5))*dpr,wp:Math.random()*Math.PI*2,ts:0.008+Math.random()*0.04});
+          col:d.col,petal:d.petal,alpha:0.45,age:0,startR:0,gravScale,
+          wf:0.005+Math.random()*0.035,wa:wa_val,wp:Math.random()*Math.PI*2,ts:0.008+Math.random()*0.04});
         fallingPetals[fallingPetals.length-1].startR=fallingPetals[fallingPetals.length-1].r;
       }else alive.push(d);
     }
@@ -748,7 +751,7 @@ function animate(){
   // Falling petals
   for(let i=fallingPetals.length-1;i>=0;i--){
     const f=fallingPetals[i];f.age++;
-    f.vy+=0.004*dpr; // gentle gravity — petals float, not swarm
+    f.vy+=0.004*dpr*(f.gravScale||1); // wide sway = slow fall, narrow = faster
     // Wave as delta (difference between this frame and last) — no cumulative trail
     const wave=Math.sin(f.age*f.wf+f.wp)*f.wa;
     const prevWave=Math.sin((f.age-1)*f.wf+f.wp)*f.wa;
