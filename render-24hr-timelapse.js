@@ -1,0 +1,207 @@
+// <!-- بسم الله الرحمن الرحيم -->
+const puppeteer = require('puppeteer-core'), http = require('http'), fs = require('fs'), path = require('path'), { execSync } = require('child_process');
+const SITE_DIR = '/home/tawfeeq/ramadan-clock-site', PORT = 9942;
+const FPS = 30, DURATION = 20, TOTAL = FPS * DURATION; // 20s, 600 frames
+const OUT_DIR = '/home/openclaw-agent/.openclaw/workspace/timelapse-24hr-frames';
+
+// Makkah prayer times (March 12, 2026) in minutes from midnight
+const PRAYER_TIMES = {Fajr:316, Sunrise:392, Dhuhr:750, Asr:953, Maghrib:1109, Isha:1229, Midnight:31, LastThird:151};
+
+// Prayer color map
+const PRAYER_COLORS = {
+  'Qiyam':'#8811ff','Last Third':'#aa44ff','Fajr':'#6633ee',
+  'Sunrise':'#ff9900','Dhuha':'#ff9900','Dhuhr':'#00bb44',
+  'Asr':'#ff8800','Maghrib':'#ff2200','Isha':'#1166ff'
+};
+
+function prayerAtMinute(m) {
+  m = ((m % 1440) + 1440) % 1440;
+  if (m >= PRAYER_TIMES.Isha || m < PRAYER_TIMES.Midnight) return 'Isha';
+  if (m >= PRAYER_TIMES.Midnight && m < PRAYER_TIMES.LastThird) return 'Qiyam';
+  if (m >= PRAYER_TIMES.LastThird && m < PRAYER_TIMES.Fajr) return 'Last Third';
+  if (m >= PRAYER_TIMES.Fajr && m < PRAYER_TIMES.Sunrise) return 'Fajr';
+  if (m >= PRAYER_TIMES.Sunrise && m < PRAYER_TIMES.Sunrise + 20) return 'Sunrise';
+  if (m >= PRAYER_TIMES.Sunrise + 20 && m < PRAYER_TIMES.Dhuhr) return 'Dhuha';
+  if (m >= PRAYER_TIMES.Dhuhr && m < PRAYER_TIMES.Asr) return 'Dhuhr';
+  if (m >= PRAYER_TIMES.Asr && m < PRAYER_TIMES.Maghrib) return 'Asr';
+  if (m >= PRAYER_TIMES.Maghrib && m < PRAYER_TIMES.Isha) return 'Maghrib';
+  return 'Isha';
+}
+
+function startServer() {
+  const m = {'.html':'text/html','.js':'application/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.jpg':'image/jpeg','.hdr':'application/octet-stream','.glb':'model/gltf-binary','.woff2':'font/woff2','.svg':'image/svg+xml','.mp3':'audio/mpeg','.ogg':'audio/ogg','.wav':'audio/wav'};
+  return new Promise(r => { const s = http.createServer((req, res) => { let fp = path.join(SITE_DIR, req.url === '/' ? 'index.html' : req.url.split('?')[0]); fs.readFile(fp, (e, d) => { if (e) { res.writeHead(404); res.end(); return } res.writeHead(200, {'Content-Type': m[path.extname(fp)] || 'application/octet-stream'}); res.end(d) }) }); s.listen(PORT, () => r(s)) });
+}
+
+async function main() {
+  if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, {recursive: true});
+  fs.readdirSync(OUT_DIR).forEach(f => fs.unlinkSync(path.join(OUT_DIR, f)));
+
+  const server = await startServer();
+  const browser = await puppeteer.launch({
+    executablePath: '/usr/bin/google-chrome-stable', headless: true,
+    args: ['--no-sandbox','--disable-gpu-sandbox','--use-gl=angle','--use-angle=gl-egl','--ozone-platform=headless','--ignore-gpu-blocklist','--disable-dev-shm-usage','--in-process-gpu','--enable-webgl'],
+    env: {...process.env, GALLIUM_DRIVER:'d3d12', MESA_D3D12_DEFAULT_ADAPTER_NAME:'NVIDIA', LD_LIBRARY_PATH:'/usr/lib/wsl/lib:'+(process.env.LD_LIBRARY_PATH||'')}
+  });
+
+  const page = await browser.newPage();
+  await page.setViewport({width: 430, height: 932, deviceScaleFactor: 3});
+  await page.emulateTimezone('Asia/Riyadh');
+
+  // Start at Fajr (5:16 AM = 316 min) for dramatic start
+  const START_MIN = 316;
+  const startH = Math.floor(START_MIN / 60), startM = START_MIN % 60;
+
+  await page.evaluateOnNewDocument((sh, sm) => {
+    window._forceTimeMin = sh * 60 + sm;
+    window._fakeTime = {h: sh, m: sm, s: 0, ms: 0};
+    Date.prototype.getHours = function() { return window._fakeTime.h };
+    Date.prototype.getMinutes = function() { return window._fakeTime.m };
+    Date.prototype.getSeconds = function() { return 0 };
+    Date.prototype.getMilliseconds = function() { return 0 };
+    try { localStorage.setItem('agot_loc', JSON.stringify({lat:21.4225, lon:39.8262, name:'Makkah', tz:'Asia/Riyadh'})) } catch(e) {}
+
+    // Intercept Three.js renderer.render to freeze minute+second hands
+    window._freezeHands = false;
+    window._captureRenderer = null;
+    window._captureScene = null;
+    window._captureCamera = null;
+    // Monkey-patch THREE.WebGLRenderer.prototype.render after Three.js loads
+    const _origDefProp = Object.defineProperty;
+    let _rendererPatched = false;
+    // Poll for renderer — patch once available
+    setInterval(() => {
+      if (_rendererPatched) return;
+      if (typeof THREE !== 'undefined' && THREE.WebGLRenderer) {
+        const origRender = THREE.WebGLRenderer.prototype.render;
+        THREE.WebGLRenderer.prototype.render = function(scene, camera) {
+          origRender.call(this, scene, camera);
+          // After each render: if freeze is on, fix hands and re-render
+          if (window._freezeHands && window.clockRays && !this._inFreeze) {
+            const needsFix = (window.clockRays[1] && Math.abs(window.clockRays[1].mesh.rotation.y - window.clockRays[1].initY) > 0.001)
+              || (window.clockRays[2] && Math.abs(window.clockRays[2].mesh.rotation.y - window.clockRays[2].initY) > 0.001);
+            if (needsFix) {
+              if (window.clockRays[1]) window.clockRays[1].mesh.rotation.y = window.clockRays[1].initY;
+              if (window.clockRays[2]) window.clockRays[2].mesh.rotation.y = window.clockRays[2].initY;
+              this._inFreeze = true;
+              origRender.call(this, scene, camera);
+              this._inFreeze = false;
+            }
+          }
+        };
+        _rendererPatched = true;
+      }
+    }, 100);
+  }, startH, startM);
+
+  await page.goto(`http://localhost:${PORT}/`, {waitUntil: 'domcontentloaded', timeout: 30000});
+  console.log('Waiting 14s for scene...');
+  await new Promise(r => setTimeout(r, 14000));
+
+  await page.evaluate(() => { if (window._setPrayerLocation) window._setPrayerLocation(21.4225, 39.8262, 'Makkah') });
+  await new Promise(r => setTimeout(r, 5000));
+
+  // Pin forceTimeMin
+  await page.evaluate((sm) => {
+    window._forceTimeMin = sm;
+    window.__pin = setInterval(() => { window._forceTimeMin = window._fakeTime.h * 60 + window._fakeTime.m }, 100);
+  }, START_MIN);
+  await new Promise(r => setTimeout(r, 3000));
+
+  // Inject overlay + hide chrome
+  await page.evaluate(async () => {
+    const link = document.createElement('link'); link.href = 'https://fonts.googleapis.com/css2?family=Instrument+Serif&display=swap'; link.rel = 'stylesheet'; document.head.appendChild(link);
+    await new Promise(r => setTimeout(r, 3000));
+
+    document.body.classList.add('chrome-hidden');
+    document.querySelectorAll('body > *').forEach(el => {
+      if (el.tagName === 'CANVAS') return;
+      if (el.classList && (el.classList.contains('mode-pill') || el.classList.contains('mode-label'))) return;
+      if (el.id === 'modePill' || el.id === 'modeLabel') return;
+      if (el.classList && el.classList.contains('poster-overlay')) return;
+      el.style.display = 'none';
+    });
+    const canvas = document.querySelector('canvas');
+    if (canvas) { canvas.style.display = 'block'; canvas.style.position = 'fixed'; canvas.style.top = '0'; canvas.style.left = '0'; canvas.style.width = '100vw'; canvas.style.height = '100vh'; canvas.style.zIndex = '0' }
+
+    // Pill + label at 12% (safe zone)
+    const pill = document.querySelector('.mode-pill');
+    if (pill) { pill.style.setProperty('display','flex','important'); pill.style.setProperty('opacity','1','important'); pill.style.zIndex = '999'; pill.style.bottom = '12%' }
+    const ml = document.querySelector('.mode-label') || document.getElementById('modeLabel');
+    if (ml) { ml.style.setProperty('display','block','important'); ml.style.setProperty('opacity','1','important'); ml.style.bottom = 'calc(12% + 62px)' }
+
+    // Title at 12%
+    const t = document.createElement('div'); t.className = 'poster-overlay';
+    t.style.cssText = 'position:fixed;top:12%;left:0;width:100%;text-align:center;z-index:9999;pointer-events:none;font-family:"Instrument Serif",serif;font-size:2.8rem;font-weight:400;letter-spacing:-0.02em;color:rgba(232,228,220,0.9);line-height:1.1';
+    t.textContent = 'a Gift of Time.'; document.body.appendChild(t);
+    // Subtitle
+    const s = document.createElement('div'); s.className = 'poster-overlay';
+    s.style.cssText = 'position:fixed;top:calc(12% + 3.8rem);left:0;width:100%;text-align:center;z-index:9999;pointer-events:none;font-family:"Instrument Serif",serif;font-size:0.85rem;font-weight:400;color:rgba(232,228,220,0.4);padding:0 10%';
+    s.textContent = 'a study in light, time, orientation and a call to prayer.'; document.body.appendChild(s);
+  });
+  await new Promise(r => setTimeout(r, 1000));
+
+  // Enable hand freezing now that scene is loaded
+  await page.evaluate(() => { window._freezeHands = true; });
+  await new Promise(r => setTimeout(r, 200));
+
+  console.log(`Capturing ${TOTAL} frames at ${FPS}fps (${DURATION}s = 24hr timelapse)...`);
+  console.log(`Start: ${startH}:${String(startM).padStart(2,'0')} (Fajr) — 24hr cycle`);
+
+  for (let i = 0; i < TOTAL; i++) {
+    // Map frame to 24hr cycle: 1440 min spread over TOTAL frames
+    const minuteOffset = (i / TOTAL) * 1440;
+    const currentMin = (START_MIN + minuteOffset) % 1440;
+    const h = Math.floor(currentMin / 60);
+    // Let minutes advance for smooth hour hand sweep (minute hand spins — looks natural in timelapse)
+    const m = Math.floor(currentMin % 60);
+
+    // For smooth hour hand: hour calc is (hours%12) + minutes/60 + seconds/3600
+    // We want fractional hours for smooth sweep, but minute hand frozen at 0.
+    // Solution: pass fractional minutes to getMinutes (drives hour hand smooth),
+    // then after render, override minute hand rotation to 12 o'clock and force re-render.
+    const realMin = currentMin % 60; // fractional minutes within the hour
+    await page.evaluate((h, realMin, forceMin) => {
+      window._fakeTime.h = h;
+      window._fakeTime.m = realMin;
+      window._forceTimeMin = forceMin;
+    }, h, Math.floor(realMin), Math.floor(currentMin));
+
+    // Update pill glow color to match current prayer
+    const prayer = prayerAtMinute(Math.floor(currentMin));
+    const glowColor = PRAYER_COLORS[prayer] || '#aa44ff';
+    await page.evaluate((gc) => {
+      const slider = document.getElementById('modePillSlider');
+      if (slider) {
+        slider.style.setProperty('--pill-glow-bar', gc);
+        slider.style.setProperty('--pill-glow-bar-shadow', gc + '73');
+        slider.style.setProperty('--pill-glow-bar-soft', gc + '26');
+        slider.style.setProperty('--pill-glow', gc + '1f');
+      }
+    }, glowColor);
+
+    // Wait for a full render cycle with frozen hands
+    await new Promise(r => setTimeout(r, 80));
+
+    const frame = String(i).padStart(4, '0');
+    await page.screenshot({path: `${OUT_DIR}/frame_${frame}.png`, type: 'png'});
+    if (i % 60 === 0) {
+      console.log(`  Frame ${i}/${TOTAL} — ${h}:${String(m).padStart(2,'0')} (${prayer})`);
+    }
+  }
+
+  console.log('Encoding portrait MP4...');
+  execSync(`ffmpeg -y -framerate ${FPS} -i "${OUT_DIR}/frame_%04d.png" -c:v libx264 -crf 18 -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" /home/openclaw-agent/.openclaw/workspace/timelapse-24hr-portrait.mp4`);
+
+  console.log('Encoding 9:16 crop...');
+  execSync(`ffmpeg -y -framerate ${FPS} -i "${OUT_DIR}/frame_%04d.png" -c:v libx264 -crf 18 -pix_fmt yuv420p -vf "crop=1290:2293:0:(2796-2293)/2,scale=trunc(iw/2)*2:trunc(ih/2)*2" /home/openclaw-agent/.openclaw/workspace/timelapse-24hr-916.mp4`);
+
+  const s1 = fs.statSync('/home/openclaw-agent/.openclaw/workspace/timelapse-24hr-portrait.mp4');
+  const s2 = fs.statSync('/home/openclaw-agent/.openclaw/workspace/timelapse-24hr-916.mp4');
+  console.log('Done!');
+  console.log(`  portrait: ${(s1.size/1024/1024).toFixed(1)}MB`);
+  console.log(`  9:16 crop: ${(s2.size/1024/1024).toFixed(1)}MB`);
+
+  await browser.close(); server.close();
+}
+main().catch(e => { console.error(e); process.exit(1) });

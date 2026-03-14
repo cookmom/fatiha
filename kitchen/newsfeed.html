@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kitchen Newsfeed</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d12;
+      --surface: #13131a;
+      --border: #1e1e2a;
+      --text: #e8e6e1;
+      --muted: #6b6979;
+      --accent: #2a2a38;
+
+      --vp: #4a9eff;
+      --ai: #ff6b6b;
+      --tools: #50c878;
+      --synths: #c084fc;
+      --art: #f59e0b;
+      --creative: #06b6d4;
+      --research: #8b5cf6;
+      --opportunities: #ef4444;
+      --discovery: #10b981;
+      --concepts: #f472b6;
+    }
+
+    html { font-size: 15px; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      font-weight: 400;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      padding: 2rem 1.5rem 1rem;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    .header h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .header-meta {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+    }
+
+    /* ── Sticky controls ── */
+    .controls {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.5rem;
+    }
+    .controls-inner {
+      max-width: 860px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+
+    .search-wrap {
+      position: relative;
+    }
+    .search-wrap input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.875rem;
+      padding: 0.55rem 0.85rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .search-wrap input::placeholder { color: var(--muted); }
+    .search-wrap input:focus { border-color: #2d2d44; }
+
+    /* ── Category pills ── */
+    .pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.3rem 0.7rem;
+      border-radius: 99px;
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s;
+      user-select: none;
+      background: var(--surface);
+      color: var(--muted);
+      border-color: var(--border);
+    }
+    .pill:hover { color: var(--text); }
+    .pill.active {
+      color: var(--text);
+      border-color: var(--pill-color);
+      background: color-mix(in srgb, var(--pill-color) 12%, var(--surface));
+    }
+    .pill-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--pill-color);
+      flex-shrink: 0;
+    }
+
+    /* ── Content ── */
+    .content {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 1rem 1.5rem 3rem;
+    }
+
+    /* ── Date group ── */
+    .date-group { margin-bottom: 2rem; }
+    .date-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 0.5rem;
+    }
+
+    /* ── Item card ── */
+    .item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.5rem 1rem;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+      align-items: start;
+    }
+    .item:last-child { border-bottom: none; }
+
+    .item-left { min-width: 0; }
+
+    .item-title {
+      font-size: 0.92rem;
+      font-weight: 500;
+      color: var(--text);
+      line-height: 1.4;
+    }
+    .item-title a {
+      color: inherit;
+      text-decoration: none;
+    }
+    .item-title a:hover { color: #fff; }
+    .item-title a::after {
+      content: ' \2197';
+      font-size: 0.75em;
+      color: var(--muted);
+      vertical-align: super;
+    }
+
+    .item-summary {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.2rem;
+      line-height: 1.5;
+    }
+
+    .item-badges {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 0.4rem;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.68rem;
+      font-weight: 500;
+      letter-spacing: 0.03em;
+    }
+    .badge-cat {
+      background: color-mix(in srgb, var(--cat-color) 15%, transparent);
+      color: var(--cat-color);
+    }
+    .badge-deadline {
+      background: color-mix(in srgb, #ef4444 18%, transparent);
+      color: #ef4444;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      font-size: 0.63rem;
+    }
+
+    /* ── Empty state ── */
+    .empty {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    /* ── Status bar ── */
+    .status-bar {
+      text-align: center;
+      font-size: 0.72rem;
+      color: var(--muted);
+      padding: 0.4rem;
+      letter-spacing: 0.03em;
+    }
+    .status-bar.error { color: #ef4444; }
+
+    /* ── Mobile ── */
+    @media (max-width: 600px) {
+      .header { padding: 1.25rem 1rem 0.75rem; }
+      .controls { padding: 0.65rem 1rem; }
+      .content { padding: 0.75rem 1rem 2rem; }
+      .item { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Kitchen Newsfeed</h1>
+  <div class="header-meta" id="headerMeta">Loading...</div>
+</div>
+
+<div class="controls">
+  <div class="controls-inner">
+    <div class="search-wrap">
+      <input type="search" id="search" placeholder="Search titles, summaries, categories..." autocomplete="off">
+    </div>
+    <div class="pills" id="pills"></div>
+  </div>
+</div>
+
+<div class="content">
+  <div id="statusBar" class="status-bar"></div>
+  <div id="feed"></div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://wezxebfnxjviihawcexs.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlenhlYmZueGp2aWloYXdjZXhzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjQ3NDMxNiwiZXhwIjoyMDg4MDUwMzE2fQ.GObc8-Bgr-7NAv3AtTTRfTTMw3hXSinZNDsheAmcVl4';
+
+const CAT_COLORS = {
+  'vp': '#4a9eff',
+  'ai': '#ff6b6b',
+  'tools': '#50c878',
+  'synths-eurorack': '#c084fc',
+  'art': '#f59e0b',
+  'creative-coding': '#06b6d4',
+  'research': '#8b5cf6',
+  'opportunities': '#ef4444',
+  'discovery': '#10b981',
+  'concepts': '#f472b6',
+};
+
+const CAT_LABELS = {
+  'vp': 'Virtual Production',
+  'ai': 'AI',
+  'tools': 'Tools',
+  'synths-eurorack': 'Synths & Eurorack',
+  'art': 'Art',
+  'creative-coding': 'Creative Coding',
+  'research': 'Research',
+  'opportunities': 'Opportunities',
+  'discovery': 'Discovery',
+  'concepts': 'Concepts',
+};
+
+// ── Fallback data (March 2, 2026) ─────────────────────────────────────────
+const FALLBACK_DATA = [
+  // VP
+  {id:'vp1',date:'2026-03-02',category:'vp',title:'Foundry Nuke Stage',summary:'New standalone ICVFX tool, real-time photorealistic playback, invite-only early access',url:'https://www.cgchannel.com/2025/04/foundry-unveils-new-virtual-production-and-icvfx-tool-nuke-stage/',priority:'normal'},
+  {id:'vp2',date:'2026-03-02',category:'vp',title:'ISE 2026: VP enters production maturity',summary:'VP/ICVFX passed hype phase',url:'https://www.iseurope.org/news/under-hood-virtual-production',priority:'normal'},
+  {id:'vp3',date:'2026-03-02',category:'vp',title:'Brompton Tessera powers Live Aid Musical',url:'https://www.etnow.com/news/2026/2/brompton-technology-powers-epic-led-visuals-for-just-for-one-day--the-live-aid-musical',priority:'normal'},
+  {id:'vp4',date:'2026-03-02',category:'vp',title:'Cirque du Soleil ALIZE: Brompton + ROE Visual',url:'https://www.etnow.com/news/2026/1/cirque-du-soleils-aliz-comes-to-life-with-brompton-technology-and-theatrixx',priority:'normal'},
+  {id:'vp5',date:'2026-03-02',category:'vp',title:'Brompton 8K Tessera SQ200',url:'https://plsn.com/featured/brompton-technology-unveils-8k-led-video-processor-tessera-sq200-at-nab-2024/',priority:'normal'},
+  {id:'vp6',date:'2026-03-02',category:'vp',title:'Vicon Active Crown',summary:'Flexible camera tracking for ICVFX volumes',url:'https://www.vicon.com/hardware/devices/activecrown/',priority:'normal'},
+  {id:'vp7',date:'2026-03-02',category:'vp',title:'UE 5.5 ICVFX production-ready',url:'https://www.unrealengine.com/en-US/blog/unreal-engine-5-5-is-now-available',priority:'normal'},
+  {id:'vp8',date:'2026-03-02',category:'vp',title:"UE 5.7 What's New",url:'https://dev.epicgames.com/documentation/en-us/unreal-engine/whats-new',priority:'normal'},
+  {id:'vp9',date:'2026-03-02',category:'vp',title:'SXSW 2026',summary:'March 12-18, Austin TX',url:'https://sxsw.com/festivals/innovation-conference/',priority:'normal'},
+  {id:'vp10',date:'2026-03-02',category:'vp',title:'Disguise ISE 2026: X1 + GX 3+',url:'https://www.disguise.one/en/ise-2026',priority:'normal'},
+  {id:'vp11',date:'2026-03-02',category:'vp',title:'NantStudios Dynamic Volume System',url:'https://www.bromptontech.com/case-study/reconfigurable-led-volume-for-next-gen-virtual-production/',priority:'normal'},
+  // AI
+  {id:'ai1',date:'2026-03-02',category:'ai',title:'Gemini 3.1 Pro',summary:'77.1% ARC-AGI-2, 1M context, beats GPT-5.2 + Claude Opus 4.6',url:'https://creati.ai/ai-news/2026-02-20/google-gemini-3-1-pro-release-beats-gpt-5-2-claude-benchmarks/',priority:'normal'},
+  {id:'ai2',date:'2026-03-02',category:'ai',title:'Feb 2026 AI model wave',summary:'Gemini 3.1 + GPT 5.3 + Claude Fennec + Grok 4.20 + DeepSeek V4',url:'https://www.comparateur-ia-facile.com/en/blog/nouveaux-modeles-ia-fevrier-2026-gpt-claude-gemini',priority:'normal'},
+  {id:'ai3',date:'2026-03-02',category:'ai',title:'AI video 2026: Kling 3.0 + Sora 2 Pro + Seedance 1.5',url:'https://medium.com/@cliprise/the-state-of-ai-video-generation-in-february-2026-every-major-model-analyzed-6dbfedbe3a5c',priority:'normal'},
+  {id:'ai4',date:'2026-03-02',category:'ai',title:'Sora 2 + Runway Gen-4.5 lead cinematic',url:'https://pinggy.io/blog/best_video_generation_ai_models/',priority:'normal'},
+  {id:'ai5',date:'2026-03-02',category:'ai',title:'LLM Stats tracker',url:'https://llm-stats.com/llm-updates',priority:'normal'},
+  {id:'ai6',date:'2026-03-02',category:'ai',title:'Artists sidestepping AI in 2026',url:'https://www.creativebloq.com/art/digital-art/digital-art-trends-2026-reveal-how-creatives-are-responding-to-ai-pressure',priority:'normal'},
+  {id:'ai7',date:'2026-03-02',category:'ai',title:'Suno v5 — 8-minute songs',url:'https://suno.com/hub/best-ai-music-generator',priority:'normal'},
+  {id:'ai8',date:'2026-03-02',category:'ai',title:'DeepSeek V4 Engram architecture',url:'https://www.comparateur-ia-facile.com/en/blog/nouveaux-modeles-ia-fevrier-2026-gpt-claude-gemini',priority:'normal'},
+  {id:'ai9',date:'2026-03-02',category:'ai',title:'Adobe Firefly Boards',url:'https://www.creativebloq.com/tech/from-firefly-to-graph-how-adobe-thinks-creatives-will-use-ai-in-2026',priority:'normal'},
+  {id:'ai10',date:'2026-03-02',category:'ai',title:'2026 creative AI stack',url:'https://www.aibarcelona.org/2026/02/top-10-generative-ai-tools-digital-creators-2026.html',priority:'normal'},
+  {id:'ai11',date:'2026-03-02',category:'ai',title:'Generative AI: 24% revenue loss for music creators',summary:'Up to 24% loss for music, 21% for AV by 2028',url:'https://www.globalissues.org/news/2026/02/25/42425',priority:'high'},
+  // Tools
+  {id:'t1',date:'2026-03-02',category:'tools',title:'Bitwig Studio 6',summary:'March 11 release — automation clips, global key sig, clip aliases',url:'https://synthanatomy.com/2026/02/bitwig-studio-6.html',priority:'normal'},
+  {id:'t2',date:'2026-03-02',category:'tools',title:'Ableton Live 12 beta',url:'https://www.ableton.com/en/release-notes/live-12-beta/',priority:'normal'},
+  {id:'t3',date:'2026-03-02',category:'tools',title:'Ableton Push 12 beta',url:'https://www.ableton.com/en/release-notes/push-12-beta/',priority:'normal'},
+  {id:'t4',date:'2026-03-02',category:'tools',title:'Notch 2026.1',summary:'AE plugin, MOVIN mocap, OptiTrack support',url:'https://manual.notch.one/2026.1/en/docs/whats-new/everything/',priority:'normal'},
+  {id:'t5',date:'2026-03-02',category:'tools',title:'Notch 0.9.23 EOL',url:'https://manual.notch.one/2026.1/en/docs/whats-new/0923-access-support-licensing/',priority:'normal'},
+  {id:'t6',date:'2026-03-02',category:'tools',title:'Resolume 7.24.3',url:'https://www.resolume.com/download/',priority:'normal'},
+  {id:'t7',date:'2026-03-02',category:'tools',title:'TouchDesigner 2023 Timecode CHOP',url:'https://interactiveimmersive.io/blog/touchdesigner-resources/touchdesigner-2023-official-updates/',priority:'normal'},
+  {id:'t8',date:'2026-03-02',category:'tools',title:'Patchies — browser AV patcher',summary:'Strudel + Hydra + p5.js + GLSL in visual node graph',url:'https://github.com/heypoom/patchies',priority:'normal'},
+  {id:'t9',date:'2026-03-02',category:'tools',title:'Generative coding = breakthrough tech 2026',url:'https://www.technologyreview.com/2026/01/12/1130027/generative-coding-ai-software-2026-breakthrough-technology/',priority:'normal'},
+  // Synths-Eurorack
+  {id:'s1',date:'2026-03-02',category:'synths-eurorack',title:'Make Noise Universal Skiff + MultiWave MIDI Inlet',url:'https://www.synthtopia.com/content/2026/01/24/make-noise-intros-new-universal-skiff-system-more/',priority:'normal'},
+  {id:'s2',date:'2026-03-02',category:'synths-eurorack',title:'midiphy zetaSID — C64 SID chip as 4HP eurorack',url:'https://synthanatomy.com/2026/02/midiphy-zetasid-revives-the-legendary-sid-chip-as-an-expandable-modular-synth-voice.html',priority:'normal'},
+  {id:'s3',date:'2026-03-02',category:'synths-eurorack',title:'VCV Rack: licensed Buchla/Moog/Intellijel modules',url:'https://www.gearnews.com/eurorack-in-techno-synths/',priority:'normal'},
+  {id:'s4',date:'2026-03-02',category:'synths-eurorack',title:'Suno Warp Markers + Time Sig support',url:'https://suno.com/blog/introducing-v4-5',priority:'normal'},
+  {id:'s5',date:'2026-03-02',category:'synths-eurorack',title:'Suno + Warner Music partnership',url:'https://www.wmg.com/news/warner-music-group-and-suno-forge-groundbreaking-partnership',priority:'normal'},
+  {id:'s6',date:'2026-03-02',category:'synths-eurorack',title:'Eurorack in Techno 2026',url:'https://www.gearnews.com/eurorack-in-techno-synths/',priority:'normal'},
+  {id:'s7',date:'2026-03-02',category:'synths-eurorack',title:'Best Eurorack modules 2026',url:'https://www.musicradar.com/news/the-best-eurorack-modules-in-the-world',priority:'normal'},
+  {id:'s8',date:'2026-03-02',category:'synths-eurorack',title:'Intellijel Jellymix + Swells + 7U case gen 2',url:'https://synthanatomy.com/2026/02/intellijel-jellymix-desktop-mixer-swells-stereo-reverb-module-and-updated-7u-case.html',priority:'normal'},
+  {id:'s9',date:'2026-03-02',category:'synths-eurorack',title:'Intellijel Multigrain granular',url:'https://modwiggler.com/forum/viewtopic.php?t=292563',priority:'normal'},
+  {id:'s10',date:'2026-03-02',category:'synths-eurorack',title:'Mannequins Silhouette',url:'https://www.reddit.com/r/modular/comments/1hj760v/new_module_from_mannequins_silhouette/',priority:'normal'},
+  // Art
+  {id:'ar1',date:'2026-03-02',category:'art',title:'ARTECHOUSE NYC SUBMERGE',url:'https://www.artechouse.com/location/nyc/',priority:'normal'},
+  {id:'ar2',date:'2026-03-02',category:'art',title:'ECHOES OF TOMORROW — Signal Space Prague',summary:'Generative systems, lasers, spatial audio, 10 artists',url:'https://criticalplayground.org/echoes-of-tomorrow-at-signal-space/',priority:'normal'},
+  {id:'ar3',date:'2026-03-02',category:'art',title:'LACMA 2026 Beeple',summary:'12 screens, audience remixes in real time',url:'https://unframed.lacma.org/2025/12/31/exhibitions-see-2026',priority:'normal'},
+  {id:'ar4',date:'2026-03-02',category:'art',title:'Kim Hankyul — kinetic sculptor, first US museum commission',url:'https://www.artsy.net/article/artsy-editorial-11-artists-breakout-moments-2026',priority:'normal'},
+  {id:'ar5',date:'2026-03-02',category:'art',title:'Artnet: 8 Artists 2026',url:'https://news.artnet.com/art-world/8-artists-poised-to-break-out-in-2026-2722681',priority:'normal'},
+  {id:'ar6',date:'2026-03-02',category:'art',title:'22 LA exhibitions 2026',url:'https://www.timeout.com/los-angeles/news/22-art-exhibitions-in-l-a-to-look-forward-to-in-2026-123125',priority:'normal'},
+  {id:'ar7',date:'2026-03-02',category:'art',title:'Zimoun — sound sculptor',summary:'Industrial materials + mechanics = emergent acoustics',url:'https://zimoun.net/',priority:'normal'},
+  // Creative Coding
+  {id:'cc1',date:'2026-03-02',category:'creative-coding',title:'fxhash FXH Protocol',summary:'FXH token + art coins + open-form generative art',url:'https://beta.fxhash.xyz/',priority:'normal'},
+  {id:'cc2',date:'2026-03-02',category:'creative-coding',title:'Patchies',summary:'Multiplayer browser AV patcher',url:'https://patchies.app',priority:'normal'},
+  {id:'cc3',date:'2026-03-02',category:'creative-coding',title:'flok.cc',summary:'Collaborative live coding: Strudel + Hydra',url:'https://flok.cc',priority:'normal'},
+  {id:'cc4',date:'2026-03-02',category:'creative-coding',title:'Switch Angel — live coding techno with Strudel',url:'https://hackaday.com/2025/10/16/live-coding-techno-with-strudel/',priority:'normal'},
+  {id:'cc5',date:'2026-03-02',category:'creative-coding',title:'awesome-creative-coding',url:'https://github.com/terkelg/awesome-creative-coding',priority:'normal'},
+  // Research
+  {id:'r1',date:'2026-03-02',category:'research',title:'Algorithm Modeling in Islamic Geometric Pattern Reconfiguration',summary:'Journal of Islamic Architecture, June 2025',url:'https://www.researchgate.net/publication/393164774',priority:'normal'},
+  {id:'r2',date:'2026-03-02',category:'research',title:'The Islamic Algorithm — $15B Parametric Design',summary:'Ancient patterns to patented parametric designs. Algorithms are public domain, implementations are not.',url:'https://medium.com/@Architects_Blog/the-islamic-algorithm-how-ancient-geometric-ip-is-creating-a-15b-parametric-design-monopoly-ee29454f44c2',priority:'normal'},
+  {id:'r3',date:'2026-03-02',category:'research',title:'islamic-geometry GitHub',summary:'Open-source generative computational Islamic geometry',url:'https://github.com/TheBeachLab/islamic-geometry',priority:'normal'},
+  {id:'r4',date:'2026-03-02',category:'research',title:'MIT: Generative coding breakthrough 2026',url:'https://www.technologyreview.com/2026/01/12/1130027/generative-coding-ai-software-2026-breakthrough-technology/',priority:'normal'},
+  // Opportunities
+  {id:'o1',date:'2026-03-02',category:'opportunities',title:'Prix Ars Electronica 2026 — DEADLINE MARCH 4',summary:'4 Golden Nicas, EUR 10k each, free entry',url:'https://ars.electronica.art/prix/en/opencall/',priority:'high'},
+  {id:'o2',date:'2026-03-02',category:'opportunities',title:'S+T+ARTS Prize 2026 — EXTENDED TO MARCH 9',summary:'EUR 40k, EU Commission',url:'https://starts-prize.aec.at/en/open-call/',priority:'high'},
+  {id:'o3',date:'2026-03-02',category:'opportunities',title:'Islamic Arts Society open call',url:'https://islamicartssociety.org/art-for-the-love-of-muhammad-pbuh-2026/',priority:'high'},
+  {id:'o4',date:'2026-03-02',category:'opportunities',title:'March 2026 Artist Opportunities (Colossal)',url:'https://www.thisiscolossal.com/2026/02/march-2026-opportunities-open-calls-residencies-grants/',priority:'high'},
+  {id:'o5',date:'2026-03-02',category:'opportunities',title:'SXSW 2026 Exhibitions',url:'https://sxsw.com/exhibitions/',priority:'high'},
+  {id:'o6',date:'2026-03-02',category:'opportunities',title:'50 Best Art Competitions 2026',url:'https://www.entrythingy.com/blog/best-art-calls-2026',priority:'high'},
+  // Discovery
+  {id:'d1',date:'2026-03-02',category:'discovery',title:'midiphy zetaSID',summary:'C64 SID chip as 4HP eurorack voice — gaming history meets modular',url:'https://synthanatomy.com/2026/02/midiphy-zetasid-revives-the-legendary-sid-chip-as-an-expandable-modular-synth-voice.html',priority:'normal'},
+  {id:'d2',date:'2026-03-02',category:'discovery',title:'Patchies',summary:'Browser-native AV patcher — closest to TouchDesigner in a tab',url:'https://github.com/heypoom/patchies',priority:'normal'},
+  {id:'d3',date:'2026-03-02',category:'discovery',title:'The Islamic Algorithm',summary:'Ancient Islamic geometric patterns being patented for parametric design — public domain algorithms, proprietary implementations',url:'https://medium.com/@Architects_Blog/the-islamic-algorithm-how-ancient-geometric-ip-is-creating-a-15b-parametric-design-monopoly-ee29454f44c2',priority:'normal'},
+  {id:'d4',date:'2026-03-02',category:'discovery',title:'islamic-geometry GitHub',url:'https://github.com/TheBeachLab/islamic-geometry',priority:'normal'},
+  {id:'d5',date:'2026-03-02',category:'discovery',title:'Zimoun',summary:'Euclidean rhythms in physical form',url:'https://zimoun.net/',priority:'normal'},
+  {id:'d6',date:'2026-03-02',category:'discovery',title:'flok.cc',summary:'Multiplayer live coding — Strudel + Hydra simultaneously',url:'https://flok.cc',priority:'normal'},
+  {id:'d7',date:'2026-03-02',category:'discovery',title:'ECHOES OF TOMORROW',summary:'Signal Space Prague — generative + laser + spatial audio venue',url:'https://criticalplayground.org/echoes-of-tomorrow-at-signal-space/',priority:'normal'},
+  {id:'d8',date:'2026-03-02',category:'discovery',title:"Daric Gill 'The Shy Machine'",summary:'12-sided kinetic sculpture that learns room acoustics and adapts light to noise',url:'https://daricgill.com/2018/08/25/shy-machine-interactive-art/',priority:'normal'},
+  {id:'d9',date:'2026-03-02',category:'discovery',title:'Seedance 1.5 Pro',summary:'Underrated AI video model — watch for VP applications',url:'https://medium.com/@cliprise/the-state-of-ai-video-generation-in-february-2026-every-major-model-analyzed-6dbfedbe3a5c',priority:'normal'},
+  {id:'d10',date:'2026-03-02',category:'discovery',title:'FXH Protocol',summary:'Rearchitecting on-chain generative art — artist coins + open-form',url:'https://beta.fxhash.xyz/',priority:'normal'},
+  {id:'d11',date:'2026-03-02',category:'discovery',title:'Algorithm Modeling Islamic Geometric Pattern',summary:'Peer-reviewed computational approach to mosque ornament generation',url:'https://www.researchgate.net/publication/393164774',priority:'normal'},
+  // Concepts
+  {id:'cn1',date:'2026-03-02',category:'concepts',title:'agiftoftime.app for Prix Ars Electronica',summary:'AI + Ramadan + faith community + daily devotional practice = strong Digital Humanity narrative',priority:'normal'},
+  {id:'cn2',date:'2026-03-02',category:'concepts',title:'SID chip revival pattern',summary:'Taking legendary obsolete sound hardware and giving it modular life — what else has not been revived?',priority:'normal'},
+  {id:'cn3',date:'2026-03-02',category:'concepts',title:'Browser AV performance',summary:'Patchies + flok.cc = multiplayer real-time AV in a browser tab — teaching, collaboration, performance',priority:'normal'},
+  {id:'cn4',date:'2026-03-02',category:'concepts',title:'VP convergence at ILM',summary:'UE 5.5 ICVFX production-ready + Foundry Nuke Stage launch = StageCraft intersection. Get on Nuke Stage beta.',priority:'normal'},
+];
+
+// ── State ─────────────────────────────────────────────────────────────────
+let allItems = [];
+let activeCategories = new Set();
+let searchQuery = '';
+let usingLiveData = false;
+
+// ── Fetch from Supabase ───────────────────────────────────────────────────
+async function fetchFromSupabase() {
+  const url = `${SUPABASE_URL}/rest/v1/daily_items?order=date.desc,created_at.desc&limit=200`;
+  const res = await fetch(url, {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+    }
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function loadData() {
+  const statusEl = document.getElementById('statusBar');
+  try {
+    const data = await fetchFromSupabase();
+    if (data && data.length > 0) {
+      allItems = data;
+      usingLiveData = true;
+      statusEl.textContent = `${data.length} items from Supabase`;
+      statusEl.className = 'status-bar';
+    } else {
+      throw new Error('empty');
+    }
+  } catch (err) {
+    allItems = FALLBACK_DATA;
+    usingLiveData = false;
+    statusEl.textContent = `Showing embedded data (${FALLBACK_DATA.length} items) — connect Supabase table to go live`;
+    statusEl.className = 'status-bar';
+  }
+
+  initPills();
+  render();
+  updateHeader();
+}
+
+// ── Pills ─────────────────────────────────────────────────────────────────
+function initPills() {
+  const cats = [...new Set(allItems.map(i => i.category))];
+  // Sort by defined order
+  const order = Object.keys(CAT_COLORS);
+  cats.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+
+  const container = document.getElementById('pills');
+  container.innerHTML = '';
+
+  // All pill
+  const all = document.createElement('button');
+  all.className = 'pill active';
+  all.style.setProperty('--pill-color', '#e8e6e1');
+  all.innerHTML = `<span class="pill-dot" style="background:#6b6979"></span>All`;
+  all.dataset.cat = '__all__';
+  all.addEventListener('click', () => {
+    activeCategories.clear();
+    updatePillState();
+    render();
+  });
+  container.appendChild(all);
+
+  cats.forEach(cat => {
+    const color = CAT_COLORS[cat] || '#888';
+    const label = CAT_LABELS[cat] || cat;
+    const count = allItems.filter(i => i.category === cat).length;
+    const btn = document.createElement('button');
+    btn.className = 'pill';
+    btn.style.setProperty('--pill-color', color);
+    btn.innerHTML = `<span class="pill-dot"></span>${label} <span style="opacity:.45;font-size:.9em">${count}</span>`;
+    btn.dataset.cat = cat;
+    btn.addEventListener('click', () => {
+      if (activeCategories.has(cat)) {
+        activeCategories.delete(cat);
+      } else {
+        activeCategories.add(cat);
+      }
+      updatePillState();
+      render();
+    });
+    container.appendChild(btn);
+  });
+}
+
+function updatePillState() {
+  document.querySelectorAll('.pill').forEach(btn => {
+    const cat = btn.dataset.cat;
+    if (cat === '__all__') {
+      btn.classList.toggle('active', activeCategories.size === 0);
+    } else {
+      btn.classList.toggle('active', activeCategories.has(cat));
+    }
+  });
+}
+
+// ── Render ────────────────────────────────────────────────────────────────
+function render() {
+  let items = allItems;
+
+  if (activeCategories.size > 0) {
+    items = items.filter(i => activeCategories.has(i.category));
+  }
+
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    items = items.filter(i =>
+      (i.title || '').toLowerCase().includes(q) ||
+      (i.summary || '').toLowerCase().includes(q) ||
+      (i.category || '').toLowerCase().includes(q)
+    );
+  }
+
+  const feed = document.getElementById('feed');
+
+  if (items.length === 0) {
+    feed.innerHTML = '<div class="empty">No items match your filter.</div>';
+    return;
+  }
+
+  // Group by date
+  const grouped = {};
+  items.forEach(item => {
+    const d = item.date || 'unknown';
+    if (!grouped[d]) grouped[d] = [];
+    grouped[d].push(item);
+  });
+
+  const dates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+  feed.innerHTML = dates.map(date => {
+    const label = formatDate(date);
+    const rows = grouped[date].map(item => renderItem(item)).join('');
+    return `<div class="date-group">
+      <div class="date-label">${label}</div>
+      ${rows}
+    </div>`;
+  }).join('');
+}
+
+function renderItem(item) {
+  const color = CAT_COLORS[item.category] || '#888';
+  const catLabel = CAT_LABELS[item.category] || item.category;
+  const isDeadline = item.priority === 'high' && item.category === 'opportunities';
+  const isHighPriority = item.priority === 'high' && item.category !== 'opportunities';
+
+  const titleEl = item.url
+    ? `<a href="${escHtml(item.url)}" target="_blank" rel="noopener">${escHtml(item.title)}</a>`
+    : escHtml(item.title);
+
+  const summaryEl = item.summary
+    ? `<div class="item-summary">${escHtml(item.summary)}</div>`
+    : '';
+
+  const deadlineBadge = isDeadline
+    ? `<span class="badge badge-deadline">Deadline</span>` : '';
+
+  const highBadge = isHighPriority
+    ? `<span class="badge" style="background:color-mix(in srgb,#f59e0b 15%,transparent);color:#f59e0b;font-size:.66rem">Priority</span>` : '';
+
+  return `<div class="item">
+    <div class="item-left">
+      <div class="item-title">${titleEl}</div>
+      ${summaryEl}
+      <div class="item-badges">
+        <span class="badge badge-cat" style="--cat-color:${color}">${escHtml(catLabel)}</span>
+        ${deadlineBadge}${highBadge}
+      </div>
+    </div>
+  </div>`;
+}
+
+function formatDate(dateStr) {
+  try {
+    const d = new Date(dateStr + 'T12:00:00');
+    return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  } catch { return dateStr; }
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function updateHeader() {
+  const dates = [...new Set(allItems.map(i => i.date))].sort((a,b) => b.localeCompare(a));
+  const latest = dates[0] ? formatDate(dates[0]) : '';
+  document.getElementById('headerMeta').textContent =
+    `${allItems.length} items · ${dates.length} date${dates.length !== 1 ? 's' : ''} · ${latest}`;
+}
+
+// ── Search ────────────────────────────────────────────────────────────────
+document.getElementById('search').addEventListener('input', e => {
+  searchQuery = e.target.value.trim();
+  render();
+});
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>

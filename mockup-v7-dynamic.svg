@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 375 2520" role="img" aria-labelledby="title desc">
+  <title id="title">A Gift of Time — V7 Dynamic Hijri Scaling</title>
+  <desc id="desc">Three examples showing Hijri date scaling to fill the gap proportionally</desc>
+
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0d0d12"/>
+      <stop offset="100%" stop-color="#0a0a10"/>
+    </linearGradient>
+    <filter id="frost" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0.05  0 1 0 0 0.05  0 0 1 0 0.07  0 0 0 0.78 0"/>
+    </filter>
+  </defs>
+
+  <rect width="375" height="2520" fill="url(#bgGrad)"/>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- EXAMPLE 1: Short city — "LA" -->
+  <!-- City ends ~42px. Countdown starts ~295px. Gap = 253px. Hijri scales UP -->
+  <!-- ═══════════════════════════════════════ -->
+  <g transform="translate(0, 0)">
+    <text x="188" y="20" text-anchor="middle" font-family="SF Mono, monospace" font-size="9" fill="rgba(255,200,100,0.5)" letter-spacing="0.1em">SHORT CITY — HIJRI SCALES UP</text>
+
+    <rect x="0" y="28" width="375" height="72" fill="rgba(13,13,18,0.85)" filter="url(#frost)"/>
+    <line x1="0" y1="100" x2="375" y2="100" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
+
+    <!-- Pin + chevron -->
+    <g transform="translate(16, 39)">
+      <g fill="none" stroke="rgba(232,228,220,0.35)" stroke-width="0.8" stroke-linecap="round">
+        <path d="M4,0 C2,0 0,1.8 0,4 C0,7 4,10.5 4,10.5 C4,10.5 8,7 8,4 C8,1.8 6,0 4,0Z"/>
+        <circle cx="4" cy="4" r="1.5"/>
+      </g>
+      <g transform="translate(13, 4)" fill="none" stroke="rgba(232,228,220,0.25)" stroke-width="0.8" stroke-linecap="round">
+        <path d="M-2,-1.5 L0,0.5 L2,-1.5"/>
+      </g>
+    </g>
+    <!-- City: "LA" — very short, ends ~42px -->
+    <text x="16" y="62" font-family="Inter, SF Pro, system-ui, sans-serif" font-size="15" font-weight="300" fill="rgba(232,228,220,0.65)">LA</text>
+
+    <!-- Countdown -->
+    <text x="359" y="42" text-anchor="end" font-family="SF Pro, system-ui, sans-serif" font-size="9" font-weight="300" letter-spacing="0.08em" fill="rgba(232,228,220,0.3)">UNTIL FAJR</text>
+    <text x="359" y="62" text-anchor="end" font-family="SF Mono, monospace" font-size="15" font-weight="300" fill="rgba(232,228,220,0.65)">6:29:28</text>
+
+    <!-- Hijri — gap center ~168, wide gap so scale UP to 12pt -->
+    <text x="168" y="62" text-anchor="middle" font-family="SF Pro, system-ui, sans-serif" font-size="12" font-weight="300" fill="rgba(232,228,220,0.3)" letter-spacing="0.02em">11 Ramaḍān · رَمَضَان</text>
+
+    <!-- Prayer times -->
+    <text x="188" y="90" text-anchor="middle" font-family="SF Pro, system-ui, sans-serif" font-size="9" font-weight="300" fill="rgba(232,228,220,0.25)">Fajr 05:15 · Sunrise 06:24 · Dhuhr 12:07 · Asr 15:21 · Maghrib 17:49 · Isha 18:57</text>
+  </g>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- EXAMPLE 2: Medium city — "Los Angeles" -->
+  <!-- City ends ~120px. Gap = 175px. Hijri at ~10pt -->
+  <!-- ═══════════════════════════════════════ -->
+  <g transform="translate(0, 140)">
+    <text x="188" y="20" text-anchor="middle" font-family="SF Mono, monospace" font-size="9" fill="rgba(255,200,100,0.5)" letter-spacing="0.1em">MEDIUM CITY — BALANCED</text>
+
+    <rect x="0" y="28" width="375" height="72" fill="rgba(13,13,18,0.85)" filter="url(#frost)"/>
+    <line x1="0" y1="100" x2="375" y2="100" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
+
+    <g transform="translate(16, 39)">
+      <g fill="none" stroke="rgba(232,228,220,0.35)" stroke-width="0.8" stroke-linecap="round">
+        <path d="M4,0 C2,0 0,1.8 0,4 C0,7 4,10.5 4,10.5 C4,10.5 8,7 8,4 C8,1.8 6,0 4,0Z"/>
+        <circle cx="4" cy="4" r="1.5"/>
+      </g>
+      <g transform="translate(13, 4)" fill="none" stroke="rgba(232,228,220,0.25)" stroke-width="0.8" stroke-linecap="round">
+        <path d="M-2,-1.5 L0,0.5 L2,-1.5"/>
+      </g>
+    </g>
+    <text x="16" y="62" font-family="Inter, SF Pro, system-ui, sans-serif" font-size="15" font-weight="300" fill="rgba(232,228,220,0.65)">Los Angeles</text>
+
+    <text x="359" y="42" text-anchor="end" font-family="SF Pro, system-ui, sans-serif" font-size="9" font-weight="300" letter-spacing="0.08em" fill="rgba(232,228,220,0.3)">UNTIL FAJR</text>
+    <text x="359" y="62" text-anchor="end" font-family="SF Mono, monospace" font-size="15" font-weight="300" fill="rgba(232,228,220,0.65)">6:29:28</text>
+
+    <!-- Hijri — gap center ~208, medium gap → 10pt -->
+    <text x="208" y="62" text-anchor="middle" font-family="SF Pro, system-ui, sans-serif" font-size="10" font-weight="300" fill="rgba(232,228,220,0.28)" letter-spacing="0.02em">11 Ramaḍān · رَمَضَان</text>
+
+    <text x="188" y="90" text-anchor="middle" font-family="SF Pro, system-ui, sans-serif" font-size="9" font-weight="300" fill="rgba(232,228,220,0.25)">Fajr 05:15 · Sunrise 06:24 · Dhuhr 12:07 · Asr 15:21 · Maghrib 17:49 · Isha 18:57</text>
+  </g>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- EXAMPLE 3: Long city — "Kuala Lumpur" -->
+  <!-- City ends ~155px. Gap = 140px. Hijri scales DOWN to 8pt -->
+  <!-- ═══════════════════════════════════════ -->
+  <g transform="translate(0, 280)">
+    <text x="188" y="20" text-anchor="middle" font-family="SF Mono, monospace" font-size="9" fill="rgba(255,200,100,0.5)" letter-spacing="0.1em">LONG CITY — HIJRI SCALES DOWN</text>
+
+    <rect x="0" y="28" width="375" height="72" fill="rgba(13,13,18,0.85)" filter="url(#frost)"/>
+    <line x1="0" y1="100" x2="375" y2="100" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
+
+    <g transform="translate(16, 39)">
+      <g fill="none" stroke="rgba(232,228,220,0.35)" stroke-width="0.8" stroke-linecap="round">
+        <path d="M4,0 C2,0 0,1.8 0,4 C0,7 4,10.5 4,10.5 C4,10.5 8,7 8,4 C8,1.8 6,0 4,0Z"/>
+        <circle cx="4" cy="4" r="1.5"/>
+      </g>
+      <g transform="translate(13, 4)" fill="none" stroke="rgba(232,228,220,0.25)" stroke-width="0.8" stroke-linecap="round">
+        <path d="M-2,-1.5 L0,0.5 L2,-1.5"/>
+      </g>
+    </g>
+    <text x="16" y="62" font-family="Inter, SF Pro, system-ui, sans-serif" font-size="15" font-weight="300" fill="rgba(232,228,220,0.65)">Kuala Lumpur</text>
+
+    <text x="359" y="42" text-anchor="end" font-family="SF Pro, system-ui, sans-serif" font-size="9" font-weight="300" letter-spacing="0.08em" fill="rgba(232,228,220,0.3)">UNTIL MAGHRIB</text>
+    <text x="359" y="62" text-anchor="end" font-family="SF Mono, monospace" font-size="15" font-weight="300" fill="rgba(232,228,220,0.65)">2:14:05</text>
+
+    <!-- Hijri — gap center ~222, tight gap → 8pt -->
+    <text x="222" y="61" text-anchor="middle" font-family="SF Pro, system-ui, sans-serif" font-size="8" font-weight="300" fill="rgba(232,228,220,0.22)" letter-spacing="0.01em">11 Ramaḍān · رَمَضَان</text>
+
+    <text x="188" y="90" text-anchor="middle" font-family="SF Pro, system-ui, sans-serif" font-size="9" font-weight="300" fill="rgba(232,228,220,0.25)">Fajr 05:41 · Sunrise 07:02 · Dhuhr 13:17 · Asr 16:38 · Maghrib 19:21 · Isha 20:33</text>
+  </g>
+</svg>

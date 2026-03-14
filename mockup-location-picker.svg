@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 375 812" role="img" aria-labelledby="title desc">
+  <title id="title">Location Picker — Expanded State</title>
+  <desc id="desc">Full-screen location picker with search and roller, overlaid on the cube scene</desc>
+
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0d0d12"/>
+      <stop offset="60%" stop-color="#111118"/>
+      <stop offset="100%" stop-color="#0a0a10"/>
+    </linearGradient>
+    <filter id="frost">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10"/>
+      <feColorMatrix type="matrix" values="1 0 0 0 0.03  0 1 0 0 0.03  0 0 1 0 0.05  0 0 0 0.88 0"/>
+    </filter>
+  </defs>
+
+  <!-- BACKGROUND (dimmed cube behind) -->
+  <rect width="375" height="812" fill="url(#bgGrad)"/>
+  <!-- Dim cube hint -->
+  <g opacity="0.15" transform="translate(188, 340)">
+    <path d="M0,-55 L65,-25 L0,5 L-65,-25 Z" fill="rgba(140,150,180,0.12)" stroke="rgba(180,190,220,0.2)" stroke-width="0.5"/>
+    <path d="M-65,-25 L0,5 L0,75 L-65,45 Z" fill="rgba(100,110,150,0.1)" stroke="rgba(180,190,220,0.15)" stroke-width="0.5"/>
+    <path d="M65,-25 L0,5 L0,75 L65,45 Z" fill="rgba(120,130,170,0.1)" stroke="rgba(180,190,220,0.15)" stroke-width="0.5"/>
+  </g>
+
+  <!-- STATUS BAR -->
+  <g font-family="SF Pro, system-ui, sans-serif" font-size="12" fill="rgba(232,228,220,0.7)">
+    <text x="30" y="18" font-weight="600" font-size="14">5:15</text>
+    <g transform="translate(310, 8)">
+      <rect x="0" y="2" width="4" height="6" rx="1" fill="rgba(232,228,220,0.5)"/>
+      <rect x="6" y="1" width="4" height="7" rx="1" fill="rgba(232,228,220,0.5)"/>
+      <rect x="12" y="0" width="4" height="8" rx="1" fill="rgba(232,228,220,0.6)"/>
+      <rect x="18" y="0" width="4" height="8" rx="1" fill="rgba(232,228,220,0.7)"/>
+      <rect x="30" y="1" width="20" height="8" rx="2" fill="none" stroke="rgba(232,228,220,0.5)" stroke-width="1"/>
+      <rect x="31" y="2.5" width="14" height="5" rx="1" fill="rgba(232,228,220,0.5)"/>
+    </g>
+  </g>
+
+  <!-- ═══ LOCATION PICKER OVERLAY ═══ -->
+  <g id="location-picker">
+
+    <!-- Frosted full-screen overlay -->
+    <rect x="0" y="28" width="375" height="784" rx="0" fill="rgba(13,13,18,0.92)" filter="url(#frost)"/>
+
+    <!-- HANDLE BAR (drag to dismiss) -->
+    <rect x="162" y="36" width="52" height="4" rx="2" fill="rgba(232,228,220,0.15)"/>
+
+    <!-- HEADER: "Location" title + Done button -->
+    <text x="188" y="68" text-anchor="middle" font-family="SF Pro, system-ui, sans-serif" font-size="16" font-weight="500" fill="rgba(232,228,220,0.85)" letter-spacing="0.01em">Location</text>
+    <text x="345" y="68" text-anchor="end" font-family="SF Pro, system-ui, sans-serif" font-size="14" font-weight="400" fill="rgba(120,160,255,0.8)">Done</text>
+
+    <!-- SEARCH BAR -->
+    <g transform="translate(16, 84)">
+      <rect x="0" y="0" width="343" height="38" rx="10" fill="rgba(118,118,128,0.12)"/>
+      <!-- Search icon -->
+      <g transform="translate(14, 12)" fill="none" stroke="rgba(232,228,220,0.35)" stroke-width="1.2" stroke-linecap="round">
+        <circle cx="0" cy="0" r="6"/>
+        <line x1="4.5" y1="4.5" x2="8" y2="8"/>
+      </g>
+      <text x="30" y="24" font-family="SF Pro, system-ui, sans-serif" font-size="14" fill="rgba(232,228,220,0.3)">Search city or country…</text>
+    </g>
+
+    <!-- USE CURRENT LOCATION button -->
+    <g transform="translate(16, 138)" cursor="pointer">
+      <rect x="0" y="0" width="343" height="44" rx="10" fill="rgba(120,160,255,0.08)" stroke="rgba(120,160,255,0.15)" stroke-width="0.5"/>
+      <!-- Location arrow icon -->
+      <g transform="translate(20, 22)" fill="none" stroke="rgba(120,160,255,0.7)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="0,-7 5,7 0,4 -5,7"/>
+      </g>
+      <text x="38" y="27" font-family="SF Pro, system-ui, sans-serif" font-size="13" font-weight="400" fill="rgba(120,160,255,0.8)">Use Current Location</text>
+      <text x="327" y="27" text-anchor="end" font-family="SF Pro, system-ui, sans-serif" font-size="11" fill="rgba(232,228,220,0.3)">GPS</text>
+    </g>
+
+    <!-- DIVIDER -->
+    <line x1="16" y1="198" x2="359" y2="198" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
+
+    <!-- RECENT / POPULAR label -->
+    <text x="16" y="220" font-family="SF Pro, system-ui, sans-serif" font-size="11" font-weight="500" letter-spacing="0.06em" fill="rgba(232,228,220,0.3)">POPULAR CITIES</text>
+
+    <!-- CITY LIST (roller-style, center item highlighted) -->
+    <g id="city-roller" font-family="SF Pro, system-ui, sans-serif">
+
+      <!-- Cities fade in from edges, center is brightest -->
+      <text x="188" y="260" text-anchor="middle" font-size="15" fill="rgba(232,228,220,0.2)">Dubai, UAE</text>
+      <text x="188" y="296" text-anchor="middle" font-size="15" fill="rgba(232,228,220,0.3)">Istanbul, Turkey</text>
+      <text x="188" y="332" text-anchor="middle" font-size="15" fill="rgba(232,228,220,0.45)">London, UK</text>
+
+      <!-- SELECTED ROW — highlighted -->
+      <g>
+        <!-- Selection indicator lines (like iOS picker) -->
+        <line x1="32" y1="348" x2="343" y2="348" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
+        <line x1="32" y1="386" x2="343" y2="386" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
+        <text x="188" y="373" text-anchor="middle" font-size="18" font-weight="500" fill="rgba(232,228,220,0.9)">Los Angeles, USA</text>
+      </g>
+
+      <text x="188" y="414" text-anchor="middle" font-size="15" fill="rgba(232,228,220,0.45)">Makkah, Saudi Arabia</text>
+      <text x="188" y="450" text-anchor="middle" font-size="15" fill="rgba(232,228,220,0.3)">Madinah, Saudi Arabia</text>
+      <text x="188" y="486" text-anchor="middle" font-size="15" fill="rgba(232,228,220,0.2)">Cairo, Egypt</text>
+      <text x="188" y="522" text-anchor="middle" font-size="15" fill="rgba(232,228,220,0.12)">Jakarta, Indonesia</text>
+      <text x="188" y="558" text-anchor="middle" font-size="15" fill="rgba(232,228,220,0.07)">Kuala Lumpur, Malaysia</text>
+    </g>
+
+    <!-- PRAYER TIMES PREVIEW (for selected city) -->
+    <g transform="translate(0, 600)">
+      <line x1="16" y1="0" x2="359" y2="0" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
+      <text x="188" y="28" text-anchor="middle" font-family="SF Pro, system-ui, sans-serif" font-size="10" font-weight="300" letter-spacing="0.05em" fill="rgba(232,228,220,0.3)">PRAYER TIMES FOR LOS ANGELES</text>
+
+      <!-- Prayer time chips -->
+      <g font-family="SF Pro, system-ui, sans-serif" font-size="11" fill="rgba(232,228,220,0.5)">
+        <g transform="translate(28, 56)">
+          <text x="0" y="0" font-weight="400" fill="rgba(232,228,220,0.6)">Fajr</text>
+          <text x="0" y="16" font-size="16" font-weight="300" fill="rgba(232,228,220,0.4)">05:15</text>
+        </g>
+        <g transform="translate(95, 56)">
+          <text x="0" y="0" font-weight="400" fill="rgba(232,228,220,0.6)">Dhuhr</text>
+          <text x="0" y="16" font-size="16" font-weight="300" fill="rgba(232,228,220,0.4)">12:07</text>
+        </g>
+        <g transform="translate(168, 56)">
+          <text x="0" y="0" font-weight="400" fill="rgba(232,228,220,0.6)">Asr</text>
+          <text x="0" y="16" font-size="16" font-weight="300" fill="rgba(232,228,220,0.4)">15:21</text>
+        </g>
+        <g transform="translate(232, 56)">
+          <text x="0" y="0" font-weight="400" fill="rgba(232,228,220,0.6)">Maghrib</text>
+          <text x="0" y="16" font-size="16" font-weight="300" fill="rgba(232,228,220,0.4)">17:49</text>
+        </g>
+        <g transform="translate(314, 56)">
+          <text x="0" y="0" font-weight="400" fill="rgba(232,228,220,0.6)">Isha</text>
+          <text x="0" y="16" font-size="16" font-weight="300" fill="rgba(232,228,220,0.4)">18:57</text>
+        </g>
+      </g>
+    </g>
+  </g>
+
+  <!-- HOME INDICATOR -->
+  <rect x="128" y="795" width="120" height="4" rx="2" fill="rgba(232,228,220,0.15)"/>
+</svg>

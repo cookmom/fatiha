@@ -1,0 +1,25 @@
+{
+  "camera_position": [
+    0.20000000298023224,
+    9.699999809265137,
+    15.0
+  ],
+  "camera_look_target": [
+    0.0,
+    -0.800000011920929,
+    1.0
+  ],
+  "cube_center": [
+    0.0,
+    0.6000000238418579,
+    1.0
+  ],
+  "cube_yaw_degrees": 45.00000125223908,
+  "checks": {
+    "camera_position_lock": true,
+    "camera_look_target_lock": true,
+    "cube_y_lock": true,
+    "cube_yaw_lock": true
+  },
+  "pass": true
+}

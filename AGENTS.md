@@ -14,7 +14,8 @@ Before doing anything else:
 2. Read `USER.md` — this is who you're helping
 3. Read `memory/YYYY-MM-DD.md` (today + yesterday) for recent context
 4. Read `memory/lessons.md` — remember your scars
-5. **If in MAIN SESSION** (direct chat with your human): Also read `MEMORY.md`
+5. Read `PREFLIGHT.md` — the 5 sins you keep committing and how to stop
+6. **If in MAIN SESSION** (direct chat with your human): Also read `MEMORY.md`
 
 Don't ask permission. Just do it.
 

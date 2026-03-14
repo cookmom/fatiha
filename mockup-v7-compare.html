@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html><head><style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0d0d12; font-family: -apple-system, 'SF Pro', 'Inter', system-ui, sans-serif; width:375px; }
+  .example { padding:16px 0 8px; border-bottom:1px solid rgba(255,255,255,0.04); }
+  .label { text-align:center; font-size:9px; letter-spacing:0.1em; color:rgba(255,200,100,0.5); font-family:monospace; margin-bottom:8px; }
+  .header { display:flex; align-items:baseline; padding:0 16px; gap:0; }
+  .city { font-size:15px; font-weight:300; color:rgba(232,228,220,0.65); white-space:nowrap; flex-shrink:0; }
+  .hijri { flex:1; text-align:center; font-weight:300; color:rgba(232,228,220,0.28); white-space:nowrap; overflow:hidden; }
+  .right { text-align:right; flex-shrink:0; }
+  .right .until { font-size:9px; font-weight:300; letter-spacing:0.08em; color:rgba(232,228,220,0.3); }
+  .right .time { font-size:15px; font-weight:300; color:rgba(232,228,220,0.65); font-family:'SF Mono',monospace; }
+  .prayers { text-align:center; font-size:9px; font-weight:300; color:rgba(232,228,220,0.25); padding:6px 16px 0; letter-spacing:0.02em; }
+  .pin { display:inline-block; width:12px; height:12px; margin-right:4px; vertical-align:-1px; }
+  .pin svg { width:12px; height:12px; }
+</style></head>
+<body>
+
+<!-- SHORT CITY -->
+<div class="example">
+  <div class="label">SHORT CITY — HIJRI SCALES UP</div>
+  <div class="header">
+    <div class="city"><span class="pin"><svg viewBox="0 0 10 13" fill="none" stroke="rgba(232,228,220,0.35)" stroke-width="0.9"><path d="M5,0.5 C2.5,0.5 0.5,2.5 0.5,4.5 C0.5,7.5 5,12 5,12 C5,12 9.5,7.5 9.5,4.5 C9.5,2.5 7.5,0.5 5,0.5Z"/><circle cx="5" cy="4.5" r="1.8"/></svg></span>LA</div>
+    <div class="hijri" id="h1">11 Ramaḍān · رَمَضَان</div>
+    <div class="right"><div class="until">UNTIL FAJR</div><div class="time">6:29:28</div></div>
+  </div>
+  <div class="prayers">Fajr 05:15 · Sunrise 06:24 · Dhuhr 12:07 · Asr 15:21 · Maghrib 17:49 · Isha 18:57</div>
+</div>
+
+<!-- MEDIUM CITY -->
+<div class="example">
+  <div class="label">MEDIUM CITY — BALANCED</div>
+  <div class="header">
+    <div class="city"><span class="pin"><svg viewBox="0 0 10 13" fill="none" stroke="rgba(232,228,220,0.35)" stroke-width="0.9"><path d="M5,0.5 C2.5,0.5 0.5,2.5 0.5,4.5 C0.5,7.5 5,12 5,12 C5,12 9.5,7.5 9.5,4.5 C9.5,2.5 7.5,0.5 5,0.5Z"/><circle cx="5" cy="4.5" r="1.8"/></svg></span>Los Angeles</div>
+    <div class="hijri" id="h2">11 Ramaḍān · رَمَضَان</div>
+    <div class="right"><div class="until">UNTIL FAJR</div><div class="time">6:29:28</div></div>
+  </div>
+  <div class="prayers">Fajr 05:15 · Sunrise 06:24 · Dhuhr 12:07 · Asr 15:21 · Maghrib 17:49 · Isha 18:57</div>
+</div>
+
+<!-- LONG CITY -->
+<div class="example">
+  <div class="label">LONG CITY — HIJRI SCALES DOWN</div>
+  <div class="header">
+    <div class="city"><span class="pin"><svg viewBox="0 0 10 13" fill="none" stroke="rgba(232,228,220,0.35)" stroke-width="0.9"><path d="M5,0.5 C2.5,0.5 0.5,2.5 0.5,4.5 C0.5,7.5 5,12 5,12 C5,12 9.5,7.5 9.5,4.5 C9.5,2.5 7.5,0.5 5,0.5Z"/><circle cx="5" cy="4.5" r="1.8"/></svg></span>Kuala Lumpur</div>
+    <div class="hijri" id="h3">11 Ramaḍān · رَمَضَان</div>
+    <div class="right"><div class="until">UNTIL MAGHRIB</div><div class="time">2:14:05</div></div>
+  </div>
+  <div class="prayers">Fajr 05:41 · Sunrise 07:02 · Dhuhr 13:17 · Asr 16:38 · Maghrib 19:21 · Isha 20:33</div>
+</div>
+
+<script>
+// Dynamic font scaling: measure gap, scale hijri to fill proportionally
+document.querySelectorAll('.header').forEach(row => {
+  const city = row.querySelector('.city');
+  const hijri = row.querySelector('.hijri');
+  const right = row.querySelector('.right');
+  
+  const cityEnd = city.getBoundingClientRect().right;
+  const rightStart = right.getBoundingClientRect().left;
+  const gap = rightStart - cityEnd;
+  
+  // Scale: 8pt at gap=100px, 12pt at gap=260px. Clamp 7-13pt.
+  const fontSize = Math.min(13, Math.max(7, 8 + (gap - 100) * (4 / 160)));
+  hijri.style.fontSize = fontSize.toFixed(1) + 'px';
+  
+  // Also scale opacity: wider gap = slightly more visible
+  const opacity = Math.min(0.35, Math.max(0.18, 0.18 + (gap - 100) * (0.17 / 160)));
+  hijri.style.color = 'rgba(232,228,220,' + opacity.toFixed(2) + ')';
+});
+</script>
+</body></html>

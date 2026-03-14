@@ -46,7 +46,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .dl-row .dl-days{margin-left:auto;color:var(--text-muted);font-size:11px;}
 
 /* App Layout */
-.app{display:flex;height:calc(100vh - var(--deadline-h));overflow:hidden;}
+.app{display:flex;height:calc(100vh - var(--deadline-h));overflow:hidden;padding-bottom:36px;}
 
 /* Code Canvas (Column 2) */
 .code-canvas{flex:1;min-width:0;background:var(--bg-sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
@@ -77,6 +77,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .spotlight-content .insp-nav .back-btn{margin-left:auto;background:transparent;border:none;color:var(--text-muted);font-size:11px;cursor:pointer;}
 .spotlight-content .insp-nav .back-btn:hover{color:var(--text);}
 
+/* AI Analysis */
+.analysis-section{margin-top:18px;padding-top:16px;border-top:1px solid var(--border);}
+.analyze-btn{background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--cyan);padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--tr);}
+.analyze-btn:hover{background:var(--bg-card-hover);border-color:var(--cyan);}
+.analyze-btn:disabled{opacity:.5;cursor:not-allowed;}
+.analysis-progress{display:none;margin-top:8px;}
+.analysis-progress-label{font-size:11px;color:var(--text-muted);margin-bottom:4px;}
+.analysis-progress-track{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.analysis-progress-bar{height:100%;background:var(--cyan);width:0%;transition:width .3s;}
+#analysisOutput{display:none;margin-top:12px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;line-height:1.7;color:var(--text-sec);white-space:pre-wrap;}
+#analysisOutput .ai-label{font-weight:700;color:var(--cyan);}
+#analysisTps{display:none;margin-top:4px;font-size:10px;color:var(--text-muted);}
+.webgpu-warn{font-size:11px;color:var(--text-muted);margin-top:6px;opacity:.7;}
+
 /* Chat Panel */
 .chat-panel{width:var(--chat-w);min-width:var(--chat-w);background:var(--bg-sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;}
 .chat-header{height:40px;padding:0 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;}
@@ -92,6 +106,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .chat-input-area input{flex:1;background:#1a1a1f;border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:12px;outline:none;}
 .chat-input-area input:focus{border-color:var(--indigo);}
 .chat-input-area button{background:var(--indigo);border:none;border-radius:6px;color:#fff;padding:0 12px;font-size:12px;cursor:pointer;}
+
+/* AI Chat Pop-out */
+.ai-chat-popout{position:fixed;background:var(--bg-sidebar);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 32px rgba(0,0,0,.7);z-index:300;min-width:300px;min-height:200px;resize:both;overflow:hidden;display:flex;flex-direction:column;}
+.ai-chat-popout-header{display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);cursor:move;user-select:none;flex-shrink:0;gap:8px;background:var(--bg-card);}
+.ai-chat-popout-title{flex:1;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ai-chat-popout-close{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0 4px;line-height:1;transition:color var(--tr);}
+.ai-chat-popout-close:hover{color:var(--text);}
+.ai-chat-popout-body{flex:1;overflow-y:auto;padding:10px;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.ai-chat-popout-input{display:flex;gap:6px;padding:10px;border-top:1px solid var(--border);flex-shrink:0;}
+.ai-chat-popout-input input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--text);outline:none;}
+.ai-chat-popout-input input:focus{border-color:var(--cyan);}
+.ai-chat-popout-input button{background:var(--cyan);border:none;border-radius:6px;color:#000;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;}
 
 /* Stage title shared */
 .stage-title{font-size:14px;font-weight:600;}
@@ -170,6 +196,29 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .cat-physics{background:rgba(6,182,212,.15);color:var(--cyan);}
 .cat-data{background:rgba(107,114,128,.15);color:var(--gray);}
 
+/* Team Drawer */
+.team-drawer{position:fixed;bottom:0;left:0;right:0;z-index:200;background:var(--bg-sidebar);border-top:1px solid var(--border);max-height:36px;overflow:hidden;}
+.team-drawer.open{max-height:none;height:376px;}
+.team-drawer-resize{position:absolute;top:0;left:0;right:0;height:5px;cursor:ns-resize;z-index:10;background:transparent;}
+.team-drawer-resize:hover{background:var(--indigo);opacity:0.4;}
+.team-drawer-handle{height:36px;display:flex;align-items:center;padding:0 14px;cursor:pointer;user-select:none;gap:8px;}
+.team-drawer-handle .td-label{font-size:11px;font-weight:600;color:var(--text-sec);}
+.team-drawer-handle .td-dots{display:flex;gap:5px;margin-left:8px;}
+.team-drawer-handle .td-dot{width:6px;height:6px;border-radius:50%;background:var(--text-muted);transition:background .5s;}
+.team-drawer-handle .td-chevron{margin-left:auto;font-size:9px;color:var(--text-muted);transition:transform var(--tr);}
+.team-drawer.open .td-chevron{transform:rotate(180deg);}
+.team-drawer.full{max-height:100vh !important;height:100vh !important;top:0 !important;bottom:0 !important;left:0;right:0;z-index:300;}
+.team-drawer.full .team-drawer-content{height:calc(100vh - 68px);}
+.td-expand{margin-left:auto;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;padding:2px 6px;line-height:1;transition:color var(--tr);}
+.td-expand:hover{color:var(--gold);}
+.team-drawer-tabs{display:flex;height:32px;border-bottom:1px solid var(--border);align-items:center;padding:0 8px;gap:2px;}
+.team-drawer-tab{padding:4px 14px;font-size:10px;font-weight:600;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;transition:var(--tr);text-transform:uppercase;letter-spacing:.04em;}
+.team-drawer-tab:hover{color:var(--text);}
+.team-drawer-tab.active{color:var(--gold);border-bottom-color:var(--gold);}
+.team-drawer-content{height:308px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.team-drawer-pane{display:none;height:100%;overflow-y:auto;}
+.team-drawer-pane.active{display:block;}
+
 /* Mobile chat FAB + sheet */
 .chat-fab{display:none;position:fixed;bottom:16px;left:16px;z-index:200;width:48px;height:48px;border-radius:50%;background:var(--indigo);border:none;color:#fff;font-size:20px;cursor:pointer;box-shadow:0 4px 16px rgba(99,102,241,.4);}
 .chat-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.5);}
@@ -220,18 +269,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .pantry-date-nav button:hover{color:var(--text);border-color:var(--text-muted);}
 .pantry-date-nav .pantry-date-label{font-size:10px;font-weight:600;color:var(--gold);min-width:60px;text-align:center;cursor:pointer;}
 .pantry-date-nav .pantry-date-label:hover{text-decoration:underline;}
-/* NEW badge */
-.new-badge{display:inline-block;padding:1px 5px;border-radius:8px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:var(--gold);color:#000;margin-left:6px;animation:newGlow 2s ease-in-out infinite alternate;}
-@keyframes newGlow{0%{box-shadow:0 0 4px rgba(234,179,8,.3);}100%{box-shadow:0 0 10px rgba(234,179,8,.6);}}
-/* Date badge on entries */
-.date-badge{display:inline-block;padding:1px 5px;border-radius:8px;font-size:8px;font-weight:600;background:rgba(255,255,255,.06);color:var(--text-muted);margin-left:4px;}
-/* History tab date list */
-.history-date-list{padding:10px;}
-.history-date-item{padding:8px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:4px;cursor:pointer;transition:var(--tr);display:flex;align-items:center;justify-content:space-between;}
-.history-date-item:hover{border-color:var(--gold);transform:translateY(-1px);}
-.history-date-item .hd-date{font-size:12px;font-weight:600;color:var(--text);}
-.history-date-item .hd-count{font-size:10px;color:var(--text-muted);}
-.history-date-item.today{border-left:3px solid var(--gold);}
+/* Pantry filters */
+.pantry-filters{padding:8px 10px 6px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.pantry-search{width:100%;background:#1a1a1f;border:1px solid var(--border);border-radius:6px;padding:5px 9px;color:var(--text);font-size:11px;outline:none;margin-bottom:6px;box-sizing:border-box;}
+.pantry-search:focus{border-color:var(--indigo);}
+.pantry-cats{display:flex;gap:3px;flex-wrap:wrap;}
+.pcat-btn{padding:2px 7px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:9px;font-weight:600;cursor:pointer;transition:var(--tr);text-transform:uppercase;letter-spacing:.03em;}
+.pcat-btn:hover{color:var(--text);}
+.pcat-btn.active{color:#000 !important;border-color:transparent;}
+/* Pantry item cards */
+.pantry-item{padding:9px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:5px;transition:border-color var(--tr);}
+.pantry-item:hover{border-color:#2a2a32;cursor:pointer;}
+.pantry-item .pi-meta{display:flex;align-items:center;gap:5px;margin-bottom:4px;flex-wrap:wrap;}
+.pantry-item .pi-cat{display:inline-block;padding:1px 7px;border-radius:10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+.pantry-item .pi-title{font-size:12px;font-weight:600;line-height:1.3;margin-bottom:3px;}
+.pantry-item .pi-title a{color:var(--text);text-decoration:none;}
+.pantry-item .pi-title a:hover{color:var(--cyan);text-decoration:underline;}
+.pantry-item .pi-summary{font-size:10px;color:var(--text-muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.pantry-deadline{display:inline-block;padding:1px 5px;border-radius:4px;font-size:8px;font-weight:700;text-transform:uppercase;background:var(--red);color:#fff;letter-spacing:.04em;}
+.pi-star{margin-left:auto;cursor:pointer;font-size:14px;color:var(--text-muted);opacity:.4;transition:all .2s;user-select:none;}
+.pi-star:hover{opacity:.8;color:#eab308;}
+.pi-star.active{opacity:1;color:#eab308;}
 
 ::-webkit-scrollbar{width:5px;}
 ::-webkit-scrollbar-track{background:transparent;}
@@ -324,19 +382,56 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
         <button id="pantryNext" title="Next day">▶</button>
       </div>
     </div>
-    <div class="ref-tabs">
-      <div class="ref-tab active" data-ref="inspo">Inspo</div>
-      <div class="ref-tab" data-ref="tech">Algos</div>
-      <div class="ref-tab" data-ref="concepts">Concepts</div>
-      <div class="ref-tab" data-ref="history">History</div>
+    <div class="pantry-filters">
+      <input type="text" class="pantry-search" id="pantrySearch" placeholder="Search…" autocomplete="off">
+      <div class="pantry-cats">
+        <button class="pcat-btn active" data-cat="all">All</button>
+        <button class="pcat-btn" data-cat="vp" style="--pc:#4a9eff">vp</button>
+        <button class="pcat-btn" data-cat="ai" style="--pc:#ff6b6b">ai</button>
+        <button class="pcat-btn" data-cat="tools" style="--pc:#50c878">tools</button>
+        <button class="pcat-btn" data-cat="synths-eurorack" style="--pc:#c084fc">synths</button>
+        <button class="pcat-btn" data-cat="art" style="--pc:#f59e0b">art</button>
+        <button class="pcat-btn" data-cat="creative-coding" style="--pc:#06b6d4">cc</button>
+        <button class="pcat-btn" data-cat="research" style="--pc:#8b5cf6">research</button>
+        <button class="pcat-btn" data-cat="opportunities" style="--pc:#ef4444">opps</button>
+        <button class="pcat-btn" data-cat="discovery" style="--pc:#10b981">disc</button>
+        <button class="pcat-btn" data-cat="concepts" style="--pc:#f472b6">concepts</button>
+        <button class="pcat-btn" data-cat="favorites" style="--pc:#eab308">★ favs</button>
+        <button class="pcat-btn" data-cat="fatiha" style="--pc:#d4a574">🖋 fatiha</button>
+      </div>
     </div>
     <div class="ref-content">
-      <div class="ref-pane active" data-refpane="inspo" id="inspoPane"></div>
-      <div class="ref-pane" data-refpane="tech" id="techPane"></div>
-      <div class="ref-pane" data-refpane="concepts" id="conceptsPane"></div>
-      <div class="ref-pane" data-refpane="history" id="historyPane"></div>
+      <div id="pantryItems" style="padding:8px;"></div>
     </div>
   </aside>
+</div>
+
+<!-- Team Drawer -->
+<div class="team-drawer" id="teamDrawer">
+  <div class="team-drawer-resize" id="teamDrawerResize"></div>
+  <div class="team-drawer-handle" id="teamDrawerHandle">
+    <span class="td-label">🧑‍🍳 Team</span>
+    <span class="td-dots">
+      <span class="td-dot" id="tdBobDot"></span>
+      <span class="td-dot" id="tdBrettDot"></span>
+      <span class="td-dot" id="tdDevonDot"></span>
+      <span class="td-dot" id="tdChefDot"></span>
+    </span>
+    <span class="td-chevron">▲</span>
+  </div>
+  <div class="team-drawer-tabs">
+    <div class="team-drawer-tab active" data-agent="bob">🔨 Bob</div>
+    <div class="team-drawer-tab" data-agent="brett">⚙️ Brett</div>
+    <div class="team-drawer-tab" data-agent="devon">💻 Devon</div>
+    <div class="team-drawer-tab" data-agent="chef">🍳 Chef</div>
+    <button class="td-expand" id="tdExpand" title="Fullscreen">⤢</button>
+  </div>
+  <div class="team-drawer-content">
+    <div class="team-drawer-pane active" data-agentpane="bob" id="bobPane" style="padding:0;"></div>
+    <div class="team-drawer-pane" data-agentpane="brett" id="brettPane" style="padding:0;"></div>
+    <div class="team-drawer-pane" data-agentpane="devon" id="devonPane" style="padding:0;"></div>
+    <div class="team-drawer-pane" data-agentpane="chef" id="chefPane" style="padding:0;"></div>
+  </div>
 </div>
 
 <!-- Mobile: Chat FAB + Sheet -->
@@ -698,66 +793,35 @@ function draw() {
 function mousePressed() { noiseSeed(random(10000)); redraw(); }` },
 ];
 
-// ── Pantry Data Store ──
-const PANTRY_STORE_KEY='chef-pantry-data';
+// ── Pantry (Supabase) ──────────────────────────────────────────────────────
+const KITCHEN_API='http://localhost:4100';
+const PANTRY_CAT_COLORS={'vp':'#4a9eff','ai':'#ff6b6b','tools':'#50c878','synths-eurorack':'#c084fc','art':'#f59e0b','creative-coding':'#06b6d4','research':'#8b5cf6','opportunities':'#ef4444','discovery':'#10b981','concepts':'#f472b6','favorites':'#eab308'};
 const TODAY_STR=new Date().toISOString().slice(0,10);
-
-// Seed data: move hardcoded arrays into dated buckets
-const SEED_PANTRY={
-  '2026-02-13':{
-    inspo: INSPIRATIONS.map(i=>({...i})),
-    concepts: CONCEPTS.map(c=>({...c}))
-  }
-};
-
-function getPantryData(){
-  try{
-    const stored=JSON.parse(localStorage.getItem(PANTRY_STORE_KEY)||'null');
-    if(stored) return stored;
-  }catch(e){}
-  // Initialize from seed
-  localStorage.setItem(PANTRY_STORE_KEY,JSON.stringify(SEED_PANTRY));
-  return JSON.parse(JSON.stringify(SEED_PANTRY));
-}
-function savePantryData(data){localStorage.setItem(PANTRY_STORE_KEY,JSON.stringify(data));}
-
-// Get all dates that have entries, sorted descending
-function getPantryDates(){
-  const data=getPantryData();
-  return Object.keys(data).sort().reverse();
-}
-
-// Get items for a specific date and category
-function getPantryItems(date,category){
-  const data=getPantryData();
-  return (data[date]&&data[date][category])||[];
-}
-
-// Get ALL items for a category across all dates (for "all" view)
-function getAllPantryItems(category){
-  const data=getPantryData();
-  const items=[];
-  for(const date of Object.keys(data).sort().reverse()){
-    const dayItems=data[date]&&data[date][category];
-    if(dayItems) dayItems.forEach(item=>items.push({...item,_date:date}));
-  }
-  return items;
-}
-
-// Add items — callable via WS message system
-function addPantryItems(date,category,items){
-  const data=getPantryData();
-  if(!data[date]) data[date]={};
-  if(!data[date][category]) data[date][category]=[];
-  data[date][category].push(...items);
-  savePantryData(data);
-  // Re-render if currently viewing this date or "all"
-  if(pantryViewDate===date||pantryViewDate==='all') renderPantryView();
-}
-window.addPantryItems=addPantryItems;
-
-// Current pantry view state
+let pantryAllItems=[];
 let pantryViewDate=TODAY_STR;
+let pantryActiveCategories=new Set();
+let pantrySearchQuery='';
+
+async function fetchPantryFromSupabase(){
+  const el=document.getElementById('pantryItems');
+  if(el) el.innerHTML='<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center;">Loading…</div>';
+  try{
+    const res=await fetch(`${KITCHEN_API}/api/items?limit=500`);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    pantryAllItems=await res.json();
+    console.log('Pantry: loaded',pantryAllItems.length,'items');
+    const dates=getPantryDates();
+    if(dates.length&&!pantryAllItems.find(i=>i.date===pantryViewDate)) pantryViewDate=dates[0];
+    renderPantryView();
+  }catch(e){
+    console.error('Pantry fetch failed:',e);
+    if(el) el.innerHTML='<div style="padding:20px;color:var(--red);font-size:12px;text-align:center;">Failed to load pantry</div>';
+  }
+}
+
+function getPantryDates(){
+  return [...new Set(pantryAllItems.map(i=>i.date))].sort().reverse();
+}
 
 function formatPantryDate(dateStr){
   if(dateStr===TODAY_STR) return 'Today';
@@ -768,26 +832,559 @@ function formatPantryDate(dateStr){
 function pantryNavigate(direction){
   const dates=getPantryDates();
   if(!dates.length) return;
-  if(pantryViewDate==='all'){
-    pantryViewDate=dates[0]; // go to most recent
-  } else {
-    const idx=dates.indexOf(pantryViewDate);
-    if(direction==='prev'&&idx<dates.length-1) pantryViewDate=dates[idx+1];
-    else if(direction==='next'&&idx>0) pantryViewDate=dates[idx-1];
-    else if(direction==='next'&&idx===0) pantryViewDate=dates[0]; // stay at newest
-  }
+  const idx=dates.indexOf(pantryViewDate);
+  if(direction==='prev'&&idx<dates.length-1) pantryViewDate=dates[idx+1];
+  else if(direction==='next'&&idx>0) pantryViewDate=dates[idx-1];
   renderPantryView();
 }
 
 function renderPantryView(){
-  const dateLabel=$('#pantryDateLabel');
+  const dateLabel=document.getElementById('pantryDateLabel');
   if(dateLabel) dateLabel.textContent=formatPantryDate(pantryViewDate);
-  renderInspoPane();
-  renderConceptsPane();
-  renderHistoryPane();
+  let items=pantryAllItems.filter(i=>i.date===pantryViewDate);
+  if(pantryActiveCategories.size>0) items=items.filter(i=>{
+    if(pantryActiveCategories.has(i.category)) return true;
+    if(pantryActiveCategories.has('favorites')&&Array.isArray(i.tags)&&i.tags.includes('favorite')) return true;
+    return false;
+  });
+  if(pantrySearchQuery){
+    const q=pantrySearchQuery.toLowerCase();
+    items=items.filter(i=>(i.title||'').toLowerCase().includes(q)||(i.summary||'').toLowerCase().includes(q)||(i.category||'').toLowerCase().includes(q)||(Array.isArray(i.tags)?i.tags.some(t=>(t||'').toLowerCase().includes(q)):false));
+  }
+  const container=document.getElementById('pantryItems');
+  if(!container) return;
+  if(!items.length){
+    container.innerHTML='<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center;">No items for this date</div>';
+    return;
+  }
+  container.innerHTML=items.map(item=>{
+    const color=PANTRY_CAT_COLORS[item.category]||'#6b7280';
+    const bg=color+'22';
+    const catPill=`<span class="pi-cat" style="background:${bg};color:${color}">${esc(item.category||'')}</span>`;
+    const badge=item.priority==='high'?'<span class="pantry-deadline">DEADLINE</span>':'';
+    const titleEl=item.url?`<a href="${esc(item.url)}" target="_blank" rel="noopener">${esc(item.title||'Untitled')}</a>`:esc(item.title||'Untitled');
+    const isFav=Array.isArray(item.tags)&&item.tags.includes('favorite');
+    const starBtn=`<span class="pi-star${isFav?' active':''}" onclick="event.stopPropagation();toggleFavorite('${esc(item.id)}',this)" title="Favorite">★</span>`;
+    return `<div class="pantry-item" data-pantry-id="${esc(item.id||'')}" onclick="openPantrySpotlight(this)" data-item='${JSON.stringify(item).replace(/'/g,"&#39;")}'><div class="pi-meta">${catPill}${badge}${starBtn}</div><div class="pi-title">${titleEl}</div>${item.summary?`<div class="pi-summary">${esc(item.summary)}</div>`:''}</div>`;
+  }).join('');
 }
 
-function isToday(dateStr){return dateStr===TODAY_STR;}
+// ── Favorites toggle ──
+async function toggleFavorite(itemId, el){
+  const item=pantryAllItems.find(i=>i.id===itemId);
+  if(!item)return;
+  let tags=Array.isArray(item.tags)?[...item.tags]:[];
+  const idx=tags.indexOf('favorite');
+  if(idx>=0){tags.splice(idx,1);}else{tags.push('favorite');}
+  item.tags=tags;
+  // Update UI immediately
+  if(el){el.classList.toggle('active');}
+  // Also update spotlight star if open
+  const spotStar=document.getElementById('spotlightStar');
+  if(spotStar&&currentAnalysisItem&&currentAnalysisItem.id===itemId){
+    spotStar.classList.toggle('active',tags.includes('favorite'));
+  }
+  // Persist to API
+  try{
+    await fetch(KITCHEN_API+'/api/items/'+itemId,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({tags:tags})});
+  }catch(e){console.error('Failed to save favorite:',e);}
+}
+window.toggleFavorite=toggleFavorite;
+
+// Open pantry item in spotlight (Top panel)
+// ── AI Analysis (Qwen3.5-2B via WebGPU + Transformers.js) ───────────────────
+
+const HAS_WEBGPU = !!navigator.gpu;
+
+let aiWorker = null;
+let aiModelReady = false;
+let aiModelLoading = false;
+let currentAnalysisItem = null;
+
+const AI_WORKER_CODE = `
+import { AutoTokenizer, AutoModelForCausalLM, TextStreamer, InterruptableStoppingCriteria } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3';
+
+class TextGenerationPipeline {
+  static model_id = 'onnx-community/Qwen3-4B-ONNX';
+  static tokenizer = null;
+  static model = null;
+
+  static async getInstance(progress_callback = null) {
+    if (!this.tokenizer) {
+      this.tokenizer = AutoTokenizer.from_pretrained(this.model_id, { progress_callback });
+    }
+    if (!this.model) {
+      this.model = AutoModelForCausalLM.from_pretrained(this.model_id, {
+        dtype: 'q4f16',
+        device: 'webgpu',
+        progress_callback,
+      });
+    }
+    return Promise.all([this.tokenizer, this.model]);
+  }
+}
+
+const stopping_criteria = new InterruptableStoppingCriteria();
+let isGenerating = false;
+
+self.addEventListener('message', async (e) => {
+  const { type, data } = e.data;
+
+  if (type === 'check') {
+    self.postMessage({ status: 'ready', modelReady: TextGenerationPipeline.model !== null });
+    return;
+  }
+
+  if (type === 'interrupt') {
+    stopping_criteria.interrupt();
+    return;
+  }
+
+  if (type === 'load') {
+    try {
+      await TextGenerationPipeline.getInstance((progress) => {
+        if (progress.status === 'progress') {
+          self.postMessage({ status: 'loading', file: progress.file, progress: progress.progress });
+        } else if (progress.status === 'done') {
+          self.postMessage({ status: 'fileLoaded', file: progress.file });
+        } else if (progress.status === 'initiate') {
+          self.postMessage({ status: 'fileStart', file: progress.file });
+        }
+      });
+      self.postMessage({ status: 'modelReady' });
+    } catch(err) {
+      self.postMessage({ status: 'error', error: err.message });
+    }
+    return;
+  }
+
+  if (type === 'generate') {
+    isGenerating = true;
+    stopping_criteria.reset();
+    try {
+      const [tokenizer, model] = await TextGenerationPipeline.getInstance();
+      const { messages } = data;
+
+      const inputs = await tokenizer.apply_chat_template(messages, {
+        add_generation_prompt: true,
+        return_dict: true,
+        enable_thinking: false,
+      });
+
+      let outputText = '';
+      let startTime = null;
+      let numTokens = 0;
+      let tps = 0;
+
+      const streamer = new TextStreamer(tokenizer, {
+        skip_prompt: true,
+        skip_special_tokens: true,
+        callback_function: (text) => {
+          if (startTime === null) startTime = performance.now();
+          numTokens++;
+          outputText += text;
+          tps = numTokens / ((performance.now() - startTime) / 1000);
+          self.postMessage({ status: 'update', output: outputText, tps, numTokens });
+        },
+      });
+
+      await model.generate({
+        ...inputs,
+        max_new_tokens: 512,
+        do_sample: false,
+        streamer,
+        stopping_criteria,
+      });
+
+      self.postMessage({ status: 'complete', output: outputText, tps, numTokens });
+    } catch(err) {
+      self.postMessage({ status: 'error', error: err.message });
+    }
+    isGenerating = false;
+    return;
+  }
+});
+`;
+
+function initAIWorker() {
+  if (aiWorker) return;
+  const blob = new Blob([AI_WORKER_CODE], { type: 'text/javascript' });
+  aiWorker = new Worker(URL.createObjectURL(blob), { type: 'module' });
+  aiWorker.onmessage = handleWorkerMessage;
+}
+
+function handleWorkerMessage(e) {
+  const { status, output, tps, numTokens, file, progress, error } = e.data;
+  const btn = document.getElementById('analyzeBtn');
+  const progressWrap = document.getElementById('modelProgress');
+  const progressBar = document.getElementById('modelProgressBar');
+  const progressLabel = document.getElementById('modelProgressLabel');
+  const outputEl = document.getElementById('analysisOutput');
+  const tpsEl = document.getElementById('analysisTps');
+
+  if (status === 'loading') {
+    aiModelLoading = true;
+    if (progressWrap) progressWrap.style.display = 'block';
+    const pct = progress != null ? Math.min(Math.round(progress), 100) : 0;
+    if (progressBar) progressBar.style.width = pct + '%';
+    const shortFile = file ? file.split('/').pop() : '';
+    if (progressLabel) progressLabel.textContent = `Loading ${shortFile} (${pct}%)…`;
+  } else if (status === 'fileLoaded') {
+    if (progressBar) progressBar.style.width = '100%';
+  } else if (status === 'modelReady') {
+    aiModelReady = true;
+    aiModelLoading = false;
+    if (progressWrap) progressWrap.style.display = 'none';
+    if (btn) btn.disabled = false;
+    // Auto-kick off generation now that model is ready
+    if (currentAnalysisItem) doGenerate(currentAnalysisItem);
+  } else if (status === 'update') {
+    if (outputEl) {
+      outputEl.style.display = 'block';
+      outputEl.innerHTML = formatAnalysisOutput(output);
+    }
+    if (tpsEl) { tpsEl.style.display = 'block'; tpsEl.textContent = `${tps.toFixed(1)} tok/s`; }
+  } else if (status === 'complete') {
+    if (outputEl && output) {
+      outputEl.innerHTML = formatAnalysisOutput(output);
+    }
+    if (tpsEl) tpsEl.textContent = `Done · ${tps.toFixed(1)} tok/s · ${numTokens} tokens`;
+    if (btn) { btn.disabled = false; btn.textContent = '🔬 Re-analyze'; }
+    // Save analysis to chat context + show chat
+    if (output) aiChatMessages.push({ role: 'assistant', content: output });
+    const chatSec = document.getElementById('aiChatSection');
+    if (chatSec) chatSec.style.display = 'block';
+    const chatHistory = document.getElementById('aiChatHistory');
+    if (chatHistory) chatHistory.innerHTML = ''; // clear previous chat on new analysis
+  } else if (status === 'error') {
+    if (outputEl) { outputEl.style.display = 'block'; outputEl.textContent = '⚠ Error: ' + error; }
+    if (btn) { btn.disabled = false; btn.textContent = '🔬 Analyze'; }
+    if (progressWrap) progressWrap.style.display = 'none';
+    console.error('AI worker error:', error);
+  }
+}
+
+function formatAnalysisOutput(text) {
+  const labels = ['WHO','WHAT','WHERE','HOW','OPPORTUNITIES','IMPLEMENT','ALGO'];
+  let html = text;
+  labels.forEach(lbl => {
+    html = html.replace(new RegExp('(^|\\n)(' + lbl + ':)', 'g'),
+      (_, pre, match) => (pre || '') + '<span class="ai-label">' + match + '</span>');
+  });
+  return html;
+}
+
+// AI Chat — follow-up conversation with the model about the current item
+let aiChatMessages = []; // tracks full conversation for context
+const itemChatHistories = new Map(); // per-item chat history: id -> {messages, html}
+let currentSpotlightItemId = null; // id of item currently in spotlight
+let chatIsPopped = false; // whether chat is in pop-out mode
+
+async function sendAiChat() {
+  const input = chatIsPopped ? document.getElementById('aiChatInputPopped') : document.getElementById('aiChatInput');
+  const history = chatIsPopped ? document.getElementById('aiChatHistoryPopped') : document.getElementById('aiChatHistory');
+  if (!input || !input.value.trim()) return;
+
+  const msg = input.value.trim();
+  input.value = '';
+
+  // Add user message to history display
+  history.innerHTML += '<div style="margin-bottom:8px;"><span style="font-weight:600;color:var(--text);">You:</span> <span style="color:var(--text-sec);font-size:12px;">'+esc(msg)+'</span></div>';
+  history.innerHTML += '<div id="aiChatReply" style="margin-bottom:8px;"><span style="font-weight:600;color:var(--cyan);">AI:</span> <span id="aiChatReplyText" style="color:var(--text-sec);font-size:12px;">…</span></div>';
+  history.scrollTop = history.scrollHeight;
+
+  aiChatMessages.push({ role: 'user', content: msg });
+
+  // Stream from Ollama
+  let chatOutput = '';
+  try {
+    const res = await fetch('http://localhost:11434/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({model:'qwen3.5:35b-a3b', messages: aiChatMessages.slice(-20), stream: true, options:{num_predict:2048}, think: false})
+    });
+    if (!res.ok) throw new Error('Ollama HTTP '+res.status);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, {stream:true});
+      for (const line of chunk.split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          const j = JSON.parse(line);
+          if (j.message && j.message.content) {
+            chatOutput += j.message.content;
+            const replyText = document.getElementById('aiChatReplyText');
+            if (replyText) replyText.innerHTML = formatAnalysisOutput(chatOutput);
+            history.scrollTop = history.scrollHeight;
+          }
+        } catch(e) {}
+      }
+    }
+  } catch(e) {
+    chatOutput = '❌ ' + e.message;
+  }
+
+  const replyText = document.getElementById('aiChatReplyText');
+  if (replyText) replyText.innerHTML = formatAnalysisOutput(chatOutput);
+  const replyEl = document.getElementById('aiChatReply');
+  if (replyEl) replyEl.removeAttribute('id');
+  const replyTextEl = document.getElementById('aiChatReplyText');
+  if (replyTextEl) replyTextEl.removeAttribute('id');
+  aiChatMessages.push({ role: 'assistant', content: chatOutput });
+  history.scrollTop = history.scrollHeight;
+}
+window.sendAiChat = sendAiChat;
+
+function popOutChat() {
+  if (chatIsPopped) return;
+  var inlineSection = document.getElementById('aiChatSection');
+  var inlineHistory = document.getElementById('aiChatHistory');
+  var itemTitle = currentAnalysisItem ? currentAnalysisItem.title : 'AI Chat';
+  chatIsPopped = true;
+  if (inlineSection) inlineSection.style.display = 'none';
+
+  var popout = document.createElement('div');
+  popout.id = 'aiChatPopout';
+  popout.className = 'ai-chat-popout';
+  popout.style.cssText = 'right:20px;bottom:60px;width:420px;height:400px;';
+  popout.innerHTML =
+    '<div class="ai-chat-popout-header" id="aiChatPopoutHeader">' +
+      '<span style="font-size:14px;margin-right:4px;">💬</span>' +
+      '<span class="ai-chat-popout-title" id="aiChatPopoutTitle">' + esc(itemTitle) + '</span>' +
+      '<button class="ai-chat-popout-close" onclick="closePopOutChat()" title="Close">✕</button>' +
+    '</div>' +
+    '<div class="ai-chat-popout-body" id="aiChatHistoryPopped">' + (inlineHistory ? inlineHistory.innerHTML : '') + '</div>' +
+    '<div class="ai-chat-popout-input">' +
+      '<input id="aiChatInputPopped" type="text" placeholder="Ask about this item\u2026" onkeydown="if(event.key===\'Enter\')sendAiChat()"/>' +
+      '<button onclick="sendAiChat()">Send</button>' +
+    '</div>';
+  document.body.appendChild(popout);
+
+  var body = document.getElementById('aiChatHistoryPopped');
+  if (body) body.scrollTop = body.scrollHeight;
+
+  // Make draggable
+  var header = document.getElementById('aiChatPopoutHeader');
+  var isDragging = false, dragOffX = 0, dragOffY = 0;
+  header.addEventListener('mousedown', function(e) {
+    if (e.target.classList.contains('ai-chat-popout-close')) return;
+    isDragging = true;
+    var rect = popout.getBoundingClientRect();
+    dragOffX = e.clientX - rect.left;
+    dragOffY = e.clientY - rect.top;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!isDragging) return;
+    popout.style.left = (e.clientX - dragOffX) + 'px';
+    popout.style.top = (e.clientY - dragOffY) + 'px';
+    popout.style.right = 'auto';
+    popout.style.bottom = 'auto';
+  });
+  document.addEventListener('mouseup', function() { isDragging = false; });
+}
+window.popOutChat = popOutChat;
+
+function closePopOutChat() {
+  var popout = document.getElementById('aiChatPopout');
+  var inlineSection = document.getElementById('aiChatSection');
+  var inlineHistory = document.getElementById('aiChatHistory');
+  var poppedHistory = document.getElementById('aiChatHistoryPopped');
+  if (poppedHistory && inlineHistory) {
+    inlineHistory.innerHTML = poppedHistory.innerHTML;
+  }
+  if (popout) popout.remove();
+  chatIsPopped = false;
+  if (inlineSection) inlineSection.style.display = '';
+}
+window.closePopOutChat = closePopOutChat;
+
+async function fetchPageContent(url) {
+  try {
+    const resp = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(url));
+    const html = await resp.text();
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    const text = div.textContent || div.innerText || '';
+    return text.replace(/\s+/g, ' ').trim().slice(0, 2000);
+  } catch(e) {
+    return '(Could not fetch source content)';
+  }
+}
+
+async function doGenerate(item) {
+  const btn = document.getElementById('analyzeBtn');
+  const outputEl = document.getElementById('analysisOutput');
+  const tpsEl = document.getElementById('analysisTps');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Analyzing…'; }
+  if (outputEl) { outputEl.style.display = 'none'; outputEl.textContent = ''; }
+  if (tpsEl) { tpsEl.style.display = 'none'; tpsEl.textContent = ''; }
+
+  const pageContent = item.url ? await fetchPageContent(item.url) : '(no source URL)';
+  const prompt = `You are an intelligence analyst for a creative technologist working in virtual production, generative art, and music technology. Analyze this item and provide a structured brief:
+
+TITLE: ${item.title || ''}
+CATEGORY: ${item.category || ''}
+SUMMARY: ${item.summary || ''}
+SOURCE CONTENT: ${pageContent}
+
+Provide your analysis in this exact format:
+
+WHO: Key people, companies, or contacts mentioned
+WHAT: Core technology, product, concept, or announcement
+WHERE: Location, platform, availability, or venue
+HOW: Technical implementation, approach, or method
+OPPORTUNITIES: How this could benefit a VP engineer/creative technologist
+IMPLEMENT: Concrete ways to use or build on this
+ALGO: Inferred algorithm, pattern, or technique that could be extracted
+
+Keep each section to 1-3 sentences. Be specific and actionable.`;
+
+  // Seed chat context with the analysis prompt
+  aiChatMessages = [
+    { role: 'system', content: 'You are an intelligence analyst for a creative technologist working in virtual production, generative art, and music technology. Be concise and actionable.' },
+    { role: 'user', content: prompt }
+  ];
+  aiWorker.postMessage({ type: 'generate', data: { messages: aiChatMessages, reasonEnabled: false } });
+}
+
+async function runAnalysis(item) {
+  if (!HAS_WEBGPU) return;
+  currentAnalysisItem = item;
+  initAIWorker();
+
+  const btn = document.getElementById('analyzeBtn');
+  if (!aiModelReady) {
+    if (aiModelLoading) return; // already loading
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Loading model…'; }
+    aiModelLoading = true;
+    aiWorker.postMessage({ type: 'load' });
+    // doGenerate will be called by handleWorkerMessage on modelReady
+  } else {
+    await doGenerate(item);
+  }
+}
+
+function openPantrySpotlight(el){
+  const item=JSON.parse(el.dataset.item);
+
+  // Save current item's chat history before switching
+  if (currentSpotlightItemId !== null) {
+    var prevHistory = chatIsPopped ? document.getElementById('aiChatHistoryPopped') : document.getElementById('aiChatHistory');
+    itemChatHistories.set(currentSpotlightItemId, {
+      messages: aiChatMessages.slice(),
+      html: prevHistory ? prevHistory.innerHTML : ''
+    });
+  }
+
+  currentAnalysisItem = item;
+  currentSpotlightItemId = item.id || (item.title + '|' + item.date);
+
+  // Restore or seed chat context
+  var savedChat = itemChatHistories.get(currentSpotlightItemId);
+  if (savedChat) {
+    aiChatMessages = savedChat.messages.slice();
+  } else {
+    // Seed ollama chat context with item info
+    aiChatMessages = [{role:'system', content:'You are an expert analyst helping a creative technologist. Be direct and insightful. The user is looking at this item: "'+item.title+'"'+(item.analysis?' Analysis: '+item.analysis.substring(0,1500):'')+(item.summary?' Summary: '+item.summary:'')+'. Answer follow-up questions about it.'}];
+  }
+  const color=PANTRY_CAT_COLORS[item.category]||'#6b7280';
+  const bg=color+'22';
+  const placeholder=$('#spotlightPlaceholder');
+  const content=$('#spotlightContent');
+  placeholder.style.display='none';
+  content.classList.add('active');
+  const dateStr=item.date?new Date(item.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}):'';
+  // Parse images array
+  const images = Array.isArray(item.images) ? item.images : (typeof item.images === 'string' ? (function(){try{return JSON.parse(item.images)}catch(e){return []}}()) : []);
+
+  content.innerHTML=`
+    ${item.summary_brief?`<div style="padding:10px 12px;background:${bg};border-left:3px solid ${color};border-radius:0 6px 6px 0;margin-bottom:14px;font-size:13px;line-height:1.5;color:var(--text);">${esc(item.summary_brief)}</div>`:''}
+    <span class="cat-pill" style="background:${bg};color:${color}">${esc(item.category||'')}</span>
+    <span id="spotlightStar" class="pi-star${(Array.isArray(item.tags)&&item.tags.includes('favorite'))?' active':''}" onclick="toggleFavorite('${esc(item.id)}',this)" style="font-size:18px;cursor:pointer;" title="Favorite">★</span>
+    ${item.priority==='high'?'<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#ef444433;color:#ef4444;margin-left:6px;vertical-align:middle;">DEADLINE</span>':''}
+    <h2>${esc(item.title||'Untitled')}</h2>
+    ${dateStr?`<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">${dateStr}</div>`:''}
+    ${item.summary?`<div class="desc">${esc(item.summary)}</div>`:''}
+    ${images.length>0?`<div style="display:flex;gap:8px;overflow-x:auto;padding:8px 0;margin:12px 0;scrollbar-width:thin;">${images.map(img=>`<img src="${esc(img)}" style="height:160px;border-radius:6px;flex-shrink:0;object-fit:cover;background:var(--bg-card);" onerror="this.style.display='none'" loading="lazy"/>`).join('')}</div>`
+      :(item.url?`<div id="spotlightImg" style="margin:16px 0;border-radius:8px;overflow:hidden;background:var(--bg-card);min-height:40px;"><div style="padding:12px;font-size:11px;color:var(--text-muted);">Loading preview...</div></div>`:'')}
+    ${item.url?`<a class="source-link" href="${esc(item.url)}" target="_blank" rel="noopener">${esc(item.url)} ↗</a>`:''}
+    ${item.analysis?'<div id="analysisOutput" style="display:block;margin-top:14px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;line-height:1.7;color:var(--text-sec);white-space:pre-wrap;">'+formatAnalysisOutput(esc(item.analysis))+'</div>':'<div class="analysis-section">'+(HAS_WEBGPU?'<button id="analyzeBtn" class="analyze-btn" onclick="runAnalysis(currentAnalysisItem)">🔬 Analyze</button><div id="modelProgress" class="analysis-progress"><div class="analysis-progress-label" id="modelProgressLabel">Loading model…</div><div class="analysis-progress-track"><div id="modelProgressBar" class="analysis-progress-bar"></div></div></div><div id="analysisOutput"></div><div id="analysisTps"></div>':'')+'</div>'}
+    <div id="aiChatSection" style="margin-top:12px;">
+      <div id="aiChatHistory" style="max-height:200px;overflow-y:auto;margin-bottom:8px;"></div>
+      <div style="display:flex;gap:6px;">
+        <input id="aiChatInput" type="text" placeholder="Ask about this item…" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--text);outline:none;" onkeydown="if(event.key==='Enter')sendAiChat()"/>
+        <button onclick="sendAiChat()" style="background:var(--cyan);border:none;border-radius:6px;color:#000;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;">Send</button>
+        <button onclick="popOutChat()" title="Pop out chat" style="background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-muted);padding:6px 10px;font-size:13px;cursor:pointer;transition:color .2s,border-color .2s;" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--cyan)';" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border)';">↗</button>
+      </div>
+    </div>
+    <div class="insp-nav">
+      <button class="back-btn" onclick="closePantrySpotlight()">✕ Close</button>
+    </div>
+  `;
+  // Restore saved chat HTML (inline) or handle pop-out focus shift
+  if (chatIsPopped) {
+    // Pop-out is open: update title and swap history
+    var poppedTitle = document.getElementById('aiChatPopoutTitle');
+    if (poppedTitle) poppedTitle.textContent = item.title || 'AI Chat';
+    var poppedHistory = document.getElementById('aiChatHistoryPopped');
+    if (poppedHistory) {
+      poppedHistory.innerHTML = savedChat ? savedChat.html : '';
+      poppedHistory.scrollTop = poppedHistory.scrollHeight;
+    }
+    // Keep inline section hidden
+    var inlineSection = document.getElementById('aiChatSection');
+    if (inlineSection) inlineSection.style.display = 'none';
+  } else if (savedChat) {
+    // Restore inline chat history
+    var inlineHistory = document.getElementById('aiChatHistory');
+    if (inlineHistory) {
+      inlineHistory.innerHTML = savedChat.html;
+      inlineHistory.scrollTop = inlineHistory.scrollHeight;
+    }
+  }
+
+  // Fetch og:image preview (only if no scraped images)
+  if(item.url && images.length===0){
+    fetch('https://api.microlink.io/?url='+encodeURIComponent(item.url))
+      .then(r=>r.json())
+      .then(d=>{
+        const imgEl=$('#spotlightImg');
+        if(!imgEl) return;
+        const img=d.data&&(d.data.image&&d.data.image.url||d.data.logo&&d.data.logo.url);
+        if(img){
+          imgEl.innerHTML=`<img src="${esc(img)}" style="width:100%;display:block;border-radius:8px;" onerror="this.parentElement.style.display='none'"/>`;
+        } else {
+          imgEl.style.display='none';
+        }
+      })
+      .catch(()=>{const el=$('#spotlightImg');if(el)el.style.display='none';});
+  }
+  // highlight selected item
+  $$('.pantry-item').forEach(i=>i.style.borderColor='');
+  el.style.borderColor=color;
+}
+function closePantrySpotlight(){
+  $('#spotlightContent').classList.remove('active');
+  $('#spotlightContent').innerHTML='';
+  $('#spotlightPlaceholder').style.display='';
+  $$('.pantry-item').forEach(i=>i.style.borderColor='');
+}
+window.openPantrySpotlight=openPantrySpotlight;
+
+// Add items — callable via WS; also POSTs to Supabase
+async function addPantryItems(date,category,items){
+  try{
+    const rows=items.map(item=>({date,category,title:item.title,summary:item.desc||item.summary,url:item.link||item.url,source:item.source,tags:item.tags,priority:item.priority}));
+    await fetch(`${KITCHEN_API}/api/items`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(rows)});
+  }catch(e){console.error('addPantryItems POST failed:',e);}
+  items.forEach(item=>{pantryAllItems.unshift({id:Date.now()+'_'+Math.random(),date,category,title:item.title,summary:item.desc||item.summary,url:item.link||item.url,source:item.source,tags:item.tags,priority:item.priority});});
+  if(pantryViewDate===date) renderPantryView();
+}
+window.addPantryItems=addPantryItems;
 
 // ── Helpers ──
 const $=s=>document.querySelector(s);
@@ -835,12 +1432,49 @@ function switchStageTab(tab){
 }
 $$('.code-canvas-tab').forEach(t=>t.addEventListener('click',()=>switchStageTab(t.dataset.tab)));
 
-// ── Reference Tabs ──
-function switchRefTab(tab){
-  $$('.ref-tab').forEach(t=>t.classList.toggle('active',t.dataset.ref===tab));
-  $$('.ref-pane').forEach(p=>p.classList.toggle('active',p.dataset.refpane===tab));
-}
-$$('.ref-tab').forEach(t=>t.addEventListener('click',()=>switchRefTab(t.dataset.ref)));
+// ── Reference Tabs (legacy no-op — pantry now uses filter pills) ──
+function switchRefTab(tab){}
+
+// ── Pantry filter pills ──
+document.querySelectorAll('.pcat-btn').forEach(btn=>{
+  const color=btn.style.getPropertyValue('--pc');
+  if(color) btn.style.cssText+=`;--pc:${color}`;
+  btn.addEventListener('click',()=>{
+    const cat=btn.dataset.cat;
+    if(cat==='all'){
+      pantryActiveCategories.clear();
+      document.querySelectorAll('.pcat-btn').forEach(b=>{
+        b.classList.toggle('active',b.dataset.cat==='all');
+        if(b.dataset.cat==='all') b.style.background='var(--gold)';
+        else b.style.background='';
+      });
+    } else {
+      document.querySelector('.pcat-btn[data-cat="all"]').classList.remove('active');
+      document.querySelector('.pcat-btn[data-cat="all"]').style.background='';
+      if(pantryActiveCategories.has(cat)){
+        pantryActiveCategories.delete(cat);
+        btn.classList.remove('active');
+        btn.style.background='';
+        btn.style.color='';
+      } else {
+        pantryActiveCategories.add(cat);
+        btn.classList.add('active');
+        const c=PANTRY_CAT_COLORS[cat]||'#6b7280';
+        btn.style.background=c;
+        btn.style.color='#000';
+      }
+      if(pantryActiveCategories.size===0){
+        document.querySelector('.pcat-btn[data-cat="all"]').classList.add('active');
+        document.querySelector('.pcat-btn[data-cat="all"]').style.background='var(--gold)';
+      }
+    }
+    renderPantryView();
+  });
+});
+// Style All button initially
+(()=>{const b=document.querySelector('.pcat-btn[data-cat="all"]');if(b){b.style.background='var(--gold)';b.style.color='#000';b.style.borderColor='transparent';}})();
+
+document.getElementById('pantrySearch').addEventListener('input',e=>{pantrySearchQuery=e.target.value.trim();renderPantryView();});
 
 // ── Code Editor ──
 const codeEditor=$('#codeEditor');
@@ -925,58 +1559,8 @@ $('#loadSelect').addEventListener('change',e=>{
 setTimeout(()=>{updateCanvasSize();runCode();},100);
 window.addEventListener('resize',()=>{updateCanvasSize();});
 
-// ── Inspiration Panel (Pantry-aware) ──
-let currentInspoItems=[];
-
-function renderInspoPane(){
-  const items=pantryViewDate==='all'?getAllPantryItems('inspo'):getPantryItems(pantryViewDate,'inspo');
-  currentInspoItems=items;
-  $('#inspoPane').innerHTML=items.length?items.map((item,i)=>`
-    <div class="insp-card-s" onclick="showInspDetail(${i})" style="display:flex;gap:8px;align-items:flex-start;">
-      ${item.img ? '<img src="'+item.img+'" style="width:48px;height:36px;object-fit:cover;border-radius:4px;flex-shrink:0;margin-top:2px;">' : ''}
-      <div style="min-width:0;">
-        <span class="cat-pill cat-${item.cat}">${item.cat}</span>
-        ${isToday(item._date||pantryViewDate)?'<span class="new-badge">new</span>':''}
-        ${item._date?'<span class="date-badge">'+item._date+'</span>':''}
-        <h4>${esc(item.title)}</h4>
-        <div class="desc">${esc(item.desc)}</div>
-      </div>
-    </div>
-  `).join(''):'<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center;">No entries for this date</div>';
-}
-renderInspoPane();
-
-function showInspDetail(idx){
-  const item=currentInspoItems[idx];
-  const sameCat=currentInspoItems.map((it,i)=>({...it,idx:i})).filter(it=>it.cat===item.cat);
-  const pos=sameCat.findIndex(it=>it.idx===idx);
-  const prev=sameCat[(pos-1+sameCat.length)%sameCat.length].idx;
-  const next=sameCat[(pos+1)%sameCat.length].idx;
-
-  const sc=$('#spotlightContent');
-  sc.innerHTML=`
-    ${item.img ? '<img src="'+item.img+'" style="width:100%;max-height:300px;object-fit:cover;border-radius:8px;margin-bottom:12px;">' : ''}
-    <span class="cat-pill cat-${item.cat}">${item.cat}</span>
-    <h2>${esc(item.title)}</h2>
-    <div class="desc">${esc(item.desc)}</div>
-    <a class="source-link" href="${esc(item.link)}" target="_blank" rel="noopener">View source ↗</a>
-    <div class="insp-nav">
-      <button onclick="showInspDetail(${prev})">← prev</button>
-      <button onclick="showInspDetail(${next})">next →</button>
-      <button class="back-btn" onclick="hideSpotlight()">✕ Close</button>
-    </div>
-  `;
-  sc.classList.add('active');
-  $('#spotlightPlaceholder').style.display='none';
-
-  // Track
-  try{
-    const interactions=JSON.parse(localStorage.getItem('chef-kitchen-interactions')||'{}');
-    interactions[item.id]=(interactions[item.id]||0)+1;
-    interactions._lastClick={id:item.id,time:Date.now()};
-    localStorage.setItem('chef-kitchen-interactions',JSON.stringify(interactions));
-  }catch(e){}
-}
+// ── Spotlight helpers (kept for compatibility) ──
+function showInspDetail(idx){ /* no-op — items now link directly */ }
 window.showInspDetail=showInspDetail;
 
 function hideSpotlight(){
@@ -985,17 +1569,7 @@ function hideSpotlight(){
 }
 window.hideSpotlight=hideSpotlight;
 
-// ── Techniques Panel ──
-$('#techPane').innerHTML=TECHNIQUES.map((t,i)=>`
-  <div class="tech-card-s">
-    <div class="info">
-      <span class="cat-pill cat-${t.cat}">${t.cat}</span>
-      <h4>${esc(t.name)}</h4>
-    </div>
-    <button class="load-btn" onclick="loadTechnique(${i})">Load</button>
-  </div>
-`).join('');
-
+// ── Techniques (load-only, no panel) ──
 function loadTechnique(idx){
   const t=TECHNIQUES[idx];
   codeEditor.value=t.code;
@@ -1005,66 +1579,17 @@ function loadTechnique(idx){
 }
 window.loadTechnique=loadTechnique;
 
-// ── Concepts Panel (Pantry-aware) ──
-function renderConceptsPane(){
-  const items=pantryViewDate==='all'?getAllPantryItems('concepts'):getPantryItems(pantryViewDate,'concepts');
-  if(!items.length){
-    $('#conceptsPane').innerHTML='<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center;">No concepts for this date</div>';
-    return;
-  }
-  let html='<div class="concepts-wrap"><div class="concepts-nav">';
-  items.forEach((_,i)=>{
-    const ch=i===0?'checked':'';
-    html+=`<input type="radio" name="concept" id="c${i+1}" ${ch}><label for="c${i+1}">${i+1}</label>`;
-  });
-  html+='<div class="concept-panels">';
-  items.forEach((c,i)=>{
-    const dateBadge=(c._date||pantryViewDate);
-    const badge=isToday(dateBadge)?'<span class="new-badge" style="margin-left:0;margin-bottom:4px;">new</span> ':'';
-    html+=`<div class="concept-panel cp${i+1}">${badge}<h3>"${esc(c.title)}"</h3><p>${esc(c.body)}</p></div>`;
-  });
-  html+='</div></div></div>';
-  $('#conceptsPane').innerHTML=html;
-}
-renderConceptsPane();
-
-// ── History Pane ──
-function renderHistoryPane(){
-  const dates=getPantryDates();
-  if(!dates.length){
-    $('#historyPane').innerHTML='<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center;">No pantry history yet</div>';
-    return;
-  }
-  const data=getPantryData();
-  $('#historyPane').innerHTML='<div class="history-date-list">'+dates.map(d=>{
-    const dayData=data[d]||{};
-    const inspoCount=(dayData.inspo||[]).length;
-    const conceptCount=(dayData.concepts||[]).length;
-    const total=inspoCount+conceptCount;
-    const todayCls=isToday(d)?'today':'';
-    return `<div class="history-date-item ${todayCls}" onclick="pantryJumpToDate('${d}')">
-      <span class="hd-date">${isToday(d)?'🥘 Today — ':''} ${new Date(d+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'})}</span>
-      <span class="hd-count">${inspoCount} inspo · ${conceptCount} concepts</span>
-    </div>`;
-  }).join('')+'</div>';
-}
-renderHistoryPane();
-
-function pantryJumpToDate(dateStr){
-  pantryViewDate=dateStr;
-  // Switch to inspo tab to show entries
-  switchRefTab('inspo');
-  renderPantryView();
-}
+// ── pantryJumpToDate (kept for compat) ──
+function pantryJumpToDate(dateStr){pantryViewDate=dateStr;renderPantryView();}
 window.pantryJumpToDate=pantryJumpToDate;
 
 // ── Pantry date nav buttons ──
 $('#pantryPrev').addEventListener('click',()=>pantryNavigate('prev'));
 $('#pantryNext').addEventListener('click',()=>pantryNavigate('next'));
-$('#pantryDateLabel').addEventListener('click',()=>{
-  pantryViewDate=TODAY_STR;
-  renderPantryView();
-});
+$('#pantryDateLabel').addEventListener('click',()=>{pantryViewDate=TODAY_STR;renderPantryView();});
+
+// ── Fetch pantry from Supabase on load ──
+fetchPantryFromSupabase();
 
 // ── Chat (OpenClaw WebSocket) ──
 const CHAT_KEY='chef-kitchen-chat';
@@ -1093,7 +1618,7 @@ function renderMsgs(){
   const msgs=loadMsgs();
   const html=msgs.map(m=>{
     const cls=m.sender==='user'?'user':'chef';
-    return `<div class="chat-msg ${cls}">${urlify(m.text)}<span class="msg-time">${formatTime(m.timestamp)}</span></div>`;
+    return '<div class="chat-msg '+cls+'">'+urlify(m.text)+'<span class="msg-time">'+formatTime(m.timestamp)+'</span></div>';
   }).join('');
   const el=$('#chatMessages');if(el){el.innerHTML=html;el.scrollTop=el.scrollHeight;}
   const el2=$('#chatMessagesMobile');if(el2){el2.innerHTML=html;el2.scrollTop=el2.scrollHeight;}
@@ -1147,7 +1672,6 @@ function wsConnect(){
           else if(m.role==='assistant'&&!text.match(/^(NO_REPLY|HEARTBEAT_OK)$/)) stored.push({text,timestamp:m.ts||Date.now(),sender:'chef'});
         });
         if(msg.id==='h2'&&stored.length){
-          // After a response, just update the last chef message
           const lastChef=stored.filter(s=>s.sender==='chef').pop();
           if(lastChef) updateLastChefMsg(lastChef.text);
         } else if(stored.length){
@@ -1171,12 +1695,10 @@ function wsConnect(){
       if(msg.type==='event'&&msg.event==='chat'){
         const d=msg.payload||msg.data||{};
         console.log('chat event:',JSON.stringify(d).slice(0,200));
-        // Delta state — extract text from message content
         if(d.state==='delta'){
           const text=extractText(d.message);
           if(text){streamBuffer=text;updateLastChefMsg(streamBuffer);}
         }
-        // Final state — fetch latest from history if no streamed content
         if(d.state==='final'){
           const text=extractText(d.message);
           if(text)updateLastChefMsg(text);
@@ -1184,13 +1706,11 @@ function wsConnect(){
           else { fetchLastResponse(); }
           streamBuffer='';currentRunId=null;
         }
-        // Error/aborted
         if(d.state==='error'||d.state==='aborted'){
           if(d.errorMessage)updateLastChefMsg('❌ '+d.errorMessage);
           else if(streamBuffer)updateLastChefMsg(streamBuffer);
           streamBuffer='';currentRunId=null;
         }
-        // Legacy format fallback
         if(d.kind==='text-delta'&&d.delta){streamBuffer+=d.delta;updateLastChefMsg(streamBuffer);}
         if(d.kind==='text-done'&&d.text){updateLastChefMsg(d.text);streamBuffer='';currentRunId=null;}
         if(d.kind==='done'){if(streamBuffer)updateLastChefMsg(streamBuffer);streamBuffer='';currentRunId=null;}
@@ -1249,6 +1769,419 @@ $$('.m-tab').forEach(tab=>{
     else {document.body.classList.add('mobile-code');switchStageTab('canvas');}
   });
 });
+
+// ── Team Drawer ──────────────────────────────────────────────────────────
+(function teamDrawer(){
+  const drawer = document.getElementById('teamDrawer');
+  const handle = document.getElementById('teamDrawerHandle');
+  let activeAgent = 'bob';
+  let agentPollers = {}; // agent -> stop function
+
+  const tdExp = document.getElementById('tdExpand');
+  handle.addEventListener('click', ()=>{ drawer.classList.remove('full'); drawer.classList.toggle('open'); if(drawer.classList.contains('open')&&!drawer.style.height) drawer.style.height='376px'; tdExp.textContent='⤢'; });
+
+  // Drag-to-resize
+  const resizeHandle = document.getElementById('teamDrawerResize');
+  let dragging=false, startY=0, startH=0;
+  resizeHandle.addEventListener('mousedown', e=>{
+    if(!drawer.classList.contains('open')) return;
+    dragging=true; startY=e.clientY; startH=drawer.offsetHeight;
+    document.body.style.userSelect='none'; document.body.style.cursor='ns-resize';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e=>{
+    if(!dragging) return;
+    const delta=startY-e.clientY;
+    const newH=Math.min(Math.max(startH+delta,120),window.innerHeight);
+    drawer.style.height=newH+'px';
+    drawer.querySelector('.team-drawer-content').style.height=(newH-68)+'px';
+  });
+  document.addEventListener('mouseup', ()=>{ if(dragging){dragging=false;document.body.style.userSelect='';document.body.style.cursor='';} });
+  tdExp.addEventListener('click', (e)=>{ e.stopPropagation(); if(!drawer.classList.contains('open')) return; const isFull=drawer.classList.toggle('full'); tdExp.textContent=isFull?'⤡':'⤢'; });
+
+  // Tab switching
+  $$('.team-drawer-tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      const agent = tab.dataset.agent;
+      $$('.team-drawer-tab').forEach(t=>t.classList.toggle('active', t.dataset.agent===agent));
+      $$('.team-drawer-pane').forEach(p=>p.classList.toggle('active', p.dataset.agentpane===agent));
+      // Stop old poller, start new
+      if(agentPollers[activeAgent]) agentPollers[activeAgent]();
+      activeAgent = agent;
+      // Dispatch a custom event so dashboards can listen
+      document.dispatchEvent(new CustomEvent('team-tab-switch', {detail:{agent}}));
+    });
+  });
+
+  // Register poller stop functions from dashboards
+  window._registerAgentPoller = function(agent, stopFn){ agentPollers[agent] = stopFn; };
+
+  // Status dot sync every 5s
+  function syncDots(){
+    const map = {bob:'bobDot', brett:'brettDot', devon:'devonDot', chef:'chefDot'};
+    const tdMap = {bob:'tdBobDot', brett:'tdBrettDot', devon:'tdDevonDot', chef:'tdChefDot'};
+    for(const [agent, srcId] of Object.entries(map)){
+      const src = document.getElementById(srcId);
+      const dst = document.getElementById(tdMap[agent]);
+      if(src && dst) dst.style.background = getComputedStyle(src).backgroundColor;
+    }
+  }
+  setInterval(syncDots, 5000);
+  setTimeout(syncDots, 2000);
+})();
+
+// ── Devon Dashboard ────────────────────────────────────────────────────────
+(function devonDashboard(){
+  const BASE = 'http://localhost:7749/canvas/kitchen/tmp-proxy';
+  const POLL_MS = 4000;
+  let timer = null;
+
+  const pane = document.getElementById('devonPane');
+  pane.innerHTML = `
+    <div class="bob-header">
+      <div class="bob-status-dot" id="devonDot"></div>
+      <div class="bob-status-label" id="devonLabel">Idle</div>
+      <div class="bob-actions"><div class="bob-btn" id="devonRefresh">↻ Refresh</div></div>
+    </div>
+    <div style="padding:10px 12px;border-bottom:1px solid var(--border)">
+      <div class="bob-log-label">Current Brief</div>
+      <pre id="devonBrief" style="max-height:160px;overflow-y:auto;background:#0d0d10;border:1px solid var(--border);border-radius:6px;padding:8px;font-size:10px;color:var(--text-sec);white-space:pre-wrap;word-break:break-word;margin-top:6px">No brief yet</pre>
+    </div>
+    <div style="padding:10px 12px">
+      <div class="bob-log-label">Last Output</div>
+      <pre id="devonFindings" style="max-height:340px;overflow-y:auto;background:#0d0d10;border:1px solid var(--border);border-radius:6px;padding:8px;font-size:10px;color:var(--text-sec);white-space:pre-wrap;word-break:break-word;margin-top:6px">No output yet</pre>
+    </div>
+  `;
+
+  const dot = document.getElementById('devonDot');
+  const label = document.getElementById('devonLabel');
+
+  async function poll(){
+    try {
+      const [briefR, findR] = await Promise.all([
+        fetch(BASE+'/crew-brief.md?_='+Date.now()),
+        fetch(BASE+'/crew-findings.md?_='+Date.now()),
+      ]);
+      if(briefR.ok) document.getElementById('devonBrief').textContent = await briefR.text();
+      if(findR.ok){
+        const t = await findR.text();
+        document.getElementById('devonFindings').textContent = t;
+        const age = Date.now() - (new Date(t.match(/\d{4}-\d{2}-\d{2}T[\d:.,]+/)?.[0]||0)).getTime();
+        dot.className = 'bob-status-dot' + (age < 300000 ? ' running' : '');
+        label.textContent = age < 300000 ? 'Working' : 'Idle';
+      }
+    } catch(e){ dot.className='bob-status-dot'; label.textContent='Idle'; }
+  }
+
+  document.getElementById('devonRefresh').addEventListener('click', poll);
+  document.addEventListener('team-tab-switch', e=>{ if(e.detail.agent==='devon'&&!timer){poll();timer=setInterval(poll,POLL_MS);} });
+  window._registerAgentPoller&&window._registerAgentPoller('devon', ()=>{ if(timer){clearInterval(timer);timer=null;} });
+})();
+
+// ── Brett Dashboard ────────────────────────────────────────────────────────
+(function brettDashboard(){
+  const BASE = 'http://localhost:7749/canvas/kitchen/tmp-proxy';
+  const POLL_MS = 4000;
+  let timer = null;
+
+  const pane = document.getElementById('brettPane');
+  pane.innerHTML = `
+    <div class="bob-header">
+      <div class="bob-status-dot" id="brettDot"></div>
+      <div class="bob-status-label" id="brettLabel">Idle</div>
+      <div class="bob-actions"><div class="bob-btn" id="brettRefresh">↻ Refresh</div></div>
+    </div>
+    <div style="padding:10px 12px;border-bottom:1px solid var(--border)">
+      <div class="bob-log-label">Current Brief</div>
+      <pre id="brettBrief" style="max-height:160px;overflow-y:auto;background:#0d0d10;border:1px solid var(--border);border-radius:6px;padding:8px;font-size:10px;color:var(--text-sec);white-space:pre-wrap;word-break:break-word;margin-top:6px">Loading...</pre>
+    </div>
+    <div style="padding:10px 12px;border-bottom:1px solid var(--border)">
+      <div class="bob-log-label">Last Review</div>
+      <pre id="brettReview" style="max-height:240px;overflow-y:auto;background:#0d0d10;border:1px solid var(--border);border-radius:6px;padding:8px;font-size:10px;white-space:pre-wrap;word-break:break-word;margin-top:6px;color:var(--text-sec)">Loading...</pre>
+    </div>
+    <div style="padding:10px 12px">
+      <div class="bob-log-label">Cycle Log</div>
+      <div class="bob-log-scroll" id="brettCycleLog" style="max-height:200px"><div class="bob-no-data">No cycle log yet</div></div>
+    </div>
+  `;
+
+  const dot = document.getElementById('brettDot');
+  const label = document.getElementById('brettLabel');
+  const briefEl = document.getElementById('brettBrief');
+  const reviewEl = document.getElementById('brettReview');
+  const cycleEl = document.getElementById('brettCycleLog');
+
+  async function poll(){
+    try {
+      const [briefR, reviewR, cycleR] = await Promise.all([
+        fetch(BASE+'/crew-brief.md?_='+Date.now()),
+        fetch(BASE+'/crew-review.md?_='+Date.now()),
+        fetch(BASE+'/crew-cycle-log.md?_='+Date.now()),
+      ]);
+      if(briefR.ok) briefEl.textContent = await briefR.text();
+      if(reviewR.ok){
+        const rv = await reviewR.text();
+        reviewEl.textContent = rv;
+        const first = rv.trim().split('\n')[0].toUpperCase();
+        reviewEl.style.color = first.startsWith('PASS') ? '#10b981' : first.startsWith('FAIL') ? '#ef4444' : 'var(--text-sec)';
+      }
+      if(cycleR.ok){
+        const lines = (await cycleR.text()).split('\n').filter(Boolean).slice(-30);
+        cycleEl.innerHTML = lines.map(l=>{
+          const cls = /pass/i.test(l)?'skill':/fail/i.test(l)?'error':/milestone/i.test(l)?'milestone':'';
+          return `<div class="bob-log-line ${cls}">${l.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</div>`;
+        }).join('') || '<div class="bob-no-data">No entries yet</div>';
+      }
+      dot.className='bob-status-dot running'; label.textContent='Active';
+    } catch(e){
+      dot.className='bob-status-dot'; label.textContent='Idle';
+    }
+  }
+
+  document.getElementById('brettRefresh').addEventListener('click', poll);
+  document.addEventListener('team-tab-switch', e=>{ if(e.detail.agent==='brett'&&!timer){poll();timer=setInterval(poll,POLL_MS);} });
+  window._registerAgentPoller&&window._registerAgentPoller('brett', ()=>{ if(timer){clearInterval(timer);timer=null;} });
+})();
+
+// ── Chef Dashboard ─────────────────────────────────────────────────────────
+(function chefDashboard(){
+  const BASE = 'http://localhost:7749/canvas/kitchen/tmp-proxy';
+  const POLL_MS = 4000;
+  let timer = null;
+
+  const pane = document.getElementById('chefPane');
+  pane.innerHTML = `
+    <div class="bob-header">
+      <div class="bob-status-dot running" id="chefDot"></div>
+      <div class="bob-status-label" style="color:var(--text)">Active</div>
+      <div class="bob-actions"><div class="bob-btn" id="chefRefresh">↻ Refresh</div></div>
+    </div>
+    <div style="padding:10px 12px;border-bottom:1px solid var(--border)">
+      <div class="bob-log-label">Heartbeat</div>
+      <div class="bob-log-scroll" id="chefHeartbeat" style="max-height:220px"><div class="bob-no-data">No heartbeat log yet</div></div>
+    </div>
+    <div style="padding:10px 12px">
+      <div class="bob-log-label">Cron</div>
+      <div class="bob-log-scroll" id="chefCron" style="max-height:220px"><div class="bob-no-data">No cron log yet</div></div>
+    </div>
+  `;
+
+  function renderLines(el, text){
+    const lines = text.trim().split('\n').filter(Boolean).slice(-20);
+    if(!lines.length){ el.innerHTML='<div class="bob-no-data">No entries yet</div>'; return; }
+    el.innerHTML = lines.map(l=>`<div class="bob-log-line">${l.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</div>`).join('');
+    el.scrollTop = el.scrollHeight;
+  }
+
+  async function poll(){
+    try {
+      const [hbR, crR] = await Promise.all([
+        fetch(BASE+'/chef-heartbeat.log?_='+Date.now()),
+        fetch(BASE+'/chef-cron.log?_='+Date.now()),
+      ]);
+      if(hbR.ok) renderLines(document.getElementById('chefHeartbeat'), await hbR.text());
+      if(crR.ok) renderLines(document.getElementById('chefCron'), await crR.text());
+    } catch(_){}
+  }
+
+  document.getElementById('chefRefresh').addEventListener('click', poll);
+  document.addEventListener('team-tab-switch', e=>{ if(e.detail.agent==='chef'&&!timer){poll();timer=setInterval(poll,POLL_MS);} });
+  window._registerAgentPoller&&window._registerAgentPoller('chef', ()=>{ if(timer){clearInterval(timer);timer=null;} });
+})();
+
+// ── Bob Dashboard ──────────────────────────────────────────────────────────
+(function bobDashboard(){
+  const BOB_LOG   = 'http://localhost:7749/canvas/kitchen/tmp-proxy/bob-live.log';
+  const BOB_MILES = 'http://localhost:7749/canvas/kitchen/tmp-proxy/bob-milestones.txt';
+  const POLL_MS   = 4000;
+  let bobTimer    = null;
+  let lastLogLen  = 0;
+  let bobActive   = false;
+
+  // Inject styles
+  const style = document.createElement('style');
+  style.textContent = `
+    #bobPane { font-family: 'SF Mono','Fira Code',monospace; font-size: 11px; background: var(--bg); }
+    .bob-header { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--border); background:var(--bg-card); position:sticky; top:0; z-index:2; }
+    .bob-status-dot { width:8px; height:8px; border-radius:50%; background:var(--text-muted); flex-shrink:0; transition:background .5s; }
+    .bob-status-dot.running { background:#10b981; box-shadow:0 0 6px #10b981; animation:bobpulse 1.5s infinite; }
+    .bob-status-dot.error   { background:#ef4444; }
+    @keyframes bobpulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .bob-status-label { font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; }
+    .bob-actions { display:flex; gap:6px; margin-left:auto; }
+    .bob-btn { padding:3px 10px; font-size:10px; font-weight:600; border-radius:12px; border:1px solid var(--border); background:var(--bg-card-hover); color:var(--text-muted); cursor:pointer; transition:var(--tr); }
+    .bob-btn:hover { color:var(--text); border-color:var(--text-muted); }
+    .bob-milestones { padding:10px 12px; border-bottom:1px solid var(--border); }
+    .bob-milestones-label { font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px; }
+    .bob-renders { display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:thin; padding-bottom:4px; }
+    .bob-render-thumb { flex-shrink:0; width:120px; border-radius:6px; border:1px solid var(--border); overflow:hidden; cursor:pointer; transition:border-color var(--tr); }
+    .bob-render-thumb:hover { border-color:var(--gold); }
+    .bob-render-thumb img { width:100%; display:block; aspect-ratio:16/9; object-fit:cover; background:#111; }
+    .bob-render-label { font-size:9px; color:var(--text-muted); padding:2px 4px; text-align:center; }
+    .bob-log-area { padding:10px 12px; }
+    .bob-log-label { font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+    .bob-log-scroll { max-height:340px; overflow-y:auto; background:#0d0d10; border:1px solid var(--border); border-radius:6px; padding:8px; scrollbar-width:thin; }
+    .bob-log-line { color:#a1a1aa; line-height:1.6; white-space:pre-wrap; word-break:break-all; }
+    .bob-log-line.action { color:#6366f1; }
+    .bob-log-line.skill  { color:#10b981; }
+    .bob-log-line.error  { color:#ef4444; }
+    .bob-log-line.milestone { color:#eab308; font-weight:700; }
+    .bob-no-data { padding:24px 12px; text-align:center; color:var(--text-muted); font-size:11px; }
+    .bob-lightbox { display:none; position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:9999; align-items:center; justify-content:center; cursor:zoom-out; }
+    .bob-lightbox.open { display:flex; }
+    .bob-lightbox img { max-width:90vw; max-height:90vh; border-radius:8px; }
+  `;
+  document.head.appendChild(style);
+
+  // Build pane HTML
+  const pane = document.getElementById('bobPane');
+  pane.innerHTML = `
+    <div class="bob-header">
+      <div class="bob-status-dot" id="bobDot"></div>
+      <div class="bob-status-label" id="bobStatusLabel">Idle</div>
+      <div class="bob-actions">
+        <div class="bob-btn" id="bobRefreshBtn">↻ Refresh</div>
+        <div class="bob-btn" id="bobScrollBtn">↓ Bottom</div>
+      </div>
+    </div>
+    <div class="bob-milestones" id="bobMilestonesSection" style="display:none">
+      <div class="bob-milestones-label">Milestone Renders</div>
+      <div class="bob-renders" id="bobRenders"></div>
+    </div>
+    <div class="bob-log-area">
+      <div class="bob-log-label">Live Log <span id="bobLogCount" style="color:var(--text-muted);font-weight:400;font-size:9px;"></span></div>
+      <div class="bob-log-scroll" id="bobLogScroll">
+        <div class="bob-no-data" id="bobNoData">No log yet — Bob hasn't started.<br>Launch Bob and switch here to monitor.</div>
+      </div>
+    </div>
+    <div class="bob-lightbox" id="bobLightbox"><img id="bobLightboxImg" src="" alt="milestone render"></div>
+  `;
+
+  const dot       = document.getElementById('bobDot');
+  const label     = document.getElementById('bobStatusLabel');
+  const logScroll = document.getElementById('bobLogScroll');
+  const noData    = document.getElementById('bobNoData');
+  const logCount  = document.getElementById('bobLogCount');
+  const renders   = document.getElementById('bobRenders');
+  const milestonesSection = document.getElementById('bobMilestonesSection');
+  const lightbox  = document.getElementById('bobLightbox');
+  const lbImg     = document.getElementById('bobLightboxImg');
+
+  lightbox.addEventListener('click', ()=>lightbox.classList.remove('open'));
+
+  document.getElementById('bobRefreshBtn').addEventListener('click', pollBob);
+  document.getElementById('bobScrollBtn').addEventListener('click', ()=>{
+    logScroll.scrollTop = logScroll.scrollHeight;
+  });
+
+  function classifyLine(line){
+    if(/\[ACTION\]|\[BPY\]/.test(line)) return 'action';
+    if(/\[SKILL\]/.test(line)) return 'skill';
+    if(/\[ERROR\]|ERROR|Traceback/.test(line)) return 'error';
+    if(/milestone|MILESTONE|\[RENDER\]/.test(line)) return 'milestone';
+    return '';
+  }
+
+  async function pollLog(){
+    try {
+      const r = await fetch(BOB_LOG + '?_=' + Date.now());
+      if(!r.ok) throw new Error(r.status);
+      const text = await r.text();
+      const lines = text.split('\n').filter(l=>l.trim());
+      if(lines.length === 0) return;
+
+      noData.style.display = 'none';
+      dot.className = 'bob-status-dot running';
+
+      const isRunning = Date.now()/1000 - (lastLogLen ? 0 : Infinity) < 30;
+      label.textContent = 'Running';
+      bobActive = true;
+
+      if(lines.length !== lastLogLen){
+        lastLogLen = lines.length;
+        const last200 = lines.slice(-200);
+        logScroll.innerHTML = last200.map(l=>{
+          const cls = classifyLine(l);
+          return `<div class="bob-log-line ${cls}">${escHtml(l)}</div>`;
+        }).join('');
+        logCount.textContent = `(${lines.length} lines)`;
+        logScroll.scrollTop = logScroll.scrollHeight;
+      }
+    } catch(e){
+      if(bobActive){
+        dot.className = 'bob-status-dot error';
+        label.textContent = 'Unreachable';
+      }
+    }
+  }
+
+  async function pollMilestones(){
+    try {
+      const r = await fetch(BOB_MILES + '?_=' + Date.now());
+      if(!r.ok) return;
+      const text = await r.text();
+      const entries = text.trim().split('\n').filter(Boolean);
+      if(!entries.length) return;
+
+      milestonesSection.style.display = 'block';
+      // entries format: "N /path/file.png" OR "timestamp|/path/file.png|desc"
+      const existing = new Set([...renders.querySelectorAll('img')].map(i=>i.dataset.src.split('?')[0]));
+      entries.forEach((entry, idx)=>{
+        const t = entry.trim();
+        let fname, n;
+        if(t.includes('|')){
+          const parts = t.split('|');
+          fname = (parts[1]||'').split('/').pop();
+          n = idx+1;
+        } else {
+          const parts = t.split(/\s+/);
+          n = parts[0]; fname = (parts[1]||'').split('/').pop();
+        }
+        if(!fname) return;
+        const url = `http://localhost:7749/canvas/kitchen/tmp-proxy/${fname}?_=${Date.now()}`;
+        if(existing.has(url.split('?')[0])) return;
+        const thumb = document.createElement('div');
+        thumb.className = 'bob-render-thumb';
+        thumb.innerHTML = `<img src="${url}" data-src="${url}" alt="milestone ${n}"><div class="bob-render-label">Milestone ${n}</div>`;
+        thumb.querySelector('img').addEventListener('click', e=>{
+          lbImg.src = e.target.src;
+          lightbox.classList.add('open');
+        });
+        renders.appendChild(thumb);
+        renders.scrollLeft = renders.scrollWidth;
+      });
+    } catch(_){}
+  }
+
+  function escHtml(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function pollBob(){
+    pollLog();
+    pollMilestones();
+  }
+
+  // Auto-start polling when Bob tab is active
+
+  function startBobPolling(){
+    if(bobTimer) return;
+    pollBob();
+    bobTimer = setInterval(pollBob, POLL_MS);
+  }
+  function stopBobPolling(){
+    if(bobTimer){ clearInterval(bobTimer); bobTimer = null; }
+  }
+
+  // Intercept tab clicks via drawer events
+  document.addEventListener('team-tab-switch', e=>{ if(e.detail.agent==='bob') startBobPolling(); });
+  window._registerAgentPoller&&window._registerAgentPoller('bob', stopBobPolling);
+  // Bob is default active tab — start polling when drawer opens
+  document.getElementById('teamDrawerHandle').addEventListener('click', ()=>{
+    if(document.getElementById('teamDrawer').classList.contains('open')&&document.querySelector('.team-drawer-tab[data-agent="bob"]').classList.contains('active')) startBobPolling();
+  });
+
+})();
 </script>
 </body>
 </html>

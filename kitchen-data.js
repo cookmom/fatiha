@@ -481,6 +481,24 @@ function draw() {
   updatePixels();
 }
 function mousePressed() { noiseSeed(random(10000)); redraw(); }` },
+  { id:'garry-tan-creativity', cat:'philosophy', title:'Garry Tan — "The Greatest Period of Creativity"',
+    desc:'"The greatest period of creativity is just about to begin if you believe you can write the prompt for it" — Y Combinator CEO on AI-enabled creative explosion.',
+    link:'https://x.com/garrytan/status/2025590002449793156',
+    img:'https://pbs.twimg.com/amplify_video_thumb/2024963057386917888/img/lskgfJwsnYx4vUj_.jpg',
+    gallery:[],
+    videos:['https://video.twimg.com/amplify_video/2024963057386917888/vid/avc1/3840x2160/uPunqD8auWcHR-Yb.mp4'],
+    detail:'Garry Tan (Y Combinator CEO) — 4K video essay. 5.1K likes, 672 RTs. The thesis: AI doesn\'t replace creativity, it amplifies it. The prompt IS the creative act. Feb 22, 2026.',
+    chefTake:'This is literally us. Domain expertise is the moat, not code. Tawfeeq writes the prompt — 20 years of VP, creative tech, and Islamic art sensibility IS the prompt. The tools just got infinite. Peak validation of the Seven Heavens thesis.'
+  },
+  { id:'singularity-robot', cat:'kinetic', title:'Singularity Crossing — World\'s Smallest Industrial Robot Arm',
+    desc:'Ultra-precise miniature industrial robot arm by Olek Stepanenko. Purpose-built for micro-scale automation.',
+    link:'https://x.com/olekstepanenko/status/2021679928165507431',
+    img:'https://pbs.twimg.com/amplify_video_thumb/2021679861845106688/img/RZXTNcw-80QD0O1m.jpg',
+    gallery:[],
+    videos:['https://video.twimg.com/amplify_video/2021679861845106688/vid/avc1/720x1280/3JBv4TplDz7vxOHv.mp4'],
+    detail:'Video showcasing the world\'s smallest and most precise industrial robot arm. Built for micro-scale robotics and automation applications. Posted by @olekstepanenko, Feb 2026.',
+    chefTake:'Saved by Tawfeeq — to be reviewed.'
+  },
 ];
 
 // ── Helpers ──

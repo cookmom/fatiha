@@ -1,0 +1,10 @@
+{
+  "lastChecks": {
+    "supabase_signups": 1741326660,
+    "supabase_feedback": 1741326660
+  },
+  "supabase": {
+    "lastSeenSignupId": 10,
+    "lastSeenFeedbackId": 4
+  }
+}

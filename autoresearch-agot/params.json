@@ -1,0 +1,269 @@
+{
+  "source": "/home/tawfeeq/ramadan-clock-site/glass-cube-clock.js",
+  "parameters": [
+    {
+      "name": "uIorR",
+      "value": 1.38,
+      "min": 1.32,
+      "max": 1.5,
+      "category": "shader",
+      "pattern": "(uIorR:\\s*\\{\\s*value:\\s*)([0-9.]+)(\\s*\\})"
+    },
+    {
+      "name": "uIorG",
+      "value": 1.56,
+      "min": 1.5,
+      "max": 1.62,
+      "category": "shader",
+      "pattern": "(uIorG:\\s*\\{\\s*value:\\s*)([0-9.]+)(\\s*\\})"
+    },
+    {
+      "name": "uIorB",
+      "value": 1.9,
+      "min": 1.72,
+      "max": 1.9,
+      "category": "shader",
+      "pattern": "(uIorB:\\s*\\{\\s*value:\\s*)([0-9.]+)(\\s*\\})"
+    },
+    {
+      "name": "uAb",
+      "value": 0.19,
+      "min": 0.1,
+      "max": 0.2,
+      "category": "shader",
+      "pattern": "(uAb:\\s*\\{\\s*value:\\s*)([0-9.]+)(\\s*\\})"
+    },
+    {
+      "name": "uDich",
+      "value": 1.2,
+      "min": 0.9,
+      "max": 1.2,
+      "category": "shader",
+      "pattern": "(uDich:\\s*\\{\\s*value:\\s*)([0-9.]+)(\\s*\\})"
+    },
+    {
+      "name": "uFresnel",
+      "value": 2.3,
+      "min": 2.2,
+      "max": 3.6,
+      "category": "shader",
+      "pattern": "(uFresnel:\\s*\\{\\s*value:\\s*)([0-9.]+)(\\s*\\})"
+    },
+    {
+      "name": "uSpecIntensity",
+      "value": 5.0,
+      "min": 3.2,
+      "max": 5.0,
+      "category": "lighting",
+      "pattern": "(uSpecIntensity:\\s*\\{\\s*value:\\s*)([0-9.]+)(\\s*\\})"
+    },
+    {
+      "name": "toneMappingExposure",
+      "value": 1.07,
+      "min": 0.95,
+      "max": 1.25,
+      "category": "postprocess",
+      "pattern": "(renderer\\.toneMappingExposure\\s*=\\s*)([0-9.]+)(;)"
+    },
+    {
+      "name": "PRAYER_WASH_MAX",
+      "value": 1.0,
+      "min": 0.0,
+      "max": 1.8,
+      "category": "lighting",
+      "pattern": "(const\\s+PRAYER_WASH_MAX\\s*=\\s*)([0-9.]+)(;)"
+    },
+    {
+      "name": "PRAYER_RIM_MAX",
+      "value": 8.4,
+      "min": 5.0,
+      "max": 10.0,
+      "category": "lighting",
+      "pattern": "(const\\s+PRAYER_RIM_MAX\\s*=\\s*)([0-9.]+)(;)"
+    },
+    {
+      "name": "PRAYER_SLASH_MAX",
+      "value": 34.5,
+      "min": 26.0,
+      "max": 36.0,
+      "category": "lighting",
+      "pattern": "(const\\s+PRAYER_SLASH_MAX\\s*=\\s*)([0-9.]+)(;)"
+    },
+    {
+      "name": "PRAYER_GLOW_MAX",
+      "value": 1.9,
+      "min": 0.8,
+      "max": 2.0,
+      "category": "lighting",
+      "pattern": "(const\\s+PRAYER_GLOW_MAX\\s*=\\s*)([0-9.]+)(;)"
+    },
+    {
+      "name": "backLightIntensity",
+      "value": 76,
+      "min": 50,
+      "max": 90,
+      "category": "lighting",
+      "pattern": "(const\\s+back\\s*=\\s*new THREE\\.SpotLight\\(0x[0-9a-fA-F]+,\\s*)([0-9.]+)(\\))"
+    },
+    {
+      "name": "cubeBackIntensity",
+      "value": 13,
+      "min": 7,
+      "max": 14,
+      "category": "lighting",
+      "pattern": "(const\\s+cubeBack\\s*=\\s*new THREE\\.SpotLight\\(0x[0-9a-fA-F]+,\\s*)([0-9.]+)(\\))"
+    },
+    {
+      "name": "violetRimIntensity",
+      "value": 11,
+      "min": 7,
+      "max": 12,
+      "category": "lighting",
+      "pattern": "(const\\s+violetRim\\s*=\\s*new THREE\\.SpotLight\\(0x[0-9a-fA-F]+,\\s*)([0-9.]+)(\\))"
+    },
+    {
+      "name": "rimIntensity",
+      "value": 10,
+      "min": 6,
+      "max": 11,
+      "category": "lighting",
+      "pattern": "(const\\s+rim\\s*=\\s*new THREE\\.SpotLight\\(0x[0-9a-fA-F]+,\\s*)([0-9.]+)(\\))"
+    },
+    {
+      "name": "cubeSunIntensity",
+      "value": 90,
+      "min": 60,
+      "max": 95,
+      "category": "lighting",
+      "pattern": "(const\\s+cubeSun\\s*=\\s*new THREE\\.PointLight\\(0x[0-9a-fA-F]+,\\s*)([0-9.]+)(,)"
+    },
+    {
+      "name": "podiumFrontWashIntensity",
+      "value": 9.8,
+      "min": 7,
+      "max": 12,
+      "category": "lighting",
+      "pattern": "(const\\s+podiumFrontWash\\s*=\\s*new THREE\\.SpotLight\\(0x[0-9a-fA-F]+,\\s*)([0-9.]+)(\\))"
+    },
+    {
+      "name": "fogLayerOpacity",
+      "value": 0.17,
+      "min": 0.12,
+      "max": 0.26,
+      "category": "fog",
+      "pattern": "(uOpacity:\\s*\\{\\s*value:\\s*)([0-9.]+)(\\s*\\},\\s*// deeper pool)"
+    },
+    {
+      "name": "warmFogOpacity",
+      "value": 0.12,
+      "min": 0.04,
+      "max": 0.14,
+      "category": "fog",
+      "pattern": "(uOpacity:\\s*\\{\\s*value:\\s*)([0-9.]+)(\\s*\\},\\s*// v56: 0\\.07\u21920\\.09)"
+    },
+    {
+      "name": "godRayOpacity",
+      "value": 0.12,
+      "min": 0.08,
+      "max": 0.18,
+      "category": "fog",
+      "pattern": "(uOpacity:\\s*\\{\\s*value:\\s*)([0-9.]+)(\\s*\\}\\s*\\},)"
+    },
+    {
+      "name": "shaftOpacity",
+      "value": 0.045,
+      "min": 0.02,
+      "max": 0.08,
+      "category": "fog",
+      "pattern": "(op:\\s*\\{\\s*value:\\s*)([0-9.]+)(\\s*\\})"
+    },
+    {
+      "name": "OP_ACTIVE",
+      "value": 1.9,
+      "min": 1.2,
+      "max": 2.4,
+      "category": "postprocess",
+      "pattern": "(const\\s+OP_ACTIVE\\s*=\\s*)([0-9.]+)(;)"
+    },
+    {
+      "name": "OP_STEP",
+      "value": 0.16,
+      "min": 0.12,
+      "max": 0.24,
+      "category": "postprocess",
+      "pattern": "(const\\s+OP_STEP\\s*=\\s*)([0-9.]+)(;)"
+    },
+    {
+      "name": "beamGaussianSharp",
+      "value": 7.3,
+      "min": 5.8,
+      "max": 7.6,
+      "category": "shader",
+      "pattern": "(\\(vUv\\.x-0\\.5\\)\\*)([0-9.]+)(,2\\.0\\)\\);\\s*\\/\\/ 4\\.8\u21925\\.6)"
+    },
+    {
+      "name": "beamGaussianSoft",
+      "value": 1.4,
+      "min": 1.3,
+      "max": 2.2,
+      "category": "shader",
+      "pattern": "(\\(vUv\\.x-0\\.5\\)\\*)([0-9.]+)(,2\\.0\\)\\);)"
+    },
+    {
+      "name": "causticShimmerFreq",
+      "value": 73,
+      "min": 52,
+      "max": 76,
+      "category": "shader",
+      "pattern": "(sin\\(r \\*\\s*)([0-9.]+)(\\s*\\+\\s*time \\* 0\\.5 \\+ theta \\* 3\\.0\\))"
+    },
+    {
+      "name": "podiumRoughness",
+      "value": 0.19,
+      "min": 0.16,
+      "max": 0.32,
+      "category": "material",
+      "pattern": "(const podiumBase = \\{ roughness:\\s*)([0-9.]+)(,\\s*metalness:)"
+    },
+    {
+      "name": "podiumMetalness",
+      "value": 0.14,
+      "min": 0.06,
+      "max": 0.16,
+      "category": "material",
+      "pattern": "(metalness:\\s*)([0-9.]+)(,\\s*clearcoat:)"
+    },
+    {
+      "name": "podiumClearcoat",
+      "value": 0.84,
+      "min": 0.5,
+      "max": 0.9,
+      "category": "material",
+      "pattern": "(clearcoat:\\s*)([0-9.]+)(,\\s*clearcoatRoughness:)"
+    },
+    {
+      "name": "podiumClearcoatRoughness",
+      "value": 0.05,
+      "min": 0.04,
+      "max": 0.12,
+      "category": "material",
+      "pattern": "(clearcoatRoughness:\\s*)([0-9.]+)(,\\s*color:)"
+    },
+    {
+      "name": "transmissionScale",
+      "value": 4.35,
+      "min": 3.2,
+      "max": 4.4,
+      "category": "shader",
+      "pattern": "(vec3\\(0\\.94,\\s*0\\.97,\\s*1\\.06\\)\\s*\\*\\s*)([0-9.]+)(\\s*\\*\\s*bottomAtten)"
+    },
+    {
+      "name": "edgeCatchGain",
+      "value": 3.0,
+      "min": 2.2,
+      "max": 3.0,
+      "category": "shader",
+      "pattern": "(col \\+= vec3\\(0\\.70, 0\\.85, 1\\.00\\) \\* edgeCatch \\*\\s*)([0-9.]+)(;)"
+    }
+  ]
+}

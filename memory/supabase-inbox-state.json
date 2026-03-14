@@ -1,5 +1,5 @@
 {
-  "lastChecked": "2026-02-26T21:07:00Z",
+  "lastChecked": "2026-03-14T04:10:00Z",
   "seenSignupIds": [9, 10],
-  "notes": "signups table has no status column — tracking by ID. feedback table has status column but was empty."
+  "notes": "All signups seen (IDs 9+10, both Tawfeeq test entries). Signups table has no status column — tracking by ID. All feedback rows empty. Analytics shows 3 share events (IDs 2,3,4) but those are not inbox items."
 }

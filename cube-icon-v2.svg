@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#0d0d12" rx="0"/>
+  
+  <!-- Glow layer -->
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="softglow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="16"/>
+    </filter>
+  </defs>
+  
+  <!-- Outer glow -->
+  <g transform="translate(256,256) scale(16.5)" opacity=".25" filter="url(#softglow)">
+    <path d="M0,-9.375 L8.66,-4.375 L8.66,5.625 L0,10.625 L-8.66,5.625 L-8.66,-4.375 Z" 
+          fill="none" stroke="rgba(200,190,255,1)" stroke-width="1.5"/>
+  </g>
+  
+  <!-- Main cube -->
+  <g transform="translate(256,256) scale(16.5)" filter="url(#glow)">
+    <!-- Top face -->
+    <polygon points="0,-9.375 8.66,-4.375 0,-0.375 -8.66,-4.375" 
+             fill="rgba(232,228,220,.06)" stroke="rgba(232,228,220,.8)" stroke-width=".9" stroke-linejoin="round"/>
+    <!-- Left face -->
+    <polygon points="-8.66,-4.375 0,-0.375 0,10.625 -8.66,5.625" 
+             fill="rgba(232,228,220,.03)" stroke="rgba(232,228,220,.55)" stroke-width=".9" stroke-linejoin="round"/>
+    <!-- Right face -->
+    <polygon points="8.66,-4.375 0,-0.375 0,10.625 8.66,5.625" 
+             fill="rgba(232,228,220,.045)" stroke="rgba(232,228,220,.65)" stroke-width=".9" stroke-linejoin="round"/>
+  </g>
+</svg>

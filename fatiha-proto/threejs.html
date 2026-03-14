@@ -234,79 +234,172 @@ function spawnGardenElement(evt,progress){
 /* ═══════════════════════════════════════════════════
    2D DRAW FUNCTIONS — copied verbatim from v43
    ═══════════════════════════════════════════════════ */
-function drawPencPetal(cx,cy,s,angle,cols,alpha){
-  // Pointed almond petal (real penç style) — sharp tip, widest at 1/3 from base, tapers to point
-  ctx.save();ctx.translate(cx,cy);ctx.rotate(angle);
-  const w=s*0.32; // half-width at widest point
-  ctx.beginPath();
-  ctx.moveTo(0,-s); // sharp tip (pointing outward)
-  ctx.bezierCurveTo(w*0.3,-s*0.7, w,-s*0.35, w,-s*0.1); // right side curves out
-  ctx.bezierCurveTo(w,s*0.15, w*0.5,s*0.35, 0,s*0.4); // tapers to base
-  ctx.bezierCurveTo(-w*0.5,s*0.35, -w,s*0.15, -w,-s*0.1); // left side mirrors
-  ctx.bezierCurveTo(-w,-s*0.35, -w*0.3,-s*0.7, 0,-s); // back to tip
-  ctx.closePath();
-  // Three-shade radial fill
-  const grad=ctx.createLinearGradient(0,-s,0,s*0.3);
-  grad.addColorStop(0,cols[0]); // light at tip
-  grad.addColorStop(0.45,cols[1]); // medium
-  grad.addColorStop(1,cols[2]); // dark at base
-  ctx.globalAlpha=alpha;ctx.fillStyle=grad;ctx.fill();
-  // Tahrir — fine contour
-  ctx.strokeStyle=cols[3]||'rgba(80,40,40,0.3)';
-  ctx.lineWidth=0.5*dpr;ctx.stroke();
-  // Center vein
-  ctx.beginPath();ctx.moveTo(0,-s*0.9);ctx.lineTo(0,s*0.25);
-  ctx.strokeStyle=`rgba(255,255,255,${0.08*alpha})`;ctx.lineWidth=0.4*dpr;ctx.stroke();
-  ctx.restore();
-}
-function drawRose(x,y,maxR,petalCount,bl,baseRot,col,golden){
+/* ═══════════════════════════════════════════════════
+   FLOWER PRIMITIVES — from Palestine wildflower references
+   Construction: contour → flat fill → tahrir outline
+   ═══════════════════════════════════════════════════ */
+
+function drawPencFlower(x,y,R,n,bl,baseRot,col,golden){
+  // Penç: 5-6 clover-lobed petals around double-circle center
+  // Each petal = notched heart/clover lobe (from vase bouquet reference)
   if(bl<0.05)return;
-  const R=maxR*bl;
-  // Real penç structure: pointed almond petals in concentric rings
-  // Outer ring: large petals, offset from inner. Inner: smaller, tighter.
-  // 5-fold base symmetry (penj = five), scales up for larger roses
-  const baseN=petalCount>15?8:petalCount>8?6:5;
-  const rings=[
-    {n:baseN+2, r:0.72, size:0.48, alpha:0.55, offset:0},            // outer
-    {n:baseN,   r:0.42, size:0.38, alpha:0.72, offset:Math.PI/baseN}, // mid (offset half-step)
-    {n:Math.max(3,baseN-2), r:0.18, size:0.28, alpha:0.88, offset:0}, // inner
-  ];
-  for(let ri=0;ri<rings.length;ri++){
-    const ring=rings[ri];
-    const visible=Math.floor(ring.n*Math.min(1,bl*(1.2+ri*0.5)));
-    if(visible<1)continue;
-    for(let i=0;i<visible;i++){
-      const angle=baseRot+(i/ring.n)*Math.PI*2+ring.offset;
-      const dist=R*ring.r;
-      const px=x+Math.cos(angle)*dist, py=y+Math.sin(angle)*dist;
-      const s=R*ring.size;
-      const frac=ri/3;
-      let cols;
-      if(golden){
-        cols=[`rgb(${255-frac*20},${220-frac*40},${100+frac*30})`,
-              `rgb(${240-frac*30},${190-frac*50},${70+frac*25})`,
-              `rgb(${200-frac*40},${150-frac*50},${50+frac*20})`,
-              'rgba(160,120,40,0.3)'];
-      } else {
-        const f=1-frac;
-        cols=[`rgb(${Math.round(col[0]+(255-col[0])*f*0.5)},${Math.round(col[1]+(255-col[1])*f*0.4)},${Math.round(col[2]+(255-col[2])*f*0.4)})`,
-              `rgb(${Math.round(col[0]+(255-col[0])*f*0.2)},${Math.round(col[1]+(255-col[1])*f*0.15)},${Math.round(col[2]+(255-col[2])*f*0.15)})`,
-              `rgb(${col[0]},${col[1]},${col[2]})`,
-              `rgba(${Math.round(col[0]*0.4)},${Math.round(col[1]*0.3)},${Math.round(col[2]*0.3)},0.3)`];
-      }
-      drawPencPetal(px,py,s,angle,cols,ring.alpha*bl);
-    }
+  const r=R*bl;
+  const petalN=n||5;
+  const petalR=r*0.7; // distance from center to petal center
+  const petalS=r*0.42; // petal lobe size
+  const lineW=Math.max(0.5,0.8*dpr);
+  // Flat fill color
+  const fillR=golden?220:col[0], fillG=golden?190:col[1], fillB=golden?80:col[2];
+  const darkR=golden?180:Math.round(col[0]*0.6), darkG=golden?140:Math.round(col[1]*0.5), darkB=golden?40:Math.round(col[2]*0.5);
+  const lineCol=golden?'rgba(140,100,30,0.7)':`rgba(${darkR},${darkG},${darkB},0.7)`;
+
+  // Draw petals — each is a notched heart lobe
+  for(let i=0;i<petalN;i++){
+    const frac=i/petalN;
+    const visible=bl*(petalN+1);
+    if(i>=visible)break;
+    const a=baseRot+frac*Math.PI*2;
+    const px=x+Math.cos(a)*petalR*0.45;
+    const py=y+Math.sin(a)*petalR*0.45;
+    const tipX=x+Math.cos(a)*petalR;
+    const tipY=y+Math.sin(a)*petalR;
+    // Lobe spread perpendicular to radial direction
+    const perpA=a+Math.PI*0.5;
+    const spread=petalS*0.5;
+    const lx=tipX+Math.cos(perpA)*spread, ly=tipY+Math.sin(perpA)*spread;
+    const rx=tipX-Math.cos(perpA)*spread, ry=tipY-Math.sin(perpA)*spread;
+    // Notch at petal tip (between the two lobes)
+    const notchX=x+Math.cos(a)*(petalR*0.75);
+    const notchY=y+Math.sin(a)*(petalR*0.75);
+    // Draw clover lobe shape
+    ctx.beginPath();
+    ctx.moveTo(px,py);
+    // Right lobe
+    ctx.quadraticCurveTo(
+      px+Math.cos(a)*petalS*0.6+Math.cos(perpA)*petalS*0.1,
+      py+Math.sin(a)*petalS*0.6+Math.sin(perpA)*petalS*0.1,
+      rx,ry
+    );
+    ctx.quadraticCurveTo(
+      tipX+Math.cos(a)*petalS*0.35-Math.cos(perpA)*spread*0.3,
+      tipY+Math.sin(a)*petalS*0.35-Math.sin(perpA)*spread*0.3,
+      notchX,notchY
+    );
+    // Left lobe
+    ctx.quadraticCurveTo(
+      tipX+Math.cos(a)*petalS*0.35+Math.cos(perpA)*spread*0.3,
+      tipY+Math.sin(a)*petalS*0.35+Math.sin(perpA)*spread*0.3,
+      lx,ly
+    );
+    ctx.quadraticCurveTo(
+      px+Math.cos(a)*petalS*0.6-Math.cos(perpA)*petalS*0.1,
+      py+Math.sin(a)*petalS*0.6-Math.sin(perpA)*petalS*0.1,
+      px,py
+    );
+    ctx.closePath();
+    // Flat fill
+    ctx.globalAlpha=bl*0.8;
+    ctx.fillStyle=`rgb(${fillR},${fillG},${fillB})`;ctx.fill();
+    // Tahrir contour on top
+    ctx.globalAlpha=bl;
+    ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
   }
-  // Center — contrasting dot (like green center in real penç)
-  if(bl>0.3){
-    const cr=R*0.09;
+  // Double-circle center
+  if(bl>0.2){
+    const cr=r*0.18;
+    // Outer ring
     ctx.beginPath();ctx.arc(x,y,cr,0,Math.PI*2);
-    ctx.fillStyle=golden?`rgba(255,240,140,${0.9*bl})`:`rgba(60,120,50,${0.7*bl})`;ctx.fill();
-    ctx.strokeStyle=golden?'rgba(180,140,50,0.3)':'rgba(40,80,35,0.4)';
-    ctx.lineWidth=0.5*dpr;ctx.beginPath();ctx.arc(x,y,cr,0,Math.PI*2);ctx.stroke();
+    ctx.globalAlpha=bl*0.9;
+    ctx.fillStyle=golden?`rgb(200,170,60)`:`rgb(${darkR},${darkG},${darkB})`;ctx.fill();
+    ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
+    // Inner dot
+    ctx.beginPath();ctx.arc(x,y,cr*0.45,0,Math.PI*2);
+    ctx.fillStyle=golden?`rgb(240,220,120)`:`rgb(${fillR},${fillG},${fillB})`;ctx.fill();
   }
-  // Golden glow disabled — structure first
-  // if(golden&&bl>0.3){...}
+}
+
+function drawCarnation(x,y,R,bl,baseRot,col){
+  // Carnation: ruffled/serrated petal mass in a cup calyx
+  if(bl<0.1)return;
+  const r=R*bl;
+  const lineW=Math.max(0.5,0.8*dpr);
+  const darkR=Math.round(col[0]*0.55), darkG=Math.round(col[1]*0.45), darkB=Math.round(col[2]*0.45);
+  const lineCol=`rgba(${darkR},${darkG},${darkB},0.7)`;
+  // Serrated petal mass — irregular curved top edge
+  const petalCount=Math.floor(8+bl*6);
+  for(let i=0;i<petalCount;i++){
+    const frac=i/petalCount;
+    const a=baseRot+frac*Math.PI*2;
+    const dist=r*(0.4+Math.random()*0.3);
+    const px=x+Math.cos(a)*dist;
+    const py=y+Math.sin(a)*dist;
+    const s=r*(0.15+Math.random()*0.15);
+    // Small ruffled petal — jagged edge
+    ctx.beginPath();
+    ctx.moveTo(px,py);
+    const tipA=a+(-0.15+Math.random()*0.3);
+    const tipDist=s*(0.8+Math.random()*0.4);
+    const tx=px+Math.cos(tipA)*tipDist, ty=py+Math.sin(tipA)*tipDist;
+    // Serrated edge via small zigzag
+    const perpA=tipA+Math.PI*0.5;
+    const w=s*0.35;
+    ctx.quadraticCurveTo(px+Math.cos(tipA)*s*0.4+Math.cos(perpA)*w,
+                         py+Math.sin(tipA)*s*0.4+Math.sin(perpA)*w, tx,ty);
+    ctx.quadraticCurveTo(px+Math.cos(tipA)*s*0.4-Math.cos(perpA)*w,
+                         py+Math.sin(tipA)*s*0.4-Math.sin(perpA)*w, px,py);
+    ctx.closePath();
+    ctx.globalAlpha=bl*(0.5+frac*0.3);
+    ctx.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;ctx.fill();
+    ctx.globalAlpha=bl*0.8;
+    ctx.strokeStyle=lineCol;ctx.lineWidth=lineW*0.7;ctx.stroke();
+  }
+  // Calyx — cup shape at base
+  if(bl>0.3){
+    const cx1=x-r*0.2,cy1=y+r*0.3;
+    const cx2=x+r*0.2,cy2=y+r*0.3;
+    ctx.beginPath();ctx.moveTo(cx1,cy1);
+    ctx.quadraticCurveTo(x,y+r*0.5,cx2,cy2);
+    ctx.globalAlpha=bl*0.6;
+    ctx.strokeStyle='rgba(40,80,30,0.6)';ctx.lineWidth=lineW;ctx.stroke();
+  }
+}
+
+function drawTulipBud(x,y,R,bl,baseRot,col){
+  // Tulip bud: 3 elongated pointed petals, flame-like tips curving outward
+  if(bl<0.1)return;
+  const r=R*bl;
+  const lineW=Math.max(0.5,0.8*dpr);
+  const darkR=Math.round(col[0]*0.5), darkG=Math.round(col[1]*0.4), darkB=Math.round(col[2]*0.4);
+  const lineCol=`rgba(${darkR},${darkG},${darkB},0.7)`;
+  for(let i=0;i<3;i++){
+    const a=baseRot+i*(Math.PI*2/3);
+    const tipX=x+Math.cos(a)*r*0.9;
+    const tipY=y+Math.sin(a)*r*0.9;
+    const perpA=a+Math.PI*0.5;
+    const w=r*0.22;
+    // Elongated petal with curving tip
+    ctx.beginPath();ctx.moveTo(x,y);
+    ctx.bezierCurveTo(
+      x+Math.cos(a)*r*0.3+Math.cos(perpA)*w, y+Math.sin(a)*r*0.3+Math.sin(perpA)*w,
+      tipX+Math.cos(perpA)*w*0.6, tipY+Math.sin(perpA)*w*0.6,
+      tipX+Math.cos(a+0.3)*r*0.15, tipY+Math.sin(a+0.3)*r*0.15 // curving tip
+    );
+    ctx.bezierCurveTo(
+      tipX-Math.cos(perpA)*w*0.6, tipY-Math.sin(perpA)*w*0.6,
+      x+Math.cos(a)*r*0.3-Math.cos(perpA)*w, y+Math.sin(a)*r*0.3-Math.sin(perpA)*w,
+      x,y
+    );
+    ctx.closePath();
+    ctx.globalAlpha=bl*0.75;
+    ctx.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;ctx.fill();
+    ctx.globalAlpha=bl;
+    ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
+  }
+}
+
+// Backward-compatible wrapper — garden system calls drawRose
+function drawRose(x,y,maxR,petalCount,bl,baseRot,col,golden){
+  drawPencFlower(x,y,maxR,petalCount>10?6:5,bl,baseRot,col,golden);
 }
 function drawStem(fx,fy,tx,ty,thick,bl){
   if(bl<0.05)return;

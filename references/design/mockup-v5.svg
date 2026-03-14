@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 375 812" role="img" aria-labelledby="title desc">
+  <title id="title">A Gift of Time — V5 Three-Row Header</title>
+  <desc id="desc">Clean row separation: Row 1 city+countdown, Row 2 hijri, Row 3 prayers</desc>
+
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0d0d12"/>
+      <stop offset="60%" stop-color="#111118"/>
+      <stop offset="100%" stop-color="#0a0a10"/>
+    </linearGradient>
+    <filter id="frost" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0.05  0 1 0 0 0.05  0 0 1 0 0.07  0 0 0 0.78 0"/>
+    </filter>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="375" height="812" fill="url(#bgGrad)"/>
+
+  <!-- STATUS BAR -->
+  <g font-family="SF Pro, system-ui, sans-serif" font-size="12" fill="rgba(232,228,220,0.7)">
+    <text x="30" y="18" font-weight="600" font-size="14">5:15</text>
+    <g transform="translate(310, 8)">
+      <rect x="0" y="2" width="4" height="6" rx="1" fill="rgba(232,228,220,0.5)"/>
+      <rect x="6" y="1" width="4" height="7" rx="1" fill="rgba(232,228,220,0.5)"/>
+      <rect x="12" y="0" width="4" height="8" rx="1" fill="rgba(232,228,220,0.6)"/>
+      <rect x="18" y="0" width="4" height="8" rx="1" fill="rgba(232,228,220,0.7)"/>
+      <rect x="30" y="1" width="20" height="8" rx="2" fill="none" stroke="rgba(232,228,220,0.5)" stroke-width="1"/>
+      <rect x="31" y="2.5" width="14" height="5" rx="1" fill="rgba(232,228,220,0.5)"/>
+      <rect x="50.5" y="3" width="1.5" height="4" rx="0.5" fill="rgba(232,228,220,0.3)"/>
+    </g>
+  </g>
+
+  <!-- ═══ HEADER V5 — THREE DISTINCT ROWS ═══ -->
+  <g id="sticky-header">
+    <rect x="0" y="28" width="375" height="78" fill="rgba(13,13,18,0.75)" filter="url(#frost)"/>
+    <line x1="0" y1="106" x2="375" y2="106" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
+
+    <!-- ROW 1: City (left) ←→ Countdown (right) — single baseline -->
+    <g id="location-btn" cursor="pointer">
+      <g transform="translate(16, 38)">
+        <g fill="none" stroke="rgba(232,228,220,0.35)" stroke-width="0.8" stroke-linecap="round">
+          <path d="M4,0 C2,0 0,1.8 0,4 C0,7 4,10.5 4,10.5 C4,10.5 8,7 8,4 C8,1.8 6,0 4,0Z"/>
+          <circle cx="4" cy="4" r="1.5"/>
+        </g>
+        <g transform="translate(13, 4)" fill="none" stroke="rgba(232,228,220,0.25)" stroke-width="0.8" stroke-linecap="round">
+          <path d="M-2,-1.5 L0,0.5 L2,-1.5"/>
+        </g>
+      </g>
+      <text x="36" y="50" font-family="Inter, SF Pro, system-ui, sans-serif" font-size="14" font-weight="300" fill="rgba(232,228,220,0.6)" letter-spacing="0.01em">Los Angeles</text>
+    </g>
+
+    <g id="countdown-right">
+      <text x="359" y="39" text-anchor="end" font-family="SF Pro, system-ui, sans-serif" font-size="9" font-weight="300" letter-spacing="0.08em" fill="rgba(232,228,220,0.3)">UNTIL FAJR</text>
+      <text x="359" y="55" text-anchor="end" font-family="SF Mono, monospace" font-size="14" font-weight="300" fill="rgba(232,228,220,0.6)" letter-spacing="0.02em">6:29:28</text>
+    </g>
+
+    <!-- ROW 2: Hijri date — full width, centered, own line -->
+    <text x="188" y="78" text-anchor="middle" font-family="SF Pro, system-ui, sans-serif" font-size="10" font-weight="300" fill="rgba(232,228,220,0.3)" letter-spacing="0.03em">11 Ramaḍān 1447 AH · رَمَضَان</text>
+
+    <!-- ROW 3: Prayer times bar -->
+    <text x="188" y="96" text-anchor="middle" font-family="SF Pro, system-ui, sans-serif" font-size="9" font-weight="300" fill="rgba(232,228,220,0.25)" letter-spacing="0.02em">Fajr 05:15 · Sunrise 06:24 · Dhuhr 12:07 · Asr 15:21 · Maghrib 17:49 · Isha 18:57</text>
+  </g>
+
+  <!-- ═══ CUBE ZONE ═══ -->
+  <g id="cube-zone" opacity="0.9">
+    <g transform="translate(188, 350)">
+      <path d="M0,-55 L65,-25 L0,5 L-65,-25 Z" fill="rgba(140,150,180,0.12)" stroke="rgba(180,190,220,0.2)" stroke-width="0.5"/>
+      <path d="M-65,-25 L0,5 L0,75 L-65,45 Z" fill="rgba(100,110,150,0.1)" stroke="rgba(180,190,220,0.15)" stroke-width="0.5"/>
+      <path d="M65,-25 L0,5 L0,75 L65,45 Z" fill="rgba(120,130,170,0.1)" stroke="rgba(180,190,220,0.15)" stroke-width="0.5"/>
+      <path d="M0,-55 L0,75" stroke="rgba(120,200,255,0.15)" stroke-width="1"/>
+      <g opacity="0.3">
+        <ellipse cx="-8" cy="50" rx="12" ry="4" fill="rgba(100,140,255,0.4)"/>
+        <ellipse cx="5" cy="55" rx="10" ry="3" fill="rgba(100,255,180,0.3)"/>
+        <ellipse cx="15" cy="52" rx="8" ry="3" fill="rgba(255,200,100,0.3)"/>
+      </g>
+      <ellipse cx="0" cy="-35" rx="40" ry="15" fill="rgba(200,210,240,0.08)"/>
+    </g>
+    <ellipse cx="188" cy="530" rx="120" ry="40" fill="rgba(100,80,200,0.04)"/>
+    <line x1="188" y1="350" x2="188" y2="200" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
+  </g>
+
+  <!-- ═══ MODE PILL ═══ -->
+  <g id="mode-pill" transform="translate(72, 710)">
+    <rect x="0" y="0" width="232" height="48" rx="24" fill="rgba(18,18,22,0.75)" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
+    <g transform="translate(52, 24)" filter="url(#glow)">
+      <circle cx="0" cy="0" r="11" fill="none" stroke="rgba(232,228,220,0.9)" stroke-width="1.2"/>
+      <circle cx="0" cy="0" r="11" fill="none" stroke="rgba(180,200,255,0.2)" stroke-width="3"/>
+      <circle cx="0" cy="20" r="2" fill="rgba(232,228,220,0.7)"/>
+    </g>
+    <g transform="translate(116, 24)" opacity="0.35">
+      <rect x="-9" y="-9" width="18" height="18" rx="2" fill="none" stroke="rgba(232,228,220,0.9)" stroke-width="1.2" transform="rotate(45)"/>
+    </g>
+    <g transform="translate(180, 24)" opacity="0.35">
+      <polygon points="0,-11 10.5,8 -10.5,8" fill="none" stroke="rgba(232,228,220,0.9)" stroke-width="1.2" stroke-linejoin="round"/>
+    </g>
+  </g>
+
+  <rect x="128" y="795" width="120" height="4" rx="2" fill="rgba(232,228,220,0.15)"/>
+</svg>

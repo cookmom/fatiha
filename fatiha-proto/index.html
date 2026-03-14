@@ -1,0 +1,899 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fatiha.app — v21 Tajweed Garden</title>
+<style>
+  * { margin: 0; padding: 0; }
+  body { background: #0D0D0D; overflow: hidden; }
+  canvas { display: block; }
+  #play-btn {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    background: transparent; border: 1px solid rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.4); padding: 14px 32px; border-radius: 10px;
+    font-size: 0.9rem; cursor: pointer; z-index: 10;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<button id="play-btn">▶</button>
+
+<script>
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+var W, H, dpr;
+
+function resize() {
+  dpr = devicePixelRatio;
+  W = cv.width = window.innerWidth * dpr;
+  H = cv.height = window.innerHeight * dpr;
+  cv.style.width = window.innerWidth + 'px';
+  cv.style.height = window.innerHeight + 'px';
+  buildCurve();
+}
+
+// ── Bezier curve ─────────────────────────────────────────────
+var curvePoints = [];
+function cubicBez(p0,p1,p2,p3,t){
+  const u=1-t;
+  return{x:u*u*u*p0.x+3*u*u*t*p1.x+3*u*t*t*p2.x+t*t*t*p3.x,
+         y:u*u*u*p0.y+3*u*u*t*p1.y+3*u*t*t*p2.y+t*t*t*p3.y};
+}
+function buildCurve(){
+  const segs=[
+    // Portrait: progress=0 at BOTTOM-RIGHT, horizontal start so normals go up/down
+    {p0:{x:.92,y:.96},p1:{x:.82,y:.95},p2:{x:.72,y:.92},p3:{x:.65,y:.86}},
+    {p0:{x:.65,y:.86},p1:{x:.55,y:.78},p2:{x:.50,y:.70},p3:{x:.35,y:.66}},
+    {p0:{x:.35,y:.66},p1:{x:.15,y:.60},p2:{x:.12,y:.54},p3:{x:.22,y:.48}},
+    {p0:{x:.22,y:.48},p1:{x:.35,y:.40},p2:{x:.80,y:.36},p3:{x:.75,y:.28}},
+    {p0:{x:.75,y:.28},p1:{x:.70,y:.20},p2:{x:.35,y:.18},p3:{x:.22,y:.14}},
+    {p0:{x:.22,y:.14},p1:{x:.14,y:.11},p2:{x:.10,y:.06},p3:{x:.08,y:.02}},
+  ];
+  curvePoints=[];
+  for(const s of segs){
+    const p0={x:s.p0.x*W,y:s.p0.y*H},p1={x:s.p1.x*W,y:s.p1.y*H},
+          p2={x:s.p2.x*W,y:s.p2.y*H},p3={x:s.p3.x*W,y:s.p3.y*H};
+    for(let i=0;i<150;i++)curvePoints.push(cubicBez(p0,p1,p2,p3,i/150));
+  }
+  const L=segs[segs.length-1];
+  curvePoints.push(cubicBez({x:L.p0.x*W,y:L.p0.y*H},{x:L.p1.x*W,y:L.p1.y*H},
+    {x:L.p2.x*W,y:L.p2.y*H},{x:L.p3.x*W,y:L.p3.y*H},1));
+}
+function curveAt(t){
+  const fi=t*(curvePoints.length-1),i=Math.floor(fi),f=fi-i;
+  const a=curvePoints[Math.min(i,curvePoints.length-1)],
+        b=curvePoints[Math.min(i+1,curvePoints.length-1)];
+  return{x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f};
+}
+function getNormalIdx(idx){
+  const ni=Math.min(idx+1,curvePoints.length-1),pi=Math.max(idx-1,0);
+  const dx=curvePoints[ni].x-curvePoints[pi].x,dy=curvePoints[ni].y-curvePoints[pi].y,
+        l=Math.sqrt(dx*dx+dy*dy)||1;
+  return{x:-dy/l,y:dx/l};
+}
+function normalAt(t){
+  const fi=t*(curvePoints.length-1),i=Math.floor(fi);
+  const a=curvePoints[Math.max(0,Math.min(i-1,curvePoints.length-1))],
+        b=curvePoints[Math.min(i+1,curvePoints.length-1)];
+  const dx=b.x-a.x,dy=b.y-a.y,l=Math.sqrt(dx*dx+dy*dy)||1;
+  return{x:-dy/l,y:dx/l};
+}
+
+// ── Rose palette ─────────────────────────────────────────────
+function pathColor(t){
+  const s=[
+    [0,0x8B,0x1A,0x3A],[.15,0xC2,0x18,0x5B],[.30,0xE8,0x3E,0x6C],
+    [.45,0xFF,0x6B,0x8A],[.60,0xFF,0x8E,0x72],[.75,0xFF,0xAA,0x5C],
+    [.90,0xE8,0x7C,0x5E],[1,0xC2,0x52,0x52]
+  ];
+  let i=0;while(i<s.length-1&&s[i+1][0]<t)i++;
+  if(i>=s.length-1)return[s[s.length-1][1],s[s.length-1][2],s[s.length-1][3]];
+  const a=s[i],b=s[i+1],f=(t-a[0])/(b[0]-a[0]);
+  return[a[1]+(b[1]-a[1])*f,a[2]+(b[2]-a[2])*f,a[3]+(b[3]-a[3])*f];
+}
+
+// ── Audio ────────────────────────────────────────────────────
+var audioCtx,analyser,audio,timeData;
+var isPlaying=false;
+const TOTAL_DUR=6.0;
+var smoothAmp=0;
+var waveformData=null;
+fetch('bismillah-wave.json').then(r=>r.json()).then(d=>{waveformData=d;});
+
+function getAmp(){
+  if(analyser&&timeData){
+    analyser.getByteTimeDomainData(timeData);
+    let rms=0;for(let i=0;i<timeData.length;i++){const v=(timeData[i]-128)/128;rms+=v*v;}
+    const live=Math.sqrt(rms/timeData.length);if(live>.005)return live;
+  }
+  if(waveformData){
+    const t=(typeof window._synthTime==='number')?window._synthTime/TOTAL_DUR:(audio?audio.currentTime/TOTAL_DUR:0);
+    if(t>0)return waveformData[Math.min(Math.floor(t*waveformData.length),waveformData.length-1)]||0;
+  }
+  return 0;
+}
+
+// ══════════════════════════════════════════════════════════════
+// TAJWEED EVENTS — timestamped against Mishary's Bismillah
+// Each event: { time (seconds), type, letter, size (0-1), side (1 or -1), desc }
+// ══════════════════════════════════════════════════════════════
+const TAJWEED = [
+  // ══ بِسْمِ — "Bismi" (0.0–0.75s) ══
+  { t:0.05, type:'bud',      letter:'بِ', size:0.35, side:-1, desc:'Ba+kasra — opening, downward bud' },
+  { t:0.15, type:'leaf',     letter:'بِ', size:0.3, side:1,   desc:'Ba vowel release — small leaf' },
+  { t:0.28, type:'thorn',    letter:'سْ', size:0.35, side:1,  desc:'Seen+sukoon — sibilant rest' },
+  { t:0.38, type:'leaf',     letter:'سْ', size:0.25, side:-1, desc:'Seen tail — tiny leaf' },
+  { t:0.50, type:'ghunnah',  letter:'مِ', size:0.5, side:-1,  desc:'Meem — nasal resonance glow' },
+  { t:0.58, type:'bud',      letter:'مِ', size:0.3, side:1,   desc:'Meem release — small bud' },
+  { t:0.68, type:'leaf',     letter:'مِ', size:0.2, side:-1,  desc:'Kasra tail' },
+
+  // ══ اللَّهِ — "Allāhi" (0.75–1.50s) — THE WORD ══
+  { t:0.78, type:'bud',      letter:'ا', size:0.3, side:1,    desc:'Alif — opening breath' },
+  { t:0.85, type:'golden_rose', letter:'للَّ', size:1.0, side:1, desc:'Laam+shaddah — ALLAH — biggest golden rose' },
+  { t:0.95, type:'vine',     letter:'للَّ', size:0.5, side:-1, desc:'Laam sustain — short vine' },
+  { t:1.08, type:'leaf',     letter:'لـَ', size:0.35, side:1,  desc:'Fatha on laam — leaf' },
+  { t:1.18, type:'leaf',     letter:'ـا', size:0.3, side:-1,   desc:'Alif extension' },
+  { t:1.30, type:'bud',      letter:'هِ', size:0.2, side:-1,   desc:'Ha — breath letter, tiny bud' },
+  { t:1.38, type:'leaf',     letter:'هِ', size:0.15, side:1,   desc:'Ha kasra release' },
+
+  // ══ الرَّحْمَـٰنِ — "Ar-Raḥmāni" (1.50–3.00s) ══
+  { t:1.52, type:'leaf',     letter:'ا', size:0.25, side:1,    desc:'Alif connector' },
+  { t:1.60, type:'rose',     letter:'رَّ', size:0.8, side:1,   desc:'Ra+shaddah — heavy+doubled, crimson rose' },
+  { t:1.72, type:'leaf',     letter:'رَ', size:0.35, side:-1,  desc:'Ra fatha — leaf unfurling' },
+  { t:1.85, type:'bud',      letter:'رَّ', size:0.4, side:1,   desc:'Shaddah echo — second bud' },
+  { t:1.98, type:'thorn',    letter:'حْ', size:0.3, side:-1,   desc:'Ha+sukoon — rest, thorn' },
+  { t:2.08, type:'leaf',     letter:'حْ', size:0.2, side:1,    desc:'Ha release' },
+  { t:2.18, type:'ghunnah',  letter:'مَ', size:0.55, side:-1,  desc:'Meem — nasal onset glow' },
+  { t:2.28, type:'vine',     letter:'مَـٰ', size:0.75, side:1, desc:'Meem+alif madd (~2 beats) — long vine' },
+  { t:2.42, type:'leaf',     letter:'ـٰ', size:0.35, side:-1,  desc:'Alif madd sustain — leaf along vine' },
+  { t:2.55, type:'leaf',     letter:'ـٰ', size:0.3, side:1,    desc:'Madd continuing' },
+  { t:2.68, type:'ghunnah',  letter:'نِ', size:0.45, side:-1,  desc:'Noon — nasal glow' },
+  { t:2.78, type:'bud',      letter:'نِ', size:0.3, side:1,    desc:'Noon release — bud' },
+  { t:2.88, type:'leaf',     letter:'نِ', size:0.2, side:-1,   desc:'Kasra close' },
+
+  // ══ الرَّحِيمِ — "Ar-Raḥīmi" (3.00–5.50s) ══
+  { t:3.05, type:'leaf',     letter:'ا', size:0.25, side:1,    desc:'Alif connector' },
+  { t:3.15, type:'rose',     letter:'رَّ', size:0.7, side:-1,  desc:'Ra+shaddah — strong rose, second Raḥ' },
+  { t:3.28, type:'leaf',     letter:'رَ', size:0.3, side:1,    desc:'Ra fatha release' },
+  { t:3.40, type:'bud',      letter:'رَّ', size:0.35, side:-1, desc:'Shaddah echo' },
+  { t:3.55, type:'bud',      letter:'حِ', size:0.25, side:1,   desc:'Ha+kasra — delicate' },
+  { t:3.65, type:'leaf',     letter:'حِ', size:0.2, side:-1,   desc:'Ha breath' },
+  { t:3.78, type:'vine',     letter:'ـيـ', size:1.0, side:1,   desc:'Ya-madd (~4 beats) — LONGEST vine, final flourish' },
+  { t:3.95, type:'leaf',     letter:'ـيـ', size:0.4, side:-1,  desc:'Ya sustain — leaf' },
+  { t:4.15, type:'leaf',     letter:'ـيـ', size:0.35, side:1,  desc:'Madd continuing' },
+  { t:4.35, type:'leaf',     letter:'ـيـ', size:0.3, side:-1,  desc:'Madd still going' },
+  { t:4.55, type:'bud',      letter:'ـيـ', size:0.3, side:1,   desc:'Madd winding down — bud' },
+  { t:4.75, type:'ghunnah',  letter:'مِ', size:0.4, side:-1,   desc:'Final meem — closing nasal glow' },
+  { t:4.88, type:'bud',      letter:'مِ', size:0.3, side:1,    desc:'Meem release' },
+  { t:5.00, type:'leaf',     letter:'مِ', size:0.2, side:-1,   desc:'Final kasra' },
+  { t:5.15, type:'bloom',    letter:'وقف', size:0.7, side:1,   desc:'Waqf — all roses fully bloom' },
+  { t:5.35, type:'leaf',     letter:'—', size:0.15, side:1,    desc:'Silence leaf — breath settling' },
+  { t:5.50, type:'leaf',     letter:'—', size:0.1, side:-1,    desc:'Final whisper' },
+];
+
+const GOLDEN_ANGLE = 137.508 * Math.PI / 180;
+
+// ── Permanent garden elements ────────────────────────────────
+var garden = []; // never removed
+var tajweedIdx = 0; // next event to process
+var glows = [];  // temporary ghunnah glows (fade but slowly)
+
+function spawnGardenElement(evt, progress) {
+  const ci = Math.min(Math.floor(progress * (curvePoints.length-1)), curvePoints.length-1);
+  const col = pathColor(progress);
+  const base = {
+    ci: ci,
+    side: evt.side,
+    born: progress,
+    col: col,
+    baseRot: Math.random() * Math.PI * 2,
+  };
+
+  switch(evt.type) {
+    case 'golden_rose':
+      garden.push({...base, kind:'rose',
+        maxR: (55 + evt.size * 70) * dpr,
+        petalCount: Math.floor(26 + evt.size * 24),
+        stemLen: (60 + evt.size * 80) * dpr,
+        stemW: (3.5 + evt.size * 3) * dpr,
+        golden: true,
+        growDur: 0.08,
+      });
+      break;
+
+    case 'rose':
+      garden.push({...base, kind:'rose',
+        maxR: (30 + evt.size * 50) * dpr,
+        petalCount: Math.floor(14 + evt.size * 22),
+        stemLen: (35 + evt.size * 60) * dpr,
+        stemW: (2.5 + evt.size * 3) * dpr,
+        golden: false,
+        growDur: 0.06,
+      });
+      break;
+
+    case 'bud':
+      garden.push({...base, kind:'bud',
+        maxR: (8 + evt.size * 12) * dpr,
+        stemLen: (12 + evt.size * 18) * dpr,
+        stemW: (1 + evt.size) * dpr,
+        growDur: 0.04,
+      });
+      break;
+
+    case 'thorn':
+      garden.push({...base, kind:'thorn',
+        len: (10 + evt.size * 15) * dpr,
+        growDur: 0.03,
+      });
+      break;
+
+    case 'vine':
+      garden.push({...base, kind:'vine',
+        maxLen: (100 + evt.size * 300) * dpr,
+        width: (2 + evt.size * 3) * dpr,
+        growDur: 0.10 + evt.size * 0.08,
+        leafCount: Math.floor(4 + evt.size * 10),
+      });
+      break;
+
+    case 'leaf':
+      garden.push({...base, kind:'leaf',
+        leafSize: (10 + evt.size * 20) * dpr,
+        leafAngle: base.baseRot + evt.side * 0.5,
+        growDur: 0.03,
+      });
+      break;
+
+    case 'ghunnah':
+      glows.push({
+        ci: ci,
+        born: progress,
+        maxR: (40 + evt.size * 60) * dpr,
+        col: col,
+        dur: 0.12, // fades over this progress range
+      });
+      break;
+
+    case 'bloom':
+      // Signal all roses to fully open
+      for(const g of garden) {
+        if(g.kind === 'rose' || g.kind === 'bud') g.forceBloom = progress;
+      }
+      break;
+  }
+}
+
+// ── Drawing functions ────────────────────────────────────────
+
+function drawRose(x, y, maxR, petalCount, bloom, baseRot, col, golden) {
+  const petals = Math.floor(petalCount * bloom);
+  if(petals < 1) return;
+
+  for(let i = 0; i < petals; i++) {
+    const angle = i * GOLDEN_ANGLE + baseRot;
+    const frac = i / petalCount;
+    const dist = maxR * Math.sqrt(frac) * bloom;
+    const px = x + Math.cos(angle) * dist;
+    const py = y + Math.sin(angle) * dist;
+    const petalR = maxR * (0.12 + frac * 0.22) * bloom;
+
+    // Gold for Allah, rose family for others
+    let r, g, b;
+    if(golden) {
+      r = Math.round(255 - frac * 40);
+      g = Math.round(200 - frac * 60);
+      b = Math.round(80 + frac * 30);
+    } else {
+      const lf = frac;
+      r = Math.round(col[0] + (255 - col[0]) * (1 - lf) * 0.4);
+      g = Math.round(col[1] + (255 - col[1]) * (1 - lf) * 0.3);
+      b = Math.round(col[2] + (255 - col[2]) * (1 - lf) * 0.3);
+    }
+
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(angle + Math.PI * 0.3);
+    const s = petalR;
+    ctx.beginPath();
+    ctx.moveTo(0, -s);
+    const bx = s * 0.55, by = s * 0.35;
+    ctx.bezierCurveTo(bx, -by, bx, by * 1.4, 0, s * 0.65);
+    ctx.bezierCurveTo(-bx, by * 1.4, -bx, -by, 0, -s);
+    ctx.closePath();
+    ctx.globalAlpha = 0.7 + 0.3 * (1 - frac);
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Center pistil
+  if(bloom > 0.4) {
+    ctx.beginPath();
+    ctx.arc(x, y, maxR * 0.07 * bloom, 0, Math.PI * 2);
+    ctx.fillStyle = golden ? `rgba(255,240,180,${0.9*bloom})` : `rgba(255,220,180,${0.8*bloom})`;
+    ctx.fill();
+  }
+
+  // Golden glow for Allah
+  if(golden && bloom > 0.3) {
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, maxR * 1.3 * bloom);
+    grad.addColorStop(0, `rgba(255,215,80,${0.15*bloom})`);
+    grad.addColorStop(1, 'rgba(255,215,80,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, maxR * 1.3 * bloom, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawStem(fromX, fromY, toX, toY, thickness, bloom, col) {
+  if(bloom < 0.05) return;
+  const dx = toX - fromX, dy = toY - fromY;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  const mx = (fromX + toX) / 2 - dy * 0.12;
+  const my = (fromY + toY) / 2 + dx * 0.12;
+  ctx.beginPath();
+  ctx.moveTo(fromX, fromY);
+  ctx.quadraticCurveTo(mx, my, fromX + (toX - fromX) * bloom, fromY + (toY - fromY) * bloom);
+  ctx.strokeStyle = `rgba(70,110,55,${0.55*bloom})`;
+  ctx.lineWidth = thickness;
+  ctx.stroke();
+}
+
+function drawLeaf(x, y, angle, size, bloom) {
+  if(bloom < 0.2) return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  const s = size * bloom;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.bezierCurveTo(s*0.4, -s*0.3, s*0.9, -s*0.1, s*0.75, s*0.12);
+  ctx.bezierCurveTo(s*0.5, s*0.3, s*0.2, s*0.15, 0, 0);
+  ctx.fillStyle = `rgba(65,105,45,${0.5*bloom})`;
+  ctx.fill();
+  // Leaf vein
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(s*0.6, s*0.02);
+  ctx.strokeStyle = `rgba(90,140,60,${0.3*bloom})`; ctx.lineWidth = 0.8*dpr; ctx.stroke();
+  ctx.restore();
+}
+
+function drawBud(x, y, maxR, bloom, col) {
+  // Closed or partially open bud
+  const layers = 3;
+  for(let i = 0; i < layers; i++) {
+    const f = i / layers;
+    const angle = i * 0.8 + bloom * 0.3;
+    const r = maxR * (0.5 + f * 0.5) * Math.min(1, bloom * 1.5);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    const s = r;
+    ctx.moveTo(0, -s);
+    ctx.bezierCurveTo(s*0.4, -s*0.2, s*0.4, s*0.3, 0, s*0.5);
+    ctx.bezierCurveTo(-s*0.4, s*0.3, -s*0.4, -s*0.2, 0, -s);
+    ctx.closePath();
+    const lr = Math.round(col[0] + (255-col[0]) * (1-f) * 0.3);
+    const lg = Math.round(col[1] + (255-col[1]) * (1-f) * 0.2);
+    const lb = Math.round(col[2] + (255-col[2]) * (1-f) * 0.2);
+    ctx.globalAlpha = 0.6 + f * 0.3;
+    ctx.fillStyle = `rgb(${lr},${lg},${lb})`;
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawThorn(x, y, len, angle, bloom) {
+  if(bloom < 0.1) return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  const l = len * bloom;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(l * 0.15, -l * 0.3);
+  ctx.lineTo(0, -l);
+  ctx.lineTo(-l * 0.15, -l * 0.3);
+  ctx.closePath();
+  ctx.fillStyle = `rgba(100,80,60,${0.6*bloom})`;
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawVine(cx, cy, normal, side, maxLen, width, bloom, leafCount, baseRot, col) {
+  if(bloom < 0.05) return;
+  const len = maxLen * bloom;
+  const steps = 30;
+  // Vine curves away from the main stem organically
+  ctx.beginPath();
+  const pts = [];
+  for(let i = 0; i <= steps; i++) {
+    const f = i / steps;
+    const along = len * f;
+    // Gentle S-curve
+    const sway = Math.sin(f * Math.PI * 2 + baseRot) * along * 0.15;
+    const vx = cx + normal.x * along * side + normal.y * sway;
+    const vy = cy + normal.y * along * side - normal.x * sway;
+    pts.push({x: vx, y: vy});
+    if(i === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
+  }
+  ctx.strokeStyle = `rgba(65,105,45,${0.5*bloom})`;
+  ctx.lineWidth = width * (1.2 - bloom * 0.3);
+  ctx.stroke();
+
+  // Leaves along vine at fibonacci-ish intervals
+  for(let i = 0; i < leafCount; i++) {
+    const f = (i + 1) / (leafCount + 1);
+    const bloomF = Math.max(0, Math.min(1, (bloom - f * 0.3) * 2.5));
+    if(bloomF < 0.1) continue;
+    const pi = Math.floor(f * (pts.length - 1));
+    const p = pts[pi];
+    const angle = baseRot + i * GOLDEN_ANGLE + Math.PI * side * 0.3;
+    drawLeaf(p.x, p.y, angle, (8 + i * 3) * dpr, bloomF);
+  }
+
+  // Small bud at vine tip
+  if(bloom > 0.6) {
+    const tip = pts[pts.length - 1];
+    drawBud(tip.x, tip.y, 6 * dpr, Math.min(1, (bloom - 0.6) * 3), col);
+  }
+}
+
+// ── Traveling petal sprites ──────────────────────────────────
+var petalCanvases=[];
+function buildPetals(){
+  petalCanvases=[];
+  const hues=[
+    ['#FFD0D8','#E83E6C','#8B1A3A'],
+    ['#FFDDD0','#FF6B8A','#C2185B'],
+    ['#FFE0E8','#FF8E72','#E87C5E'],
+    ['#FFC8D0','#E83E6C','#A01040'],
+    ['#FFD8C0','#FFAA5C','#C25252'],
+  ];
+  for(let v=0;v<5;v++){
+    const pc=document.createElement('canvas');
+    const sz=Math.round(64*(dpr||2)); pc.width=sz; pc.height=sz;
+    const pctx=pc.getContext('2d');
+    pctx.translate(sz/2,sz/2);
+    pctx.rotate((v*0.5)-1.2);
+    const s=sz*0.38;
+    pctx.beginPath();pctx.moveTo(0,-s);
+    const bx=s*(0.5+v*0.06),by=s*0.3;
+    pctx.bezierCurveTo(bx,-by,bx,by*1.5,0,s*0.7);
+    pctx.bezierCurveTo(-bx,by*1.5,-bx,-by,0,-s);
+    pctx.closePath();
+    const g=pctx.createRadialGradient(0,-s*0.15,s*0.1,0,s*0.1,s);
+    g.addColorStop(0,hues[v][0]);g.addColorStop(0.5,hues[v][1]);g.addColorStop(1,hues[v][2]);
+    pctx.fillStyle=g;pctx.fill();
+    pctx.beginPath();pctx.moveTo(0,-s*0.8);pctx.lineTo(0,s*0.5);
+    pctx.strokeStyle='rgba(255,255,255,0.15)';pctx.lineWidth=1;pctx.stroke();
+    petalCanvases.push(pc);
+  }
+}
+
+var dots=[];
+var lastT=-1;
+var fallingPetals=[]; // petals that dropped off the tail
+
+function animate(){
+  requestAnimationFrame(animate);
+  ctx.fillStyle='#0D0D0D';ctx.fillRect(0,0,W,H);
+  if(!curvePoints.length)return;
+
+  const time=(typeof window._synthTime==='number')?window._synthTime:(audio?audio.currentTime:0);
+  const progress=Math.min(time/TOTAL_DUR,1);
+  if(typeof window._synthTime==='number')isPlaying=true;
+
+  const rawAmp=isPlaying?getAmp():0;
+  smoothAmp+=(rawAmp-smoothAmp)*0.12;
+  const energy=Math.min(1,smoothAmp*3);
+
+  // ── Process tajweed events ────────────────────────────────
+  while(tajweedIdx < TAJWEED.length && time >= TAJWEED[tajweedIdx].t) {
+    spawnGardenElement(TAJWEED[tajweedIdx], TAJWEED[tajweedIdx].t / TOTAL_DUR);
+    tajweedIdx++;
+  }
+
+  // ── Borders ───────────────────────────────────────────────
+  const outerPad=W*.024;
+  ctx.strokeStyle='#3D3D3D';ctx.lineWidth=1*dpr;ctx.strokeRect(outerPad,outerPad,W-outerPad*2,H-outerPad*2);
+  const innerPad=W*.032;
+  ctx.strokeStyle='#2A2A2A';ctx.strokeRect(innerPad,innerPad,W-innerPad*2,H-innerPad*2);
+
+  // ── Dot-presence-driven split ─────────────────────────────
+  const splitGap=(60+energy*180)*dpr; // wider base gap so strands stay visibly separate
+  const splitBlur=40;
+  const dotPresence=new Float32Array(curvePoints.length);
+  for(const d of dots){
+    const ci=Math.min(d.ci,curvePoints.length-1);
+    const age=(progress-d.born)/0.09;
+    const strength=Math.max(0,1-age);
+    for(let j=-splitBlur;j<=splitBlur;j++){
+      const idx=ci+j;
+      if(idx>=0&&idx<curvePoints.length){
+        const falloff=1-Math.abs(j)/splitBlur;
+        dotPresence[idx]=Math.max(dotPresence[idx],strength*falloff*falloff);
+      }
+    }
+  }
+  const smoothedPresence=new Float32Array(curvePoints.length);
+  for(let i=0;i<curvePoints.length;i++)smoothedPresence[i]=dotPresence[i];
+  for(let pass=0;pass<3;pass++){
+    for(let i=2;i<curvePoints.length-2;i++){
+      smoothedPresence[i]=smoothedPresence[i]*.4+(smoothedPresence[i-1]+smoothedPresence[i+1])*.2
+        +(smoothedPresence[i-2]+smoothedPresence[i+2])*.1;
+    }
+  }
+  const displacements=[];
+  for(let i=0;i<curvePoints.length;i++) displacements.push(splitGap*smoothedPresence[i]);
+
+  // ── Draw ghunnah glows (behind everything) ────────────────
+  for(let i = glows.length-1; i >= 0; i--) {
+    const g = glows[i];
+    const age = progress - g.born;
+    const alpha = Math.max(0, 1 - age / g.dur);
+    if(alpha <= 0) { glows.splice(i, 1); continue; }
+    const ci = Math.min(g.ci, curvePoints.length-1);
+    const p = curvePoints[ci];
+    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, g.maxR * alpha);
+    grad.addColorStop(0, `rgba(${g.col[0]},${g.col[1]},${g.col[2]},${0.12*alpha})`);
+    grad.addColorStop(0.5, `rgba(${g.col[0]},${g.col[1]},${g.col[2]},${0.05*alpha})`);
+    grad.addColorStop(1, `rgba(${g.col[0]},${g.col[1]},${g.col[2]},0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(p.x, p.y, g.maxR * alpha, 0, Math.PI*2); ctx.fill();
+  }
+
+  // ── Draw garden elements (permanent) ──────────────────────
+  for(const g of garden) {
+    const elapsed = progress - g.born;
+    const ci = Math.min(g.ci, curvePoints.length-1);
+    const n = getNormalIdx(ci);
+    const disp = displacements[ci] || 0;
+    // Garden elements follow the weaving paths
+    const wt = ci / (curvePoints.length - 1);
+    const weavePhase = g.side > 0 ? 0 : Math.PI; // each side follows its own helix strand
+    const weave = Math.sin(wt * Math.PI * 2 * 4.5 + weavePhase);
+    const baseX = curvePoints[ci].x + n.x * disp * weave;
+    const baseY = curvePoints[ci].y + n.y * disp * weave;
+
+    // Force bloom from waqf event
+    const growDur = g.growDur || 0.06;
+    let bloom = Math.min(1, elapsed / growDur);
+    if(g.forceBloom !== undefined) bloom = Math.max(bloom, Math.min(1, (progress - g.forceBloom) / 0.04));
+
+    switch(g.kind) {
+      case 'rose': {
+        const tipX = baseX + n.x * g.stemLen * g.side;
+        const tipY = baseY + n.y * g.stemLen * g.side;
+        const stemB = Math.min(1, bloom * 2); // stem first
+        const roseB = Math.max(0, bloom * 2 - 1); // then bloom
+        drawStem(baseX, baseY, tipX, tipY, g.stemW, stemB, g.col);
+        // Leaf on stem
+        if(stemB > 0.5) {
+          const lx = baseX + (tipX-baseX)*0.4, ly = baseY + (tipY-baseY)*0.4;
+          const la = Math.atan2(tipY-baseY, tipX-baseX) + 0.5 * g.side;
+          drawLeaf(lx, ly, la, g.stemW * 5, stemB);
+        }
+        const rx = baseX + (tipX-baseX)*stemB;
+        const ry = baseY + (tipY-baseY)*stemB;
+        drawRose(rx, ry, g.maxR, g.petalCount, roseB, g.baseRot, g.col, g.golden);
+        break;
+      }
+      case 'bud': {
+        const tipX = baseX + n.x * g.stemLen * g.side;
+        const tipY = baseY + n.y * g.stemLen * g.side;
+        drawStem(baseX, baseY, tipX, tipY, g.stemW, bloom, g.col);
+        const bx = baseX + (tipX-baseX)*bloom;
+        const by = baseY + (tipY-baseY)*bloom;
+        drawBud(bx, by, g.maxR, bloom, g.col);
+        break;
+      }
+      case 'thorn': {
+        const angle = Math.atan2(n.y * g.side, n.x * g.side);
+        drawThorn(baseX, baseY, g.len, angle, bloom);
+        break;
+      }
+      case 'vine': {
+        drawVine(baseX, baseY, n, g.side, g.maxLen, g.width, bloom,
+                 g.leafCount, g.baseRot, g.col);
+        break;
+      }
+      case 'leaf': {
+        drawLeaf(baseX, baseY, g.leafAngle, g.leafSize, bloom);
+        break;
+      }
+    }
+  }
+
+  // ── Growing vine stalks along weaving paths ──
+  const WEAVE_FREQ = 4.5;
+  const CL = curvePoints.length;
+  const growCI = Math.min(Math.floor(progress * (CL - 1)), CL - 1); // only draw up to current progress
+
+  for(let strand = 0; strand < 2; strand++) {
+    const phase = strand === 0 ? 0 : Math.PI;
+    // Base stalk color shifts with progress (deep green → warm green)
+    ctx.beginPath();
+    let prevPx, prevPy;
+    for(let i = 0; i <= growCI; i++) {
+      const t = i / (CL - 1);
+      const weave = Math.sin(t * Math.PI * 2 * WEAVE_FREQ + phase);
+      const n = getNormalIdx(i), d = displacements[i];
+      const px = curvePoints[i].x + n.x * d * weave;
+      const py = curvePoints[i].y + n.y * d * weave;
+      if(i === 0) { ctx.moveTo(px, py); }
+      else { ctx.lineTo(px, py); }
+      prevPx = px; prevPy = py;
+    }
+    // Stalk width tapers: thick at base → thin at growth tip
+    const baseW = 3.5 * dpr;
+    const tipW = 1.0 * dpr;
+    // Draw with gradient stroke (approximate with lineWidth)
+    const stalkGreen = strand === 0 ? 'rgba(45,90,30,0.7)' : 'rgba(35,75,25,0.65)';
+    ctx.strokeStyle = stalkGreen;
+    ctx.lineWidth = (baseW + tipW) / 2; // average width
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Draw thinner highlight stroke for depth
+    ctx.beginPath();
+    for(let i = 0; i <= growCI; i++) {
+      const t = i / (CL - 1);
+      const weave = Math.sin(t * Math.PI * 2 * WEAVE_FREQ + phase);
+      const n = getNormalIdx(i), d = displacements[i];
+      const px = curvePoints[i].x + n.x * d * weave;
+      const py = curvePoints[i].y + n.y * d * weave;
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.strokeStyle = 'rgba(80,140,50,0.35)';
+    ctx.lineWidth = 1.5 * dpr;
+    ctx.stroke();
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // ISLAMIC HARMONIC GARDEN — φ governs neighbor proportions,
+  // √2 governs minimum spacing, Fibonacci cycles element sizes
+  // ══════════════════════════════════════════════════════════════
+  const PHI = 1.618033988749;
+  const SQRT2 = 1.41421356;
+  const FIB = [3,5,8,5,3,8,2,5,8,3,5,1,8,5,3]; // weighted toward larger values
+
+  if(isPlaying && progress > 0 && energy > 0.02) {
+    const fillRate = 0.000015 - energy * 0.000012; // 10x denser
+    if(!window._lastFillT) window._lastFillT = 0;
+    if(!window._fibIdx) window._fibIdx = 0;
+    if(!window._occ) window._occ = []; // occupancy: {ci, side, r}
+
+    if(progress - window._lastFillT >= fillRate) {
+      const ci = Math.min(Math.floor(progress * (curvePoints.length-1)), curvePoints.length-1);
+      const col = pathColor(progress);
+
+      // ── φ-aware side: prefer less occupied side nearby ──
+      let up=0,dn=0;
+      for(const o of window._occ){if(Math.abs(o.ci-ci)<25){if(o.s>0)up++;else dn++;}}
+      let side;
+      if(up>dn+2) side=-1; else if(dn>up+2) side=1;
+      else side=(Math.random()>0.5)?1:-1;
+
+      // ── Fibonacci size cycle — biased large ──
+      const fibS = FIB[window._fibIdx % FIB.length] / 4; // 0.25 → 2.0
+      window._fibIdx++;
+
+      // ── Nearest neighbor on same side ──
+      let nearD=Infinity, nearR=0;
+      for(const o of window._occ){
+        const d=Math.abs(o.ci-ci);
+        if(o.s===side && d<nearD){nearD=d;nearR=o.r;}
+      }
+
+      // ── φ-ratio sizing — much more generous ──
+      let sizeVar;
+      if(nearD < 5 && nearR > 0) {
+        // Very close: still φ-relate but allow larger
+        sizeVar = (nearR/(10*dpr)) / PHI + 0.3;
+        sizeVar = Math.max(0.2, Math.min(5, sizeVar));
+      } else if(nearD < 20) {
+        // Nearby: fibonacci × energy
+        sizeVar = fibS * (0.6 + energy * 3.0);
+      } else {
+        // Open: go big
+        sizeVar = fibS * PHI * (0.5 + energy * 3.5);
+      }
+
+      // ── Relaxed spacing — only shrink if DIRECTLY on top ──
+      const propR = (6+energy*18)*dpr*sizeVar;
+      let crowded=false;
+      for(const o of window._occ){
+        if(o.s===side && Math.abs(o.ci-ci)<3){
+          crowded=true; break;
+        }
+      }
+      if(crowded) sizeVar *= 0.4; // still visible, not dust
+
+      const roll = Math.random();
+      let newR = propR;
+
+      if(roll < 0.55) {
+        const ls=(8+energy*35+Math.random()*20)*dpr*sizeVar;
+        newR=ls*0.5;
+        garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
+          kind:'leaf',leafSize:ls,leafAngle:Math.random()*Math.PI*2,
+          growDur:0.012+Math.random()*0.015});
+      } else if(roll < 0.78) {
+        const mr=(6+energy*20+Math.random()*14)*dpr*sizeVar;
+        newR=mr;
+        garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
+          kind:'bud',maxR:mr,stemLen:mr*PHI,stemW:(0.8+energy*1.5)*dpr,growDur:0.02});
+      } else if(roll < 0.93) {
+        const mr=(8+energy*22)*dpr*sizeVar;
+        newR=mr;
+        garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
+          kind:'rose',maxR:mr,petalCount:Math.floor(4+Math.random()*7),
+          stemLen:mr*PHI,stemW:(0.8+energy*1.2)*dpr,golden:false,growDur:0.025});
+      } else {
+        const tl=(5+energy*15)*dpr*sizeVar;
+        newR=tl;
+        garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
+          kind:'thorn',len:tl,growDur:0.015});
+      }
+
+      window._occ.push({ci,s:side,r:newR});
+      if(window._occ.length>500) window._occ.shift();
+      window._lastFillT = progress;
+    }
+  }
+
+  // ── Traveling petal dots ──────────────────────────────────
+  if(isPlaying&&progress>0){
+    const spacing=0.005+Math.random()*0.004;
+    if(lastT<0||progress-lastT>=spacing){
+      const col=pathColor(progress);
+      const minR=4*dpr,maxR=28*dpr;
+      const r=Math.min(maxR,Math.max(minR,minR+energy*(maxR-minR)*4));
+      const curveIdx=Math.min(Math.floor(progress*(curvePoints.length-1)),curvePoints.length-1);
+      const spread=4+energy*10;
+      dots.push({ci:curveIdx,side:1,offX:(Math.random()-.5)*spread*dpr,offY:(Math.random()-.5)*spread*dpr,
+        r:Math.min(maxR,r*(0.6+Math.random()*.7)),col:[...col],born:progress,
+        rot:Math.random()*Math.PI*2,petal:(Math.random()*5)|0});
+      dots.push({ci:curveIdx,side:-1,offX:(Math.random()-.5)*spread*dpr,offY:(Math.random()-.5)*spread*dpr,
+        r:Math.min(maxR,r*(0.5+Math.random()*.8)),col:[...col],born:progress,
+        rot:Math.random()*Math.PI*2,petal:(Math.random()*5)|0});
+      lastT=progress;
+    }
+    // Dying petals → falling petals (drop off the tail with gravity)
+    const alive=[];
+    for(const d of dots){
+      if(progress-d.born>=0.09){
+        // Convert to falling petal
+        const ci=Math.min(d.ci,curvePoints.length-1);
+        const n=getNormalIdx(ci);
+        const disp=displacements[ci]||0;
+        // Falling petals: smaller, each with UNIQUE wave pattern
+        const ti2=Math.min(ci+1,curvePoints.length-1),ti1=Math.max(ci-1,0);
+        const tx=curvePoints[ti2].x-curvePoints[ti1].x, ty=curvePoints[ti2].y-curvePoints[ti1].y;
+        const tl=Math.sqrt(tx*tx+ty*ty)||1;
+        // Each petal gets its own wave frequency, amplitude, and phase
+        const waveFreq = 0.02 + Math.random()*0.07; // slower range for floatier feel
+        const waveAmp = (0.4 + Math.random()*2.0)*dpr; // wider swing range
+        const wavePhase = Math.random()*Math.PI*2;
+        const tumbleSpeed = 0.03 + Math.random()*0.18; // each petal tumbles differently
+        const driftAngle = Math.atan2(ty,tx) + Math.PI + (Math.random()-0.5)*1.4;
+        const driftSpeed = (0.5 + Math.random()*1.2)*dpr; // slower drift
+        const fwt = ci / (curvePoints.length - 1);
+        const fwv = Math.sin(fwt * Math.PI * 2 * 4.5 + (d.side > 0 ? 0 : Math.PI));
+        fallingPetals.push({
+          x: curvePoints[ci].x+n.x*disp*fwv+d.offX,
+          y: curvePoints[ci].y+n.y*disp*fwv+d.offY,
+          vx: Math.cos(driftAngle)*driftSpeed,
+          vy: Math.sin(driftAngle)*driftSpeed + 0.2*dpr,
+          rot: d.rot,
+          rotV: (Math.random()-0.5)*0.15,
+          r: d.r * (0.2 + Math.random()*0.35), // 20-55% of original
+          col: d.col,
+          petal: d.petal,
+          alpha: 0.5,
+          born: progress,
+          wf: waveFreq, wa: waveAmp, wp: wavePhase, ts: tumbleSpeed,
+        });
+      } else {
+        alive.push(d);
+      }
+    }
+    dots=alive;
+  }
+
+  // ── Draw traveling petals ─────────────────────────────────
+  for(const d of dots){
+    const age=(progress-d.born)/0.09;
+    const alpha=Math.max(0,1-age*age);
+    const ci=Math.min(d.ci,curvePoints.length-1);
+    const n=getNormalIdx(ci);
+    const disp=displacements[ci]||0;
+    const dwt = ci / (curvePoints.length - 1);
+    const dwv = Math.sin(dwt * Math.PI * 2 * 4.5 + (d.side > 0 ? 0 : Math.PI));
+    const px=curvePoints[ci].x+n.x*disp*dwv+d.offX;
+    const py=curvePoints[ci].y+n.y*disp*dwv+d.offY;
+    const sz=d.r*2.2;
+    ctx.save();
+    ctx.translate(px,py);
+    ctx.rotate(d.rot+age*0.8);
+    ctx.globalAlpha=alpha*0.85;
+    ctx.drawImage(petalCanvases[d.petal],-sz/2,-sz/2,sz,sz);
+    ctx.restore();
+  }
+
+  // ── Falling petals (shrink toward zero as they approach floor) ──
+  for(let i=fallingPetals.length-1; i>=0; i--){
+    const f=fallingPetals[i];
+    if(!f.age) f.age=0;
+    if(!f.startR) f.startR=f.r; // remember original size
+    f.age++;
+    f.vy += 0.01033*dpr; // 35% less gravity total
+    const wave = Math.sin(f.age * f.wf + f.wp) * f.wa;
+    const wave2 = Math.sin(f.age * f.wf * 0.37 + f.wp * 2.1) * f.wa * 0.4;
+    const da = Math.atan2(f.vy, f.vx);
+    f.x += f.vx + Math.cos(da + Math.PI/2) * (wave + wave2);
+    f.y += f.vy + Math.sin(da + Math.PI/2) * (wave + wave2);
+    f.vx *= 0.992;
+    f.vy *= 0.992;
+    f.rot += f.ts;
+    f.ts += (Math.random()-0.5)*0.004;
+    // Split difference: shrink to ~30% (not zero), gentler fade curve
+    const floorY = H * 0.95;
+    const distToFloor = Math.max(0, floorY - f.y);
+    const totalDrop = floorY - (H * 0.1);
+    const life = Math.max(0, distToFloor / totalDrop);
+    f.r = f.startR * (0.30 + life * 0.70); // shrinks to 30% at floor, not zero
+    f.alpha = (0.15 + life * 0.45); // keeps some presence even near bottom
+    if(life < 0.02 || f.y > floorY){ fallingPetals.splice(i,1); continue; }
+    const sz=f.r*2.2;
+    ctx.save();
+    ctx.translate(f.x, f.y);
+    ctx.rotate(f.rot);
+    ctx.globalAlpha=f.alpha;
+    ctx.drawImage(petalCanvases[f.petal],-sz/2,-sz/2,sz,sz);
+    ctx.restore();
+  }
+
+  // ── Bounding UI ───────────────────────────────────────────
+  if(dots.length>2){
+    let mnX=Infinity,mnY=Infinity,mxX=-Infinity,mxY=-Infinity;
+    for(const d of dots){
+      const ci=Math.min(d.ci,curvePoints.length-1),n=getNormalIdx(ci),disp=displacements[ci]||0;
+      const bwt=ci/(curvePoints.length-1),bwv=Math.sin(bwt*Math.PI*2*4.5+(d.side>0?0:Math.PI));
+      const px=curvePoints[ci].x+n.x*disp*bwv+d.offX,py=curvePoints[ci].y+n.y*disp*bwv+d.offY;
+      mnX=Math.min(mnX,px-d.r);mnY=Math.min(mnY,py-d.r);mxX=Math.max(mxX,px+d.r);mxY=Math.max(mxY,py+d.r);
+    }
+    const pad=20*dpr,bcx=(mnX+mxX)/2,bcy=(mnY+mxY)/2,bR=Math.max(mxX-mnX,mxY-mnY)*.5+pad;
+    ctx.beginPath();ctx.arc(bcx,bcy,bR,0,Math.PI*2);
+    ctx.strokeStyle='rgba(100,180,160,0.08)';ctx.setLineDash([4*dpr,6*dpr]);ctx.lineWidth=1*dpr;ctx.stroke();ctx.setLineDash([]);
+  }
+
+  // ── Leading dot ───────────────────────────────────────────
+  if(isPlaying&&progress>0&&progress<1){
+    const p=curveAt(progress);
+    ctx.beginPath();ctx.arc(p.x,p.y,4*dpr,0,Math.PI*2);
+    ctx.fillStyle='rgba(255,255,255,0.6)';ctx.fill();
+  }
+}
+
+resize();buildPetals();
+window.addEventListener('resize',()=>{resize();buildPetals();});
+document.getElementById('play-btn').addEventListener('click',async()=>{
+  document.getElementById('play-btn').style.display='none';
+  audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  analyser=audioCtx.createAnalyser();analyser.fftSize=2048;analyser.smoothingTimeConstant=0.85;
+  timeData=new Uint8Array(analyser.fftSize);
+  audio=new Audio('bismillah.mp3');
+  const src=audioCtx.createMediaElementSource(audio);src.connect(analyser);analyser.connect(audioCtx.destination);
+  await audio.play();isPlaying=true;
+});
+animate();
+</script>
+</body>
+</html>

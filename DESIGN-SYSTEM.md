@@ -66,6 +66,15 @@ Exception: **Lateef** for Arabic script numerals on the clock only.
 - **No bold body text** — use weight 500 or color/opacity for emphasis
 - Headlines can break across lines — embrace it
 
+### Sticky Text (Zero Layout Shift)
+Any text that updates dynamically (countdowns, headings, coordinates, prayer times) MUST NOT cause layout shift:
+- **`font-variant-numeric: tabular-nums`** — every digit gets equal width
+- **Zero-pad numbers** to fixed width: `009°` not `9°`, `02:14` not `2:14`
+- **Never change `font-weight` on dynamic text** — weight affects character width, causes reflow
+- **Never add/remove `text-decoration`** — underlines change line box height
+- **Use `opacity` and `color` for emphasis** — these are paint-only, zero layout cost
+- **Rule of thumb:** if a value changes at 60fps (compass heading) or on user interaction (swipe preview), it must be sticky text. No exceptions.
+
 ## Icons
 
 ### Phosphor Icons — Thin weight ONLY

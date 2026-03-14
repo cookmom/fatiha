@@ -31,11 +31,67 @@ Things like:
 - Default speaker: Kitchen HomePod
 ```
 
+### Web Scraping — Standard Method
+- **Always use `markitdown`** for converting web pages/docs to clean text for LLM ingestion
+- Already installed: v0.1.5 (`pip show markitdown`)
+- MIT license, Microsoft, no telemetry, no network calls beyond the target URL
+- ```python
+  from markitdown import MarkItDown
+  md = MarkItDown()
+  result = md.convert_url("https://example.com/page")
+  text = result.text_content  # clean markdown string
+  # Or from local file:
+  result = md.convert("/path/to/file.pdf")
+  ```
+- Supports: HTML, PDF, DOCX, XLSX, PPTX, images (OCR), audio, YouTube URLs, EPubs, CSV, JSON, XML, ZIP
+- Use instead of BeautifulSoup/requests for any scrape-to-text pipeline
+- Falls back to `requests` only if markitdown fails on a specific URL
+
+### Local Servers & Ports
+
+| Port | Protocol | What | Root / Script | Portproxy |
+|------|----------|------|---------------|-----------|
+| 4000 | HTTP | Kitchen dashboard | `kitchen/serve.sh` → `canvas/kitchen/` | `127.0.0.1 → 192.168.1.81` |
+| 4100 | HTTP | Kitchen SQLite API | `kitchen/api.py` | `127.0.0.1 → 192.168.1.81` |
+| 7747 | HTTP | AGOT dev server | `/home/tawfeeq/ramadan-clock-site/` | `127.0.0.1 → 192.168.1.81` |
+| 7749 | HTTPS | AGOT phone testing (gyro) | `/home/tawfeeq/ramadan-clock-site/` | `0.0.0.0 → 192.168.1.81` |
+| 11434 | HTTP | Ollama LLM | System service | `127.0.0.1 → 192.168.1.81` |
+
+**Full kitchen docs:** `kitchen/README.md`
+
+**WiFi IP**: `192.168.1.81` (WSL2 mirrored networking)
+
+**Windows portproxy rules** (PowerShell admin — needed after reboot):
+```powershell
+netsh interface portproxy add v4tov4 listenport=4000 listenaddress=127.0.0.1 connectport=4000 connectaddress=192.168.1.81
+netsh interface portproxy add v4tov4 listenport=4100 listenaddress=127.0.0.1 connectport=4100 connectaddress=192.168.1.81
+netsh interface portproxy add v4tov4 listenport=11434 listenaddress=127.0.0.1 connectport=11434 connectaddress=192.168.1.81
+netsh interface portproxy add v4tov4 listenport=7747 listenaddress=127.0.0.1 connectport=7747 connectaddress=192.168.1.81
+netsh interface portproxy add v4tov4 listenport=7749 listenaddress=0.0.0.0 connectport=7749 connectaddress=192.168.1.81
+# Verify: netsh interface portproxy show v4tov4
+```
+
+**Quick health check:**
+```bash
+for p in 4000 4100 11434 7747; do echo "$p: $(curl -s -o /dev/null -w '%{http_code}' http://localhost:$p/)"; done
+```
+
+**Note**: Python HTTP servers die silently. `kitchen/serve.sh` auto-restarts the dashboard. API server (`api.py`) needs manual restart if it dies. Always verify with `ss -tlnp | grep PORT`.
+
 ### Twitter/X Scraping
 - **Primary**: `api.vxtwitter.com` — JSON API, no auth needed
   - Single tweet: `curl -sL "https://api.vxtwitter.com/<handle>/status/<id>"`
   - Returns: full text, media URLs, likes, retweets, date
-- **Backup**: `syndication.twitter.com/srv/timeline-profile/screen-name/<handle>` — full timeline HTML (rate limited)
+- **Profile check**: `syndication.twitter.com/srv/timeline-profile/screen-name/<handle>` — confirms profile exists, returns timeline HTML
+  - ```bash
+    curl -sL "https://syndication.twitter.com/srv/timeline-profile/screen-name/HANDLE" | python3 -c "
+    import sys, re; html = sys.stdin.read()
+    print('NOT FOUND' if 'does not exist' in html else 'EXISTS')
+    m = re.search(r'\"name\":\"([^\"]+)\"', html)
+    if m: print('Name:', m.group(1))
+    "
+    ```
+- **NEVER use `web_fetch` on x.com** — always blocked. Use the above methods.
 - Script: `tools/twitter-feed.sh <handle>` or `tools/twitter-feed.sh --tweet <id>`
 - Use vxtwitter for daily monitoring of tracked handles
 
@@ -96,6 +152,30 @@ Things like:
 - **Fullscreen clock**: fills viewport, subdial at ~(215, 620) → DPR crop: `{x:280, y:1100, width:200, height:200}`
 - Always verify coordinates if layout changes
 
+### Crew Model Assignments (Claude Code CLI)
+| Agent | Model | Flag | Rationale |
+|-------|-------|------|-----------|
+| **Chris (Lookdev)** | Opus | `--model opus` | Aesthetic judgment, taste, nuance |
+| **Devon (Builder)** | Sonnet (default) | _(none)_ | Code implementation |
+| **Brett (Reviewer)** | Sonnet or Qwen local | _(none)_ or Ollama | Diff review, QA |
+| **Bob (3D)** | Sonnet (default) | _(none)_ | Geometry, math |
+
+Claude Code default model: `sonnet` (set in `~/.claude/settings.json`).
+Override per spawn: `claude --model opus --print --permission-mode bypassPermissions "..."`
+
+### Ollama (Local LLM — RTX A6000)
+- **Service**: `systemctl status ollama` (runs on port 11434)
+- **Models**:
+  - `qwen3.5:35b-a3b` (24GB) — **Brett's reviewer model**. Beats Claude Opus 4.5 on SWE-bench. Code review, diff analysis, thinking mode. ~2.8s/200 tokens warm.
+  - `qwen2.5-coder:32b` (19GB) — Backup code model.
+  - `llama3:70b` (39GB) — Heavy reasoning. Needs both GPUs. Slow cold start.
+  - `llama3:latest` (4.7GB) — Lightweight tasks, cron reinforcement. ~1s response.
+- **API**: `curl http://localhost:11434/api/generate -d '{"model":"qwen2.5-coder:32b","prompt":"...","stream":false}'`
+- **Cold start**: ~30s (model load into VRAM). Warm: instant.
+- **VRAM**: Qwen 32B fits on one A6000 (20GB/48GB). Llama 70B spans both.
+- **Brett script**: `brett-review.sh` — reads .crew/BRIEF.md + git diff, sends to Qwen, writes .crew/REVIEW.md
+- **Token cost**: ZERO — all local. No rate limits, no API costs.
+
 ### References
 - `references/claude-skills-guide.pdf` — Anthropic's "Complete Guide to Building Skills for Claude" (33 pages, Jan 2026)
   - Skills = structured systems, not just prompts
@@ -109,3 +189,36 @@ Skills are shared. Your setup is yours. Keeping them apart means you can update 
 ---
 
 Add whatever helps you do your job. This is your cheat sheet.
+
+### Deployment Pipeline (agiftoftime.app)
+
+**Remotes:**
+| Remote | Repo | Purpose |
+|--------|------|---------|
+| `origin` | `cookmom/ramadan-clock-site` | Legacy (backup) |
+| `stagingrepo` | `cookmom/ramadan-clock-site-staging` | Legacy staging preview |
+| `tawfeeq` | `tawfeeqmartin/agiftoftime` | **Primary** — Cloudflare deploys from here |
+
+**Branches:** `staging` (dev) → `main` (production)
+
+**Hosting:** Cloudflare Pages (free tier), auto-deploys on push to `main`
+
+**Domain:** `agiftoftime.app` — DNS via Cloudflare, registered on Squarespace
+
+**Production vs Staging behavior** (same codebase, hostname switch):
+- `agiftoftime.app` → production: dev panel disabled (D key + `?dev` blocked), version tag hidden
+- `agiftoftime.pages.dev` / `localhost` / staging URLs → dev panel + version tag enabled
+- Gate: `var _isProduction = (location.hostname === 'agiftoftime.app');` in `glass-cube-clock.js`
+
+**Push flow:**
+```bash
+# After edits:
+./test-render.sh                    # GPU Chrome verify
+git add -A && git commit -m "msg"   # commits as Tawfeeq Martin
+git push tawfeeq staging            # staging preview
+git push tawfeeq staging:main       # production deploy (auto via Cloudflare)
+```
+
+**Git author:** `Tawfeeq Martin <tawfeeqmartin@gmail.com>` (repo-level config)
+
+**GitHub token (tawfeeqmartin):** Fine-grained PAT, all repos, admin+contents. Stored in `tawfeeq` remote URL.

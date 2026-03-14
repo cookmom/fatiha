@@ -1,0 +1,233 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AGOT Glass Cube Clock — Shader Snippets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0d0d12;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    color: #cdd6f4;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    gap: 40px;
+  }
+
+  .card {
+    background: #1e1e2e;
+    border: 1px solid rgba(137, 180, 250, 0.12);
+    border-radius: 16px;
+    padding: 0;
+    width: 780px;
+    overflow: hidden;
+    box-shadow:
+      0 4px 24px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(137, 180, 250, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px 12px;
+    border-bottom: 1px solid rgba(137, 180, 250, 0.06);
+  }
+
+  .card-title {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #89b4fa;
+  }
+
+  .card-lang {
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #585b70;
+  }
+
+  .dots {
+    display: flex;
+    gap: 6px;
+  }
+  .dots span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: block;
+  }
+  .dots .red { background: #f38ba8; opacity: 0.7; }
+  .dots .yellow { background: #f9e2af; opacity: 0.7; }
+  .dots .green { background: #a6e3a1; opacity: 0.7; }
+
+  pre {
+    padding: 20px 24px 24px;
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-x: hidden;
+    white-space: pre;
+    tab-size: 2;
+  }
+
+  /* Syntax highlighting — Catppuccin Mocha palette */
+  .kw  { color: #cba6f7; }              /* keywords: uniform, float, vec3, void, return, if, for, const */
+  .fn  { color: #89b4fa; }              /* functions: refract, normalize, clamp, pow, mix, sin, cos, texture2D, smoothstep, atan, exp, abs, dot, length, max, floor, discard */
+  .num { color: #fab387; }              /* numbers */
+  .cm  { color: #585b70; font-style: italic; }  /* comments */
+  .str { color: #a6e3a1; }              /* strings (unused in GLSL but there) */
+  .op  { color: #89dceb; }              /* operators: + - * / = */
+  .pp  { color: #f38ba8; }              /* preprocessor: #define */
+  .tp  { color: #f9e2af; }             /* types/swizzles: .xy .rgb */
+  .var { color: #cdd6f4; }              /* variables — default */
+
+  .watermark {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #313244;
+    text-align: center;
+    padding: 20px;
+  }
+
+  /* Standalone Bismillah card — centered vertically and horizontally */
+  .card-bismillah pre {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 80px;
+    padding: 24px 24px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Card 0: Bismillah (standalone) -->
+<div class="card card-bismillah" id="card-bismillah">
+  <div class="card-header">
+    <div class="dots"><span class="red"></span><span class="yellow"></span><span class="green"></span></div>
+    <span class="card-title">line 1</span>
+    <span class="card-lang">html · comment</span>
+  </div>
+  <pre><span class="cm">&lt;!-- بسم الله الرحمن الرحيم --&gt;</span></pre>
+</div>
+
+<!-- Card 1: Dichroic Refraction -->
+<div class="card" id="card-dichroic">
+  <div class="card-header">
+    <div class="dots"><span class="red"></span><span class="yellow"></span><span class="green"></span></div>
+    <span class="card-title">dichroic refraction</span>
+    <span class="card-lang">glsl · fragment</span>
+  </div>
+  <pre>
+<span class="cm">// بسم الله الرحمن الرحيم</span>
+
+<span class="cm">// Per-face IOR shift — each face bends light differently</span>
+<span class="cm">// Side: wider red-blue split. Top: blue-shifted, tight.</span>
+<span class="kw">float</span> iorR <span class="op">=</span> uIorR <span class="op">+</span> faceX <span class="op">*</span> <span class="num">0.05</span>  <span class="op">-</span> faceY <span class="op">*</span> <span class="num">0.04</span>;
+<span class="kw">float</span> iorG <span class="op">=</span> uIorG <span class="op">-</span> faceX <span class="op">*</span> <span class="num">0.025</span> <span class="op">+</span> faceY <span class="op">*</span> <span class="num">0.03</span>;
+<span class="kw">float</span> iorB <span class="op">=</span> uIorB <span class="op">-</span> faceX <span class="op">*</span> <span class="num">0.045</span> <span class="op">+</span> faceY <span class="op">*</span> <span class="num">0.02</span>;
+
+<span class="cm">// Separate refraction ray per color channel</span>
+<span class="kw">vec3</span> rR <span class="op">=</span> <span class="fn">refract</span>(<span class="op">-</span>e, dn, <span class="num">1.0</span><span class="op">/</span>iorR);
+<span class="kw">vec3</span> rG <span class="op">=</span> <span class="fn">refract</span>(<span class="op">-</span>e, dn, <span class="num">1.0</span><span class="op">/</span>iorG);
+<span class="kw">vec3</span> rB <span class="op">=</span> <span class="fn">refract</span>(<span class="op">-</span>e, dn, <span class="num">1.0</span><span class="op">/</span>iorB);
+
+<span class="cm">// Per-face UV offset — each face samples a different FBO region</span>
+<span class="kw">vec2</span> abXY <span class="op">=</span> <span class="kw">vec2</span>(uAb <span class="op">/</span> uAspect, uAb) <span class="op">*</span> abScale;
+<span class="kw">float</span> R <span class="op">=</span> <span class="fn">texture2D</span>(uScene, <span class="fn">clamp</span>(uv <span class="op">+</span> rR<span class="tp">.xy</span> <span class="op">*</span> abXY, <span class="num">0.001</span>, <span class="num">0.999</span>))<span class="tp">.r</span>;
+<span class="kw">float</span> G <span class="op">=</span> <span class="fn">texture2D</span>(uScene, <span class="fn">clamp</span>(uv <span class="op">+</span> rG<span class="tp">.xy</span> <span class="op">*</span> abXY, <span class="num">0.001</span>, <span class="num">0.999</span>))<span class="tp">.g</span>;
+<span class="kw">float</span> B <span class="op">=</span> <span class="fn">texture2D</span>(uScene, <span class="fn">clamp</span>(uv <span class="op">+</span> rB<span class="tp">.xy</span> <span class="op">*</span> abXY, <span class="num">0.001</span>, <span class="num">0.999</span>))<span class="tp">.b</span>;
+<span class="kw">vec3</span> refracted <span class="op">=</span> <span class="kw">vec3</span>(R, G, B);
+</pre>
+</div>
+
+<!-- Card 2: Prayer Windows -->
+<div class="card" id="card-prayer">
+  <div class="card-header">
+    <div class="dots"><span class="red"></span><span class="yellow"></span><span class="green"></span></div>
+    <span class="card-title">prayer windows</span>
+    <span class="card-lang">glsl · fragment</span>
+  </div>
+  <pre>
+<span class="cm">// بسم الله الرحمن الرحيم</span>
+
+<span class="kw">uniform float</span> uStartAngle, uEndAngle;
+<span class="kw">uniform vec3</span>  uColor1, uColor2;
+<span class="kw">uniform float</span> uIntensity, uOuterRadius, uEdgeFade, uFalloff;
+<span class="kw">varying vec2</span>  vPos;
+
+<span class="kw">void</span> <span class="fn">main</span>() {
+  <span class="kw">float</span> r <span class="op">=</span> <span class="fn">length</span>(vPos);
+  <span class="kw">float</span> radial <span class="op">=</span> <span class="fn">exp</span>(<span class="op">-</span>r <span class="op">/</span> uOuterRadius <span class="op">*</span> uFalloff);
+
+  <span class="kw">float</span> angle <span class="op">=</span> <span class="fn">atan</span>(vPos<span class="tp">.x</span>, <span class="op">-</span>vPos<span class="tp">.y</span>);
+
+  <span class="cm">// Handle wrapping windows (e.g. Tahajjud crossing midnight)</span>
+  <span class="kw">float</span> span <span class="op">=</span> uStartAngle <span class="op">-</span> uEndAngle;
+  <span class="kw">if</span> (span <span class="op">&lt;</span> <span class="num">0.0</span>) span <span class="op">+=</span> TAU;
+  <span class="kw">float</span> mid <span class="op">=</span> uStartAngle <span class="op">-</span> span <span class="op">*</span> <span class="num">0.5</span>;
+
+  <span class="cm">// Signed angular distance with wrapping</span>
+  <span class="kw">float</span> d <span class="op">=</span> angle <span class="op">-</span> mid;
+  d <span class="op">=</span> d <span class="op">-</span> TAU <span class="op">*</span> <span class="fn">floor</span>((d <span class="op">+</span> PI) <span class="op">/</span> TAU);
+  <span class="kw">float</span> angular <span class="op">=</span> <span class="fn">exp</span>(<span class="op">-</span><span class="fn">pow</span>(<span class="fn">max</span>(normDist <span class="op">-</span> <span class="num">0.97</span>, <span class="num">0.0</span>) <span class="op">*</span> uEdgeFade, <span class="num">2.0</span>));
+
+  <span class="cm">// Dichroic color shift across fan</span>
+  <span class="kw">vec3</span> col <span class="op">=</span> <span class="fn">mix</span>(uColor1, uColor2, <span class="fn">clamp</span>(<span class="num">0.5</span> <span class="op">+</span> d<span class="op">/</span>hSpan, <span class="num">0.0</span>, <span class="num">1.0</span>));
+  <span class="kw">float</span> alpha <span class="op">=</span> radial <span class="op">*</span> angular <span class="op">*</span> uIntensity;
+  gl_FragColor <span class="op">=</span> <span class="kw">vec4</span>(col <span class="op">*</span> alpha, alpha);
+}
+</pre>
+</div>
+
+<!-- Card 3: Thin-Film Iridescence -->
+<div class="card" id="card-iridescence">
+  <div class="card-header">
+    <div class="dots"><span class="red"></span><span class="yellow"></span><span class="green"></span></div>
+    <span class="card-title">thin-film iridescence</span>
+    <span class="card-lang">glsl · fragment</span>
+  </div>
+  <pre>
+<span class="cm">// بسم الله الرحمن الرحيم</span>
+
+<span class="cm">// Thin-film interference — color shifts with viewing angle</span>
+<span class="kw">vec3</span> <span class="fn">thinFilm</span>(<span class="kw">float</span> cosT, <span class="kw">float</span> t) {
+  <span class="kw">float</span> p <span class="op">=</span> <span class="num">6.28318</span> <span class="op">*</span> <span class="num">5.0</span> <span class="op">*</span> cosT <span class="op">+</span> t <span class="op">*</span> <span class="num">0.25</span>;
+  <span class="kw">return</span> <span class="kw">vec3</span>(<span class="num">0.5</span><span class="op">+</span><span class="num">0.5</span><span class="op">*</span><span class="fn">cos</span>(p), <span class="num">0.5</span><span class="op">+</span><span class="num">0.5</span><span class="op">*</span><span class="fn">cos</span>(p<span class="op">-</span><span class="num">2.094</span>), <span class="num">0.5</span><span class="op">+</span><span class="num">0.5</span><span class="op">*</span><span class="fn">cos</span>(p<span class="op">+</span><span class="num">2.094</span>));
+}
+
+<span class="cm">// Dichroic iridescence: surface-only, tight diagonal band</span>
+<span class="kw">vec3</span> irid <span class="op">=</span> <span class="fn">thinFilm</span>(cosT, uTime);
+col <span class="op">=</span> <span class="fn">mix</span>(col, col <span class="op">*</span> irid <span class="op">*</span> <span class="num">1.4</span>, diagF <span class="op">*</span> <span class="num">0.22</span>);
+col <span class="op">+=</span> irid <span class="op">*</span> diagF <span class="op">*</span> fresnel <span class="op">*</span> <span class="num">0.12</span>;
+
+<span class="cm">// Fresnel edge: cool blue-white (glass = cold at edges)</span>
+col <span class="op">+=</span> <span class="kw">vec3</span>(<span class="num">0.80</span>, <span class="num">0.92</span>, <span class="num">1.00</span>) <span class="op">*</span> fresnel <span class="op">*</span> <span class="num">0.40</span>;
+
+<span class="cm">// Top-face dichroic — real glass thin-film interference</span>
+<span class="kw">float</span> topFace <span class="op">=</span> <span class="fn">smoothstep</span>(<span class="num">0.5</span>, <span class="num">0.92</span>, Nw<span class="tp">.y</span>);
+<span class="kw">vec3</span> topIrid <span class="op">=</span> <span class="fn">thinFilm</span>(NdotV, uTime <span class="op">*</span> <span class="num">0.4</span>);
+col <span class="op">=</span> <span class="fn">mix</span>(col, col <span class="op">*</span> topIrid <span class="op">*</span> <span class="num">1.6</span> <span class="op">+</span> topIrid <span class="op">*</span> <span class="num">0.18</span>, topFace <span class="op">*</span> <span class="num">0.40</span>);
+<span class="cm">// Fresnel color shift at grazing angles</span>
+<span class="kw">float</span> topFresnel <span class="op">=</span> <span class="fn">pow</span>(<span class="num">1.0</span> <span class="op">-</span> NdotV, <span class="num">3.0</span>) <span class="op">*</span> topFace;
+col <span class="op">+=</span> <span class="kw">vec3</span>(<span class="num">0.25</span>, <span class="num">0.15</span>, <span class="num">0.55</span>) <span class="op">*</span> topFresnel <span class="op">*</span> <span class="num">0.15</span>;
+</pre>
+</div>
+
+<div class="watermark">a gift of time · agiftoftime.app</div>
+
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "timestamp": 1772959466,
+  "label": "20260308-004312",
+  "params_hash": "f0152756d5",
+  "aesthetic": 66.91,
+  "performance": 100.0,
+  "combined": 76.837,
+  "fps_avg": 60.204,
+  "shots": "{\"fajr\": \"/home/openclaw-agent/.openclaw/workspace/autoresearch-agot/screenshots/1772959392_20260308-004312_fajr_f0152756d5.png\", \"dhuhr\": \"/home/openclaw-agent/.openclaw/workspace/autoresearch-agot/screenshots/1772959411_20260308-004312_dhuhr_f0152756d5.png\", \"maghrib\": \"/home/openclaw-agent/.openclaw/workspace/autoresearch-agot/screenshots/1772959429_20260308-004312_maghrib_f0152756d5.png\", \"isha\": \"/home/openclaw-agent/.openclaw/workspace/autoresearch-agot/screenshots/1772959448_20260308-004312_isha_f0152756d5.png\"}",
+  "breakdown": "{\"fajr\": {\"fps\": 60.28912131127797, \"color_richness\": 86.39176568615979, \"contrast\": 33.31166076660156, \"prismatic\": 100.0, \"edge_luminance\": 41.05951690673828, \"brightness_balance\": 96.46109771728516, \"aesthetic\": 73.88836761620776}, \"dhuhr\": {\"fps\": 60.144879378187326, \"color_richness\": 77.80516221213294, \"contrast\": 52.83919143676758, \"prismatic\": 100.0, \"edge_luminance\": 38.878753662109375, \"brightness_balance\": 96.08706665039062, \"aesthetic\": 75.26400219422567}, \"maghrib\": {\"fps\": 60.317248733191775, \"color_richness\": 77.11275104330151, \"contrast\": 31.01624870300293, \"prismatic\": 100.0, \"edge_luminance\": 17.761165618896484, \"brightness_balance\": 59.937686920166016, \"aesthetic\": 62.136265346522556}, \"isha\": {\"fps\": 60.06304961080071, \"color_richness\": 64.08183426511253, \"contrast\": 32.14305114746094, \"prismatic\": 100.0, \"edge_luminance\": 13.57785415649414, \"brightness_balance\": 45.76525115966797, \"aesthetic\": 56.35053497019402}}"
+}
