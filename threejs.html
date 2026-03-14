@@ -124,6 +124,7 @@ const curvePoints=window._cp=[];
     const last=spiralArcs[spiralArcs.length-1];
     curvePoints.push({x:last.cx+Math.cos(last.ea)*last.r, y:last.cy+Math.sin(last.ea)*last.r});
   }
+  curvePoints.reverse(); // start from screen-bottom-right (outer), spiral inward
 }
 const CL=curvePoints.length;
 function getNormal(i){
