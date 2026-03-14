@@ -1071,8 +1071,13 @@ function animate(){
     const leadDisp=disp[Math.min(idx,CL-1)]||0;
     const breatheTarget=60*dpr+leadDisp*1.8;
     if(!window._smoothBreath)window._smoothBreath=breatheTarget;
-    window._smoothBreath+=(breatheTarget-window._smoothBreath)*0.08; // smooth interpolation
-    const boxW=window._smoothBreath,boxH=window._smoothBreath;
+    window._smoothBreath+=(breatheTarget-window._smoothBreath)*0.08;
+    // Scale down near screen edges, scale back up away from them
+    const edgeMargin=80*dpr;
+    const distL=px, distR=WD-px, distT=py, distB=HD-py;
+    const minDist=Math.min(distL,distR,distT,distB);
+    const edgeScale=minDist<edgeMargin?minDist/edgeMargin:1;
+    const boxW=window._smoothBreath*edgeScale,boxH=window._smoothBreath*edgeScale;
     const bx=px-boxW/2,by=py-boxH/2;
     const cSz=6*dpr; // corner square size
     ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=0.8*dpr;
