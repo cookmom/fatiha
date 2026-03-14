@@ -60,74 +60,68 @@ composer.addPass(new RenderPass(scene,camera));
 // composer.addPass(bloom);
 
 /* ═══════════════════════════════════════════════════
-   GOLDEN RATIO SPIRAL — pixel-precise from reference image
+   GOLDEN RATIO SPIRAL — pixel-precise from reference
    ═══════════════════════════════════════════════════ */
 const goldenRects=[];
 const spiralArcs=[];
 const curvePoints=[];
 {
-  const M=20*dpr; // border safe margin
-  const X=M, Y=M, W=WD-M*2, H=HD-M*2;
-  goldenRects.push({x:X,y:Y,w:W,h:H}); // outer frame
+  const PHI=1.618033988749;
+  const M=24*dpr;
+  // Fit a golden rectangle (ratio PHI:1) centered in the canvas
+  // Width = canvas width - margins, height = width * PHI
+  let gw=WD-M*2, gh=gw*PHI;
+  if(gh>HD-M*2){gh=HD-M*2; gw=gh/PHI;}
+  const gx=(WD-gw)/2, gy=(HD-gh)/2;
 
-  // Reference layout (portrait, y-flipped canvas):
-  // 1. Bottom = large square (side = W)
-  const s1=W;
-  const topH=H-s1;
-  goldenRects.push({x:X, y:Y, w:W, h:topH});       // top remainder
-  // horizontal divider drawn by the two rects sharing an edge
-
-  // 2. Top remainder: right = square (side = topH)
-  const s2=topH;
-  const leftW=W-s2;
-  goldenRects.push({x:X+leftW, y:Y, w:s2, h:topH}); // top-right square
-
-  // 3. Top-left remainder: top = square (side = leftW)
-  const s3=leftW;
-  const remH3=topH-s3;
-  goldenRects.push({x:X, y:Y, w:leftW, h:s3});       // top-left square
-
-  // 4. Bottom-left remainder: right = square (side = remH3)
-  const s4=remH3;
-  const remW4=leftW-s4;
-  goldenRects.push({x:X+remW4, y:Y+s3, w:s4, h:remH3}); // mini right square
-
-  // 5. Left mini remainder: bottom = square (side = remW4)
-  const s5=Math.min(remW4, remH3);
-  if(s5>1){
-    goldenRects.push({x:X, y:Y+s3+(remH3-s5), w:s5, h:s5});
-    const remH5=remH3-s5;
-    // 6. Top mini
-    if(remH5>1){
-      const s6=Math.min(remW4, remH5);
-      goldenRects.push({x:X+(remW4-s6), y:Y+s3, w:s6, h:remH5});
+  // Recursive golden subdivision — exactly like reference
+  // Each step: cut a square from the current rect, remainder is new rect
+  // Direction cycles: bottom, right, top, left (matching reference image)
+  let rx=gx, ry=gy, rw=gw, rh=gh;
+  const LEVELS=9;
+  for(let i=0;i<LEVELS;i++){
+    goldenRects.push({x:rx,y:ry,w:rw,h:rh});
+    const sq=Math.min(rw,rh); // square side = shorter dimension
+    const dir=i%4; // 0=bottom, 1=right, 2=top, 3=left
+    let cx,cy;
+    if(dir===0){
+      // Cut square from BOTTOM — square at bottom, remainder on top
+      cx=rx; cy=ry; // arc center = top-left of square... no
+      // Arc: quarter circle in the square, center at appropriate corner
+      // For bottom square: center is at top-left, sweeps from bottom-right to top-right
+      spiralArcs.push({cx:rx, cy:ry+rh-sq, r:sq, sa:Math.PI/2, ea:0});
+      rh-=sq; // remainder is top portion
+    }else if(dir===1){
+      // Cut square from RIGHT
+      spiralArcs.push({cx:rx+rw-sq, cy:ry, r:sq, sa:Math.PI, ea:Math.PI/2});
+      rw-=sq;
+    }else if(dir===2){
+      // Cut square from TOP
+      spiralArcs.push({cx:rx+rw, cy:ry+sq, r:sq, sa:-Math.PI/2, ea:-Math.PI});
+      ry+=sq; rh-=sq;
+    }else{
+      // Cut square from LEFT
+      spiralArcs.push({cx:rx+sq, cy:ry+rh, r:sq, sa:0, ea:-Math.PI/2});
+      rx+=sq; rw-=sq;
     }
   }
 
-  // SPIRAL ARCS — reference shows CLOCKWISE inward spiral
-  // Canvas is Y-flipped: y increases downward in draw coords = upward on screen
-  // Arc 1: bottom square. Center = LEFT side at divider height (X, Y+topH).
-  // Sweeps from bottom-right (down) clockwise to top-left (up-left)
-  // In y-flipped: center at (X, Y+topH), radius=s1
-  // Reference arc goes from point (X+W, Y+H) counterclockwise to (X, Y+topH)
-  spiralArcs.push({cx:X, cy:Y+topH, r:s1, sa:-Math.PI/2, ea:0}); // bottom to right
-
-  // Arc 2: top-right square. Center = (X+W, Y+topH). Radius=s2.
-  spiralArcs.push({cx:X+W, cy:Y+topH, r:s2, sa:Math.PI, ea:Math.PI/2});
-
-  // Arc 3: top-left square. Center = (X+leftW, Y). Radius=s3.
-  spiralArcs.push({cx:X+leftW, cy:Y, r:s3, sa:Math.PI/2, ea:0});
-
-  // Arc 4: mini right square. Center = (X+remW4, Y+s3). Radius=s4.
-  spiralArcs.push({cx:X+remW4, cy:Y+s3, r:s4, sa:0, ea:-Math.PI/2});
-
-  // Arc 5
-  if(s5>1){
-    spiralArcs.push({cx:X, cy:Y+s3+(remH3-s5), r:s5, sa:-Math.PI/2, ea:-Math.PI});
+  // Sample curvePoints along arcs
+  const TARGET=900;
+  let totalR=0;
+  for(const a of spiralArcs) totalR+=a.r;
+  for(const arc of spiralArcs){
+    const n=Math.max(6,Math.round(TARGET*arc.r/totalR));
+    for(let j=0;j<n;j++){
+      const t=j/n;
+      const angle=arc.sa+(arc.ea-arc.sa)*t;
+      curvePoints.push({x:arc.cx+Math.cos(angle)*arc.r, y:arc.cy+Math.sin(angle)*arc.r});
+    }
   }
-
-  const last=spiralArcs[spiralArcs.length-1];
-  curvePoints.push({x:last.cx+Math.cos(last.ea)*last.r, y:last.cy+Math.sin(last.ea)*last.r});
+  if(spiralArcs.length>0){
+    const last=spiralArcs[spiralArcs.length-1];
+    curvePoints.push({x:last.cx+Math.cos(last.ea)*last.r, y:last.cy+Math.sin(last.ea)*last.r});
+  }
 }
 const CL=curvePoints.length;
 function getNormal(i){
