@@ -745,19 +745,23 @@ function animate(){
     ctx.drawImage(petalCanvases[d.petal],-sz/2,-sz/2,sz,sz);ctx.restore();
   }
 
-  // Falling petals
+  // Falling petals — wave as DISPLACEMENT from base position (no trails)
   for(let i=fallingPetals.length-1;i>=0;i--){
     const f=fallingPetals[i];f.age++;
+    // Base physics (no wave — clean trajectory)
     f.vy+=0.01033*dpr;
+    f.bx=(f.bx||f.x)+f.vx; f.by=(f.by||f.y)+f.vy; // track base position
+    f.vx*=0.992;f.vy*=0.992;f.rot+=f.ts;f.ts+=(Math.random()-0.5)*0.004;
+    // Wave as pure displacement from base (recomputed each frame, never accumulated)
     const wave=Math.sin(f.age*f.wf+f.wp)*f.wa;
     const wave2=Math.sin(f.age*f.wf*0.37+f.wp*2.1)*f.wa*0.4;
     const da=Math.atan2(f.vy,f.vx);
-    f.x+=f.vx+Math.cos(da+Math.PI/2)*(wave+wave2);f.y+=f.vy+Math.sin(da+Math.PI/2)*(wave+wave2);
-    f.vx*=0.992;f.vy*=0.992;f.rot+=f.ts;f.ts+=(Math.random()-0.5)*0.004;
-    const floorY=HD*0.95,dist=Math.max(0,floorY-f.y),total=floorY-HD*0.1;
+    f.x=f.bx+Math.cos(da+Math.PI/2)*(wave+wave2);
+    f.y=f.by+Math.sin(da+Math.PI/2)*(wave+wave2);
+    const floorY=HD*0.95,dist=Math.max(0,floorY-f.by),total=floorY-HD*0.1;
     const life=Math.max(0,dist/total);
     f.r=f.startR*(0.30+life*0.70);f.alpha=0.15+life*0.45;
-    if(life<0.02||f.y>floorY){fallingPetals.splice(i,1);continue;}
+    if(life<0.02||f.by>floorY){fallingPetals.splice(i,1);continue;}
     const sz=f.r*2.2;
     ctx.save();ctx.translate(f.x,f.y);ctx.rotate(f.rot);ctx.globalAlpha=f.alpha;
     ctx.drawImage(petalCanvases[f.petal],-sz/2,-sz/2,sz,sz);ctx.restore();
