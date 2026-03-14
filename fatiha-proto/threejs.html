@@ -233,64 +233,90 @@ function spawnGardenElement(evt,progress){
 /* ═══════════════════════════════════════════════════
    2D DRAW FUNCTIONS — copied verbatim from v43
    ═══════════════════════════════════════════════════ */
+function drawDoubleLobePetal(cx,cy,s,angle,cols,alpha){
+  // Double-lobed petal (penç style) — two rounded lobes meeting at a point
+  ctx.save();ctx.translate(cx,cy);ctx.rotate(angle);
+  const lw=s*0.42, lh=s*0.55; // lobe width/height
+  // Left lobe
+  ctx.beginPath();ctx.moveTo(0,-s*0.05);
+  ctx.bezierCurveTo(-lw*0.3,-lh*0.6, -lw,-lh*0.4, -lw*0.7,lh*0.15);
+  ctx.bezierCurveTo(-lw*0.4,lh*0.55, -lw*0.05,lh*0.3, 0,lh*0.1);
+  // Right lobe
+  ctx.bezierCurveTo(lw*0.05,lh*0.3, lw*0.4,lh*0.55, lw*0.7,lh*0.15);
+  ctx.bezierCurveTo(lw,-lh*0.4, lw*0.3,-lh*0.6, 0,-s*0.05);
+  ctx.closePath();
+  // Three-shade fill (Islamic technique)
+  const grad=ctx.createLinearGradient(0,-s*0.3,0,lh*0.4);
+  grad.addColorStop(0,cols[0]); // light (tip)
+  grad.addColorStop(0.5,cols[1]); // medium
+  grad.addColorStop(1,cols[2]); // dark (base)
+  ctx.globalAlpha=alpha;ctx.fillStyle=grad;ctx.fill();
+  // Tahrir — fine contour line
+  ctx.strokeStyle=cols[3]||'rgba(80,40,40,0.25)';
+  ctx.lineWidth=0.5*dpr;ctx.stroke();
+  ctx.restore();
+}
 function drawRose(x,y,maxR,petalCount,bl,baseRot,col,golden){
   if(bl<0.05)return;
   const R=maxR*bl;
-  // Concentric rings of overlapping C-curved petals
+  // Rüstem Pasha penç: 3 concentric rings of double-lobed petals
+  // Outer ring: 12 petals, Mid ring: 12 petals (offset π/12), Inner: 8 petals
   const rings=[
-    {n:Math.max(3,Math.floor(petalCount*0.22)),r:0.85,size:0.45,alpha:0.65}, // outer — large, open
-    {n:Math.max(3,Math.floor(petalCount*0.28)),r:0.55,size:0.35,alpha:0.75}, // mid
-    {n:Math.max(2,Math.floor(petalCount*0.25)),r:0.32,size:0.28,alpha:0.85}, // inner
-    {n:Math.max(2,Math.floor(petalCount*0.15)),r:0.15,size:0.20,alpha:0.92}, // core
+    {n:12, r:0.78, size:0.38, alpha:0.6, offset:0},         // outer — largest
+    {n:12, r:0.50, size:0.30, alpha:0.72, offset:Math.PI/12}, // mid — offset half-step
+    {n:8,  r:0.26, size:0.22, alpha:0.85, offset:Math.PI/8},  // inner — tighter
   ];
   for(let ri=0;ri<rings.length;ri++){
     const ring=rings[ri];
-    const visiblePetals=Math.floor(ring.n*Math.min(1,bl*(1.5+ri*0.3)));
-    if(visiblePetals<1)continue;
-    for(let i=0;i<visiblePetals;i++){
-      const angle=baseRot+(i/ring.n)*Math.PI*2+ri*0.4; // offset each ring
+    const visible=Math.floor(ring.n*Math.min(1,bl*(1.3+ri*0.4)));
+    if(visible<1)continue;
+    for(let i=0;i<visible;i++){
+      const angle=baseRot+(i/ring.n)*Math.PI*2+ring.offset;
       const dist=R*ring.r;
-      const px=x+Math.cos(angle)*dist,py=y+Math.sin(angle)*dist;
-      const s=R*ring.size*(0.85+Math.random()*0.3);
-      const frac=ri/rings.length;
-      let r,g,b;
+      const px=x+Math.cos(angle)*dist, py=y+Math.sin(angle)*dist;
+      const s=R*ring.size;
+      const frac=ri/3;
+      let cols;
       if(golden){
-        r=Math.round(255-frac*50);g=Math.round(215-frac*80);b=Math.round(80+frac*50);
-      }else{
-        r=Math.round(col[0]+(255-col[0])*(1-frac)*0.45);
-        g=Math.round(col[1]+(255-col[1])*(1-frac)*0.35);
-        b=Math.round(col[2]+(255-col[2])*(1-frac)*0.35);
+        const l=Math.round(255-frac*30), m=Math.round(215-frac*50), d=Math.round(160-frac*60);
+        cols=[`rgb(${l},${m+20},${80+frac*40})`,`rgb(${l-20},${m},${80+frac*30})`,`rgb(${l-50},${m-30},${60+frac*20})`,'rgba(160,120,40,0.3)'];
+      } else {
+        const lr=Math.round(col[0]+(255-col[0])*(1-frac)*0.5);
+        const lg=Math.round(col[1]+(255-col[1])*(1-frac)*0.4);
+        const lb=Math.round(col[2]+(255-col[2])*(1-frac)*0.4);
+        const mr=Math.round(col[0]+(255-col[0])*(1-frac)*0.2);
+        const mg=Math.round(col[1]+(255-col[1])*(1-frac)*0.15);
+        const mb=Math.round(col[2]+(255-col[2])*(1-frac)*0.15);
+        cols=[`rgb(${lr},${lg},${lb})`,`rgb(${mr},${mg},${mb})`,`rgb(${col[0]},${col[1]},${col[2]})`,`rgba(${Math.round(col[0]*0.4)},${Math.round(col[1]*0.3)},${Math.round(col[2]*0.3)},0.3)`];
       }
-      ctx.save();ctx.translate(px,py);ctx.rotate(angle+Math.PI*0.5+ri*0.2);
-      // Elongated petal — pointed base, cupped open top
-      ctx.beginPath();ctx.moveTo(0,-s);
-      ctx.bezierCurveTo(s*0.5,-s*0.7, s*0.6,-s*0.1, s*0.35,s*0.4);
-      ctx.quadraticCurveTo(0,s*0.65, -s*0.35,s*0.4);
-      ctx.bezierCurveTo(-s*0.6,-s*0.1, -s*0.5,-s*0.7, 0,-s);
-      ctx.closePath();
-      ctx.globalAlpha=ring.alpha*bl;ctx.fillStyle=`rgb(${r},${g},${b})`;ctx.fill();
-      // Vein line
-      ctx.beginPath();ctx.moveTo(0,-s*0.85);ctx.quadraticCurveTo(s*0.05,0,0,s*0.3);
-      ctx.strokeStyle=`rgba(255,255,255,${0.06*bl})`;ctx.lineWidth=0.6*dpr;ctx.stroke();
-      ctx.restore();
+      drawDoubleLobePetal(px,py,s,angle+Math.PI*0.5,cols,ring.alpha*bl);
     }
   }
-  // Center bud — tight spiral
-  if(bl>0.3){
-    const cr=R*0.12;
-    ctx.beginPath();ctx.arc(x,y,cr,0,Math.PI*2);
-    ctx.fillStyle=golden?`rgba(255,235,160,${0.9*bl})`:`rgba(255,210,180,${0.85*bl})`;ctx.fill();
-    // Spiral line in center
-    ctx.beginPath();
-    for(let t=0;t<Math.PI*3;t+=0.15){const sr=cr*(1-t/(Math.PI*4));
-      ctx.lineTo(x+Math.cos(t+baseRot)*sr,y+Math.sin(t+baseRot)*sr);}
-    ctx.strokeStyle=golden?`rgba(200,160,60,${0.3*bl})`:`rgba(180,100,100,${0.25*bl})`;
-    ctx.lineWidth=0.8*dpr;ctx.stroke();
+  // Central rosette — tight curvilinear 6-petal core
+  if(bl>0.25){
+    const cr=R*0.14;
+    for(let i=0;i<6;i++){
+      const a=baseRot+i*Math.PI/3;
+      const px=x+Math.cos(a)*cr*0.4, py=y+Math.sin(a)*cr*0.4;
+      ctx.save();ctx.translate(px,py);ctx.rotate(a);
+      ctx.beginPath();
+      ctx.ellipse(0,0,cr*0.35,cr*0.55,0,0,Math.PI*2);
+      const cc=golden?`rgba(255,230,140,${0.9*bl})`:`rgba(255,200,180,${0.85*bl})`;
+      ctx.globalAlpha=0.8*bl;ctx.fillStyle=cc;ctx.fill();
+      ctx.strokeStyle=golden?'rgba(180,140,50,0.2)':'rgba(150,80,80,0.2)';
+      ctx.lineWidth=0.4*dpr;ctx.stroke();
+      ctx.restore();
+    }
+    // Center dot
+    ctx.beginPath();ctx.arc(x,y,cr*0.18,0,Math.PI*2);
+    ctx.fillStyle=golden?`rgba(255,240,160,${bl})`:`rgba(255,215,180,${0.9*bl})`;ctx.fill();
   }
   // Golden glow
-  if(golden&&bl>0.3){const grad=ctx.createRadialGradient(x,y,0,x,y,R*1.4);
+  if(golden&&bl>0.3){
+    const grad=ctx.createRadialGradient(x,y,0,x,y,R*1.4);
     grad.addColorStop(0,`rgba(255,215,80,${0.18*bl})`);grad.addColorStop(1,'rgba(255,215,80,0)');
-    ctx.fillStyle=grad;ctx.beginPath();ctx.arc(x,y,R*1.4,0,Math.PI*2);ctx.fill();}
+    ctx.fillStyle=grad;ctx.beginPath();ctx.arc(x,y,R*1.4,0,Math.PI*2);ctx.fill();
+  }
 }
 function drawStem(fx,fy,tx,ty,thick,bl){
   if(bl<0.05)return;
