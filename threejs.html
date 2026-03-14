@@ -610,7 +610,7 @@ function animate(){
         fallingPetals.push({x:curvePoints[ci].x+n.x*dd*fwv+d.offX,y:curvePoints[ci].y+n.y*dd*fwv+d.offY,
           vx:Math.cos(da)*ds,vy:Math.sin(da)*ds+0.08*dpr,rot:d.rot,r:d.r*(0.25+Math.random()*0.3),
           col:d.col,petal:d.petal,alpha:0.45,age:0,startR:0,
-          wf:0.008+Math.random()*0.025,wa:(0.3+Math.random()*1.2)*dpr,wp:Math.random()*Math.PI*2,ts:0.008+Math.random()*0.04});
+          wf:0.008+Math.random()*0.025,wa:(0.15+Math.random()*0.5)*dpr,wp:Math.random()*Math.PI*2,ts:0.008+Math.random()*0.04});
         fallingPetals[fallingPetals.length-1].startR=fallingPetals[fallingPetals.length-1].r;
       }else alive.push(d);
     }
@@ -632,10 +632,12 @@ function animate(){
   for(let i=fallingPetals.length-1;i>=0;i--){
     const f=fallingPetals[i];f.age++;
     f.vy+=0.004*dpr; // gentle gravity — petals float, not swarm
+    // Wave as delta (difference between this frame and last) — no cumulative trail
     const wave=Math.sin(f.age*f.wf+f.wp)*f.wa;
-    const wave2=Math.sin(f.age*f.wf*0.37+f.wp*2.1)*f.wa*0.4;
+    const prevWave=Math.sin((f.age-1)*f.wf+f.wp)*f.wa;
+    const dWave=wave-prevWave;
     const da=Math.atan2(f.vy,f.vx);
-    f.x+=f.vx+Math.cos(da+Math.PI/2)*(wave+wave2);f.y+=f.vy+Math.sin(da+Math.PI/2)*(wave+wave2);
+    f.x+=f.vx+Math.cos(da+Math.PI/2)*dWave;f.y+=f.vy+Math.sin(da+Math.PI/2)*dWave;
     f.vx*=0.985;f.vy*=0.985;f.rot+=f.ts; // more drag, gentle spin
     const floorY=HD*0.95,dist=Math.max(0,floorY-f.y),total=floorY-HD*0.1;
     const life=Math.max(0,dist/total);
