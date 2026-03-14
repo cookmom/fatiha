@@ -636,7 +636,7 @@ function animate(){
     const wave2=Math.sin(f.age*f.wf*0.37+f.wp*2.1)*f.wa*0.4;
     const da=Math.atan2(f.vy,f.vx);
     f.x+=f.vx+Math.cos(da+Math.PI/2)*(wave+wave2);f.y+=f.vy+Math.sin(da+Math.PI/2)*(wave+wave2);
-    f.vx*=0.992;f.vy*=0.992;f.rot+=f.ts;f.ts+=(Math.sin(f.born*99999+fi*7)-0.5)*0.004;
+    f.vx*=0.992;f.vy*=0.992;f.rot+=f.ts;f.ts+=(Math.sin(f.born*99999+i*7)-0.5)*0.004;
     const floorY=HD*0.95,dist=Math.max(0,floorY-f.y),total=floorY-HD*0.1;
     const life=Math.max(0,dist/total);
     f.r=f.startR*(0.30+life*0.70);f.alpha=0.15+life*0.45;
