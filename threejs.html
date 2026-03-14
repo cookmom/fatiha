@@ -240,79 +240,85 @@ function spawnGardenElement(evt,progress){
    ═══════════════════════════════════════════════════ */
 
 function drawPencFlower(x,y,R,n,bl,baseRot,col,golden){
-  // Penç: 5-6 clover-lobed petals around double-circle center
-  // Each petal = notched heart/clover lobe (from vase bouquet reference)
+  // Penç: 5-6 petals as PIE SLICES sharing edges — no gaps
+  // Each petal has notched double-lobe tip (M-shaped outer edge)
+  // Petals meet tangentially at center circle
   if(bl<0.05)return;
   const r=R*bl;
   const petalN=n||5;
-  const petalR=r*0.7; // distance from center to petal center
-  const petalS=r*0.42; // petal lobe size
+  const centerR=r*0.2; // center circle radius
+  const outerR=r*0.95; // outer petal reach
   const lineW=Math.max(0.5,0.8*dpr);
-  // Flat fill color
   const fillR=golden?220:col[0], fillG=golden?190:col[1], fillB=golden?80:col[2];
   const darkR=golden?180:Math.round(col[0]*0.6), darkG=golden?140:Math.round(col[1]*0.5), darkB=golden?40:Math.round(col[2]*0.5);
   const lineCol=golden?'rgba(140,100,30,0.7)':`rgba(${darkR},${darkG},${darkB},0.7)`;
+  const sliceAngle=Math.PI*2/petalN;
 
-  // Draw petals — each is a notched heart lobe
+  // Draw all petals as connected pie slices
   for(let i=0;i<petalN;i++){
-    const frac=i/petalN;
-    const visible=bl*(petalN+1);
+    const visible=bl*(petalN+0.5);
     if(i>=visible)break;
-    const a=baseRot+frac*Math.PI*2;
-    const px=x+Math.cos(a)*petalR*0.45;
-    const py=y+Math.sin(a)*petalR*0.45;
-    const tipX=x+Math.cos(a)*petalR;
-    const tipY=y+Math.sin(a)*petalR;
-    // Lobe spread perpendicular to radial direction
-    const perpA=a+Math.PI*0.5;
-    const spread=petalS*0.5;
-    const lx=tipX+Math.cos(perpA)*spread, ly=tipY+Math.sin(perpA)*spread;
-    const rx=tipX-Math.cos(perpA)*spread, ry=tipY-Math.sin(perpA)*spread;
-    // Notch at petal tip (between the two lobes)
-    const notchX=x+Math.cos(a)*(petalR*0.75);
-    const notchY=y+Math.sin(a)*(petalR*0.75);
-    // Draw clover lobe shape
+    const a=baseRot+i*sliceAngle; // center angle of this petal
+    const aL=a-sliceAngle*0.5; // left edge angle
+    const aR=a+sliceAngle*0.5; // right edge angle
+    // Points on center circle (where petal starts)
+    const cLx=x+Math.cos(aL)*centerR, cLy=y+Math.sin(aL)*centerR;
+    const cRx=x+Math.cos(aR)*centerR, cRy=y+Math.sin(aR)*centerR;
+    // Outer lobe points — two bumps with a notch between
+    const notchDepth=0.18; // how deep the V-notch is (fraction of outerR)
+    const lobeSpread=0.35; // how wide each lobe bulges
+    // Left lobe apex
+    const aLL=a-sliceAngle*0.28;
+    const lLx=x+Math.cos(aLL)*outerR, lLy=y+Math.sin(aLL)*outerR;
+    // Right lobe apex
+    const aRR=a+sliceAngle*0.28;
+    const lRx=x+Math.cos(aRR)*outerR, lRy=y+Math.sin(aRR)*outerR;
+    // Notch point (between the two lobes, pulled inward)
+    const nX=x+Math.cos(a)*outerR*(1-notchDepth);
+    const nY=y+Math.sin(a)*outerR*(1-notchDepth);
+    // Mid-edge control points (bulge each side outward for roundness)
+    const midL=a-sliceAngle*0.42;
+    const mLx=x+Math.cos(midL)*outerR*0.7, mLy=y+Math.sin(midL)*outerR*0.7;
+    const midR=a+sliceAngle*0.42;
+    const mRx=x+Math.cos(midR)*outerR*0.7, mRy=y+Math.sin(midR)*outerR*0.7;
+
     ctx.beginPath();
-    ctx.moveTo(px,py);
-    // Right lobe
+    // Start at center-left
+    ctx.moveTo(cLx,cLy);
+    // Left edge → left lobe (smooth curve outward)
+    ctx.quadraticCurveTo(mLx,mLy, lLx,lLy);
+    // Left lobe → notch
     ctx.quadraticCurveTo(
-      px+Math.cos(a)*petalS*0.6+Math.cos(perpA)*petalS*0.1,
-      py+Math.sin(a)*petalS*0.6+Math.sin(perpA)*petalS*0.1,
-      rx,ry
+      x+Math.cos(a-sliceAngle*0.1)*outerR*1.02,
+      y+Math.sin(a-sliceAngle*0.1)*outerR*1.02,
+      nX,nY
     );
+    // Notch → right lobe
     ctx.quadraticCurveTo(
-      tipX+Math.cos(a)*petalS*0.35-Math.cos(perpA)*spread*0.3,
-      tipY+Math.sin(a)*petalS*0.35-Math.sin(perpA)*spread*0.3,
-      notchX,notchY
+      x+Math.cos(a+sliceAngle*0.1)*outerR*1.02,
+      y+Math.sin(a+sliceAngle*0.1)*outerR*1.02,
+      lRx,lRy
     );
-    // Left lobe
-    ctx.quadraticCurveTo(
-      tipX+Math.cos(a)*petalS*0.35+Math.cos(perpA)*spread*0.3,
-      tipY+Math.sin(a)*petalS*0.35+Math.sin(perpA)*spread*0.3,
-      lx,ly
-    );
-    ctx.quadraticCurveTo(
-      px+Math.cos(a)*petalS*0.6-Math.cos(perpA)*petalS*0.1,
-      py+Math.sin(a)*petalS*0.6-Math.sin(perpA)*petalS*0.1,
-      px,py
-    );
+    // Right lobe → right edge back to center
+    ctx.quadraticCurveTo(mRx,mRy, cRx,cRy);
+    // Close through center arc
+    ctx.arc(x,y,centerR,aR,aL,true);
     ctx.closePath();
+
     // Flat fill
-    ctx.globalAlpha=bl*0.8;
+    ctx.globalAlpha=bl*0.85;
     ctx.fillStyle=`rgb(${fillR},${fillG},${fillB})`;ctx.fill();
-    // Tahrir contour on top
+    // Tahrir contour
     ctx.globalAlpha=bl;
     ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
   }
   // Double-circle center
-  if(bl>0.2){
-    const cr=r*0.18;
-    // Outer ring
+  if(bl>0.15){
+    const cr=centerR*1.05;
     ctx.beginPath();ctx.arc(x,y,cr,0,Math.PI*2);
     ctx.globalAlpha=bl*0.9;
     ctx.fillStyle=golden?`rgb(200,170,60)`:`rgb(${darkR},${darkG},${darkB})`;ctx.fill();
     ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
-    // Inner dot
     ctx.beginPath();ctx.arc(x,y,cr*0.45,0,Math.PI*2);
     ctx.fillStyle=golden?`rgb(240,220,120)`:`rgb(${fillR},${fillG},${fillB})`;ctx.fill();
   }
