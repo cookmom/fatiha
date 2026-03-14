@@ -564,13 +564,111 @@ function drawStem(fx,fy,tx,ty,thick,bl){
   ctx.strokeStyle=`rgba(70,110,55,${0.55*bl})`;ctx.lineWidth=thick;ctx.stroke();
 }
 function drawLeaf(x,y,angle,size,bl){
-  if(bl<0.2)return;ctx.save();ctx.translate(x,y);ctx.rotate(angle);
-  const s=size*bl;ctx.beginPath();ctx.moveTo(0,0);
-  ctx.bezierCurveTo(s*0.4,-s*0.3,s*0.9,-s*0.1,s*0.75,s*0.12);
-  ctx.bezierCurveTo(s*0.5,s*0.3,s*0.2,s*0.15,0,0);
-  ctx.fillStyle=`rgba(65,105,45,${0.5*bl})`;ctx.fill();
-  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(s*0.6,s*0.02);
-  ctx.strokeStyle=`rgba(90,140,60,${0.3*bl})`;ctx.lineWidth=0.8*dpr;ctx.stroke();ctx.restore();
+  if(bl<0.2)return;
+  // Seeded PRNG for stable leaf variation
+  function srand(s){return function(){s=(s*9301+49297)%233280;return s/233280;};}
+  const rng=srand(Math.floor(Math.abs(angle)*10000+size*100));
+
+  ctx.save();ctx.translate(x,y);ctx.rotate(angle);
+  const s=size*bl;
+  if(s<2){ctx.restore();return;}
+
+  // Saz leaf parameters
+  const isSmall=size<14*dpr; // small pointed leaf variant (bud accompaniment)
+  const nSerr=isSmall?0:(3+Math.floor(rng()*2)); // 3-4 serrations for large saz leaves
+  const asymm=0.88+rng()*0.24; // asymmetry factor 0.88-1.12
+  const curve=(rng()-0.5)*0.2*s; // S-curve bend magnitude
+  const len=s;
+  const maxW=s*(isSmall?0.18:0.22);
+
+  // Central vein (spine) — gentle S-curve
+  function spine(t){
+    return{x:t*len,y:Math.sin(t*Math.PI)*curve*(1-t*0.6)};
+  }
+  function spineNormal(t){
+    const dt=0.005;
+    const a=spine(Math.max(0,t-dt)),b=spine(Math.min(1,t+dt));
+    const dx=b.x-a.x,dy=b.y-a.y;
+    const l=Math.sqrt(dx*dx+dy*dy)||1;
+    return{nx:-dy/l,ny:dx/l};
+  }
+
+  // Width profile: saz leaf widens quickly, peaks at ~30%, then long graceful taper
+  function widthAt(t){
+    if(t<0.06)return t/0.06*0.65;
+    if(t<0.3)return 0.65+(t-0.06)/0.24*0.35;
+    return Math.pow((1-t)/0.7,0.8);
+  }
+
+  // Serration: pointed lobes with V-notch dips (feathered saz edge)
+  function serrMod(t,offset){
+    if(nSerr===0||t<0.12||t>0.92)return 1;
+    const phase=((t-0.12)/0.8*nSerr+offset);
+    const frac=phase-Math.floor(phase);
+    // Lobe rises smoothly, drops sharply — creates pointed barb effect
+    const lobe=frac<0.65?frac/0.65:1-(frac-0.65)/0.35;
+    return 0.82+0.18*lobe;
+  }
+
+  // Sample outline points along both sides of the leaf
+  const N=Math.max(20,Math.round(s*0.7));
+  const topEdge=[],botEdge=[];
+  for(let i=0;i<=N;i++){
+    const t=i/N;
+    const sp=spine(t);
+    const nm=spineNormal(t);
+    const w=widthAt(t)*maxW;
+    const wTop=w*asymm*serrMod(t,0);
+    const wBot=w*(2-asymm)*serrMod(t,0.5);
+    topEdge.push({x:sp.x+nm.nx*wTop,y:sp.y+nm.ny*wTop});
+    botEdge.push({x:sp.x-nm.nx*wBot,y:sp.y-nm.ny*wBot});
+  }
+
+  // Draw filled leaf shape
+  ctx.beginPath();
+  ctx.moveTo(topEdge[0].x,topEdge[0].y);
+  for(let i=1;i<topEdge.length;i++)ctx.lineTo(topEdge[i].x,topEdge[i].y);
+  for(let i=botEdge.length-1;i>=0;i--)ctx.lineTo(botEdge[i].x,botEdge[i].y);
+  ctx.closePath();
+
+  // Gradient fill: darker at base, lighter at tip
+  const grad=ctx.createLinearGradient(0,0,len,0);
+  grad.addColorStop(0,`rgba(40,80,30,${0.65*bl})`);
+  grad.addColorStop(0.4,`rgba(58,108,40,${0.55*bl})`);
+  grad.addColorStop(1,`rgba(82,138,52,${0.4*bl})`);
+  ctx.fillStyle=grad;ctx.fill();
+
+  // Subtle outline
+  ctx.strokeStyle=`rgba(35,70,25,${0.25*bl})`;
+  ctx.lineWidth=Math.max(0.5,0.5*dpr);ctx.stroke();
+
+  // Central vein (curved line along spine)
+  ctx.beginPath();
+  const v0=spine(0);ctx.moveTo(v0.x,v0.y);
+  for(let i=1;i<=10;i++){const v=spine(i/10);ctx.lineTo(v.x,v.y);}
+  ctx.strokeStyle=`rgba(75,125,50,${0.4*bl})`;
+  ctx.lineWidth=Math.max(0.6,0.9*dpr);ctx.stroke();
+
+  // Side veins branching from central vein (saz feather detail)
+  if(!isSmall&&s>10*dpr){
+    ctx.strokeStyle=`rgba(75,125,50,${0.2*bl})`;
+    ctx.lineWidth=Math.max(0.3,0.4*dpr);
+    const nVeins=nSerr+1;
+    for(let i=1;i<=nVeins;i++){
+      const t=0.15+(i/(nVeins+1))*0.7;
+      const sp=spine(t);
+      const nm=spineNormal(t);
+      const w=widthAt(t)*maxW*0.6;
+      // Angled toward tip — side veins point slightly forward
+      const fwd=len*0.04;
+      ctx.beginPath();ctx.moveTo(sp.x,sp.y);
+      ctx.lineTo(sp.x+nm.nx*w*asymm+fwd,sp.y+nm.ny*w*asymm);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(sp.x,sp.y);
+      ctx.lineTo(sp.x-nm.nx*w*(2-asymm)+fwd,sp.y-nm.ny*w*(2-asymm));ctx.stroke();
+    }
+  }
+
+  ctx.restore();
 }
 function drawBud(x,y,maxR,bl,col,baseRot){
   if(bl<0.05)return;
