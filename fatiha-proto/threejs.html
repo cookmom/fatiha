@@ -217,7 +217,7 @@ function spawnGardenElement(evt,progress){
         stemLen:mr*PHI,stemW:(2.5+evt.size*3)*dpr,golden:false,growDur:0.06});break;}
     case 'bud':{
       const mr=Math.max(12*dpr,(8+evt.size*12)*dpr);
-      garden.push({...base,kind:'bud',maxR:mr,stemLen:mr*PHI,
+      garden.push({...base,kind:'bud',maxR:mr,stemLen:mr*PHI*(1+mr/(30*dpr)),
         stemW:(1+evt.size)*dpr,growDur:0.04});break;}
     case 'thorn':
       garden.push({...base,kind:'thorn',len:(10+evt.size*15)*dpr,growDur:0.03});break;
@@ -405,11 +405,17 @@ function drawRose(x,y,maxR,petalCount,bl,baseRot,col,golden){
   const rng=srand(Math.floor(baseRot*10000));
 
   const lineW=Math.max(0.5,0.8*dpr);
-  const fillR=golden?220:col[0], fillG=golden?190:col[1], fillB=golden?80:col[2];
-  const darkR=golden?140:Math.round(col[0]*0.45), darkG=golden?100:Math.round(col[1]*0.35), darkB=golden?30:Math.round(col[2]*0.35);
-  const midR=golden?200:Math.round(col[0]*0.85+40), midG=golden?170:Math.round(col[1]*0.85+30), midB=golden?70:Math.round(col[2]*0.85+25);
-  const litR=golden?245:Math.min(255,Math.round(col[0]*0.7+80)), litG=golden?225:Math.min(255,Math.round(col[1]*0.7+60)), litB=golden?130:Math.min(255,Math.round(col[2]*0.7+50));
+  // Per-flower color tint shift for variety
+  const tintShift=((rng()-0.5)*30)|0;
+  const fillR=golden?220:Math.min(255,Math.max(0,col[0]+tintShift)), fillG=golden?190:Math.min(255,Math.max(0,col[1]+((rng()-0.5)*20)|0)), fillB=golden?80:Math.min(255,Math.max(0,col[2]+((rng()-0.5)*20)|0));
+  const darkR=golden?140:Math.round(fillR*0.45), darkG=golden?100:Math.round(fillG*0.35), darkB=golden?30:Math.round(fillB*0.35);
+  const midR=golden?200:Math.round(fillR*0.85+40), midG=golden?170:Math.round(fillG*0.85+30), midB=golden?70:Math.round(fillB*0.85+25);
+  const litR=golden?245:Math.min(255,Math.round(fillR*0.7+80)), litG=golden?225:Math.min(255,Math.round(fillG*0.7+60)), litB=golden?130:Math.min(255,Math.round(fillB*0.7+50));
   const lineCol=golden?'rgba(140,100,30,0.75)':`rgba(${darkR},${darkG},${darkB},0.75)`;
+  // Per-flower variation: petal width factor, layer rotation offsets
+  const widVar=0.8+rng()*0.4; // ±20% petal width variation
+  const layerRotA=rng()*0.4; // extra rotation offset per layer
+  const layerRotB=rng()*0.4;
 
   // Petal with openness: 0=tight closed bud, 1=fully spread
   // Per-petal gradient: darker at base, lighter at tip/edges
@@ -465,7 +471,7 @@ function drawRose(x,y,maxR,petalCount,bl,baseRot,col,golden){
   // Bloom order: center appears first, outer appears last
   // Wider ranges + higher stagger = slower, more gradual unfurl
 
-  // OUTER petals — bloom range 0.5→1.0 (was 0.65→1.0)
+  // OUTER petals — bloom range 0.5→1.0
   const outerBl=lbl(0.50,1.0);
   if(outerBl>0){
     const baseLen=maxR*0.88*(0.5+bl*0.5);
@@ -475,11 +481,11 @@ function drawRose(x,y,maxR,petalCount,bl,baseRot,col,golden){
       if(pBl<=0)continue;
       const a=baseRot+i*outerSlice+outerJit[i];
       const lenVar=baseLen*outerLenV[i]*(0.3+pBl*0.7);
-      petal(x,y,a,lenVar,0.8,`rgb(${fillR},${fillG},${fillB})`,pBl*0.85,ease(pBl),0);
+      petal(x,y,a,lenVar,0.8*widVar,`rgb(${fillR},${fillG},${fillB})`,pBl*0.85,ease(pBl),0);
     }
   }
 
-  // MID petals — bloom range 0.25→0.78 (was 0.35→0.75)
+  // MID petals — bloom range 0.25→0.78
   const midBl=lbl(0.25,0.78);
   if(midBl>0){
     const midSlice=Math.PI*2/midN;
@@ -488,14 +494,14 @@ function drawRose(x,y,maxR,petalCount,bl,baseRot,col,golden){
       const stagger=i/midN*0.5;
       const pBl=Math.max(0,Math.min(1,(midBl-stagger)/0.5));
       if(pBl<=0)continue;
-      const a=baseRot+midOff+i*midSlice+midJit[i];
+      const a=baseRot+midOff+layerRotA+i*midSlice+midJit[i];
       const lenVar=baseLen*midLenV[i]*(0.25+pBl*0.75);
       const op=ease(pBl);
-      petal(x,y,a,lenVar,0.75,`rgb(${midR},${midG},${midB})`,pBl*0.9,op*op,1);
+      petal(x,y,a,lenVar,0.75*widVar,`rgb(${midR},${midG},${midB})`,pBl*0.9,op*op,1);
     }
   }
 
-  // INNER petals — bloom range 0.08→0.55 (was 0.12→0.5)
+  // INNER petals — bloom range 0.08→0.55
   const innerBl=lbl(0.08,0.55);
   if(innerBl>0){
     const inSlice=Math.PI*2/innerN;
@@ -504,57 +510,46 @@ function drawRose(x,y,maxR,petalCount,bl,baseRot,col,golden){
       const stagger=i/innerN*0.45;
       const pBl=Math.max(0,Math.min(1,(innerBl-stagger)/0.55));
       if(pBl<=0)continue;
-      const a=baseRot+inOff+i*inSlice+inJit[i];
+      const a=baseRot+inOff+layerRotB+i*inSlice+inJit[i];
       const lenVar=baseLen*inLenV[i]*(0.2+pBl*0.8);
       const op=ease(pBl);
-      petal(x,y,a,lenVar,0.7,`rgb(${litR},${litG},${litB})`,pBl*0.95,op*op*op,2);
+      petal(x,y,a,lenVar,0.7*widVar,`rgb(${litR},${litG},${litB})`,pBl*0.95,op*op*op,2);
     }
   }
 
-  // CENTER — appears first, bl 0.0→0.35 (slowed from 0.3)
+  // CENTER — packed dots (dense stamen cluster), bl 0.0→0.35
   const centerBl=lbl(0.0,0.35);
   if(centerBl>0.05){
-    const cR=maxR*0.16*(0.3+bl*0.7);
-    // Organic center mass — slightly irregular blob instead of perfect circle
-    ctx.beginPath();
-    const cSegs=8;
-    for(let i=0;i<=cSegs;i++){
-      const a=baseRot+i*(Math.PI*2/cSegs);
-      const jR=cR*(0.88+rng()*0.24); // vary radius per segment
-      const cx2=x+Math.cos(a)*jR, cy2=y+Math.sin(a)*jR;
-      if(i===0)ctx.moveTo(cx2,cy2);
-      else{const cpA=a-Math.PI/cSegs;const cpR=cR*(0.95+rng()*0.15);
-        ctx.quadraticCurveTo(x+Math.cos(cpA)*cpR,y+Math.sin(cpA)*cpR,cx2,cy2);}
-    }
-    ctx.closePath();
-    ctx.globalAlpha=centerBl*0.95;
-    ctx.fillStyle=golden?'rgb(200,170,50)':`rgb(${darkR},${darkG},${darkB})`;ctx.fill();
-    ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
-    // Dot ring — organic: tiny ovals with varied sizes
-    if(cR>2){
-      const dotN=Math.max(4,Math.min(10,Math.floor(maxR*bl*0.4)));
-      const ringR=cR*1.6;
-      for(let i=0;i<dotN;i++){
-        const a=baseRot+i*(Math.PI*2/dotN)+(rng()-0.5)*0.25;
-        const dr=ringR*(0.85+rng()*0.3);
-        const dx=x+Math.cos(a)*dr, dy=y+Math.sin(a)*dr;
-        const dotRx=Math.max(0.4,cR*(0.16+rng()*0.14));
-        const dotRy=Math.max(0.4,cR*(0.12+rng()*0.16));
-        const dotRot=rng()*Math.PI;
-        ctx.save();ctx.translate(dx,dy);ctx.rotate(dotRot);
-        ctx.beginPath();ctx.ellipse(0,0,dotRx,dotRy,0,0,Math.PI*2);
-        ctx.globalAlpha=centerBl*(0.65+rng()*0.3);
-        ctx.fillStyle=golden?'rgb(240,220,100)':`rgb(${litR},${litG},${litB})`;ctx.fill();
-        ctx.restore();
+    const cR=maxR*0.18*(0.3+bl*0.7);
+    // Packed dots — many small circles of varying sizes filling center area
+    const dotCount=Math.max(6,Math.floor(cR*cR*0.08));
+    const placed=[];
+    for(let attempt=0;attempt<dotCount*4;attempt++){
+      // Random position within center radius using seeded rng
+      const a=rng()*Math.PI*2;
+      const dist=cR*Math.sqrt(rng())*0.95; // sqrt for uniform disk distribution
+      const dx=x+Math.cos(a)*dist, dy=y+Math.sin(a)*dist;
+      const dotR=Math.max(0.4,cR*(0.06+rng()*0.12));
+      // Simple overlap check
+      let ok=true;
+      for(const p of placed){
+        const px=p[0]-dx,py=p[1]-dy;
+        if(px*px+py*py<(p[2]+dotR)*(p[2]+dotR)*0.7){ok=false;break;}
       }
+      if(!ok)continue;
+      placed.push([dx,dy,dotR]);
+      ctx.beginPath();ctx.arc(dx,dy,dotR,0,Math.PI*2);
+      ctx.globalAlpha=centerBl*(0.55+rng()*0.4);
+      const tint=rng();
+      if(golden){
+        const g=Math.round(170+tint*60),r=Math.round(200+tint*45);
+        ctx.fillStyle=`rgb(${r},${g},${Math.round(40+tint*80)})`;
+      }else{
+        ctx.fillStyle=`rgb(${Math.round(darkR+(litR-darkR)*tint)},${Math.round(darkG+(litG-darkG)*tint)},${Math.round(darkB+(litB-darkB)*tint)})`;
+      }
+      ctx.fill();
+      if(placed.length>=dotCount)break;
     }
-    // Inner dot — slightly off-center oval
-    const ixOff=(rng()-0.5)*cR*0.15, iyOff=(rng()-0.5)*cR*0.15;
-    ctx.save();ctx.translate(x+ixOff,y+iyOff);ctx.rotate(rng()*Math.PI);
-    ctx.beginPath();ctx.ellipse(0,0,cR*0.38,cR*0.30,0,0,Math.PI*2);
-    ctx.globalAlpha=centerBl*0.9;
-    ctx.fillStyle=golden?'rgb(245,225,120)':`rgb(${litR},${litG},${litB})`;ctx.fill();
-    ctx.restore();
   }
   ctx.globalAlpha=1;
 }
@@ -575,14 +570,98 @@ function drawLeaf(x,y,angle,size,bl){
   ctx.strokeStyle=`rgba(90,140,60,${0.3*bl})`;ctx.lineWidth=0.8*dpr;ctx.stroke();ctx.restore();
 }
 function drawBud(x,y,maxR,bl,col){
-  for(let i=0;i<3;i++){
-    const f=i/3,angle=i*0.8+bl*0.3,r=maxR*(0.5+f*0.5)*Math.min(1,bl*1.5);
-    ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.beginPath();
-    const s=r;ctx.moveTo(0,-s);ctx.bezierCurveTo(s*0.4,-s*0.2,s*0.4,s*0.3,0,s*0.5);
-    ctx.bezierCurveTo(-s*0.4,s*0.3,-s*0.4,-s*0.2,0,-s);ctx.closePath();
-    const lr=Math.round(col[0]+(255-col[0])*(1-f)*0.3),lg=Math.round(col[1]+(255-col[1])*(1-f)*0.2),lb=Math.round(col[2]+(255-col[2])*(1-f)*0.2);
-    ctx.globalAlpha=0.6+f*0.3;ctx.fillStyle=`rgb(${lr},${lg},${lb})`;ctx.fill();ctx.restore();
+  if(bl<0.05)return;
+  // Seeded PRNG for stable variant selection
+  function srand(s){return function(){s=(s*9301+49297)%233280;return s/233280;};}
+  const rng=srand(Math.floor(x*100+y*7));
+  const variant=Math.floor(rng()*3); // 0=tight closed, 1=half-open, 2=small rosette
+  const r=maxR*Math.min(1,bl*1.4);
+  const lineW=Math.max(0.5,0.7*dpr);
+  const darkR=Math.round(col[0]*0.5),darkG=Math.round(col[1]*0.4),darkB=Math.round(col[2]*0.4);
+  const lineCol=`rgba(${darkR},${darkG},${darkB},0.7)`;
+
+  if(variant===0){
+    // Tight closed bud — 3 petals tightly wrapped around each other
+    for(let i=0;i<3;i++){
+      const f=i/3;
+      const a=i*Math.PI*2/3+bl*0.2;
+      const wrapTight=0.25+f*0.12; // each petal wraps tighter
+      const h=r*(0.7+f*0.3);
+      ctx.save();ctx.translate(x,y);ctx.rotate(a);
+      ctx.beginPath();
+      ctx.moveTo(0,r*0.1);
+      ctx.bezierCurveTo(r*wrapTight,-h*0.3, r*wrapTight*0.8,-h*0.8, 0,-h);
+      ctx.bezierCurveTo(-r*wrapTight*0.8,-h*0.8, -r*wrapTight,-h*0.3, 0,r*0.1);
+      ctx.closePath();
+      const lr=Math.round(col[0]+(255-col[0])*(1-f)*0.25);
+      const lg=Math.round(col[1]+(255-col[1])*(1-f)*0.2);
+      const lb=Math.round(col[2]+(255-col[2])*(1-f)*0.15);
+      ctx.globalAlpha=bl*(0.6+f*0.3);
+      ctx.fillStyle=`rgb(${lr},${lg},${lb})`;ctx.fill();
+      ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.globalAlpha=bl*0.5;ctx.stroke();
+      ctx.restore();
+    }
+    // Tiny tip highlight
+    ctx.beginPath();ctx.arc(x,y-r*0.6,r*0.08,0,Math.PI*2);
+    ctx.globalAlpha=bl*0.6;ctx.fillStyle=`rgb(${Math.min(255,col[0]+60)},${Math.min(255,col[1]+40)},${Math.min(255,col[2]+30)})`;ctx.fill();
+  }else if(variant===1){
+    // Half-open bud — petals starting to separate at tip
+    const petalN=4;
+    for(let i=0;i<petalN;i++){
+      const f=i/petalN;
+      const a=i*Math.PI*2/petalN+rng()*0.3;
+      const spread=bl*0.35; // tips spread as bloom increases
+      const h=r*(0.6+f*0.35);
+      ctx.save();ctx.translate(x,y);ctx.rotate(a);
+      ctx.beginPath();
+      ctx.moveTo(0,r*0.15);
+      // Base is tight, tip fans out
+      const baseW=r*0.18;
+      const tipW=r*(0.08+spread*0.3);
+      const tipOff=spread*r*0.25; // tip offset outward
+      ctx.bezierCurveTo(baseW,-h*0.3, tipW+tipOff,-h*0.7, tipOff,-h);
+      ctx.bezierCurveTo(-tipW+tipOff,-h*0.7, -baseW,-h*0.3, 0,r*0.15);
+      ctx.closePath();
+      const lr=Math.round(col[0]+(255-col[0])*f*0.2);
+      const lg=Math.round(col[1]+(255-col[1])*f*0.15);
+      const lb=Math.round(col[2]+(255-col[2])*f*0.1);
+      ctx.globalAlpha=bl*(0.55+f*0.35);
+      ctx.fillStyle=`rgb(${lr},${lg},${lb})`;ctx.fill();
+      ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.globalAlpha=bl*0.5;ctx.stroke();
+      ctx.restore();
+    }
+  }else{
+    // Small rosette bud — tiny version of rose with fewer petals
+    const petalN=Math.floor(3+rng()*2);
+    for(let ring=0;ring<2;ring++){
+      const ringR=r*(ring===0?0.85:0.5);
+      const ringN=ring===0?petalN:Math.max(2,petalN-1);
+      const rotOff=ring*0.4+rng()*0.3;
+      for(let i=0;i<ringN;i++){
+        const a=rotOff+i*Math.PI*2/ringN;
+        const len=ringR*(0.8+rng()*0.3);
+        const w=len*(0.28+rng()*0.1);
+        ctx.save();ctx.translate(x,y);ctx.rotate(a);
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.bezierCurveTo(w*0.6,-len*0.3, w*0.7,-len*0.7, 0,-len);
+        ctx.bezierCurveTo(-w*0.7,-len*0.7, -w*0.6,-len*0.3, 0,0);
+        ctx.closePath();
+        const bright=ring===0?0:0.2;
+        const lr=Math.min(255,Math.round(col[0]+bright*60));
+        const lg=Math.min(255,Math.round(col[1]+bright*40));
+        const lb=Math.min(255,Math.round(col[2]+bright*30));
+        ctx.globalAlpha=bl*(0.6+ring*0.25);
+        ctx.fillStyle=`rgb(${lr},${lg},${lb})`;ctx.fill();
+        ctx.strokeStyle=lineCol;ctx.lineWidth=lineW*0.8;ctx.globalAlpha=bl*0.45;ctx.stroke();
+        ctx.restore();
+      }
+    }
+    // Center dot
+    ctx.beginPath();ctx.arc(x,y,r*0.1,0,Math.PI*2);
+    ctx.globalAlpha=bl*0.7;ctx.fillStyle=`rgb(${darkR},${darkG},${darkB})`;ctx.fill();
   }
+  ctx.globalAlpha=1;
 }
 function drawThorn(x,y,len,angle,bl){
   if(bl<0.1)return;ctx.save();ctx.translate(x,y);ctx.rotate(angle);
@@ -639,12 +718,12 @@ function continuousFill(progress,energy){
   }else if(roll<0.78){
     const mr=Math.max(10*dpr,(6+energy*20+Math.random()*14)*dpr*sv);newR=mr;
     garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
-      kind:'bud',maxR:mr,stemLen:mr*PHI,stemW:(0.8+energy*1.5)*dpr,growDur:0.02});
+      kind:'bud',maxR:mr,stemLen:mr*PHI*(1+mr/(30*dpr)),stemW:(0.8+energy*1.5)*dpr,growDur:0.02});
   }else if(roll<0.93){
     const mr=Math.max(14*dpr,(8+energy*22)*dpr*sv);newR=mr;
     garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
-      kind:'rose',maxR:mr,petalCount:Math.floor(4+Math.random()*7),
-      stemLen:mr*PHI,stemW:(0.8+energy*1.2)*dpr,golden:false,growDur:0.025});
+      kind:'rose',maxR:mr,petalCount:Math.floor(4+Math.random()*4),
+      stemLen:mr*PHI*(1+mr/(30*dpr)),stemW:(0.8+energy*1.2)*dpr,golden:false,growDur:0.025});
   }else{
     const tl=(5+energy*15)*dpr*sv;newR=tl;
     garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
