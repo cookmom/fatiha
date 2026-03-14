@@ -561,7 +561,7 @@ function drawStem(fx,fy,tx,ty,thick,bl){
   const c2x=fx+dx*0.7+dy*0.08,c2y=fy+dy*0.7-dx*0.08;
   const ex=fx+(tx-fx)*bl,ey=fy+(ty-fy)*bl;
   ctx.beginPath();ctx.moveTo(fx,fy);ctx.bezierCurveTo(c1x,c1y,c2x,c2y,ex,ey);
-  ctx.strokeStyle=`rgba(70,110,55,${0.55*bl})`;ctx.lineWidth=thick;ctx.stroke();
+  ctx.strokeStyle=`rgba(70,110,55,${0.9*bl})`;ctx.lineWidth=thick;ctx.stroke();
 }
 function drawLeaf(x,y,angle,size,bl){
   if(bl<0.2)return;
@@ -633,13 +633,13 @@ function drawLeaf(x,y,angle,size,bl){
 
   // Gradient fill: darker at base, lighter at tip
   const grad=ctx.createLinearGradient(0,0,len,0);
-  grad.addColorStop(0,`rgba(40,80,30,${0.65*bl})`);
-  grad.addColorStop(0.4,`rgba(58,108,40,${0.55*bl})`);
-  grad.addColorStop(1,`rgba(82,138,52,${0.4*bl})`);
+  grad.addColorStop(0,`rgba(40,80,30,${0.95*bl})`);
+  grad.addColorStop(0.4,`rgba(58,108,40,${0.92*bl})`);
+  grad.addColorStop(1,`rgba(82,138,52,${0.85*bl})`);
   ctx.fillStyle=grad;ctx.fill();
 
-  // Subtle outline
-  ctx.strokeStyle=`rgba(35,70,25,${0.25*bl})`;
+  // Outline
+  ctx.strokeStyle=`rgba(35,70,25,${0.55*bl})`;
   ctx.lineWidth=Math.max(0.5,0.5*dpr);ctx.stroke();
 
   // Central vein (curved line along spine)
@@ -988,14 +988,14 @@ function animate(){
       const n=getNormal(i),dd=disp[i]||0;
       const px=curvePoints[i].x+n.x*dd*w,py=curvePoints[i].y+n.y*dd*w;
       i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}
-    ctx.strokeStyle=strand===0?'rgba(45,90,30,0.7)':'rgba(35,75,25,0.65)';
+    ctx.strokeStyle=strand===0?'rgba(45,90,30,1.0)':'rgba(35,75,25,1.0)';
     ctx.lineWidth=2.5*dpr;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
     ctx.beginPath();
     for(let i=0;i<=growCI;i++){const t=i/(CL-1),w=Math.sin(t*Math.PI*2*WEAVE_FREQ+phase);
       const n=getNormal(i),dd=disp[i]||0;
       const px=curvePoints[i].x+n.x*dd*w,py=curvePoints[i].y+n.y*dd*w;
       i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}
-    ctx.strokeStyle='rgba(80,140,50,0.35)';ctx.lineWidth=1.5*dpr;ctx.stroke();
+    ctx.strokeStyle='rgba(80,140,50,0.6)';ctx.lineWidth=1.5*dpr;ctx.stroke();
   }
 
   // Continuous fill
