@@ -46,7 +46,7 @@ const TOTAL_DUR=6.0;
    ═══════════════════════════════════════════════════ */
 const scene=new THREE.Scene();
 scene.background=null; // offscreen canvas provides the background
-const camera=new THREE.OrthographicCamera(0,WD,HD,0,-1000,1000); // left,right,bottom,top — Y flipped to match canvas
+const camera=new THREE.OrthographicCamera(0,WD,HD,0,-1000,1000); // left,right,bottom,top
 camera.position.z=500;
 const renderer=new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(W,H);renderer.setPixelRatio(dpr);
@@ -112,10 +112,12 @@ function pathColor(t){
 const offscreen=document.createElement('canvas');
 offscreen.width=WD;offscreen.height=HD;
 const ctx=offscreen.getContext('2d');
+// Flip canvas vertically to match Three.js texture orientation
+ctx.translate(0,HD);ctx.scale(1,-1);
 
 const offTex=new THREE.CanvasTexture(offscreen);
 offTex.minFilter=THREE.LinearFilter;offTex.magFilter=THREE.LinearFilter;
-offTex.flipY=false; // canvas Y=0 is top, match our ortho camera
+offTex.flipY=false; // canvas Y=0 is top, camera bottom=HD top=0 — both inverted = correct
 const quadGeo=new THREE.PlaneGeometry(WD,HD);
 const quadMat=new THREE.MeshBasicMaterial({map:offTex,transparent:false});
 const quad=new THREE.Mesh(quadGeo,quadMat);
