@@ -240,79 +240,72 @@ function spawnGardenElement(evt,progress){
    ═══════════════════════════════════════════════════ */
 
 function drawPencFlower(x,y,R,n,bl,baseRot,col,golden){
-  // Penç v12: LINE DRAWING style — opaque fill, crisp visible outlines
+  // Penç v13: 7 petal layers spiraling inward — ranunculus density
   if(bl<0.05)return;
   const r=R*bl;
   const petalN=n||5;
   const lineW=Math.max(0.8,1.0*dpr);
   const fillR=golden?235:col[0], fillG=golden?210:col[1], fillB=golden?120:col[2];
-  const darkR=golden?160:Math.round(col[0]*0.5), darkG=golden?120:Math.round(col[1]*0.4), darkB=golden?40:Math.round(col[2]*0.4);
-  const lineCol=golden?`rgba(120,90,20,${0.7*bl})`:`rgba(${darkR},${darkG},${darkB},${0.7*bl})`;
+  const darkR=golden?160:Math.round(col[0]*0.45), darkG=golden?120:Math.round(col[1]*0.35), darkB=golden?40:Math.round(col[2]*0.35);
+  const lineCol=golden?`rgba(120,90,20,${0.6*bl})`:`rgba(${darkR},${darkG},${darkB},${0.6*bl})`;
   function srand(s){return function(){s=(s*9301+49297)%233280;return s/233280;};}
   const rng=srand(Math.floor(baseRot*10000+petalN*777));
 
-  function petal(px,py,angle,len,widRatio,fillCol,strokeAlpha){
+  function petal(px,py,angle,len,widRatio,fillCol,strokeA){
     const w=len*widRatio*0.5;
     ctx.save();ctx.translate(px,py);ctx.rotate(angle);
-    ctx.beginPath();
-    ctx.moveTo(0,0);
+    ctx.beginPath();ctx.moveTo(0,0);
     ctx.bezierCurveTo(-w*0.75,-len*0.22, -w*1.05,-len*0.52, -w*0.75,-len*0.82);
     ctx.bezierCurveTo(-w*0.55,-len*0.94, -w*0.18,-len*1.01, 0,-len*0.93);
     ctx.bezierCurveTo(w*0.18,-len*1.01, w*0.55,-len*0.94, w*0.75,-len*0.82);
     ctx.bezierCurveTo(w*1.05,-len*0.52, w*0.75,-len*0.22, 0,0);
     ctx.closePath();
-    // OPAQUE fill — no blending, each petal is solid
-    ctx.globalAlpha=bl*0.92;ctx.fillStyle=fillCol;ctx.fill();
-    // CRISP visible outline — the defining feature
-    ctx.globalAlpha=strokeAlpha;ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
+    ctx.globalAlpha=bl*0.93;ctx.fillStyle=fillCol;ctx.fill();
+    ctx.globalAlpha=strokeA;ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
     ctx.restore();
   }
 
-  // 4 color grades: lightest outer → darkest inner
-  const c1=`rgb(${Math.min(255,fillR+25)},${Math.min(255,fillG+20)},${Math.min(255,fillB+20)})`;
-  const c2=`rgb(${fillR},${fillG},${fillB})`;
-  const c3=`rgb(${Math.max(0,fillR-30)},${Math.max(0,fillG-25)},${Math.max(0,fillB-20)})`;
-  const c4=`rgb(${Math.max(0,fillR-55)},${Math.max(0,fillG-45)},${Math.max(0,fillB-35)})`;
+  // Generate 7 layers: lightest/largest outer → darkest/smallest inner
+  const numLayers=7;
+  for(let li=0;li<numLayers;li++){
+    const t=li/(numLayers-1); // 0=outer, 1=inner
+    const minBl=t*0.55; // inner layers appear later
+    if(bl<minBl)continue;
+    const layerBl=Math.min(1,(bl-minBl)/(1-minBl));
+    // Layer properties — interpolate from outer to inner
+    const ln=petalN+Math.floor(t*4); // more petals as we go inward
+    const len=r*(0.65-t*0.45); // shorter inner
+    const wr=0.92-t*0.3; // narrower inner
+    const dist=r*(0.18-t*0.17); // closer to center
+    const strokeA=bl*(0.55+t*0.2);
+    // Color — lighter outside, darker inside
+    const cR=Math.max(0,Math.min(255,fillR+25-t*75));
+    const cG=Math.max(0,Math.min(255,fillG+20-t*60));
+    const cB=Math.max(0,Math.min(255,fillB+20-t*50));
+    const col=`rgb(${cR},${cG},${cB})`;
+    // Spiral offset increases per layer
+    const spiralOff=li*Math.PI/(petalN*1.8);
 
-  const layers=[
-    {n:petalN,   len:r*0.65, wr:0.90, dist:r*0.16, col:c1, strk:bl*0.65, minBl:0,    off:0},
-    {n:petalN+1, len:r*0.48, wr:0.82, dist:r*0.10, col:c2, strk:bl*0.7,  minBl:0.15, off:Math.PI/(petalN*2)},
-    {n:petalN+2, len:r*0.33, wr:0.70, dist:r*0.04, col:c3, strk:bl*0.75, minBl:0.3,  off:Math.PI/(petalN*3)},
-    {n:petalN+3, len:r*0.20, wr:0.60, dist:0,      col:c4, strk:bl*0.6,  minBl:0.45, off:Math.PI/(petalN*4)},
-  ];
-
-  for(const L of layers){
-    if(bl<L.minBl)continue;
-    const layerBl=Math.min(1,(bl-L.minBl)/(1-L.minBl));
-    for(let i=0;i<L.n;i++){
-      if(i>=layerBl*(L.n+0.5))break;
-      const a=baseRot+i*(Math.PI*2/L.n)+(rng()-0.5)*0.12+L.off;
-      petal(x+Math.cos(a)*L.dist, y+Math.sin(a)*L.dist, a-Math.PI*0.5,
-        L.len*(0.93+rng()*0.14), L.wr*(0.9+rng()*0.15), L.col, L.strk);
+    for(let i=0;i<ln;i++){
+      if(i>=layerBl*(ln+0.5))break;
+      const a=baseRot+i*(Math.PI*2/ln)+(rng()-0.5)*0.1+spiralOff;
+      petal(x+Math.cos(a)*dist, y+Math.sin(a)*dist, a-Math.PI*0.5,
+        len*(0.92+rng()*0.12), wr*(0.9+rng()*0.15), col, strokeA);
     }
   }
 
-  // CENTER: stamen spiral + core dots
-  if(bl>0.35){
-    const cr=r*0.16;
-    // Spiral ring of small circles
-    const sN=Math.floor(12+petalN);
+  // CENTER: tight spiral of stamen dots
+  if(bl>0.4){
+    const cr=r*0.12;
+    const sN=Math.floor(14+petalN);
     for(let i=0;i<sN;i++){
-      const sa=baseRot+i*(Math.PI*2/sN)*1.1; // slight spiral offset
-      const sd=cr*(0.3+i/sN*0.6);
-      const sr=cr*(0.06+rng()*0.05);
+      const sa=baseRot+i*(Math.PI*2/sN)*1.15; // golden-ish spiral
+      const sd=cr*(0.15+i/sN*0.8);
+      const sr=cr*(0.05+rng()*0.04);
       ctx.beginPath();ctx.arc(x+Math.cos(sa)*sd,y+Math.sin(sa)*sd,sr,0,Math.PI*2);
-      ctx.globalAlpha=bl*0.8;
-      ctx.fillStyle=golden?'rgb(255,235,140)':`rgb(${Math.min(255,fillR+60)},${Math.min(255,fillG+50)},${Math.min(255,fillB+40)})`;
-      ctx.fill();
-      ctx.globalAlpha=bl*0.5;ctx.strokeStyle=lineCol;ctx.lineWidth=lineW*0.4;ctx.stroke();
-    }
-    // 3-5 core dots
-    for(let i=0;i<4;i++){
-      const da=baseRot+i*Math.PI*0.5+rng()*0.5;
-      const dd=rng()*cr*0.2;
-      ctx.beginPath();ctx.arc(x+Math.cos(da)*dd,y+Math.sin(da)*dd,cr*0.09,0,Math.PI*2);
-      ctx.globalAlpha=bl*0.8;ctx.fillStyle=golden?'rgb(180,150,50)':`rgb(${darkR},${darkG},${darkB})`;ctx.fill();
+      ctx.globalAlpha=bl*0.75;
+      ctx.fillStyle=golden?'rgb(255,240,150)':`rgb(${Math.min(255,fillR+55)},${Math.min(255,fillG+45)},${Math.min(255,fillB+35)})`;
+      ctx.fill();ctx.globalAlpha=bl*0.45;ctx.strokeStyle=lineCol;ctx.lineWidth=lineW*0.35;ctx.stroke();
     }
   }
 }
