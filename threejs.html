@@ -1061,12 +1061,24 @@ function animate(){
     ctx.drawImage(petalCanvases[f.petal],-sz/2,-sz/2,sz,sz);ctx.restore();
   }
 
-  // Leading dot
+  // Leading dot + tech demo tracking box
   if(isPlaying&&progress>0&&progress<1){
     const fi=progress*(CL-1),idx=Math.floor(fi),frac=fi-idx;
     const a=curvePoints[Math.min(idx,CL-1)],b=curvePoints[Math.min(idx+1,CL-1)];
     const px=a.x+(b.x-a.x)*frac,py=a.y+(b.y-a.y)*frac;
     ctx.beginPath();ctx.arc(px,py,4*dpr,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,0.6)';ctx.fill();
+    // Tracking box around leading edge zone
+    const boxW=120*dpr,boxH=120*dpr;
+    const bx=px-boxW/2,by=py-boxH/2;
+    const cSz=6*dpr; // corner square size
+    ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=0.8*dpr;
+    ctx.strokeRect(bx,by,boxW,boxH);
+    // Corner squares
+    ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.fillRect(bx-cSz/2,by-cSz/2,cSz,cSz); // top-left
+    ctx.fillRect(bx+boxW-cSz/2,by-cSz/2,cSz,cSz); // top-right
+    ctx.fillRect(bx-cSz/2,by+boxH-cSz/2,cSz,cSz); // bottom-left
+    ctx.fillRect(bx+boxW-cSz/2,by+boxH-cSz/2,cSz,cSz); // bottom-right
   }
 
   // Upload to Three.js and render with bloom
