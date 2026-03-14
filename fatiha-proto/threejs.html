@@ -393,9 +393,114 @@ function drawTulipBud(x,y,R,bl,baseRot,col){
   }
 }
 
-// Backward-compatible wrapper — garden system calls drawRose
+// Layered rose — 3-ring petal structure from Palestine wildflower refs
 function drawRose(x,y,maxR,petalCount,bl,baseRot,col,golden){
-  drawPencFlower(x,y,maxR,petalCount>10?6:5,bl,baseRot,col,golden);
+  if(bl<0.05)return;
+  const r=maxR*bl;
+  if(r<1)return;
+  // Seeded PRNG — deterministic per flower
+  function srand(s){return function(){s=(s*9301+49297)%233280;return s/233280;};}
+  const rng=srand(Math.floor(baseRot*10000));
+
+  const lineW=Math.max(0.5,0.8*dpr);
+  const fillR=golden?220:col[0], fillG=golden?190:col[1], fillB=golden?80:col[2];
+  const darkR=golden?140:Math.round(col[0]*0.45), darkG=golden?100:Math.round(col[1]*0.35), darkB=golden?30:Math.round(col[2]*0.35);
+  const midR=golden?200:Math.round(col[0]*0.85+40), midG=golden?170:Math.round(col[1]*0.85+30), midB=golden?70:Math.round(col[2]*0.85+25);
+  const litR=golden?245:Math.min(255,Math.round(col[0]*0.7+80)), litG=golden?225:Math.min(255,Math.round(col[1]*0.7+60)), litB=golden?130:Math.min(255,Math.round(col[2]*0.7+50));
+  const lineCol=golden?'rgba(140,100,30,0.75)':`rgba(${darkR},${darkG},${darkB},0.75)`;
+
+  // Draw a single petal: wide rounded bezier with slight tip notch
+  function petal(px,py,angle,len,wid,fillC,alpha){
+    ctx.save();ctx.translate(px,py);ctx.rotate(angle);
+    const w=len*wid; // width is fraction of length
+    const notch=len*0.06; // slight notch at tip
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    // Left side — wide bezier curving out
+    ctx.bezierCurveTo(w*0.6,-len*0.25, w*0.85,-len*0.65, notch*0.5,-len+notch);
+    // Tip notch
+    ctx.lineTo(0,-len);
+    ctx.lineTo(-notch*0.5,-len+notch);
+    // Right side — mirror
+    ctx.bezierCurveTo(-w*0.85,-len*0.65, -w*0.6,-len*0.25, 0,0);
+    ctx.closePath();
+    ctx.globalAlpha=bl*alpha;
+    ctx.fillStyle=fillC;ctx.fill();
+    ctx.globalAlpha=bl*alpha*0.9;
+    ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
+    ctx.restore();
+  }
+
+  // Determine petal counts per layer based on petalCount
+  const outerN=Math.max(4,Math.min(8,Math.floor(petalCount*0.35)));
+  const midN=Math.max(5,Math.min(10,Math.floor(petalCount*0.4)));
+  const innerN=Math.max(4,Math.min(7,Math.floor(petalCount*0.25)+2));
+
+  // Layer 1: large outer petals — cupped, wide
+  const outerLen=r*0.88;
+  const outerSlice=Math.PI*2/outerN;
+  for(let i=0;i<outerN;i++){
+    if(i>=bl*(outerN+0.5))break;
+    const jitter=(rng()-0.5)*0.15;
+    const a=baseRot+i*outerSlice+jitter;
+    const lenVar=outerLen*(0.92+rng()*0.16);
+    petal(x,y,a,lenVar,0.8,`rgb(${fillR},${fillG},${fillB})`,0.85);
+  }
+
+  // Layer 2: medium petals — rotated offset, slightly smaller
+  if(bl>0.25){
+    const midLen=r*0.62;
+    const midSlice=Math.PI*2/midN;
+    const midOff=outerSlice*0.5+rng()*0.2;
+    for(let i=0;i<midN;i++){
+      if(i>=bl*(midN+0.5))break;
+      const jitter=(rng()-0.5)*0.12;
+      const a=baseRot+midOff+i*midSlice+jitter;
+      const lenVar=midLen*(0.9+rng()*0.2);
+      petal(x,y,a,lenVar,0.75,`rgb(${midR},${midG},${midB})`,0.9);
+    }
+  }
+
+  // Layer 3: small inner petals — tight ring
+  if(bl>0.45){
+    const inLen=r*0.38;
+    const inSlice=Math.PI*2/innerN;
+    const inOff=outerSlice*0.33+rng()*0.3;
+    for(let i=0;i<innerN;i++){
+      if(i>=bl*(innerN+0.5))break;
+      const jitter=(rng()-0.5)*0.1;
+      const a=baseRot+inOff+i*inSlice+jitter;
+      const lenVar=inLen*(0.88+rng()*0.24);
+      petal(x,y,a,lenVar,0.7,`rgb(${litR},${litG},${litB})`,0.95);
+    }
+  }
+
+  // Center: filled circle + dot ring
+  if(bl>0.5){
+    const cR=r*0.16;
+    ctx.beginPath();ctx.arc(x,y,cR,0,Math.PI*2);
+    ctx.globalAlpha=bl*0.95;
+    ctx.fillStyle=golden?'rgb(200,170,50)':`rgb(${darkR},${darkG},${darkB})`;ctx.fill();
+    ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
+    // Dot ring around center
+    if(r>6){
+      const dotN=Math.max(4,Math.min(10,Math.floor(r*0.4)));
+      const dotR=Math.max(0.5,cR*0.22);
+      const ringR=cR*1.6;
+      for(let i=0;i<dotN;i++){
+        const a=baseRot+i*(Math.PI*2/dotN);
+        const dx=x+Math.cos(a)*ringR, dy=y+Math.sin(a)*ringR;
+        ctx.beginPath();ctx.arc(dx,dy,dotR,0,Math.PI*2);
+        ctx.globalAlpha=bl*0.8;
+        ctx.fillStyle=golden?'rgb(240,220,100)':`rgb(${litR},${litG},${litB})`;ctx.fill();
+      }
+    }
+    // Inner dot
+    ctx.beginPath();ctx.arc(x,y,cR*0.35,0,Math.PI*2);
+    ctx.globalAlpha=bl*0.9;
+    ctx.fillStyle=golden?'rgb(245,225,120)':`rgb(${litR},${litG},${litB})`;ctx.fill();
+  }
+  ctx.globalAlpha=1;
 }
 function drawStem(fx,fy,tx,ty,thick,bl){
   if(bl<0.05)return;
