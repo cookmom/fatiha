@@ -958,20 +958,6 @@ function animate(){
   requestAnimationFrame(animate);
   ctx.fillStyle='#0d0d0d';ctx.fillRect(0,0,WD,HD);
 
-  // ── GOLDEN RECTANGLE FRAME (static tech overlay) ──
-  ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;
-  for(const r of goldenRects){
-    ctx.strokeRect(r.x,r.y,r.w,r.h);
-  }
-
-  // ── GOLDEN SPIRAL LINE (tech overlay) ──
-  if(curvePoints.length>1){
-    ctx.beginPath();
-    ctx.moveTo(curvePoints[0].x,curvePoints[0].y);
-    for(let i=1;i<curvePoints.length;i++) ctx.lineTo(curvePoints[i].x,curvePoints[i].y);
-    ctx.strokeStyle='rgba(255,255,255,0.20)';ctx.lineWidth=1;ctx.stroke();
-  }
-
   const time=(typeof window._synthTime==='number')?window._synthTime:(audio?audio.currentTime:0);
   const progress=Math.min(time/TOTAL_DUR,1);
   if(typeof window._synthTime==='number')isPlaying=true;
@@ -1144,7 +1130,17 @@ function animate(){
     // ctx.fillRect(bx+boxW-cSz/2,by+boxH-cSz/2,cSz,cSz);
   }
 
-  // Upload to Three.js and render with bloom
+  // ── GOLDEN RECTANGLE FRAME (drawn LAST so it's on top) ──
+  ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;
+  for(const r of goldenRects) ctx.strokeRect(r.x,r.y,r.w,r.h);
+  // ── GOLDEN SPIRAL LINE ──
+  if(curvePoints.length>1){
+    ctx.beginPath();ctx.moveTo(curvePoints[0].x,curvePoints[0].y);
+    for(let i=1;i<curvePoints.length;i++) ctx.lineTo(curvePoints[i].x,curvePoints[i].y);
+    ctx.strokeStyle='rgba(255,255,255,0.20)';ctx.lineWidth=1;ctx.stroke();
+  }
+
+  // Upload to Three.js and render
   offTex.needsUpdate=true;
   composer.render();
 }
