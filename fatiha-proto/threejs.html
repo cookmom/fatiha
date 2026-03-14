@@ -34,6 +34,7 @@ import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
    ═══════════════════════════════════════════════════ */
 const W=window.innerWidth, H=window.innerHeight;
 const dpr=Math.min(window.devicePixelRatio,2);
+const WD=W*dpr, HD=H*dpr;
 const GOLDEN_ANGLE=137.508*Math.PI/180;
 const PHI=1.618033988749;
 const FIB=[3,5,8,5,3,8,2,5,8,3,5,1,8,5,3];
@@ -44,8 +45,8 @@ const TOTAL_DUR=6.0;
    THREE.JS SCENE
    ═══════════════════════════════════════════════════ */
 const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x0d0d0d);
-const camera=new THREE.OrthographicCamera(0,W*dpr,0,H*dpr,-1000,1000);
+scene.background=null; // offscreen canvas provides the background
+const camera=new THREE.OrthographicCamera(0,WD,HD,0,-1000,1000); // left,right,bottom,top — Y flipped to match canvas
 camera.position.z=500;
 const renderer=new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(W,H);renderer.setPixelRatio(dpr);
@@ -73,7 +74,6 @@ function cubicBez(a,b,c,d,t){
   return{x:u*u*u*a.x+3*u*u*t*b.x+3*u*t*t*c.x+t*t*t*d.x,
          y:u*u*u*a.y+3*u*u*t*b.y+3*u*t*t*c.y+t*t*t*d.y};
 }
-const WD=W*dpr, HD=H*dpr;
 const curvePoints=[];
 for(const s of SEGS){
   const p0={x:s.p0.x*WD,y:s.p0.y*HD},p1={x:s.p1.x*WD,y:s.p1.y*HD},
@@ -115,6 +115,7 @@ const ctx=offscreen.getContext('2d');
 
 const offTex=new THREE.CanvasTexture(offscreen);
 offTex.minFilter=THREE.LinearFilter;offTex.magFilter=THREE.LinearFilter;
+offTex.flipY=false; // canvas Y=0 is top, match our ortho camera
 const quadGeo=new THREE.PlaneGeometry(WD,HD);
 const quadMat=new THREE.MeshBasicMaterial({map:offTex,transparent:false});
 const quad=new THREE.Mesh(quadGeo,quadMat);
