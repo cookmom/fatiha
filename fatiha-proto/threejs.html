@@ -240,78 +240,84 @@ function spawnGardenElement(evt,progress){
    ═══════════════════════════════════════════════════ */
 
 function drawPencFlower(x,y,R,n,bl,baseRot,col,golden){
-  // Penç v7: Single scalloped outline — 5 lobes with V-notches between
-  // Draw the WHOLE flower as one closed path, then fill + stroke
+  // Penç v8: Two overlapping petal layers + dense center cluster
+  // Based on peony reference — organic wavy edges, visible overlap
   if(bl<0.05)return;
   const r=R*bl;
   const petalN=n||5;
   const lineW=Math.max(0.5,0.8*dpr);
   const fillR=golden?220:col[0], fillG=golden?190:col[1], fillB=golden?80:col[2];
   const darkR=golden?180:Math.round(col[0]*0.6), darkG=golden?140:Math.round(col[1]*0.5), darkB=golden?40:Math.round(col[2]*0.5);
-  const lineCol=golden?'rgba(140,100,30,0.7)':`rgba(${darkR},${darkG},${darkB},0.7)`;
-  const centerR=r*0.22;
-  const outerR=r*0.85;
-  const notchR=r*0.52; // how far in the notch dips (between lobes)
-  const sliceA=Math.PI*2/petalN;
+  const lineCol=golden?'rgba(140,100,30,0.55)':`rgba(${darkR},${darkG},${darkB},0.55)`;
+  // Seeded random for stable rendering
+  function srand(s){return function(){s=(s*9301+49297)%233280;return s/233280;};}
+  const rng=srand(Math.floor(baseRot*10000+petalN*777));
 
-  // Build scalloped outline as one continuous path
-  ctx.beginPath();
-  for(let i=0;i<petalN;i++){
-    if(i>=bl*(petalN+0.5))break;
-    const a=baseRot+i*sliceA;
-    const aNext=baseRot+(i+1)*sliceA;
-    // Lobe apex (outermost point of this petal)
-    const apexX=x+Math.cos(a)*outerR;
-    const apexY=y+Math.sin(a)*outerR;
-    // Notch between this petal and next (valley)
-    const notchA=a+sliceA*0.5;
-    const notchX=x+Math.cos(notchA)*notchR;
-    const notchY=y+Math.sin(notchA)*notchR;
-    // Control points for the rounded lobe
-    const cpLA=a-sliceA*0.25;
-    const cpLx=x+Math.cos(cpLA)*outerR*1.05;
-    const cpLy=y+Math.sin(cpLA)*outerR*1.05;
-    const cpRA=a+sliceA*0.25;
-    const cpRx=x+Math.cos(cpRA)*outerR*1.05;
-    const cpRy=y+Math.sin(cpRA)*outerR*1.05;
-
-    if(i===0){
-      // Start from the notch before first petal
-      const prevNotchA=a-sliceA*0.5;
-      ctx.moveTo(x+Math.cos(prevNotchA)*notchR, y+Math.sin(prevNotchA)*notchR);
-    }
-    // Curve up to lobe apex
-    ctx.quadraticCurveTo(cpLx, cpLy, apexX, apexY);
-    // Curve down to next notch
-    ctx.quadraticCurveTo(cpRx, cpRy, notchX, notchY);
-  }
-  ctx.closePath();
-
-  // Fill
-  ctx.globalAlpha=bl*0.85;
-  ctx.fillStyle=`rgb(${fillR},${fillG},${fillB})`;ctx.fill();
-  // Tahrir outline
-  ctx.globalAlpha=bl;
-  ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
-
-  // Internal petal division lines (radial lines from center to notches)
-  for(let i=0;i<petalN;i++){
-    if(i>=bl*(petalN+0.5))break;
-    const notchA=baseRot+i*sliceA+sliceA*0.5;
+  function drawPetal(px,py,angle,len,wid,fillCol,alpha){
+    // Organic petal — bezier with slight asymmetry
+    ctx.save();ctx.translate(px,py);ctx.rotate(angle);
+    const asym=(rng()-0.5)*wid*0.15; // slight asymmetry
     ctx.beginPath();
-    ctx.moveTo(x+Math.cos(notchA)*centerR, y+Math.sin(notchA)*centerR);
-    ctx.lineTo(x+Math.cos(notchA)*notchR, y+Math.sin(notchA)*notchR);
-    ctx.strokeStyle=lineCol;ctx.lineWidth=lineW*0.7;ctx.globalAlpha=bl*0.6;ctx.stroke();
+    ctx.moveTo(0,0);
+    // Right side — one organic curve
+    ctx.bezierCurveTo(wid*0.6+asym, -len*0.25, wid*0.55, -len*0.65, wid*0.15, -len*0.95);
+    // Rounded tip with slight wave
+    ctx.quadraticCurveTo(0, -len*1.02-rng()*len*0.05, -wid*0.15, -len*0.95);
+    // Left side back
+    ctx.bezierCurveTo(-wid*0.55, -len*0.65, -wid*0.6-asym, -len*0.25, 0, 0);
+    ctx.closePath();
+    ctx.globalAlpha=alpha;
+    ctx.fillStyle=fillCol;ctx.fill();
+    ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
+    ctx.restore();
   }
 
-  // Center circle
-  ctx.beginPath();ctx.arc(x,y,centerR,0,Math.PI*2);
-  ctx.globalAlpha=bl*0.95;
-  ctx.fillStyle=golden?'rgb(200,170,60)':`rgb(${darkR},${darkG},${darkB})`;ctx.fill();
-  ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
-  // Inner dot
-  ctx.beginPath();ctx.arc(x,y,centerR*0.4,0,Math.PI*2);
-  ctx.fillStyle=golden?'rgb(240,220,120)':`rgb(${fillR},${fillG},${fillB})`;ctx.fill();
+  // OUTER RING — 5 large petals, overlapping
+  const outerN=petalN;
+  const outerLen=r*0.65;
+  const outerWid=r*0.4;
+  const lightFill=`rgb(${Math.min(255,fillR+30)},${Math.min(255,fillG+25)},${Math.min(255,fillB+25)})`;
+  for(let i=0;i<outerN;i++){
+    if(i>=bl*(outerN+0.5))break;
+    const a=baseRot+i*(Math.PI*2/outerN)+(rng()-0.5)*0.15;
+    const px=x+Math.cos(a)*r*0.12;
+    const py=y+Math.sin(a)*r*0.12;
+    drawPetal(px,py,a-Math.PI*0.5,outerLen+rng()*r*0.1,outerWid+rng()*r*0.08,lightFill,bl*0.8);
+  }
+  // INNER RING — smaller, slightly offset, darker
+  const innerN=Math.max(3,petalN-1);
+  const innerLen=r*0.42;
+  const innerWid=r*0.28;
+  const darkFill=`rgb(${fillR},${fillG},${fillB})`;
+  if(bl>0.3){
+    for(let i=0;i<innerN;i++){
+      if(i>=bl*(innerN+1))break;
+      const a=baseRot+i*(Math.PI*2/innerN)+Math.PI/petalN+(rng()-0.5)*0.2;
+      const px=x+Math.cos(a)*r*0.08;
+      const py=y+Math.sin(a)*r*0.08;
+      drawPetal(px,py,a-Math.PI*0.5,innerLen+rng()*r*0.06,innerWid+rng()*r*0.05,darkFill,bl*0.85);
+    }
+  }
+  // CENTER — dense cluster of tiny circles (stamen)
+  if(bl>0.25){
+    const cr=r*0.18;
+    // Packed small circles
+    const dotN=Math.floor(6+petalN*2);
+    for(let i=0;i<dotN;i++){
+      const da=rng()*Math.PI*2;
+      const dd=rng()*cr*0.85;
+      const dr=cr*(0.08+rng()*0.08);
+      ctx.beginPath();ctx.arc(x+Math.cos(da)*dd,y+Math.sin(da)*dd,dr,0,Math.PI*2);
+      ctx.globalAlpha=bl*0.7;
+      ctx.fillStyle=golden?'rgb(240,220,120)':`rgb(${Math.min(255,fillR+50)},${Math.min(255,fillG+40)},${Math.min(255,fillB+30)})`;
+      ctx.fill();
+      ctx.strokeStyle=lineCol;ctx.lineWidth=lineW*0.5;ctx.stroke();
+    }
+    // Center ring
+    ctx.beginPath();ctx.arc(x,y,cr,0,Math.PI*2);
+    ctx.globalAlpha=bl*0.4;
+    ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
+  }
 }
 
 function drawCarnation(x,y,R,bl,baseRot,col){
@@ -321,20 +327,21 @@ function drawCarnation(x,y,R,bl,baseRot,col){
   const lineW=Math.max(0.5,0.8*dpr);
   const darkR=Math.round(col[0]*0.55), darkG=Math.round(col[1]*0.45), darkB=Math.round(col[2]*0.45);
   const lineCol=`rgba(${darkR},${darkG},${darkB},0.7)`;
-  // Serrated petal mass — irregular curved top edge
+  // Serrated petal mass — seeded random to prevent flicker
+  function srand(s){return function(){s=(s*9301+49297)%233280;return s/233280;};}
+  const rng=srand(Math.floor(baseRot*10000));
   const petalCount=Math.floor(8+bl*6);
   for(let i=0;i<petalCount;i++){
     const frac=i/petalCount;
     const a=baseRot+frac*Math.PI*2;
-    const dist=r*(0.4+Math.random()*0.3);
+    const dist=r*(0.4+rng()*0.3);
     const px=x+Math.cos(a)*dist;
     const py=y+Math.sin(a)*dist;
-    const s=r*(0.15+Math.random()*0.15);
-    // Small ruffled petal — jagged edge
+    const s=r*(0.15+rng()*0.15);
     ctx.beginPath();
     ctx.moveTo(px,py);
-    const tipA=a+(-0.15+Math.random()*0.3);
-    const tipDist=s*(0.8+Math.random()*0.4);
+    const tipA=a+(-0.15+rng()*0.3);
+    const tipDist=s*(0.8+rng()*0.4);
     const tx=px+Math.cos(tipA)*tipDist, ty=py+Math.sin(tipA)*tipDist;
     // Serrated edge via small zigzag
     const perpA=tipA+Math.PI*0.5;
@@ -639,7 +646,7 @@ function animate(){
     const wave2=Math.sin(f.age*f.wf*0.37+f.wp*2.1)*f.wa*0.4;
     const da=Math.atan2(f.vy,f.vx);
     f.x+=f.vx+Math.cos(da+Math.PI/2)*(wave+wave2);f.y+=f.vy+Math.sin(da+Math.PI/2)*(wave+wave2);
-    f.vx*=0.992;f.vy*=0.992;f.rot+=f.ts;f.ts+=(Math.random()-0.5)*0.004;
+    f.vx*=0.992;f.vy*=0.992;f.rot+=f.ts;f.ts+=(Math.sin(f.born*99999+fi*7)-0.5)*0.004;
     const floorY=HD*0.95,dist=Math.max(0,floorY-f.y),total=floorY-HD*0.1;
     const life=Math.max(0,dist/total);
     f.r=f.startR*(0.30+life*0.70);f.alpha=0.15+life*0.45;
