@@ -512,35 +512,16 @@ function animate(){
     spawnGardenElement(TAJWEED[tajweedIdx],TAJWEED[tajweedIdx].t/TOTAL_DUR);tajweedIdx++;}
 
   // Dot-presence displacement — from v43
-  // Two-mode split: WIDE weave at leading front, TIGHT 2px after settled
-  const FRONT_GAP=30*dpr; // wide split at traveling front (like first threejs video)
-  const SETTLE_GAP=2*dpr; // tight 2px after dots pass
+  // Split displacement — wide at front, settling behind
+  const FRONT_GAP=30*dpr;
+  const BASE_GAP=2*dpr;
   const dotPresence=new Float32Array(CL);
   for(const d of dots){const ci=Math.min(d.ci,CL-1),age=(progress-d.born)/0.09,str=Math.max(0,1-age);
     for(let j=-40;j<=40;j++){const idx=ci+j;if(idx>=0&&idx<CL)dotPresence[idx]=Math.max(dotPresence[idx],str*(1-Math.abs(j)/40)**2);}}
   for(let pass=0;pass<3;pass++)for(let i=2;i<CL-2;i++)
     dotPresence[i]=dotPresence[i]*.4+(dotPresence[i-1]+dotPresence[i+1])*.2+(dotPresence[i-2]+dotPresence[i+2])*.1;
-  // Track if a point has ever been visited (settled)
-  if(!window._everVisited||window._everVisited.length!==CL)window._everVisited=new Float32Array(CL);
-  // Reset visited state when synthTime jumps backward (new capture)
-  if(window._lastSynthTime!==undefined&&time<window._lastSynthTime-0.1)window._everVisited=new Float32Array(CL);
-  window._lastSynthTime=time;
-  for(let i=0;i<CL;i++)if(dotPresence[i]>0.05)window._everVisited[i]=1;
   const disp=[];
-  for(let i=0;i<CL;i++){
-    const visited=window._everVisited[i]>0;
-    const frontActive=dotPresence[i];
-    if(frontActive>0.1){
-      // Leading front — wide weave
-      disp.push(SETTLE_GAP+FRONT_GAP*frontActive);
-    } else if(visited){
-      // Already passed — tight settled gap
-      disp.push(SETTLE_GAP);
-    } else {
-      // Not yet reached — no split
-      disp.push(0);
-    }
-  }
+  for(let i=0;i<CL;i++)disp.push(BASE_GAP+FRONT_GAP*dotPresence[i]);
 
   // Ghunnah glows disabled — structure first
   // glows rendering removed
