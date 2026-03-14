@@ -786,7 +786,7 @@ function animate(){
       case 'bud':{
         const tx=bx+n.x*g.stemLen*g.side,ty=by+n.y*g.stemLen*g.side;
         drawStem(bx,by,tx,ty,g.stemW,bl);
-        drawBud(bx+(tx-bx)*bl,by+(ty-by)*bl,g.maxR,bl,g.col,g.baseRot);break;}
+        drawBud(bx+(tx-bx)*bl,by+(ty-by)*bl,g.maxR,bl,g.col,g.baseRot+bl*Math.PI*2);break;}
       case 'thorn':drawThorn(bx,by,g.len,Math.atan2(n.y*g.side,n.x*g.side),bl);break;
       case 'vine':drawVine(bx,by,n,g.side,g.maxLen,g.width,bl,g.leafCount,g.baseRot,g.col);break;
       case 'leaf':drawLeaf(bx,by,g.leafAngle,g.leafSize,bl);break;
