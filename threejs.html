@@ -616,7 +616,7 @@ function animate(){
     spawnGardenElement(TAJWEED[tajweedIdx],TAJWEED[tajweedIdx].t/TOTAL_DUR);tajweedIdx++;}
 
   // Dot-presence displacement — from v43
-  const splitGap=2*dpr; // tight weave — 2px apart
+  const splitGap=(60+energy*180)*dpr; // wide weave at front, settles to BASE_GAP behind
   const dotPresence=new Float32Array(CL);
   for(const d of dots){const ci=Math.min(d.ci,CL-1),age=(progress-d.born)/0.09,str=Math.max(0,1-age);
     for(let j=-40;j<=40;j++){const idx=ci+j;if(idx>=0&&idx<CL)dotPresence[idx]=Math.max(dotPresence[idx],str*(1-Math.abs(j)/40)**2);}}
