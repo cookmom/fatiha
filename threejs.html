@@ -953,6 +953,10 @@ function animate(){
     const bx=curvePoints[ci].x+n.x*d*w,by=curvePoints[ci].y+n.y*d*w;
     let bl=Math.min(1,elapsed/(g.growDur||0.06));
     if(g.forceBloom!==undefined)bl=Math.max(bl,Math.min(1,(progress-g.forceBloom)/0.04));
+    // Botanical angles from vine geometry
+    const outAngle=Math.atan2(n.y*g.side,n.x*g.side); // perpendicular outward from vine
+    const tangentAngle=Math.atan2(-n.x,n.y); // along vine growth direction
+    const jitter=(g.baseRot%0.52)-0.26; // ±15° natural variation from stored seed
     switch(g.kind){
       case 'rose':{
         const tx=bx+n.x*g.stemLen*g.side,ty=by+n.y*g.stemLen*g.side;
@@ -961,14 +965,17 @@ function animate(){
         if(sB>0.5){const lx=bx+(tx-bx)*0.4,ly=by+(ty-by)*0.4;
           drawLeaf(lx,ly,Math.atan2(ty-by,tx-bx)+0.5*g.side,g.stemW*5,sB);}
         const rx=bx+(tx-bx)*sB,ry=by+(ty-by)*sB;
-        drawRose(rx,ry,g.maxR,g.petalCount,rB,g.baseRot,g.col,g.golden);break;}
+        drawRose(rx,ry,g.maxR,g.petalCount,rB,outAngle+jitter,g.col,g.golden);break;}
       case 'bud':{
         const tx=bx+n.x*g.stemLen*g.side,ty=by+n.y*g.stemLen*g.side;
         drawStem(bx,by,tx,ty,g.stemW,bl);
-        drawBud(bx+(tx-bx)*bl,by+(ty-by)*bl,g.maxR,bl,g.col,g.baseRot+bl*Math.PI*2);break;}
+        const budRot=Math.atan2(ty-by,tx-bx)+jitter;
+        drawBud(bx+(tx-bx)*bl,by+(ty-by)*bl,g.maxR,bl,g.col,budRot);break;}
       case 'thorn':drawThorn(bx,by,g.len,Math.atan2(n.y*g.side,n.x*g.side),bl);break;
       case 'vine':drawVine(bx,by,n,g.side,g.maxLen,g.width,bl,g.leafCount,g.baseRot,g.col);break;
-      case 'leaf':drawLeaf(bx,by,g.leafAngle,g.leafSize,bl);break;
+      case 'leaf':{
+        const leafRot=tangentAngle+g.side*(0.6+jitter);
+        drawLeaf(bx,by,leafRot,g.leafSize,bl);break;}
     }
   }
 
