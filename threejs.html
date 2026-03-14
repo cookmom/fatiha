@@ -82,7 +82,7 @@ const curvePoints=[];
   for(let i=0;i<LEVELS;i++){
     goldenRects.push({x:rx,y:ry,w:rw,h:rh});
     const sq=Math.min(rw,rh); // square side = shorter dimension
-    const dir=i%4; // 0=bottom, 1=right, 2=top, 3=left
+    const dir=i%4; // 0=bottom, 1=left, 2=top, 3=right
     let cx,cy;
     if(dir===0){
       // Cut square from BOTTOM — square at bottom, remainder on top
@@ -92,17 +92,17 @@ const curvePoints=[];
       spiralArcs.push({cx:rx, cy:ry+rh-sq, r:sq, sa:Math.PI/2, ea:0});
       rh-=sq; // remainder is top portion
     }else if(dir===1){
-      // Cut square from RIGHT
-      spiralArcs.push({cx:rx+rw-sq, cy:ry, r:sq, sa:Math.PI, ea:Math.PI/2});
-      rw-=sq;
+      // Cut square from LEFT
+      spiralArcs.push({cx:rx+sq, cy:ry+rh, r:sq, sa:0, ea:-Math.PI/2});
+      rx+=sq; rw-=sq;
     }else if(dir===2){
       // Cut square from TOP
       spiralArcs.push({cx:rx+rw, cy:ry+sq, r:sq, sa:-Math.PI/2, ea:-Math.PI});
       ry+=sq; rh-=sq;
     }else{
-      // Cut square from LEFT
-      spiralArcs.push({cx:rx+sq, cy:ry+rh, r:sq, sa:0, ea:-Math.PI/2});
-      rx+=sq; rw-=sq;
+      // Cut square from RIGHT
+      spiralArcs.push({cx:rx+rw-sq, cy:ry, r:sq, sa:Math.PI, ea:Math.PI/2});
+      rw-=sq;
     }
   }
 
