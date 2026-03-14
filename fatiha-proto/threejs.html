@@ -1150,7 +1150,8 @@ function animate(){
   ctx.beginPath();
   for(let i=0;i<spiralArcs.length;i++){
     const a=spiralArcs[i];
-    ctx.arc(a.cx, a.cy, a.r, a.sa, a.ea, true);
+    // Swap sa/ea and use clockwise to get correct screen direction with y-flip
+    ctx.arc(a.cx, a.cy, a.r, a.ea, a.sa, false);
   }
   ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=1;ctx.stroke();
 
