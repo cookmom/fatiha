@@ -246,8 +246,8 @@ function drawPencFlower(x,y,R,n,bl,baseRot,col,golden){
   if(bl<0.05)return;
   const r=R*bl;
   const petalN=n||5;
-  const centerR=r*0.2; // center circle radius
-  const outerR=r*0.95; // outer petal reach
+  const centerR=r*0.25; // center circle radius — larger (25-30% of diameter)
+  const outerR=r*0.72; // shorter, fatter petals (was 0.95)
   const lineW=Math.max(0.5,0.8*dpr);
   const fillR=golden?220:col[0], fillG=golden?190:col[1], fillB=golden?80:col[2];
   const darkR=golden?180:Math.round(col[0]*0.6), darkG=golden?140:Math.round(col[1]*0.5), darkB=golden?40:Math.round(col[2]*0.5);
@@ -265,40 +265,35 @@ function drawPencFlower(x,y,R,n,bl,baseRot,col,golden){
     const cLx=x+Math.cos(aL)*centerR, cLy=y+Math.sin(aL)*centerR;
     const cRx=x+Math.cos(aR)*centerR, cRy=y+Math.sin(aR)*centerR;
     // Outer lobe points — two bumps with a notch between
-    const notchDepth=0.18; // how deep the V-notch is (fraction of outerR)
-    const lobeSpread=0.35; // how wide each lobe bulges
-    // Left lobe apex
-    const aLL=a-sliceAngle*0.28;
-    const lLx=x+Math.cos(aLL)*outerR, lLy=y+Math.sin(aLL)*outerR;
-    // Right lobe apex
-    const aRR=a+sliceAngle*0.28;
-    const lRx=x+Math.cos(aRR)*outerR, lRy=y+Math.sin(aRR)*outerR;
-    // Notch point (between the two lobes, pulled inward)
+    const notchDepth=0.35; // deep notch (30-40% into petal)
+    // Left lobe apex — wide, bulbous
+    const aLL=a-sliceAngle*0.32;
+    const lLx=x+Math.cos(aLL)*outerR*1.1, lLy=y+Math.sin(aLL)*outerR*1.1;
+    // Right lobe apex — wide, bulbous
+    const aRR=a+sliceAngle*0.32;
+    const lRx=x+Math.cos(aRR)*outerR*1.1, lRy=y+Math.sin(aRR)*outerR*1.1;
+    // Notch point (deep V between lobes)
     const nX=x+Math.cos(a)*outerR*(1-notchDepth);
     const nY=y+Math.sin(a)*outerR*(1-notchDepth);
-    // Mid-edge control points (bulge each side outward for roundness)
-    const midL=a-sliceAngle*0.42;
-    const mLx=x+Math.cos(midL)*outerR*0.7, mLy=y+Math.sin(midL)*outerR*0.7;
-    const midR=a+sliceAngle*0.42;
-    const mRx=x+Math.cos(midR)*outerR*0.7, mRy=y+Math.sin(midR)*outerR*0.7;
+    // Mid-edge control points — pushed outward for plump rounded edges
+    const midL=a-sliceAngle*0.48;
+    const mLx=x+Math.cos(midL)*outerR*0.85, mLy=y+Math.sin(midL)*outerR*0.85;
+    const midR=a+sliceAngle*0.48;
+    const mRx=x+Math.cos(midR)*outerR*0.85, mRy=y+Math.sin(midR)*outerR*0.85;
+    // Lobe control points — make lobes round/puffy
+    const lcpL=a-sliceAngle*0.18;
+    const lcLx=x+Math.cos(lcpL)*outerR*1.18, lcLy=y+Math.sin(lcpL)*outerR*1.18;
+    const lcpR=a+sliceAngle*0.18;
+    const lcRx=x+Math.cos(lcpR)*outerR*1.18, lcRy=y+Math.sin(lcpR)*outerR*1.18;
 
     ctx.beginPath();
-    // Start at center-left
     ctx.moveTo(cLx,cLy);
-    // Left edge → left lobe (smooth curve outward)
+    // Left edge → left lobe (bulge outward)
     ctx.quadraticCurveTo(mLx,mLy, lLx,lLy);
-    // Left lobe → notch
-    ctx.quadraticCurveTo(
-      x+Math.cos(a-sliceAngle*0.1)*outerR*1.02,
-      y+Math.sin(a-sliceAngle*0.1)*outerR*1.02,
-      nX,nY
-    );
-    // Notch → right lobe
-    ctx.quadraticCurveTo(
-      x+Math.cos(a+sliceAngle*0.1)*outerR*1.02,
-      y+Math.sin(a+sliceAngle*0.1)*outerR*1.02,
-      lRx,lRy
-    );
+    // Left lobe → notch (round lobe, deep dip)
+    ctx.quadraticCurveTo(lcLx,lcLy, nX,nY);
+    // Notch → right lobe (round lobe)
+    ctx.quadraticCurveTo(lcRx,lcRy, lRx,lRy);
     // Right lobe → right edge back to center
     ctx.quadraticCurveTo(mRx,mRy, cRx,cRy);
     // Close through center arc
