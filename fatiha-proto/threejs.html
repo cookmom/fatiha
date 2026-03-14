@@ -60,28 +60,75 @@ composer.addPass(new RenderPass(scene,camera));
 // composer.addPass(bloom);
 
 /* ═══════════════════════════════════════════════════
-   BEZIER CURVE — identical to 2D v43
+   GOLDEN RATIO SPIRAL — replaces bezier curve
+   Golden rectangle subdivisions with inscribed quarter-circle arcs
    ═══════════════════════════════════════════════════ */
-const SEGS=[
-  {p0:{x:.92,y:.96},p1:{x:.82,y:.95},p2:{x:.72,y:.92},p3:{x:.65,y:.86}},
-  {p0:{x:.65,y:.86},p1:{x:.55,y:.78},p2:{x:.50,y:.70},p3:{x:.35,y:.66}},
-  {p0:{x:.35,y:.66},p1:{x:.15,y:.60},p2:{x:.12,y:.54},p3:{x:.22,y:.48}},
-  {p0:{x:.22,y:.48},p1:{x:.35,y:.40},p2:{x:.80,y:.36},p3:{x:.75,y:.28}},
-  {p0:{x:.75,y:.28},p1:{x:.70,y:.20},p2:{x:.35,y:.18},p3:{x:.22,y:.14}},
-  {p0:{x:.22,y:.14},p1:{x:.14,y:.11},p2:{x:.10,y:.06},p3:{x:.08,y:.02}},
-];
-function cubicBez(a,b,c,d,t){
-  const u=1-t;
-  return{x:u*u*u*a.x+3*u*u*t*b.x+3*u*t*t*c.x+t*t*t*d.x,
-         y:u*u*u*a.y+3*u*u*t*b.y+3*u*t*t*c.y+t*t*t*d.y};
+const SPIRAL_LEVELS=10; // number of golden rectangle subdivisions
+
+// Golden rectangle subdivisions with inscribed quarter-circle arcs
+// Canvas is y-flipped (scale(1,-1)): y=0 = screen bottom, y=HD = screen top
+// Vine grows top→bottom on screen = high-y → low-y in draw coords
+// Spiral starts at high y (top of screen) and winds inward toward golden eye
+const goldenRects=[];
+const spiralArcs=[]; // {cx,cy,radius,startAngle,endAngle}
+{
+  // Work in draw-coords: (0,0) bottom-left after flip, (WD,HD) top-right
+  let x=0, y=0, w=WD, h=HD;
+  // Direction of square cut: cycles through 4 sides
+  // 0=top (high-y side), 1=right, 2=bottom (low-y side), 3=left
+  for(let i=0;i<SPIRAL_LEVELS;i++){
+    goldenRects.push({x,y,w,h});
+    const sq=Math.min(w,h); // square side = shorter dimension
+    const d=i%4;
+    if(d===0){
+      // Cut square from TOP: square at (x, y+h-sq) to (x+sq, y+h)
+      // Arc center at bottom-left of square, sweeps from right to top
+      const cx=x, cy=y+h-sq;
+      spiralArcs.push({cx,cy,r:sq,sa:Math.PI*0.5,ea:0}); // 90°→0° (top→right)
+      h-=sq;
+    }else if(d===1){
+      // Cut square from RIGHT: square at (x+w-sq, y) to (x+w, y+sq)
+      const cx=x+w-sq, cy=y+sq;
+      spiralArcs.push({cx,cy,r:sq,sa:0,ea:-Math.PI*0.5}); // 0°→-90° (right→bottom)
+      w-=sq;
+    }else if(d===2){
+      // Cut square from BOTTOM: square at (x+w-sq, y) to (x+w, y+sq)
+      const cx=x+w, cy=y+sq;
+      spiralArcs.push({cx,cy,r:sq,sa:-Math.PI*0.5,ea:-Math.PI}); // -90°→-180°
+      y+=sq; h-=sq;
+    }else{
+      // Cut square from LEFT: square at (x, y+h-sq) to (x+sq, y+h)
+      const cx=x+sq, cy=y+h-sq;
+      spiralArcs.push({cx,cy,r:sq,sa:Math.PI,ea:Math.PI*0.5}); // 180°→90°
+      x+=sq; w-=sq;
+    }
+  }
 }
+
+// Sample curvePoints along the spiral arcs (outer → inner)
+// Target ~900 total points distributed across arcs
 const curvePoints=[];
-for(const s of SEGS){
-  const p0={x:s.p0.x*WD,y:s.p0.y*HD},p1={x:s.p1.x*WD,y:s.p1.y*HD},
-        p2={x:s.p2.x*WD,y:s.p2.y*HD},p3={x:s.p3.x*WD,y:s.p3.y*HD};
-  for(let i=0;i<150;i++) curvePoints.push(cubicBez(p0,p1,p2,p3,i/150));
+const totalArcTarget=900;
+{
+  // Weight points by arc radius (larger arcs get more points)
+  let totalR=0;
+  for(const a of spiralArcs) totalR+=a.r;
+  for(let i=0;i<spiralArcs.length;i++){
+    const arc=spiralArcs[i];
+    const nPts=Math.max(10,Math.round(totalArcTarget*arc.r/totalR));
+    for(let j=0;j<nPts;j++){
+      const t=j/nPts;
+      const angle=arc.sa+(arc.ea-arc.sa)*t;
+      curvePoints.push({
+        x:arc.cx+Math.cos(angle)*arc.r,
+        y:arc.cy+Math.sin(angle)*arc.r
+      });
+    }
+  }
+  // Final point of last arc
+  const last=spiralArcs[spiralArcs.length-1];
+  curvePoints.push({x:last.cx+Math.cos(last.ea)*last.r,y:last.cy+Math.sin(last.ea)*last.r});
 }
-{const L=SEGS[5];curvePoints.push(cubicBez({x:L.p0.x*WD,y:L.p0.y*HD},{x:L.p1.x*WD,y:L.p1.y*HD},{x:L.p2.x*WD,y:L.p2.y*HD},{x:L.p3.x*WD,y:L.p3.y*HD},1));}
 const CL=curvePoints.length;
 function getNormal(i){
   const ni=Math.min(i+1,CL-1),pi=Math.max(i-1,0);
@@ -922,6 +969,21 @@ function continuousFill(progress,energy){
 function animate(){
   requestAnimationFrame(animate);
   ctx.fillStyle='#0d0d0d';ctx.fillRect(0,0,WD,HD);
+
+  // ── GOLDEN RECTANGLE FRAME (static tech overlay) ──
+  ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;
+  for(const r of goldenRects){
+    ctx.strokeRect(r.x,r.y,r.w,r.h);
+  }
+
+  // ── GOLDEN SPIRAL LINE (tech overlay) ──
+  if(curvePoints.length>1){
+    ctx.beginPath();
+    ctx.moveTo(curvePoints[0].x,curvePoints[0].y);
+    for(let i=1;i<curvePoints.length;i++) ctx.lineTo(curvePoints[i].x,curvePoints[i].y);
+    ctx.strokeStyle='rgba(255,255,255,0.20)';ctx.lineWidth=1;ctx.stroke();
+  }
+
   const time=(typeof window._synthTime==='number')?window._synthTime:(audio?audio.currentTime:0);
   const progress=Math.min(time/TOTAL_DUR,1);
   if(typeof window._synthTime==='number')isPlaying=true;
@@ -1073,27 +1135,25 @@ function animate(){
     ctx.beginPath();ctx.moveTo(px-chS,py);ctx.lineTo(px+chS,py);ctx.stroke();
     ctx.beginPath();ctx.moveTo(px,py-chS);ctx.lineTo(px,py+chS);ctx.stroke();
     ctx.beginPath();ctx.arc(px,py,1.5*dpr,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,0.6)';ctx.fill();
-    // Tracking box — breathes with smoothed weave displacement
-    const leadDisp=disp[Math.min(idx,CL-1)]||0;
-    const breatheTarget=60*dpr+leadDisp*1.8;
-    if(!window._smoothBreath)window._smoothBreath=breatheTarget;
-    window._smoothBreath+=(breatheTarget-window._smoothBreath)*0.08;
-    // Scale down near screen edges, scale back up away from them
-    const edgeMargin=80*dpr;
-    const distL=px, distR=WD-px, distT=py, distB=HD-py;
-    const minDist=Math.min(distL,distR,distT,distB);
-    const edgeScale=minDist<edgeMargin?minDist/edgeMargin:1;
-    const boxW=window._smoothBreath*edgeScale,boxH=window._smoothBreath*edgeScale;
-    const bx=px-boxW/2,by=py-boxH/2;
-    const cSz=6*dpr; // corner square size
-    ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=0.8*dpr;
-    ctx.strokeRect(bx,by,boxW,boxH);
-    // Corner squares
-    ctx.fillStyle='rgba(255,255,255,0.35)';
-    ctx.fillRect(bx-cSz/2,by-cSz/2,cSz,cSz); // top-left
-    ctx.fillRect(bx+boxW-cSz/2,by-cSz/2,cSz,cSz); // top-right
-    ctx.fillRect(bx-cSz/2,by+boxH-cSz/2,cSz,cSz); // bottom-left
-    ctx.fillRect(bx+boxW-cSz/2,by+boxH-cSz/2,cSz,cSz); // bottom-right
+    // DISABLED: Tracking box — replaced by golden rectangle frame
+    // const leadDisp=disp[Math.min(idx,CL-1)]||0;
+    // const breatheTarget=60*dpr+leadDisp*1.8;
+    // if(!window._smoothBreath)window._smoothBreath=breatheTarget;
+    // window._smoothBreath+=(breatheTarget-window._smoothBreath)*0.08;
+    // const edgeMargin=80*dpr;
+    // const distL=px, distR=WD-px, distT=py, distB=HD-py;
+    // const minDist=Math.min(distL,distR,distT,distB);
+    // const edgeScale=minDist<edgeMargin?minDist/edgeMargin:1;
+    // const boxW=window._smoothBreath*edgeScale,boxH=window._smoothBreath*edgeScale;
+    // const bx=px-boxW/2,by=py-boxH/2;
+    // const cSz=6*dpr;
+    // ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=0.8*dpr;
+    // ctx.strokeRect(bx,by,boxW,boxH);
+    // ctx.fillStyle='rgba(255,255,255,0.35)';
+    // ctx.fillRect(bx-cSz/2,by-cSz/2,cSz,cSz);
+    // ctx.fillRect(bx+boxW-cSz/2,by-cSz/2,cSz,cSz);
+    // ctx.fillRect(bx-cSz/2,by+boxH-cSz/2,cSz,cSz);
+    // ctx.fillRect(bx+boxW-cSz/2,by+boxH-cSz/2,cSz,cSz);
   }
 
   // Upload to Three.js and render with bloom
