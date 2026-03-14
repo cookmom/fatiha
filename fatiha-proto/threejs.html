@@ -213,7 +213,7 @@ function spawnGardenElement(evt,progress){
       garden.push({...base,kind:'rose',maxR:(30+evt.size*50)*dpr,petalCount:Math.floor(14+evt.size*22),
         stemLen:(35+evt.size*60)*dpr,stemW:(2.5+evt.size*3)*dpr,golden:false,growDur:0.06});break;
     case 'bud':
-      garden.push({...base,kind:'bud',maxR:(8+evt.size*12)*dpr,stemLen:(12+evt.size*18)*dpr,
+      garden.push({...base,kind:'bud',maxR:Math.max(12*dpr,(8+evt.size*12)*dpr),stemLen:(12+evt.size*18)*dpr,
         stemW:(1+evt.size)*dpr,growDur:0.04});break;
     case 'thorn':
       garden.push({...base,kind:'thorn',len:(10+evt.size*15)*dpr,growDur:0.03});break;
@@ -234,26 +234,63 @@ function spawnGardenElement(evt,progress){
    2D DRAW FUNCTIONS — copied verbatim from v43
    ═══════════════════════════════════════════════════ */
 function drawRose(x,y,maxR,petalCount,bl,baseRot,col,golden){
-  const petals=Math.floor(petalCount*bl);if(petals<1)return;
-  for(let i=0;i<petals;i++){
-    const angle=i*GOLDEN_ANGLE+baseRot,frac=i/petalCount;
-    const dist=maxR*Math.sqrt(frac)*bl;
-    const px=x+Math.cos(angle)*dist,py=y+Math.sin(angle)*dist;
-    const petalR=maxR*(0.12+frac*0.22)*bl;
-    let r,g,b;
-    if(golden){r=Math.round(255-frac*40);g=Math.round(200-frac*60);b=Math.round(80+frac*30);}
-    else{const lf=frac;r=Math.round(col[0]+(255-col[0])*(1-lf)*0.4);g=Math.round(col[1]+(255-col[1])*(1-lf)*0.3);b=Math.round(col[2]+(255-col[2])*(1-lf)*0.3);}
-    ctx.save();ctx.translate(px,py);ctx.rotate(angle+Math.PI*0.3);
-    const s=petalR;ctx.beginPath();ctx.moveTo(0,-s);
-    const bx2=s*0.55,by2=s*0.35;
-    ctx.bezierCurveTo(bx2,-by2,bx2,by2*1.4,0,s*0.65);ctx.bezierCurveTo(-bx2,by2*1.4,-bx2,-by2,0,-s);ctx.closePath();
-    ctx.globalAlpha=0.7+0.3*(1-frac);ctx.fillStyle=`rgb(${r},${g},${b})`;ctx.fill();ctx.restore();
+  if(bl<0.05)return;
+  const R=maxR*bl;
+  // Concentric rings of overlapping C-curved petals
+  const rings=[
+    {n:Math.max(3,Math.floor(petalCount*0.22)),r:0.85,size:0.45,alpha:0.65}, // outer — large, open
+    {n:Math.max(3,Math.floor(petalCount*0.28)),r:0.55,size:0.35,alpha:0.75}, // mid
+    {n:Math.max(2,Math.floor(petalCount*0.25)),r:0.32,size:0.28,alpha:0.85}, // inner
+    {n:Math.max(2,Math.floor(petalCount*0.15)),r:0.15,size:0.20,alpha:0.92}, // core
+  ];
+  for(let ri=0;ri<rings.length;ri++){
+    const ring=rings[ri];
+    const visiblePetals=Math.floor(ring.n*Math.min(1,bl*(1.5+ri*0.3)));
+    if(visiblePetals<1)continue;
+    for(let i=0;i<visiblePetals;i++){
+      const angle=baseRot+(i/ring.n)*Math.PI*2+ri*0.4; // offset each ring
+      const dist=R*ring.r;
+      const px=x+Math.cos(angle)*dist,py=y+Math.sin(angle)*dist;
+      const s=R*ring.size*(0.85+Math.random()*0.3);
+      const frac=ri/rings.length;
+      let r,g,b;
+      if(golden){
+        r=Math.round(255-frac*50);g=Math.round(215-frac*80);b=Math.round(80+frac*50);
+      }else{
+        r=Math.round(col[0]+(255-col[0])*(1-frac)*0.45);
+        g=Math.round(col[1]+(255-col[1])*(1-frac)*0.35);
+        b=Math.round(col[2]+(255-col[2])*(1-frac)*0.35);
+      }
+      ctx.save();ctx.translate(px,py);ctx.rotate(angle+Math.PI*0.5+ri*0.2);
+      // Elongated petal — pointed base, cupped open top
+      ctx.beginPath();ctx.moveTo(0,-s);
+      ctx.bezierCurveTo(s*0.5,-s*0.7, s*0.6,-s*0.1, s*0.35,s*0.4);
+      ctx.quadraticCurveTo(0,s*0.65, -s*0.35,s*0.4);
+      ctx.bezierCurveTo(-s*0.6,-s*0.1, -s*0.5,-s*0.7, 0,-s);
+      ctx.closePath();
+      ctx.globalAlpha=ring.alpha*bl;ctx.fillStyle=`rgb(${r},${g},${b})`;ctx.fill();
+      // Vein line
+      ctx.beginPath();ctx.moveTo(0,-s*0.85);ctx.quadraticCurveTo(s*0.05,0,0,s*0.3);
+      ctx.strokeStyle=`rgba(255,255,255,${0.06*bl})`;ctx.lineWidth=0.6*dpr;ctx.stroke();
+      ctx.restore();
+    }
   }
-  if(bl>0.4){ctx.beginPath();ctx.arc(x,y,maxR*0.07*bl,0,Math.PI*2);
-    ctx.fillStyle=golden?`rgba(255,240,180,${0.9*bl})`:`rgba(255,220,180,${0.8*bl})`;ctx.fill();}
-  if(golden&&bl>0.3){const grad=ctx.createRadialGradient(x,y,0,x,y,maxR*1.3*bl);
-    grad.addColorStop(0,`rgba(255,215,80,${0.15*bl})`);grad.addColorStop(1,'rgba(255,215,80,0)');
-    ctx.fillStyle=grad;ctx.beginPath();ctx.arc(x,y,maxR*1.3*bl,0,Math.PI*2);ctx.fill();}
+  // Center bud — tight spiral
+  if(bl>0.3){
+    const cr=R*0.12;
+    ctx.beginPath();ctx.arc(x,y,cr,0,Math.PI*2);
+    ctx.fillStyle=golden?`rgba(255,235,160,${0.9*bl})`:`rgba(255,210,180,${0.85*bl})`;ctx.fill();
+    // Spiral line in center
+    ctx.beginPath();
+    for(let t=0;t<Math.PI*3;t+=0.15){const sr=cr*(1-t/(Math.PI*4));
+      ctx.lineTo(x+Math.cos(t+baseRot)*sr,y+Math.sin(t+baseRot)*sr);}
+    ctx.strokeStyle=golden?`rgba(200,160,60,${0.3*bl})`:`rgba(180,100,100,${0.25*bl})`;
+    ctx.lineWidth=0.8*dpr;ctx.stroke();
+  }
+  // Golden glow
+  if(golden&&bl>0.3){const grad=ctx.createRadialGradient(x,y,0,x,y,R*1.4);
+    grad.addColorStop(0,`rgba(255,215,80,${0.18*bl})`);grad.addColorStop(1,'rgba(255,215,80,0)');
+    ctx.fillStyle=grad;ctx.beginPath();ctx.arc(x,y,R*1.4,0,Math.PI*2);ctx.fill();}
 }
 function drawStem(fx,fy,tx,ty,thick,bl){
   if(bl<0.05)return;
@@ -334,11 +371,11 @@ function continuousFill(progress,energy){
     garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
       kind:'leaf',leafSize:ls,leafAngle:Math.random()*Math.PI*2,growDur:0.012+Math.random()*0.015});
   }else if(roll<0.78){
-    const mr=(6+energy*20+Math.random()*14)*dpr*sv;newR=mr;
+    const mr=Math.max(10*dpr,(6+energy*20+Math.random()*14)*dpr*sv);newR=mr;
     garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
       kind:'bud',maxR:mr,stemLen:mr*PHI,stemW:(0.8+energy*1.5)*dpr,growDur:0.02});
   }else if(roll<0.93){
-    const mr=(8+energy*22)*dpr*sv;newR=mr;
+    const mr=Math.max(14*dpr,(8+energy*22)*dpr*sv);newR=mr;
     garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
       kind:'rose',maxR:mr,petalCount:Math.floor(4+Math.random()*7),
       stemLen:mr*PHI,stemW:(0.8+energy*1.2)*dpr,golden:false,growDur:0.025});
@@ -369,14 +406,15 @@ function animate(){
     spawnGardenElement(TAJWEED[tajweedIdx],TAJWEED[tajweedIdx].t/TOTAL_DUR);tajweedIdx++;}
 
   // Dot-presence displacement — from v43
-  const splitGap=(60+energy*180)*dpr;
+  const splitGap=2*dpr; // tight weave — 2px apart
   const dotPresence=new Float32Array(CL);
   for(const d of dots){const ci=Math.min(d.ci,CL-1),age=(progress-d.born)/0.09,str=Math.max(0,1-age);
     for(let j=-40;j<=40;j++){const idx=ci+j;if(idx>=0&&idx<CL)dotPresence[idx]=Math.max(dotPresence[idx],str*(1-Math.abs(j)/40)**2);}}
   for(let pass=0;pass<3;pass++)for(let i=2;i<CL-2;i++)
     dotPresence[i]=dotPresence[i]*.4+(dotPresence[i-1]+dotPresence[i+1])*.2+(dotPresence[i-2]+dotPresence[i+2])*.1;
+  const BASE_GAP=2*dpr; // always 2px apart even without dots
   const disp=[];
-  for(let i=0;i<CL;i++)disp.push(splitGap*dotPresence[i]);
+  for(let i=0;i<CL;i++)disp.push(BASE_GAP+splitGap*dotPresence[i]);
 
   // Ghunnah glows
   for(let i=glows.length-1;i>=0;i--){
