@@ -1141,12 +1141,15 @@ function animate(){
   // ── GOLDEN RECTANGLE FRAME (drawn LAST so it's on top) ──
   ctx.strokeStyle='rgba(255,255,255,0.30)';ctx.lineWidth=1;
   for(const r of goldenRects) ctx.strokeRect(r.x,r.y,r.w,r.h);
-  // ── GOLDEN SPIRAL LINE ──
-  if(curvePoints.length>1){
-    ctx.beginPath();ctx.moveTo(curvePoints[0].x,curvePoints[0].y);
-    for(let i=1;i<curvePoints.length;i++) ctx.lineTo(curvePoints[i].x,curvePoints[i].y);
-    ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=1;ctx.stroke();
+  // ── GOLDEN SPIRAL LINE — drawn with ctx.arc for y-flip correctness ──
+  ctx.beginPath();
+  for(let i=0;i<spiralArcs.length;i++){
+    const a=spiralArcs[i];
+    // ctx.arc handles the canvas transform automatically
+    // We need counterclockwise=true because canvas y-flip reverses arc direction
+    ctx.arc(a.cx, a.cy, a.r, a.sa, a.ea, true);
   }
+  ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=1;ctx.stroke();
 
   // Upload to Three.js and render
   offTex.needsUpdate=true;
