@@ -288,9 +288,9 @@ function drawPencFlower(x,y,R,n,bl,baseRot,col,golden){
 
     for(let i=0;i<ln;i++){
       if(i>=layerBl*(ln+0.5))break;
-      const a=baseRot+i*(Math.PI*2/ln)+(rng()-0.5)*0.1+spiralOff;
+      const a=baseRot+i*(Math.PI*2/ln)+(rng()-0.5)*0.22+spiralOff;
       petal(x+Math.cos(a)*dist, y+Math.sin(a)*dist, a-Math.PI*0.5,
-        len*(0.92+rng()*0.12), wr*(0.9+rng()*0.15), col, strokeA);
+        len*(0.82+rng()*0.35), wr*(0.9+rng()*0.15), col, strokeA);
     }
   }
 
