@@ -56,3 +56,17 @@
 - AramcoWorld construction guide: https://www.aramcoworld.com/articles/2022/art-of-islamic-patterns-rstem-pasha-rosette
 - Istanbul History — Decorative Figures: https://istanbultarihi.ist/634-decorative-figures
 - Deen Arts Foundation — Tezhip courses: https://deenartsfoundation.org/courses/introduction-to-tezhip-classic-islamic-illumination/
+
+---
+
+## Tools
+
+### p5.brush 2.0 (beta) — Aluan Campos Uribe (@acamposuribe / @IOivm)
+- **GitHub**: https://github.com/acamposuribe/p5.brush
+- **CDN**: `https://cdn.jsdelivr.net/npm/p5.brush@2.0.0-beta`
+- **Brush Maker**: https://acamposuribe.github.io/p5.brush/tools/brush-maker.html
+- **Site**: https://p5-brush.cargo.site/
+- Requires p5.js 2.x
+- Pencils, charcoal, markers, watercolor fills, hatch patterns, vector fields
+- Perfect for Islamic calligraphy strokes — edge erosion, squeeze & spots, soft absorbed edges
+- Updated 2026-03-14 — tweet: https://x.com/acamposuribe/status/2032483902229520480
