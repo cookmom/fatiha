@@ -237,6 +237,41 @@ function makeTulipPetalPoly(baseX, baseY, angle, length, width, curvature) {
   return pts;
 }
 
+// Hyacinth bell floret — elongated bell/tube shape
+function makeHyacinthBellPoly(baseX, baseY, angle, length, width) {
+  const pts = [];
+  const n = 24;
+  // Right side — narrow tube flaring to bell mouth
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    let w;
+    if (t < 0.15) w = 0.3 + t / 0.15 * 0.15;  // narrow tube top
+    else if (t < 0.5) w = 0.45 + (t - 0.15) / 0.35 * 0.1;  // slight taper
+    else if (t < 0.75) w = 0.55 + (t - 0.5) / 0.25 * 0.45;  // flare out to bell
+    else w = 1.0 - (t - 0.75) / 0.25 * 0.15;  // slight curl at mouth
+    const along = t * length;
+    const across = w * width * 0.5;
+    const x = baseX + along * Math.cos(angle) - across * Math.sin(angle);
+    const y = baseY + along * Math.sin(angle) + across * Math.cos(angle);
+    pts.push([x, y]);
+  }
+  // Left side
+  for (let i = n; i >= 0; i--) {
+    const t = i / n;
+    let w;
+    if (t < 0.15) w = 0.3 + t / 0.15 * 0.15;
+    else if (t < 0.5) w = 0.45 + (t - 0.15) / 0.35 * 0.1;
+    else if (t < 0.75) w = 0.55 + (t - 0.5) / 0.25 * 0.45;
+    else w = 1.0 - (t - 0.75) / 0.25 * 0.15;
+    const along = t * length;
+    const across = -w * width * 0.5;
+    const x = baseX + along * Math.cos(angle) - across * Math.sin(angle);
+    const y = baseY + along * Math.sin(angle) + across * Math.cos(angle);
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
 // Carnation: ruffled circle with serrated edge
 function makeCarnationPoly(cx, cy, radius, ruffleAmp, numRuffles) {
   const pts = [];
@@ -285,7 +320,7 @@ function makeRoseStem(topX, topY, bottomX, bottomY, widthTop, widthBottom) {
     const t = i / n;
     const x = lerp(topX, bottomX, t);
     const y = lerp(topY, bottomY, t);
-    const zigzag = ((i % 4 < 2) ? 1 : -1) * 1.2 * S;
+    const zigzag = Math.sin(t * Math.PI * 3.5) * 0.8 * S;
     spine.push([x + zigzag, y]);
   }
   const dx = bottomX - topX, dy = bottomY - topY;
@@ -301,14 +336,18 @@ function makeRoseStem(topX, topY, bottomX, bottomY, widthTop, widthBottom) {
   return { poly: [...right, ...left.reverse()], spine };
 }
 
-// Rose thorn polygon — small triangle
+// Rose thorn polygon — organic curved bump
 function makeThornPoly(x, y, side, size) {
   const s = size * S;
-  return [
-    [x, y],
-    [x + side * s * 1.2, y - s * 0.8],
-    [x + side * s * 0.3, y - s * 0.2]
-  ];
+  const pts = [];
+  const n = 8;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const along = t * s * 0.8;
+    const bulge = Math.sin(t * Math.PI) * s * 0.35 * side;
+    pts.push([x + bulge, y - along]);
+  }
+  return pts;
 }
 
 // Tulip stem: thick, straight, smooth, fleshy
@@ -811,6 +850,14 @@ const flowerLabels = [
       { layerVariance: 0.07, alphaScale: 1.0, priority: 4 }
     );
   }
+  // Dark center fill to eliminate white gap
+  const centerPoly = [];
+  const centerR = 6 * S;
+  for (let j = 0; j < 16; j++) {
+    const a = (j / 16) * Math.PI * 2;
+    centerPoly.push([cx + Math.cos(a) * centerR + gauss(0, 0.5), cy + Math.sin(a) * centerR + gauss(0, 0.5)]);
+  }
+  addElement(centerPoly, [90, 15, 30], { layerVariance: 0.06, alphaScale: 1.8, priority: 5 });
 }
 
 // --- FLOWER 4: Golden/amber rose (row 1, col 1) — Rose stem+leaves ---
@@ -881,18 +928,18 @@ const flowerLabels = [
     makeTulipStem(cx, stemTop5, cx, stemBot5),
     [35, 88, 32], { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
   );
-  // Long smooth blade leaves with slight twist — 2 leaves arching from base
+  // Long smooth blade leaves — dramatically long, almost as tall as stem
   const tulipLeafColor = [35, 88, 32];
-  const tlBaseY = lerp(stemTop5, stemBot5, 0.5);
+  const tlBaseY = lerp(stemTop5, stemBot5, 0.55);
   addElement(
-    makeTulipLeafPoly(cx - 2, tlBaseY, -Math.PI/2 - 0.4 + gauss(0, 0.08), 45*S, 8*S),
+    makeTulipLeafPoly(cx - 2, tlBaseY, -Math.PI/2 - 0.3 + gauss(0, 0.06), 90*S, 9*S),
     varyColor(tulipLeafColor, 6),
-    { layerVariance: 0.06, alphaScale: 1.1, priority: 0 }
+    { layerVariance: 0.08, alphaScale: 1.1, priority: 0 }
   );
   addElement(
-    makeTulipLeafPoly(cx + 2, tlBaseY, -Math.PI/2 + 0.4 + gauss(0, 0.08), 42*S, 7*S),
+    makeTulipLeafPoly(cx + 2, tlBaseY, -Math.PI/2 + 0.35 + gauss(0, 0.06), 85*S, 8*S),
     varyColor(tulipLeafColor, 6),
-    { layerVariance: 0.06, alphaScale: 1.1, priority: 0 }
+    { layerVariance: 0.08, alphaScale: 1.1, priority: 0 }
   );
   // Flower petals
   const petalAngles = [-0.35, -0.12, 0.12, 0.35];
@@ -905,7 +952,7 @@ const flowerLabels = [
     addElement(
       makeTulipPetalPoly(bx, by, angle, (55 + gauss(0, 4)) * S * (isOuter ? 0.9 : 1.0), (18 + gauss(0, 2)) * S * (isOuter ? 1.15 : 1.0), gauss(0.5, 0.3) * (i < 2 ? 1 : -1)),
       varyColor(isOuter ? [210, 65, 20] : [230, 85, 25], 10),
-      { layerVariance: 0.10, alphaScale: 1.5, priority: isOuter ? 1 : 2 }
+      { layerVariance: 0.16, alphaScale: 1.6, priority: isOuter ? 1 : 2 }
     );
   }
   for (let i = 0; i < 2; i++) {
@@ -913,7 +960,7 @@ const flowerLabels = [
     addElement(
       makeTulipPetalPoly(cx + gauss(0, 1), cy + 12*S, angle, (38 + gauss(0, 3))*S, (8 + gauss(0, 1))*S, gauss(0.3, 0.2)),
       varyColor([240, 180, 40], 10),
-      { layerVariance: 0.08, alphaScale: 0.7, priority: 3 }
+      { layerVariance: 0.12, alphaScale: 0.8, priority: 3 }
     );
   }
 }
@@ -929,43 +976,43 @@ const flowerLabels = [
     makeCarnationStem(cx, stemTop6, cx + gauss(0, 1), stemBot6, nodePositions),
     [40, 95, 38], { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
   );
-  // Narrow grass-like paired leaves at each node
+  // Narrow grass-like paired leaves at each swollen node
   const carnLeafColor = [40, 95, 38];
   for (const nt of nodePositions) {
-    const ny = lerp(stemTop6, stemBot6, nt);
-    // Left leaf
+    const nodeY = lerp(stemTop6, stemBot6, nt);
+    // Left leaf — long narrow grass blade arching outward
     addElement(
-      makeCarnationLeafPoly(cx - 1, ny, Math.PI * 0.65 + gauss(0, 0.1), 20*S, 3*S),
+      makeCarnationLeafPoly(cx - 1, nodeY, -Math.PI/2 - 0.6 + gauss(0, 0.08), 28*S, 2.5*S),
       varyColor(carnLeafColor, 6),
-      { layerVariance: 0.05, alphaScale: 1.0, priority: 0 }
+      { layerVariance: 0.06, alphaScale: 1.0, priority: 0 }
     );
-    // Right leaf
+    // Right leaf — mirrored
     addElement(
-      makeCarnationLeafPoly(cx + 1, ny, Math.PI * 0.35 + gauss(0, 0.1), 18*S, 3*S),
+      makeCarnationLeafPoly(cx + 1, nodeY, -Math.PI/2 + 0.6 + gauss(0, 0.08), 26*S, 2.5*S),
       varyColor(carnLeafColor, 6),
-      { layerVariance: 0.05, alphaScale: 1.0, priority: 0 }
+      { layerVariance: 0.06, alphaScale: 1.0, priority: 0 }
     );
   }
   // Flower
   addElement(
     makeCarnationPoly(cx, cy, 32*S, 6*S, 14),
     varyColor([195, 30, 50]),
-    { layerVariance: 0.14, alphaScale: 1.5, priority: 1 }
+    { layerVariance: 0.18, alphaScale: 1.6, priority: 1 }
   );
   addElement(
     makeCarnationPoly(cx + gauss(0, 1), cy + gauss(0, 1), 26*S, 5*S, 12),
     varyColor([175, 25, 45]),
-    { layerVariance: 0.12, alphaScale: 1.3, priority: 2 }
+    { layerVariance: 0.16, alphaScale: 1.4, priority: 2 }
   );
   addElement(
     makeCarnationPoly(cx + gauss(0, 1), cy + gauss(0, 1), 18*S, 4*S, 10),
     varyColor([155, 20, 38]),
-    { layerVariance: 0.10, alphaScale: 1.2, priority: 3 }
+    { layerVariance: 0.14, alphaScale: 1.3, priority: 3 }
   );
   addElement(
     makeCarnationPoly(cx + gauss(0, 1), cy + gauss(0, 1), 10*S, 2*S, 8),
     varyColor([120, 15, 30]),
-    { layerVariance: 0.08, alphaScale: 1.0, priority: 4 }
+    { layerVariance: 0.10, alphaScale: 1.1, priority: 4 }
   );
 }
 
@@ -999,21 +1046,26 @@ const flowerLabels = [
     varyColor(hyaLeafColor, 5),
     { layerVariance: 0.06, alphaScale: 1.0, priority: 0 }
   );
-  // Florets
-  for (let i = 0; i < numFlorets; i++) {
-    const t = i / (numFlorets - 1);
+  // Florets — elongated bells clustered tightly along spike
+  const numFloretRows = 14;
+  for (let i = 0; i < numFloretRows; i++) {
+    const t = i / (numFloretRows - 1);
     const fy = startY - t * spikeLen;
-    const side = (i % 2 === 0) ? -1 : 1;
-    const fx = cx + side * (3 + gauss(0, 1.5));
-    const bellScale = 0.6 + 0.4 * (1 - t * 0.5);
-    const bellLen = (10 + gauss(0, 1.5)) * S * bellScale;
-    const bellWid = (7 + gauss(0, 1)) * S * bellScale;
-    const bellAngle = Math.PI / 2 + side * (0.3 + gauss(0, 0.15));
-    addElement(
-      makeBudPetalPoly(fx, fy, bellAngle, bellLen, bellWid, gauss(0, 0.2)),
-      varyColor([40, 60, 140], 10),
-      { layerVariance: 0.10, alphaScale: 1.4, priority: 2 }
-    );
+    const bellScale = 0.5 + 0.5 * (1 - t * 0.4);
+    const bellLen = (16 + gauss(0, 2)) * S * bellScale;
+    const bellWid = (6 + gauss(0, 0.8)) * S * bellScale;
+    // 2-3 bells per row, fanning out from center
+    const bellsInRow = (i < 3 || i > numFloretRows - 3) ? 2 : 3;
+    for (let j = 0; j < bellsInRow; j++) {
+      const spread = (j - (bellsInRow - 1) / 2) * (0.35 + gauss(0, 0.05));
+      const bellAngle = Math.PI / 2 + spread;
+      const fx = cx + Math.cos(bellAngle) * 2 * S + gauss(0, 0.8);
+      addElement(
+        makeHyacinthBellPoly(fx, fy, bellAngle, bellLen, bellWid),
+        varyColor([40, 60, 140], 10),
+        { layerVariance: 0.10, alphaScale: 1.4, priority: 2 }
+      );
+    }
   }
 }
 
@@ -1044,14 +1096,14 @@ const flowerLabels = [
       { layerVariance: 0.05, alphaScale: 1.0, priority: 0 }
     );
   }
-  // Flower
+  // Flower — scaled up 2x for visibility, star-shaped petals
   const numPetals = 5;
   for (let i = 0; i < numPetals; i++) {
     const angle = (i / numPetals) * Math.PI * 2 - Math.PI / 2 + gauss(0, 0.08);
-    const bx = cx + Math.cos(angle) * 3;
-    const by = cy + Math.sin(angle) * 3;
-    const petalLen = (26 + gauss(0, 2)) * S;
-    const petalWid = (12 + gauss(0, 1.5)) * S;
+    const bx = cx + Math.cos(angle) * 5;
+    const by = cy + Math.sin(angle) * 5;
+    const petalLen = (50 + gauss(0, 3)) * S;
+    const petalWid = (20 + gauss(0, 2)) * S;
     addElement(
       makePetalPoly(bx, by, angle + gauss(0, 0.1), petalLen, petalWid, gauss(0, 0.2)),
       varyColor([245, 240, 235], 4),
@@ -1060,20 +1112,21 @@ const flowerLabels = [
   }
   for (let i = 0; i < numPetals; i++) {
     const angle = (i / numPetals) * Math.PI * 2 - Math.PI / 2 + Math.PI / numPetals + gauss(0, 0.08);
-    const bx = cx + Math.cos(angle) * 2;
-    const by = cy + Math.sin(angle) * 2;
+    const bx = cx + Math.cos(angle) * 3;
+    const by = cy + Math.sin(angle) * 3;
     addElement(
-      makePetalPoly(bx, by, angle + gauss(0, 0.1), (20 + gauss(0, 2)) * S, (9 + gauss(0, 1)) * S, gauss(0, 0.2)),
+      makePetalPoly(bx, by, angle + gauss(0, 0.1), (38 + gauss(0, 2)) * S, (16 + gauss(0, 1.5)) * S, gauss(0, 0.2)),
       varyColor([240, 236, 228], 4),
       { layerVariance: 0.08, alphaScale: 1.5, priority: 3 }
     );
   }
-  for (let i = 0; i < 2; i++) {
-    const angle = (i / 2) * Math.PI * 2 + gauss(0, 0.5);
+  // Yellow center
+  for (let i = 0; i < 3; i++) {
+    const angle = (i / 3) * Math.PI * 2 + gauss(0, 0.5);
     addElement(
-      makePetalPoly(cx + gauss(0,1), cy + gauss(0,1), angle, 5*S, 4*S, gauss(0,0.2)),
+      makePetalPoly(cx + gauss(0,1), cy + gauss(0,1), angle, 8*S, 7*S, gauss(0,0.2)),
       varyColor([220, 190, 80], 6),
-      { layerVariance: 0.06, alphaScale: 1.0, priority: 4 }
+      { layerVariance: 0.06, alphaScale: 1.2, priority: 4 }
     );
   }
 }
@@ -1100,14 +1153,14 @@ const flowerLabels = [
       { layerVariance: 0.05, alphaScale: 1.0, priority: 0 }
     );
   }
-  // Flower
-  const numPetals = 5;
-  for (let i = 0; i < numPetals; i++) {
-    const angle = (i / numPetals) * Math.PI * 2 - Math.PI / 2 + gauss(0, 0.1);
-    const bx = cx + Math.cos(angle) * 2;
-    const by = cy + Math.sin(angle) * 2;
-    const petalLen = (18 + gauss(0, 2)) * S;
-    const petalWid = (14 + gauss(0, 1.5)) * S;
+  // Flower — scaled up to match other flowers
+  const numPetals9 = 5;
+  for (let i = 0; i < numPetals9; i++) {
+    const angle = (i / numPetals9) * Math.PI * 2 - Math.PI / 2 + gauss(0, 0.1);
+    const bx = cx + Math.cos(angle) * 4;
+    const by = cy + Math.sin(angle) * 4;
+    const petalLen = (32 + gauss(0, 3)) * S;
+    const petalWid = (24 + gauss(0, 2)) * S;
     addElement(
       makePetalPoly(bx, by, angle + gauss(0, 0.1), petalLen, petalWid, gauss(0, 0.15)),
       varyColor([200, 50, 75], 8),
@@ -1117,7 +1170,7 @@ const flowerLabels = [
   for (let i = 0; i < 3; i++) {
     const angle = (i / 3) * Math.PI * 2 + gauss(0, 0.5);
     addElement(
-      makePetalPoly(cx + gauss(0,1), cy + gauss(0,1), angle, 6*S, 5*S, gauss(0,0.2)),
+      makePetalPoly(cx + gauss(0,1), cy + gauss(0,1), angle, 12*S, 10*S, gauss(0,0.2)),
       varyColor([140, 25, 45], 5),
       { layerVariance: 0.07, alphaScale: 1.2, priority: 4 }
     );
@@ -1148,9 +1201,9 @@ const flowerLabels = [
       { layerVariance: 0.05, alphaScale: 1.0, priority: 0 }
     );
   }
-  // Berry cluster
+  // Berry cluster — scaled up
   const numBerries = 7;
-  const clusterR = 14 * S;
+  const clusterR = 22 * S;
   for (let i = 0; i < numBerries; i++) {
     let bx, by;
     if (i === 0) {
@@ -1160,7 +1213,7 @@ const flowerLabels = [
       bx = cx + Math.cos(angle) * clusterR + gauss(0, 2);
       by = cy + Math.sin(angle) * clusterR + gauss(0, 2);
     }
-    const berryR = (7 + gauss(0, 1)) * S;
+    const berryR = (11 + gauss(0, 1.5)) * S;
     const berryPoly = [];
     const np = 24;
     for (let j = 0; j < np; j++) {
