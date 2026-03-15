@@ -1135,42 +1135,53 @@ void main() {
     }
 
     /**
-     * Internal: fill a deformed polygon using stamp fan from centroid.
-     * Approximates polygon fill by placing stamps along edges and
-     * in a radial fan pattern.
+     * Internal: fill a deformed polygon using triangle-fan scatter.
+     * Places stamps at random positions inside the polygon by sampling
+     * random triangles in the centroid fan with barycentric coordinates.
+     * Stamp size scales with polygon bounding radius for full coverage.
      */
     _renderPolygonFill(poly, cx, cy, opts) {
         const n = poly.length;
-        // Place stamps along every edge
+        if (n < 3) return;
+
+        // Compute bounding radius for adaptive stamp sizing
+        let boundR = 0;
         for (let i = 0; i < n; i++) {
-            const a = poly[i];
-            const b = poly[(i + 1) % n];
-            const edgeLen = Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
-            const steps = Math.max(1, Math.ceil(edgeLen / 6));
-            for (let s = 0; s <= steps; s++) {
-                const t = s / steps;
-                const px = a.x + (b.x - a.x) * t;
-                const py = a.y + (b.y - a.y) * t;
-                // Place stamps from edge point toward centroid
-                const toCx = cx - px;
-                const toCy = cy - py;
-                const dist = Math.sqrt(toCx * toCx + toCy * toCy);
-                const fillSteps = Math.max(1, Math.ceil(dist / 8));
-                for (let f = 0; f <= fillSteps; f++) {
-                    const ft = f / fillSteps;
-                    this.addStamp({
-                        x: px + toCx * ft + FatihaBrush.gaussian(0, 1.5),
-                        y: py + toCy * ft + FatihaBrush.gaussian(0, 1.5),
-                        color: opts.color,
-                        a: opts.a,
-                        scaleX: 5 + FatihaBrush.gaussian(0, 1),
-                        scaleY: 5 + FatihaBrush.gaussian(0, 1),
-                        texture: opts.texture || 'soft_round',
-                        layer: opts.layer,
-                        lifetime: opts.lifetime || 99999
-                    });
-                }
-            }
+            const dx = poly[i].x - cx, dy = poly[i].y - cy;
+            const d = Math.sqrt(dx * dx + dy * dy);
+            if (d > boundR) boundR = d;
+        }
+
+        // Stamp size scales with polygon — larger stamps for larger shapes
+        const stampScale = Math.max(4, boundR * 0.4);
+        // Number of stamps scales with area (bounded)
+        const numStamps = Math.max(10, Math.min(80, Math.ceil(boundR * 1.2)));
+
+        for (let s = 0; s < numStamps; s++) {
+            // Pick a random triangle in the centroid → edge fan
+            const i = Math.floor(Math.random() * n);
+            const v0 = poly[i];
+            const v1 = poly[(i + 1) % n];
+
+            // Random barycentric coordinates within triangle
+            let u = Math.random(), v = Math.random();
+            if (u + v > 1) { u = 1 - u; v = 1 - v; }
+            const w = 1 - u - v;
+
+            const px = cx * w + v0.x * u + v1.x * v;
+            const py = cy * w + v0.y * u + v1.y * v;
+
+            this.addStamp({
+                x: px + FatihaBrush.gaussian(0, 2),
+                y: py + FatihaBrush.gaussian(0, 2),
+                color: opts.color,
+                a: opts.a,
+                scaleX: stampScale * (0.7 + Math.random() * 0.6),
+                scaleY: stampScale * (0.7 + Math.random() * 0.6),
+                texture: opts.texture || 'soft_round',
+                layer: opts.layer,
+                lifetime: opts.lifetime || 99999
+            });
         }
     }
 
