@@ -1,0 +1,355 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Ottoman Rose — 3D</title>
+<style>
+*{margin:0;padding:0}
+body{background:#0d0d0d;overflow:hidden}
+canvas{display:block}
+</style>
+</head>
+<body>
+<script type="importmap">
+{"imports":{
+  "three":"https://esm.sh/three@0.170.0",
+  "three/addons/":"https://esm.sh/three@0.170.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+
+/* ═══════════════════════════════════════════════════
+   SCENE SETUP
+   ═══════════════════════════════════════════════════ */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0d0d0d);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 100);
+camera.position.set(2.5, 3, 4);
+camera.lookAt(0, 1.2, 0);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.2, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 1.2;
+controls.update();
+
+/* ═══════════════════════════════════════════════════
+   LIGHTING
+   ═══════════════════════════════════════════════════ */
+// Warm key light from upper-left
+const keyLight = new THREE.DirectionalLight(0xffeedd, 2.2);
+keyLight.position.set(-3, 5, 2);
+keyLight.castShadow = true;
+scene.add(keyLight);
+
+// Cool blue rim light from behind
+const rimLight = new THREE.DirectionalLight(0x4488cc, 1.2);
+rimLight.position.set(2, 2, -4);
+scene.add(rimLight);
+
+// Soft ambient
+const ambient = new THREE.AmbientLight(0x222233, 0.6);
+scene.add(ambient);
+
+// Subtle fill from below for translucency glow
+const fillLight = new THREE.PointLight(0xff6699, 0.5, 8);
+fillLight.position.set(0, -0.5, 0);
+scene.add(fillLight);
+
+/* ═══════════════════════════════════════════════════
+   PETAL GEOMETRY BUILDER
+   ═══════════════════════════════════════════════════ */
+function createPetalGeometry(width, height, curl, segments) {
+  const sw = segments || 12;
+  const sh = segments || 16;
+  const positions = [];
+  const normals = [];
+  const uvs = [];
+  const indices = [];
+
+  for (let iy = 0; iy <= sh; iy++) {
+    const v = iy / sh;
+    for (let ix = 0; ix <= sw; ix++) {
+      const u = ix / sw;
+
+      // Petal outline: wider in middle, tapered at base and tip
+      const envelope = Math.sin(v * Math.PI) * (0.5 + 0.5 * v);
+      const xBase = (u - 0.5) * width * envelope;
+
+      // Height along petal
+      const yBase = v * height;
+
+      // Cupping / curling: petal curves backward
+      // More curl at the edges and tip
+      const edgeFactor = Math.abs(u - 0.5) * 2; // 0 center, 1 edge
+      const tipFactor = v;
+      const curlAmount = curl * (0.3 * edgeFactor * edgeFactor + 0.7 * tipFactor * tipFactor);
+      const zBase = -curlAmount * (edgeFactor * 0.4 + tipFactor * 0.6);
+
+      // Add slight waviness for organic feel
+      const wave = Math.sin(u * Math.PI * 3) * 0.02 * v;
+
+      positions.push(xBase, yBase, zBase + wave);
+      uvs.push(u, v);
+    }
+  }
+
+  // Compute indices
+  for (let iy = 0; iy < sh; iy++) {
+    for (let ix = 0; ix < sw; ix++) {
+      const a = iy * (sw + 1) + ix;
+      const b = a + 1;
+      const c = a + (sw + 1);
+      const d = c + 1;
+      indices.push(a, c, b);
+      indices.push(b, c, d);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/* ═══════════════════════════════════════════════════
+   ROSE CONSTRUCTION
+   ═══════════════════════════════════════════════════ */
+const roseGroup = new THREE.Group();
+roseGroup.position.set(0, 1.5, 0);
+scene.add(roseGroup);
+
+// Petal material — hot pink with slight translucency
+const petalMat = new THREE.MeshPhysicalMaterial({
+  color: 0xE83E6C,
+  roughness: 0.4,
+  metalness: 0.0,
+  transmission: 0.15,
+  thickness: 0.3,
+  side: THREE.DoubleSide,
+  clearcoat: 0.3,
+  clearcoatRoughness: 0.4,
+  sheen: 1.0,
+  sheenColor: new THREE.Color(0xff99bb),
+  sheenRoughness: 0.3,
+});
+
+// Darker inner petal material
+const innerPetalMat = petalMat.clone();
+innerPetalMat.color = new THREE.Color(0xcc2255);
+
+function addPetalRing(count, radius, width, height, curl, tiltAngle, yOffset, material, scaleVar) {
+  const angleStep = (Math.PI * 2) / count;
+  for (let i = 0; i < count; i++) {
+    const geo = createPetalGeometry(width, height, curl, 14);
+    const mesh = new THREE.Mesh(geo, material);
+
+    // Slight random variation for organic feel
+    const rScale = 1 + (Math.random() - 0.5) * (scaleVar || 0.12);
+    const rAngle = (Math.random() - 0.5) * 0.15;
+    const rTilt = (Math.random() - 0.5) * 0.1;
+
+    const angle = angleStep * i + rAngle;
+
+    // Position petal at the ring radius
+    mesh.position.set(
+      Math.cos(angle) * radius,
+      yOffset,
+      Math.sin(angle) * radius
+    );
+
+    // Orient petal: face outward, then tilt back
+    mesh.rotation.y = -angle + Math.PI / 2;
+    mesh.rotation.x = -(Math.PI / 2 - tiltAngle) + rTilt;
+
+    mesh.scale.set(rScale, rScale, rScale);
+    roseGroup.add(mesh);
+  }
+}
+
+// Layer 1: 5 large outer petals — cupped/curved outward
+addPetalRing(5, 0.45, 0.7, 0.8, 0.9, 1.1, -0.15, petalMat, 0.15);
+
+// Layer 2: 6 mid petals — less open, rotated offset
+addPetalRing(6, 0.3, 0.55, 0.7, 0.7, 0.75, 0.0, petalMat, 0.1);
+
+// Layer 3: 8 inner petals — tight, more vertical
+addPetalRing(8, 0.15, 0.35, 0.55, 0.5, 0.45, 0.1, innerPetalMat, 0.1);
+
+// Extra tight center whorl
+addPetalRing(5, 0.06, 0.2, 0.35, 0.35, 0.25, 0.18, innerPetalMat, 0.08);
+
+/* ═══════════════════════════════════════════════════
+   CENTER — golden stamen dots
+   ═══════════════════════════════════════════════════ */
+const stamenMat = new THREE.MeshStandardMaterial({
+  color: 0xdaa520,
+  metalness: 0.8,
+  roughness: 0.25,
+  emissive: 0xaa8800,
+  emissiveIntensity: 0.3,
+});
+
+const stamenGeo = new THREE.SphereGeometry(0.025, 8, 8);
+for (let i = 0; i < 18; i++) {
+  const dot = new THREE.Mesh(stamenGeo, stamenMat);
+  const angle = Math.random() * Math.PI * 2;
+  const r = Math.random() * 0.08;
+  dot.position.set(
+    Math.cos(angle) * r,
+    0.28 + Math.random() * 0.06,
+    Math.sin(angle) * r
+  );
+  const s = 0.7 + Math.random() * 0.6;
+  dot.scale.set(s, s, s);
+  roseGroup.add(dot);
+}
+
+/* ═══════════════════════════════════════════════════
+   CALYX — small green leaves at base of flower
+   ═══════════════════════════════════════════════════ */
+const calyxMat = new THREE.MeshPhysicalMaterial({
+  color: 0x2d7a3a,
+  roughness: 0.6,
+  metalness: 0.0,
+  side: THREE.DoubleSide,
+});
+
+for (let i = 0; i < 5; i++) {
+  const geo = createPetalGeometry(0.25, 0.4, 0.3, 8);
+  const mesh = new THREE.Mesh(geo, calyxMat);
+  const angle = (Math.PI * 2 / 5) * i;
+  mesh.position.set(
+    Math.cos(angle) * 0.2,
+    -0.35,
+    Math.sin(angle) * 0.2
+  );
+  mesh.rotation.y = -angle + Math.PI / 2;
+  mesh.rotation.x = -(Math.PI / 2 - 1.5);
+  mesh.scale.set(0.8, 0.9, 0.8);
+  roseGroup.add(mesh);
+}
+
+/* ═══════════════════════════════════════════════════
+   STEM — curved tube
+   ═══════════════════════════════════════════════════ */
+const stemCurve = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(0, 1.5, 0),      // base of flower
+  new THREE.Vector3(0.05, 1.2, 0.02),
+  new THREE.Vector3(-0.03, 0.8, -0.04),
+  new THREE.Vector3(0.02, 0.4, 0.01),
+  new THREE.Vector3(0, 0, 0),         // bottom
+]);
+
+const stemGeo = new THREE.TubeGeometry(stemCurve, 24, 0.035, 8, false);
+const stemMat = new THREE.MeshPhysicalMaterial({
+  color: 0x2d6b3a,
+  roughness: 0.55,
+  metalness: 0.05,
+});
+const stem = new THREE.Mesh(stemGeo, stemMat);
+stem.position.y = -1.5; // align so flower sits at roseGroup origin
+scene.add(stem);
+
+// Small thorns on stem
+const thornGeo = new THREE.ConeGeometry(0.015, 0.08, 4);
+const thornMat = stemMat;
+for (let i = 0; i < 4; i++) {
+  const t = 0.2 + i * 0.18;
+  const p = stemCurve.getPointAt(t);
+  const thorn = new THREE.Mesh(thornGeo, thornMat);
+  thorn.position.copy(p);
+  thorn.position.y -= 1.5;
+  thorn.rotation.z = (i % 2 === 0 ? 1 : -1) * 0.8;
+  thorn.scale.set(1, 1, 1);
+  scene.add(thorn);
+}
+
+// Leaf on stem
+const leafGroup = new THREE.Group();
+const leafGeo = createPetalGeometry(0.35, 0.5, 0.2, 10);
+const leafMat = new THREE.MeshPhysicalMaterial({
+  color: 0x3a8a4a,
+  roughness: 0.5,
+  side: THREE.DoubleSide,
+  transmission: 0.05,
+  thickness: 0.1,
+});
+const leaf = new THREE.Mesh(leafGeo, leafMat);
+leaf.rotation.x = -0.3;
+leaf.rotation.z = 0.8;
+leafGroup.add(leaf);
+
+const stemLeafPt = stemCurve.getPointAt(0.45);
+leafGroup.position.copy(stemLeafPt);
+leafGroup.position.y -= 1.5;
+scene.add(leafGroup);
+
+// Second leaf, opposite side
+const leafGroup2 = new THREE.Group();
+const leaf2 = new THREE.Mesh(leafGeo, leafMat);
+leaf2.rotation.x = -0.3;
+leaf2.rotation.z = -0.9;
+leafGroup2.add(leaf2);
+const stemLeafPt2 = stemCurve.getPointAt(0.6);
+leafGroup2.position.copy(stemLeafPt2);
+leafGroup2.position.y -= 1.5;
+scene.add(leafGroup2);
+
+/* ═══════════════════════════════════════════════════
+   GROUND — subtle reflective disc
+   ═══════════════════════════════════════════════════ */
+const groundGeo = new THREE.CircleGeometry(5, 64);
+const groundMat = new THREE.MeshStandardMaterial({
+  color: 0x111111,
+  roughness: 0.85,
+  metalness: 0.15,
+});
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.02;
+scene.add(ground);
+
+/* ═══════════════════════════════════════════════════
+   ANIMATION
+   ═══════════════════════════════════════════════════ */
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+
+  // Gentle sway on the rose
+  const t = performance.now() * 0.001;
+  roseGroup.rotation.z = Math.sin(t * 0.5) * 0.02;
+  roseGroup.rotation.x = Math.cos(t * 0.7) * 0.015;
+
+  renderer.render(scene, camera);
+}
+animate();
+
+/* ═══════════════════════════════════════════════════
+   RESIZE
+   ═══════════════════════════════════════════════════ */
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
