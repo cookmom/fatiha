@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Watercolor Variations — Lookdev</title>
+<style>
+  body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c" width="430" height="932"></canvas>
+<script src="mixbox.js"></script>
+<script>
+// ============================================================
+// Watercolor Variations — 6 flowers, same Tyler Hobbs pipeline
+// 2 columns × 3 rows on 430×932
+// ============================================================
+
+const W = 430, H = 932;
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+// --- Seeded RNG ---
+let seed = 42;
+function rand() {
+  seed = (seed * 16807 + 0) % 2147483647;
+  return (seed - 1) / 2147483646;
+}
+function gauss(mean, std) {
+  const u1 = rand(), u2 = rand();
+  return mean + std * Math.sqrt(-2 * Math.log(u1 || 0.001)) * Math.cos(2 * Math.PI * u2);
+}
+function randInt(a, b) { return Math.floor(rand() * (b - a + 1)) + a; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+// ============================================================
+// Value noise for paper texture
+// ============================================================
+const NOISE_SIZE = 128;
+const noiseGrid = [];
+for (let i = 0; i < NOISE_SIZE * NOISE_SIZE; i++) noiseGrid.push(rand());
+
+function smoothNoise(x, y) {
+  const ix = Math.floor(x) % NOISE_SIZE, iy = Math.floor(y) % NOISE_SIZE;
+  const fx = x - Math.floor(x), fy = y - Math.floor(y);
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  const i00 = noiseGrid[iy * NOISE_SIZE + ix];
+  const i10 = noiseGrid[iy * NOISE_SIZE + (ix + 1) % NOISE_SIZE];
+  const i01 = noiseGrid[((iy + 1) % NOISE_SIZE) * NOISE_SIZE + ix];
+  const i11 = noiseGrid[((iy + 1) % NOISE_SIZE) * NOISE_SIZE + (ix + 1) % NOISE_SIZE];
+  return lerp(lerp(i00, i10, sx), lerp(i01, i11, sx), sy);
+}
+
+function fbmNoise(x, y, octaves) {
+  let val = 0, amp = 1, freq = 1, total = 0;
+  for (let i = 0; i < octaves; i++) {
+    val += amp * smoothNoise(x * freq, y * freq);
+    total += amp;
+    amp *= 0.5;
+    freq *= 2;
+  }
+  return val / total;
+}
+
+// ============================================================
+// Tyler Hobbs Polygon Deformation
+// ============================================================
+
+function deformOnce(poly, variance) {
+  const result = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i];
+    const c = poly[(i + 1) % poly.length];
+    result.push([a[0], a[1]]);
+    const bx = (a[0] + c[0]) / 2;
+    const by = (a[1] + c[1]) / 2;
+    const dx = c[0] - a[0];
+    const dy = c[1] - a[1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.5) continue;
+    const nx = -dy / len;
+    const ny = dx / len;
+    const offset = gauss(0, variance * len);
+    result.push([bx + nx * offset, by + ny * offset]);
+  }
+  return result;
+}
+
+function deformN(poly, n, variance) {
+  let p = poly.map(pt => [pt[0], pt[1]]);
+  for (let i = 0; i < n; i++) {
+    p = deformOnce(p, variance * Math.pow(0.7, i));
+  }
+  return p;
+}
+
+function makeBase(poly) {
+  return deformN(poly, 6, 0.18);
+}
+
+// ============================================================
+// Paper background
+// ============================================================
+
+function drawPaperBackground() {
+  ctx.fillStyle = '#f4ede3';
+  ctx.fillRect(0, 0, W, H);
+  const imgData = ctx.getImageData(0, 0, W, H);
+  const d = imgData.data;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const idx = (y * W + x) * 4;
+      const grain = gauss(0, 3.5);
+      const tooth = (fbmNoise(x * 0.15, y * 0.15, 3) - 0.5) * 6;
+      const localVar = (fbmNoise(x * 0.012, y * 0.012, 5) - 0.5) * 16;
+      const fiber = (fbmNoise(x * 0.06, y * 0.012, 4) - 0.5) * 7;
+      const total = grain + tooth + localVar + fiber;
+      d[idx]     = clamp(d[idx] + total, 0, 255);
+      d[idx + 1] = clamp(d[idx + 1] + total, 0, 255);
+      d[idx + 2] = clamp(d[idx + 2] + total - 1.5, 0, 255);
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+drawPaperBackground();
+
+// ============================================================
+// Shape generators
+// ============================================================
+
+function makePetalPoly(baseX, baseY, angle, length, width, curvature) {
+  const pts = [];
+  const n = 24;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    let w;
+    if (t < 0.08) w = t / 0.08 * 0.2;
+    else if (t < 0.3) w = 0.2 + (t - 0.08) / 0.22 * 0.8;
+    else if (t < 0.75) w = 1.0;
+    else w = Math.cos((t - 0.75) / 0.25 * Math.PI * 0.5);
+    const along = t * length;
+    const across = w * width * 0.5;
+    const curveOffset = curvature * Math.sin(t * Math.PI) * length * 0.08;
+    const x = baseX + along * Math.cos(angle) - (across + curveOffset) * Math.sin(angle);
+    const y = baseY + along * Math.sin(angle) + (across + curveOffset) * Math.cos(angle);
+    pts.push([x, y]);
+  }
+  for (let i = n; i >= 0; i--) {
+    const t = i / n;
+    let w;
+    if (t < 0.08) w = t / 0.08 * 0.2;
+    else if (t < 0.3) w = 0.2 + (t - 0.08) / 0.22 * 0.8;
+    else if (t < 0.75) w = 1.0;
+    else w = Math.cos((t - 0.75) / 0.25 * Math.PI * 0.5);
+    const along = t * length;
+    const across = -w * width * 0.5;
+    const curveOffset = curvature * Math.sin(t * Math.PI) * length * 0.08;
+    const x = baseX + along * Math.cos(angle) - (across + curveOffset) * Math.sin(angle);
+    const y = baseY + along * Math.sin(angle) + (across + curveOffset) * Math.cos(angle);
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
+// Narrow bud petal — tighter, more pointed
+function makeBudPetalPoly(baseX, baseY, angle, length, width, curvature) {
+  const pts = [];
+  const n = 24;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    let w;
+    if (t < 0.1) w = t / 0.1 * 0.15;
+    else if (t < 0.4) w = 0.15 + (t - 0.1) / 0.3 * 0.85;
+    else if (t < 0.6) w = 1.0;
+    else w = Math.cos((t - 0.6) / 0.4 * Math.PI * 0.5);
+    const along = t * length;
+    const across = w * width * 0.5;
+    const curveOffset = curvature * Math.sin(t * Math.PI) * length * 0.06;
+    const x = baseX + along * Math.cos(angle) - (across + curveOffset) * Math.sin(angle);
+    const y = baseY + along * Math.sin(angle) + (across + curveOffset) * Math.cos(angle);
+    pts.push([x, y]);
+  }
+  for (let i = n; i >= 0; i--) {
+    const t = i / n;
+    let w;
+    if (t < 0.1) w = t / 0.1 * 0.15;
+    else if (t < 0.4) w = 0.15 + (t - 0.1) / 0.3 * 0.85;
+    else if (t < 0.6) w = 1.0;
+    else w = Math.cos((t - 0.6) / 0.4 * Math.PI * 0.5);
+    const along = t * length;
+    const across = -w * width * 0.5;
+    const curveOffset = curvature * Math.sin(t * Math.PI) * length * 0.06;
+    const x = baseX + along * Math.cos(angle) - (across + curveOffset) * Math.sin(angle);
+    const y = baseY + along * Math.sin(angle) + (across + curveOffset) * Math.cos(angle);
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
+// Tulip flame petal — narrow base, pointed tip, slight S-curve
+function makeTulipPetalPoly(baseX, baseY, angle, length, width, curvature) {
+  const pts = [];
+  const n = 28;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    let w;
+    if (t < 0.05) w = t / 0.05 * 0.1;
+    else if (t < 0.25) w = 0.1 + (t - 0.05) / 0.2 * 0.9;
+    else if (t < 0.55) w = 1.0 - (t - 0.25) * 0.15; // slight taper
+    else if (t < 0.85) w = (1.0 - (t - 0.25) * 0.15) * (1 - (t - 0.55) / 0.3 * 0.3);
+    else w = Math.max(0, Math.cos((t - 0.85) / 0.15 * Math.PI * 0.5) * 0.4);
+    const along = t * length;
+    const across = w * width * 0.5;
+    // S-curve for the flame effect
+    const sCurve = Math.sin(t * Math.PI * 1.3) * curvature * length * 0.06;
+    const x = baseX + along * Math.cos(angle) - (across + sCurve) * Math.sin(angle);
+    const y = baseY + along * Math.sin(angle) + (across + sCurve) * Math.cos(angle);
+    pts.push([x, y]);
+  }
+  for (let i = n; i >= 0; i--) {
+    const t = i / n;
+    let w;
+    if (t < 0.05) w = t / 0.05 * 0.1;
+    else if (t < 0.25) w = 0.1 + (t - 0.05) / 0.2 * 0.9;
+    else if (t < 0.55) w = 1.0 - (t - 0.25) * 0.15;
+    else if (t < 0.85) w = (1.0 - (t - 0.25) * 0.15) * (1 - (t - 0.55) / 0.3 * 0.3);
+    else w = Math.max(0, Math.cos((t - 0.85) / 0.15 * Math.PI * 0.5) * 0.4);
+    const along = t * length;
+    const across = -w * width * 0.5;
+    const sCurve = Math.sin(t * Math.PI * 1.3) * curvature * length * 0.06;
+    const x = baseX + along * Math.cos(angle) - (across + sCurve) * Math.sin(angle);
+    const y = baseY + along * Math.sin(angle) + (across + sCurve) * Math.cos(angle);
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
+// Carnation: ruffled circle with serrated edge
+function makeCarnationPoly(cx, cy, radius, ruffleAmp, numRuffles) {
+  const pts = [];
+  const n = 120;
+  for (let i = 0; i < n; i++) {
+    const angle = (i / n) * Math.PI * 2;
+    // Multiple ruffle frequencies for realism
+    const ruffle1 = Math.sin(angle * numRuffles) * ruffleAmp;
+    const ruffle2 = Math.sin(angle * numRuffles * 2.3 + 1.5) * ruffleAmp * 0.4;
+    const ruffle3 = Math.sin(angle * numRuffles * 0.7 + 3.1) * ruffleAmp * 0.6;
+    const r = radius + ruffle1 + ruffle2 + ruffle3 + gauss(0, ruffleAmp * 0.3);
+    pts.push([cx + Math.cos(angle) * r, cy + Math.sin(angle) * r]);
+  }
+  return pts;
+}
+
+// Simple stalk polygon
+function makeStalkPoly(topX, topY, bottomX, bottomY, widthTop, widthBottom) {
+  const dx = bottomX - topX, dy = bottomY - topY;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const nx = -dy / len, ny = dx / len;
+  const n = 20;
+  const right = [], left = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const x = lerp(topX, bottomX, t);
+    const y = lerp(topY, bottomY, t);
+    const w = lerp(widthTop, widthBottom, t);
+    // Slight curve
+    const curve = Math.sin(t * Math.PI) * 3;
+    right.push([x + nx * w + curve, y + ny * w]);
+    left.push([x - nx * w + curve, y - ny * w]);
+  }
+  return [...right, ...left.reverse()];
+}
+
+// ============================================================
+// Color helpers
+// ============================================================
+
+function varyColor(base, spread) {
+  const s = spread || 8;
+  const shift = gauss(0, s);
+  return [
+    clamp(Math.round(base[0] + shift), 0, 255),
+    clamp(Math.round(base[1] + shift * 0.4), 0, 255),
+    clamp(Math.round(base[2] + shift * 0.6), 0, 255)
+  ];
+}
+
+// ============================================================
+// Texture masking (same pipeline as watercolor-chris.html)
+// ============================================================
+
+const NUM_MASKS = 4;
+const maskData = [];
+for (let m = 0; m < NUM_MASKS; m++) {
+  const circles = [];
+  for (let j = 0; j < 300; j++) {
+    circles.push([rand() * W, rand() * H, Math.abs(gauss(W * 0.06, W * 0.025))]);
+  }
+  maskData.push(circles);
+}
+
+const offCanvas = document.createElement('canvas');
+offCanvas.width = W;
+offCanvas.height = H;
+const offCtx = offCanvas.getContext('2d');
+
+function strokePoly(tCtx, poly) {
+  tCtx.beginPath();
+  tCtx.moveTo(poly[0][0], poly[0][1]);
+  for (let i = 1; i < poly.length; i++) tCtx.lineTo(poly[i][0], poly[i][1]);
+  tCtx.closePath();
+  tCtx.stroke();
+}
+
+// ============================================================
+// Grid layout: 2 cols × 3 rows
+// ============================================================
+
+const COL_W = W / 2;       // 215px per cell
+const ROW_H = H / 3;       // ~310px per cell
+const CELL_CX = COL_W / 2; // center within cell
+const CELL_CY = ROW_H / 2;
+
+function cellCenter(col, row) {
+  return [col * COL_W + COL_W / 2, row * ROW_H + ROW_H / 2 - 15];
+}
+
+// ============================================================
+// Build all 6 flowers
+// ============================================================
+
+const elements = [];
+
+function addElement(poly, color, opts) {
+  const el = {
+    base: opts.skipDeform ? poly : makeBase(poly),
+    color: color,
+    layerVariance: opts.layerVariance || 0.08,
+    alphaScale: opts.alphaScale || 1.0,
+    priority: opts.priority || 0,
+    index: elements.length
+  };
+  elements.push(el);
+  return el;
+}
+
+// --- FLOWER 1: Small tight bud (top-left) ---
+{
+  const [cx, cy] = cellCenter(0, 0);
+  const numPetals = 5;
+  const bloom = 0.3;
+  // Tight bud: petals barely open, pointing mostly upward
+  for (let i = 0; i < numPetals; i++) {
+    const angle = (i / numPetals) * Math.PI * 2 + gauss(0, 0.15);
+    const dist = bloom * 6;
+    const bx = cx + Math.cos(angle) * dist;
+    const by = cy + Math.sin(angle) * dist;
+    const petalLen = 28 + gauss(0, 3);
+    const petalWid = 14 + gauss(0, 2);
+    addElement(
+      makeBudPetalPoly(bx, by, angle + gauss(0, 0.2), petalLen, petalWid, gauss(0, 0.3)),
+      varyColor([140, 18, 30]), // deep crimson
+      { layerVariance: 0.10, alphaScale: 1.5, priority: 2 }
+    );
+  }
+  // Dark center
+  for (let i = 0; i < 3; i++) {
+    const angle = (i / 3) * Math.PI * 2 + gauss(0, 0.4);
+    addElement(
+      makeBudPetalPoly(cx + gauss(0,2), cy + gauss(0,2), angle, 12 + gauss(0,2), 8 + gauss(0,1), gauss(0,0.3)),
+      varyColor([95, 10, 20]),
+      { layerVariance: 0.08, alphaScale: 1.2, priority: 3 }
+    );
+  }
+  // Stalk
+  addElement(
+    makeStalkPoly(cx, cy + 24, cx + gauss(0, 3), cy + ROW_H/2 + 20, 1.5, 2.5),
+    [42, 95, 38],
+    { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
+  );
+}
+
+// --- FLOWER 2: Half-open rose (top-right) ---
+{
+  const [cx, cy] = cellCenter(1, 0);
+  const numPetals = 6;
+  const bloom = 0.6;
+  // Inner petals (tighter)
+  for (let i = 0; i < 4; i++) {
+    const angle = (i / 4) * Math.PI * 2 + gauss(0, 0.2);
+    const dist = bloom * 8;
+    const bx = cx + Math.cos(angle) * dist;
+    const by = cy + Math.sin(angle) * dist;
+    addElement(
+      makePetalPoly(bx, by, angle + gauss(0, 0.2), 32 + gauss(0, 4), 22 + gauss(0, 3), gauss(0, 0.5)),
+      varyColor([185, 45, 70]), // medium pink
+      { layerVariance: 0.10, alphaScale: 1.3, priority: 3 }
+    );
+  }
+  // Outer petals (opening up)
+  for (let i = 0; i < numPetals; i++) {
+    const angle = (i / numPetals) * Math.PI * 2 + gauss(0, 0.12) + 0.3;
+    const dist = bloom * 14;
+    const bx = cx + Math.cos(angle) * dist;
+    const by = cy + Math.sin(angle) * dist;
+    addElement(
+      makePetalPoly(bx, by, angle + gauss(0, 0.25), 42 + gauss(0, 5), 30 + gauss(0, 4), gauss(0, 0.7)),
+      varyColor([210, 70, 100]), // pink
+      { layerVariance: 0.12, alphaScale: 1.5, priority: 2 }
+    );
+  }
+  // Dark center blob
+  for (let i = 0; i < 3; i++) {
+    const angle = (i / 3) * Math.PI * 2 + gauss(0, 0.4);
+    addElement(
+      makePetalPoly(cx + gauss(0,2), cy + gauss(0,2), angle, 14, 10, gauss(0,0.3)),
+      varyColor([130, 20, 40]),
+      { layerVariance: 0.08, alphaScale: 1.0, priority: 4 }
+    );
+  }
+  // Stalk
+  addElement(
+    makeStalkPoly(cx, cy + 30, cx + gauss(0, 3), cy + ROW_H/2 + 20, 1.8, 2.8),
+    [38, 90, 35],
+    { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
+  );
+}
+
+// --- FLOWER 3: Full bloom rose (middle-left) ---
+{
+  const [cx, cy] = cellCenter(0, 1);
+  // Outer ring: 7 large petals
+  for (let i = 0; i < 7; i++) {
+    const angle = (i / 7) * Math.PI * 2 + gauss(0, 0.15) + 0.4;
+    const dist = 25 + gauss(0, 5);
+    const bx = cx + Math.cos(angle) * dist;
+    const by = cy + Math.sin(angle) * dist;
+    const sv = 0.9 + rand() * 0.3;
+    addElement(
+      makePetalPoly(bx, by, angle + gauss(0, 0.25), (65 + gauss(0, 6)) * sv, (48 + gauss(0, 5)) * sv, gauss(0, 1.0)),
+      varyColor([225, 140, 155]), // light pink
+      { layerVariance: 0.12, alphaScale: 1.6, priority: 1 }
+    );
+  }
+  // Mid ring
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2 + gauss(0, 0.15) + 0.2;
+    const dist = 14 + gauss(0, 3);
+    const bx = cx + Math.cos(angle) * dist;
+    const by = cy + Math.sin(angle) * dist;
+    addElement(
+      makePetalPoly(bx, by, angle + gauss(0, 0.2), 45 + gauss(0, 5), 34 + gauss(0, 4), gauss(0, 0.7)),
+      varyColor([200, 85, 115]),
+      { layerVariance: 0.10, alphaScale: 1.3, priority: 2 }
+    );
+  }
+  // Inner petals
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2 + gauss(0, 0.3);
+    const dist = gauss(4, 2);
+    addElement(
+      makePetalPoly(cx + Math.cos(angle)*dist, cy + Math.sin(angle)*dist, angle + gauss(0,0.3), 28 + gauss(0,3), 20 + gauss(0,2), gauss(0,0.5)),
+      varyColor([170, 50, 75]),
+      { layerVariance: 0.09, alphaScale: 1.2, priority: 3 }
+    );
+  }
+  // Center
+  for (let i = 0; i < 3; i++) {
+    const angle = (i / 3) * Math.PI * 2 + gauss(0, 0.5);
+    addElement(
+      makePetalPoly(cx + gauss(0,2), cy + gauss(0,2), angle, 12, 8, gauss(0,0.3)),
+      varyColor([120, 25, 45]),
+      { layerVariance: 0.07, alphaScale: 1.0, priority: 4 }
+    );
+  }
+  // Stalk
+  addElement(
+    makeStalkPoly(cx, cy + 50, cx + gauss(0, 3), cy + ROW_H/2 + 25, 2.0, 3.2),
+    [40, 92, 36],
+    { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
+  );
+}
+
+// --- FLOWER 4: Golden/amber rose (middle-right) ---
+{
+  const [cx, cy] = cellCenter(1, 1);
+  const bloom = 0.8;
+  // Outer ring
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2 + gauss(0, 0.15) + 0.3;
+    const dist = bloom * 28;
+    const bx = cx + Math.cos(angle) * dist;
+    const by = cy + Math.sin(angle) * dist;
+    const sv = 0.85 + rand() * 0.35;
+    addElement(
+      makePetalPoly(bx, by, angle + gauss(0, 0.25), (58 + gauss(0, 5)) * sv, (42 + gauss(0, 4)) * sv, gauss(0, 0.9)),
+      varyColor([230, 175, 55], 12), // warm gold outer
+      { layerVariance: 0.12, alphaScale: 1.5, priority: 1 }
+    );
+  }
+  // Mid ring
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2 + gauss(0, 0.15) + 0.15;
+    const dist = bloom * 14;
+    const bx = cx + Math.cos(angle) * dist;
+    const by = cy + Math.sin(angle) * dist;
+    addElement(
+      makePetalPoly(bx, by, angle + gauss(0, 0.2), 40 + gauss(0, 4), 30 + gauss(0, 3), gauss(0, 0.6)),
+      varyColor([210, 145, 40], 10), // amber mid
+      { layerVariance: 0.10, alphaScale: 1.3, priority: 2 }
+    );
+  }
+  // Inner
+  for (let i = 0; i < 4; i++) {
+    const angle = (i / 4) * Math.PI * 2 + gauss(0, 0.3);
+    addElement(
+      makePetalPoly(cx + gauss(0,3), cy + gauss(0,3), angle + gauss(0,0.2), 22 + gauss(0,3), 16 + gauss(0,2), gauss(0,0.4)),
+      varyColor([185, 110, 25], 8), // deeper gold
+      { layerVariance: 0.08, alphaScale: 1.1, priority: 3 }
+    );
+  }
+  // Center
+  for (let i = 0; i < 3; i++) {
+    const angle = (i / 3) * Math.PI * 2 + gauss(0, 0.4);
+    addElement(
+      makePetalPoly(cx + gauss(0,2), cy + gauss(0,2), angle, 10, 7, gauss(0,0.3)),
+      varyColor([155, 75, 15], 6), // dark amber center
+      { layerVariance: 0.07, alphaScale: 1.0, priority: 4 }
+    );
+  }
+  // Stalk
+  addElement(
+    makeStalkPoly(cx, cy + 42, cx + gauss(0, 3), cy + ROW_H/2 + 20, 1.8, 2.8),
+    [45, 100, 42],
+    { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
+  );
+}
+
+// --- FLOWER 5: Ottoman tulip (bottom-left) ---
+{
+  const [cx, cy] = cellCenter(0, 2);
+  // 4 flame petals cupping upward
+  const petalAngles = [-0.35, -0.12, 0.12, 0.35]; // fan pointing upward
+  for (let i = 0; i < 4; i++) {
+    const angle = -Math.PI / 2 + petalAngles[i] + gauss(0, 0.05);
+    const dist = 4 + Math.abs(petalAngles[i]) * 10;
+    const bx = cx + Math.cos(angle + Math.PI/2) * dist * 0.5;
+    const by = cy + 15; // base of tulip
+    const petalLen = 65 + gauss(0, 5);
+    const petalWid = 22 + gauss(0, 3);
+    // Outer petals slightly wider
+    const isOuter = (i === 0 || i === 3);
+    addElement(
+      makeTulipPetalPoly(bx, by, angle, petalLen * (isOuter ? 0.9 : 1.0), petalWid * (isOuter ? 1.15 : 1.0), gauss(0.5, 0.3) * (i < 2 ? 1 : -1)),
+      varyColor(isOuter ? [210, 65, 20] : [230, 85, 25], 10), // red-orange
+      { layerVariance: 0.10, alphaScale: 1.5, priority: isOuter ? 1 : 2 }
+    );
+  }
+  // Yellow flame streaks inside petals (lighter inner glow)
+  for (let i = 0; i < 2; i++) {
+    const angle = -Math.PI / 2 + (i === 0 ? -0.06 : 0.06);
+    addElement(
+      makeTulipPetalPoly(cx + gauss(0, 2), cy + 18, angle, 45 + gauss(0, 4), 10 + gauss(0, 2), gauss(0.3, 0.2)),
+      varyColor([240, 180, 40], 10), // yellow flame
+      { layerVariance: 0.08, alphaScale: 0.7, priority: 3 }
+    );
+  }
+  // Stalk
+  addElement(
+    makeStalkPoly(cx, cy + 18, cx + gauss(0, 2), cy + ROW_H/2 + 25, 2.0, 3.0),
+    [35, 88, 32],
+    { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
+  );
+}
+
+// --- FLOWER 6: Carnation (bottom-right) ---
+{
+  const [cx, cy] = cellCenter(1, 2);
+  // Outer ruffled layer
+  addElement(
+    makeCarnationPoly(cx, cy, 45, 8, 14),
+    varyColor([195, 30, 50]), // crimson outer
+    { layerVariance: 0.14, alphaScale: 1.5, priority: 1 }
+  );
+  // Mid ruffled layer (slightly smaller, different ruffle phase)
+  addElement(
+    makeCarnationPoly(cx + gauss(0, 2), cy + gauss(0, 2), 36, 7, 12),
+    varyColor([175, 25, 45]),
+    { layerVariance: 0.12, alphaScale: 1.3, priority: 2 }
+  );
+  // Inner ruffled layer
+  addElement(
+    makeCarnationPoly(cx + gauss(0, 2), cy + gauss(0, 2), 26, 5, 10),
+    varyColor([155, 20, 38]),
+    { layerVariance: 0.10, alphaScale: 1.2, priority: 3 }
+  );
+  // Core
+  addElement(
+    makeCarnationPoly(cx + gauss(0, 1), cy + gauss(0, 1), 14, 3, 8),
+    varyColor([120, 15, 30]),
+    { layerVariance: 0.08, alphaScale: 1.0, priority: 4 }
+  );
+  // Stalk
+  addElement(
+    makeStalkPoly(cx, cy + 42, cx + gauss(0, 3), cy + ROW_H/2 + 20, 1.8, 2.8),
+    [40, 95, 38],
+    { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
+  );
+}
+
+// ============================================================
+// Sort by priority
+// ============================================================
+elements.sort((a, b) => a.priority - b.priority || a.index - b.index);
+
+// ============================================================
+// Pre-compute deformed variants
+// ============================================================
+
+const TARGET_LAYERS = 40;
+const LAYERS_PER_EL_PER_FRAME = 3;
+const LAYER_ALPHA = 0.07;
+const PRE_DEFORM_COUNT = 2;
+
+for (const el of elements) {
+  el._preDeformed = [];
+  for (let d = 0; d < PRE_DEFORM_COUNT; d++) {
+    el._preDeformed.push(deformN(el.base, 1, el.layerVariance || 0.08));
+  }
+  el._layersRendered = 0;
+  el._done = false;
+}
+
+// ============================================================
+// Render a textured layer (same pipeline as watercolor-chris)
+// ============================================================
+
+function drawTexturedLayer(el, layerIdx) {
+  const progress = layerIdx / TARGET_LAYERS;
+  const varianceScale = Math.pow(progress, 0.7);
+  const baseVariance = el.layerVariance || 0.08;
+  const [r, g, b] = el.color;
+
+  // Frame 0: crisp outline
+  if (layerIdx === 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.2 * (el.alphaScale || 1.0);
+    ctx.strokeStyle = `rgb(${r},${g},${b})`;
+    ctx.lineWidth = 0.8;
+    ctx.lineJoin = 'round';
+    strokePoly(ctx, el.base);
+    ctx.restore();
+    ctx.globalAlpha = 1.0;
+    return;
+  }
+
+  const sourcePoly = varianceScale < 0.3
+    ? el.base
+    : el._preDeformed[layerIdx % PRE_DEFORM_COUNT];
+  const layerPoly = deformOnce(sourcePoly, baseVariance * 0.7 * varianceScale);
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const [px, py] of layerPoly) {
+    if (px < minX) minX = px; if (px > maxX) maxX = px;
+    if (py < minY) minY = py; if (py > maxY) maxY = py;
+  }
+  const bx = Math.max(0, Math.floor(minX) - 2);
+  const by = Math.max(0, Math.floor(minY) - 2);
+  const bw = Math.min(W, Math.ceil(maxX) + 2) - bx;
+  const bh = Math.min(H, Math.ceil(maxY) + 2) - by;
+  if (bw <= 0 || bh <= 0) return;
+
+  // Solid fill on offscreen
+  offCtx.clearRect(bx, by, bw, bh);
+  offCtx.globalCompositeOperation = 'source-over';
+  offCtx.globalAlpha = 1.0;
+  offCtx.fillStyle = `rgb(${r},${g},${b})`;
+  offCtx.beginPath();
+  offCtx.moveTo(layerPoly[0][0], layerPoly[0][1]);
+  for (let i = 1; i < layerPoly.length; i++) offCtx.lineTo(layerPoly[i][0], layerPoly[i][1]);
+  offCtx.closePath();
+  offCtx.fill();
+
+  // Texture mask subtraction
+  offCtx.globalCompositeOperation = 'destination-out';
+  offCtx.globalAlpha = 0.08;
+  const circles = maskData[layerIdx % NUM_MASKS];
+  for (let j = 0; j < circles.length; j++) {
+    const ccx = circles[j][0], ccy = circles[j][1], cr = circles[j][2];
+    if (ccx + cr < minX || ccx - cr > maxX || ccy + cr < minY || ccy - cr > maxY) continue;
+    offCtx.beginPath();
+    offCtx.arc(ccx, ccy, cr, 0, Math.PI * 2);
+    offCtx.fill();
+  }
+
+  // Composite
+  ctx.save();
+  ctx.globalAlpha = LAYER_ALPHA * (el.alphaScale || 1.0);
+  ctx.drawImage(offCanvas, bx, by, bw, bh, bx, by, bw, bh);
+  ctx.restore();
+  ctx.globalAlpha = 1.0;
+}
+
+// ============================================================
+// Post-processing: outlines + Mixbox
+// ============================================================
+
+function doPostProcessing() {
+  // Petal outline halos
+  for (const el of elements) {
+    if (el.priority < 1) continue;
+    const [r, g, b] = el.color;
+    const dr = Math.max(0, Math.round(r * 0.55));
+    const dg = Math.max(0, Math.round(g * 0.50));
+    const db = Math.max(0, Math.round(b * 0.55));
+    for (let pass = 0; pass < 2; pass++) {
+      const haloPoly = deformN(el.base, 5, 0.04 + pass * 0.008);
+      ctx.globalAlpha = (0.06 - pass * 0.015) * 0.3;
+      ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
+      ctx.lineWidth = 0.8;
+      ctx.lineJoin = 'round';
+      strokePoly(ctx, haloPoly);
+    }
+    ctx.globalAlpha = 1.0;
+  }
+
+  // Mixbox pigment blending
+  if (typeof mixbox !== 'undefined') {
+    const imgData = ctx.getImageData(0, 0, W, H);
+    const d = imgData.data;
+    const paperR = 244, paperG = 237, paperB = 227;
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], g = d[i+1], b = d[i+2];
+      const dr2 = paperR - r, dg2 = paperG - g, db2 = paperB - b;
+      const dev = Math.sqrt(dr2*dr2 + dg2*dg2 + db2*db2);
+      if (dev > 25) {
+        const mixed = mixbox.lerp(
+          [r, g, b, 255],
+          [Math.max(0, r - 12), Math.max(0, g - 8), Math.max(0, b - 12), 255],
+          0.12
+        );
+        d[i] = mixed[0]; d[i+1] = mixed[1]; d[i+2] = mixed[2];
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
+}
+
+// ============================================================
+// Progressive render loop
+// ============================================================
+
+window._renderComplete = false;
+window._renderProgress = 0;
+
+let frameCount = 0;
+let postDone = false;
+const totalLayersAll = elements.length * TARGET_LAYERS;
+
+function renderStep(timestamp) {
+  let layersDoneTotal = 0;
+  const allDone = elements.every(el => el._done);
+
+  if (!allDone) {
+    for (const el of elements) {
+      if (el._done) {
+        layersDoneTotal += TARGET_LAYERS;
+        continue;
+      }
+
+      for (let l = 0; l < LAYERS_PER_EL_PER_FRAME && el._layersRendered < TARGET_LAYERS; l++) {
+        drawTexturedLayer(el, el._layersRendered);
+        el._layersRendered++;
+      }
+
+      layersDoneTotal += el._layersRendered;
+      if (el._layersRendered >= TARGET_LAYERS) el._done = true;
+    }
+
+    frameCount++;
+    window._renderProgress = layersDoneTotal / totalLayersAll;
+  }
+
+  if (elements.every(el => el._done) && !postDone) {
+    doPostProcessing();
+    postDone = true;
+    window._renderProgress = 1;
+    window._renderComplete = true;
+    console.log('Watercolor variations render complete — ' + frameCount + ' frames, ' + elements.length + ' elements');
+    return;
+  }
+
+  if (!window._renderComplete) {
+    requestAnimationFrame(renderStep);
+  }
+}
+
+requestAnimationFrame(renderStep);
+</script>
+</body>
+</html>
