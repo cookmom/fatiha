@@ -38,7 +38,7 @@ function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 // ============================================================
 // Simple value noise for paper texture variation
 // ============================================================
-const NOISE_SIZE = 64;
+const NOISE_SIZE = 128;
 const noiseGrid = [];
 for (let i = 0; i < NOISE_SIZE * NOISE_SIZE; i++) noiseGrid.push(rand());
 
@@ -83,7 +83,7 @@ function makeRect(cx, cy, w, h, rotation) {
 // width = max width at widest point
 function makePetalPoly(baseX, baseY, angle, length, width, curvature) {
   const pts = [];
-  const n = 20;
+  const n = 40;
   // Right edge: from base to tip
   for (let i = 0; i <= n; i++) {
     const t = i / n;
@@ -225,7 +225,7 @@ function deformN(poly, n, variance) {
 }
 
 function makeBase(poly) {
-  return deformN(poly, 6, 0.20);  // more organic deformation for painterly feel
+  return deformN(poly, 8, 0.18);  // higher subdivision for finer edge detail
 }
 
 // ============================================================
@@ -241,12 +241,14 @@ function drawPaperBackground() {
     for (let x = 0; x < W; x++) {
       const idx = (y * W + x) * 4;
       // Per-pixel random grain
-      const grain = gauss(0, 4);
+      const grain = gauss(0, 3.5);
+      // Fine-scale paper tooth
+      const tooth = (fbmNoise(x * 0.15, y * 0.15, 3) - 0.5) * 6;
       // Local texture variation: large-scale brightness modulation
-      const localVar = (fbmNoise(x * 0.012, y * 0.012, 4) - 0.5) * 18;
+      const localVar = (fbmNoise(x * 0.012, y * 0.012, 5) - 0.5) * 16;
       // Fiber-like streaks (horizontal bias)
-      const fiber = (fbmNoise(x * 0.04, y * 0.008, 3) - 0.5) * 8;
-      const total = grain + localVar + fiber;
+      const fiber = (fbmNoise(x * 0.06, y * 0.012, 4) - 0.5) * 7;
+      const total = grain + tooth + localVar + fiber;
       d[idx]     = clamp(d[idx] + total, 0, 255);
       d[idx + 1] = clamp(d[idx + 1] + total, 0, 255);
       d[idx + 2] = clamp(d[idx + 2] + total - 1.5, 0, 255); // slightly warm
@@ -387,9 +389,9 @@ const leftLeafSpine = makeSpinePoints(
   [W * 0.18, H * 0.50],   // sweeps left
   [W * 0.06, H * 0.38],   // gentle upward curve
   [W * 0.04, H * 0.18],   // tip far upper-left
-  60
+  120
 );
-const leftLeafPoly = makeSazLeaf(leftLeafSpine, 44, 11);
+const leftLeafPoly = makeSazLeaf(leftLeafSpine, 44, 18);
 
 // Right saz leaf: emerges well below flower, sweeps right and up
 const rightLeafSpine = makeSpinePoints(
@@ -397,9 +399,9 @@ const rightLeafSpine = makeSpinePoints(
   [W * 0.76, H * 0.48],   // sweeps right
   [W * 0.88, H * 0.36],   // upward
   [W * 0.90, H * 0.20],   // tip upper-right
-  50
+  100
 );
-const rightLeafPoly = makeSazLeaf(rightLeafSpine, 34, 9);
+const rightLeafPoly = makeSazLeaf(rightLeafSpine, 34, 15);
 
 // Small accent leaf: droops from lower stalk, down and left
 const smallLeafSpine = makeSpinePoints(
@@ -407,9 +409,9 @@ const smallLeafSpine = makeSpinePoints(
   [W * 0.30, H * 0.62],   // droops down-left
   [W * 0.20, H * 0.60],   // continues down
   [W * 0.16, H * 0.54],   // tip hangs
-  30
+  60
 );
-const smallLeafPoly = makeSazLeaf(smallLeafSpine, 16, 6);
+const smallLeafPoly = makeSazLeaf(smallLeafSpine, 16, 10);
 
 const leafPolys = [leftLeafPoly, rightLeafPoly, smallLeafPoly];
 
@@ -626,8 +628,8 @@ elements.sort((a, b) => a.priority - b.priority || a.index - b.index);
 // IMPROVEMENT #2: Hard/soft edge contrast (drying halos)
 // ============================================================
 
-const TOTAL_LAYERS = 60;
-const LAYER_ALPHA = 0.052;
+const TOTAL_LAYERS = 90;
+const LAYER_ALPHA = 0.036;
 
 const blobCvs = document.createElement('canvas');
 blobCvs.width = W; blobCvs.height = H;
@@ -658,7 +660,7 @@ function strokePoly(tCtx, poly) {
 }
 
 function drawTexturedLayer(el, layerIdx) {
-  const deformCount = 4 + (layerIdx % 2);
+  const deformCount = 6 + (layerIdx % 2);
   const layerPoly = deformN(el.base, deformCount, el.layerVariance || 0.08);
   const [r, g, b] = el.color;
 
@@ -670,10 +672,10 @@ function drawTexturedLayer(el, layerIdx) {
   // Texture mask: random circles for granulation
   maskCtx.clearRect(0, 0, W, H);
   maskCtx.fillStyle = 'white';
-  for (let j = 0; j < 700; j++) {
+  for (let j = 0; j < 2200; j++) {
     const cx = rand() * W;
     const cy = rand() * H;
-    const radius = Math.abs(gauss(W * 0.022, W * 0.016));
+    const radius = Math.abs(gauss(W * 0.013, W * 0.009));
     maskCtx.beginPath();
     maskCtx.arc(cx, cy, radius, 0, Math.PI * 2);
     maskCtx.fill();
