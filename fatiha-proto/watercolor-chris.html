@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Watercolor Chris — Tyler Hobbs Method</title>
+<style>
+  body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c" width="430" height="932"></canvas>
+<script src="mixbox.js"></script>
+<script>
+// ============================================================
+// Tyler Hobbs Watercolor — faithful implementation
+// ============================================================
+
+const W = 430, H = 932;
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+// --- Seeded RNG ---
+let seed = 777;
+function rand() {
+  seed = (seed * 16807 + 0) % 2147483647;
+  return (seed - 1) / 2147483646;
+}
+function gauss(mean, std) {
+  const u1 = rand(), u2 = rand();
+  return mean + std * Math.sqrt(-2 * Math.log(u1 || 0.001)) * Math.cos(2 * Math.PI * u2);
+}
+function randInt(a, b) { return Math.floor(rand() * (b - a + 1)) + a; }
+
+// ============================================================
+// Shape generators
+// ============================================================
+
+function makeEllipsePoly(cx, cy, rx, ry, n, rotation) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const x = cx + rx * Math.cos(a) * Math.cos(rotation) - ry * Math.sin(a) * Math.sin(rotation);
+    const y = cy + rx * Math.cos(a) * Math.sin(rotation) + ry * Math.sin(a) * Math.cos(rotation);
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
+function makeRect(cx, cy, w, h, rotation) {
+  const corners = [[-w/2,-h/2],[w/2,-h/2],[w/2,h/2],[-w/2,h/2]];
+  return corners.map(([x,y]) => [
+    cx + x * Math.cos(rotation) - y * Math.sin(rotation),
+    cy + x * Math.sin(rotation) + y * Math.cos(rotation)
+  ]);
+}
+
+// Saz leaf: elongated S-curve with pointed tip
+function makeSazLeafPoly(cx, cy, length, maxWidth, rotation, curveStrength) {
+  const pts = [];
+  const n = 20;
+  // Right edge (outer curve)
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    // S-curve along the length
+    const along = (t - 0.3) * length;
+    // Width tapers at both ends, widest at ~40%
+    const widthProfile = Math.pow(Math.sin(t * Math.PI), 0.6) * (t < 0.15 ? t / 0.15 : 1);
+    // S-curve lateral displacement
+    const sCurve = curveStrength * Math.sin(t * Math.PI * 1.2) * (1 - t * 0.3);
+    const across = maxWidth * widthProfile + sCurve;
+    const x = cx + along * Math.cos(rotation) - across * Math.sin(rotation);
+    const y = cy + along * Math.sin(rotation) + across * Math.cos(rotation);
+    pts.push([x, y]);
+  }
+  // Left edge (inner curve) — reverse
+  for (let i = n; i >= 0; i--) {
+    const t = i / n;
+    const along = (t - 0.3) * length;
+    const widthProfile = Math.pow(Math.sin(t * Math.PI), 0.6) * (t < 0.15 ? t / 0.15 : 1);
+    const sCurve = curveStrength * Math.sin(t * Math.PI * 1.2) * (1 - t * 0.3);
+    const across = -maxWidth * widthProfile * 0.15 + sCurve; // thin inner edge
+    const x = cx + along * Math.cos(rotation) - across * Math.sin(rotation);
+    const y = cy + along * Math.sin(rotation) + across * Math.cos(rotation);
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
+// ============================================================
+// Define elements
+// ============================================================
+
+// ROSE — center-right area, 10 overlapping petal sub-polygons
+const roseCx = W * 0.52, roseCy = H * 0.35;
+const rosePetals = [];
+// Inner petals (smaller, tighter)
+for (let i = 0; i < 4; i++) {
+  const angle = (i / 4) * Math.PI * 2 + gauss(0, 0.2);
+  const dist = gauss(12, 4);
+  const px = roseCx + Math.cos(angle) * dist;
+  const py = roseCy + Math.sin(angle) * dist;
+  rosePetals.push(makeEllipsePoly(px, py, gauss(25, 3), gauss(18, 3), 14, angle + gauss(0, 0.3)));
+}
+// Outer petals (larger, more spread)
+for (let i = 0; i < 6; i++) {
+  const angle = (i / 6) * Math.PI * 2 + gauss(0, 0.15);
+  const dist = gauss(32, 6);
+  const px = roseCx + Math.cos(angle) * dist;
+  const py = roseCy + Math.sin(angle) * dist;
+  rosePetals.push(makeEllipsePoly(px, py, gauss(38, 5), gauss(24, 4), 14, angle + gauss(0, 0.4)));
+}
+
+// SAZ LEAF — one large cohesive saz leaf, left side
+// Build as 5 overlapping sub-polygons that all follow the same curve spine
+const leafBaseX = W * 0.18, leafBaseY = H * 0.55;
+const leafTipX = W * 0.38, leafTipY = H * 0.25;
+const leafMidX = W * 0.12, leafMidY = H * 0.40; // S-curve control point pushes left
+const leafPolys = [];
+
+// Spine points along a quadratic bezier for S-curve
+function leafSpine(t) {
+  const u = 1 - t;
+  return [
+    u*u*leafBaseX + 2*u*t*leafMidX + t*t*leafTipX,
+    u*u*leafBaseY + 2*u*t*leafMidY + t*t*leafTipY
+  ];
+}
+function leafTangentAngle(t) {
+  const dt = 0.01;
+  const [x0, y0] = leafSpine(Math.max(0, t - dt));
+  const [x1, y1] = leafSpine(Math.min(1, t + dt));
+  return Math.atan2(y1 - y0, x1 - x0);
+}
+
+for (let i = 0; i < 5; i++) {
+  const tCenter = (i + 0.5) / 5;
+  const [cx, cy] = leafSpine(tCenter);
+  const angle = leafTangentAngle(tCenter);
+  // Width tapers toward both ends, widest at ~40%
+  const widthMult = Math.sin(tCenter * Math.PI) * (tCenter < 0.2 ? tCenter / 0.2 : 1);
+  const segLen = gauss(110, 8);
+  const segWidth = gauss(30, 3) * widthMult;
+  const curve = gauss(8, 3) * (tCenter < 0.5 ? 1 : -0.5);
+  leafPolys.push(makeSazLeafPoly(cx + gauss(0, 2), cy + gauss(0, 2), segLen, Math.max(8, segWidth), angle + gauss(0, 0.04), curve));
+}
+
+// STALK — bottom up to rose, 14 heavily overlapping very thin rectangles
+const stalkPolys = [];
+const stalkStartY = H * 0.78, stalkEndY = roseCy + 20;
+const stalkBaseX = W * 0.50;
+const stalkLen = stalkStartY - stalkEndY;
+for (let i = 0; i < 14; i++) {
+  const t = i / 13;
+  const cy = stalkStartY + (stalkEndY - stalkStartY) * t;
+  const cx = stalkBaseX + Math.sin(t * 1.8) * 5 + gauss(0, 0.5);
+  const segH = stalkLen * 0.22;
+  const segW = gauss(3.5, 0.5); // very thin stem
+  stalkPolys.push(makeRect(cx, cy, segW, segH, gauss(0, 0.01)));
+}
+
+// ============================================================
+// Tyler Hobbs Polygon Deformation
+// ============================================================
+
+function deformOnce(poly, variance) {
+  const result = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i];
+    const c = poly[(i + 1) % poly.length];
+    result.push([a[0], a[1]]);
+    const bx = (a[0] + c[0]) / 2;
+    const by = (a[1] + c[1]) / 2;
+    const dx = c[0] - a[0];
+    const dy = c[1] - a[1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.5) continue; // skip degenerate edges
+    const nx = -dy / len;
+    const ny = dx / len;
+    const offset = gauss(0, variance * len);
+    result.push([bx + nx * offset, by + ny * offset]);
+  }
+  return result;
+}
+
+function deformN(poly, n, variance) {
+  let p = poly.map(pt => [pt[0], pt[1]]);
+  for (let i = 0; i < n; i++) {
+    p = deformOnce(p, variance * Math.pow(0.7, i));
+  }
+  return p;
+}
+
+// BASE POLYGON: deform 7 times (Tyler Hobbs spec)
+function makeBase(poly) {
+  return deformN(poly, 7, 0.15);
+}
+
+// ============================================================
+// Paper background
+// ============================================================
+
+function drawPaperBackground() {
+  ctx.fillStyle = '#f4ede3';
+  ctx.fillRect(0, 0, W, H);
+  const imgData = ctx.getImageData(0, 0, W, H);
+  const d = imgData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const n = gauss(0, 6);
+    d[i]   = Math.max(0, Math.min(255, d[i] + n));
+    d[i+1] = Math.max(0, Math.min(255, d[i+1] + n));
+    d[i+2] = Math.max(0, Math.min(255, d[i+2] + n - 1));
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+drawPaperBackground();
+
+// ============================================================
+// Colors
+// ============================================================
+
+const ROSE_COLORS = [
+  [215, 75, 95],   // dusty rose
+  [225, 90, 110],  // warm pink
+  [195, 55, 85],   // deep rose
+  [235, 120, 130], // light blush
+  [205, 65, 75],   // dark rose
+];
+const LEAF_COLORS = [
+  [45, 115, 55],   // deep green
+  [65, 135, 50],   // sap green
+  [35, 95, 45],    // forest green
+  [55, 125, 60],   // mid green
+  [75, 140, 65],   // bright green
+];
+const STALK_COLORS = [
+  [40, 95, 40],    // dark green
+  [50, 105, 45],   // mid green
+  [55, 85, 35],    // olive
+];
+
+// ============================================================
+// Build element list with base polygons
+// ============================================================
+
+const elements = [];
+
+stalkPolys.forEach((poly, i) => {
+  elements.push({
+    base: deformN(poly, 7, 0.06), // low variance to keep stalk thin
+    color: STALK_COLORS[i % STALK_COLORS.length],
+    layerVariance: 0.04, // low layer deformation
+    priority: 0, index: i
+  });
+});
+
+leafPolys.forEach((poly, i) => {
+  elements.push({
+    base: makeBase(poly),
+    color: LEAF_COLORS[i % LEAF_COLORS.length],
+    layerVariance: 0.10,
+    priority: 1, index: i
+  });
+});
+
+rosePetals.forEach((poly, i) => {
+  elements.push({
+    base: makeBase(poly),
+    color: ROSE_COLORS[i % ROSE_COLORS.length],
+    layerVariance: 0.10,
+    priority: 2, index: i
+  });
+});
+
+elements.sort((a, b) => a.priority - b.priority || a.index - b.index);
+
+// ============================================================
+// Rendering with Tyler Hobbs texture masking
+// ============================================================
+
+const TOTAL_LAYERS = 40;
+const LAYER_ALPHA = 0.04;
+
+// Reusable offscreen canvases
+const blobCvs = document.createElement('canvas');
+blobCvs.width = W; blobCvs.height = H;
+const blobCtx = blobCvs.getContext('2d');
+
+const maskCvs = document.createElement('canvas');
+maskCvs.width = W; maskCvs.height = H;
+const maskCtx = maskCvs.getContext('2d');
+
+const colorCvs = document.createElement('canvas');
+colorCvs.width = W; colorCvs.height = H;
+const colorCtx = colorCvs.getContext('2d');
+
+function fillPoly(tCtx, poly) {
+  tCtx.beginPath();
+  tCtx.moveTo(poly[0][0], poly[0][1]);
+  for (let i = 1; i < poly.length; i++) tCtx.lineTo(poly[i][0], poly[i][1]);
+  tCtx.closePath();
+  tCtx.fill();
+}
+
+function drawTexturedLayer(el, layerIdx) {
+  const deformCount = 4 + (layerIdx % 2);
+  const layerPoly = deformN(el.base, deformCount, el.layerVariance || 0.10);
+  const [r, g, b] = el.color;
+
+  // Blob mask
+  blobCtx.clearRect(0, 0, W, H);
+  blobCtx.fillStyle = 'white';
+  fillPoly(blobCtx, layerPoly);
+
+  // Texture mask: 900 random circles
+  maskCtx.clearRect(0, 0, W, H);
+  maskCtx.fillStyle = 'white';
+  for (let j = 0; j < 900; j++) {
+    const cx = rand() * W;
+    const cy = rand() * H;
+    const radius = Math.abs(gauss(W * 0.018, W * 0.012));
+    maskCtx.beginPath();
+    maskCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+    maskCtx.fill();
+  }
+
+  // Color layer = blob ∩ texture, then tinted
+  colorCtx.clearRect(0, 0, W, H);
+  colorCtx.globalCompositeOperation = 'source-over';
+  colorCtx.fillStyle = `rgb(${r},${g},${b})`;
+  colorCtx.fillRect(0, 0, W, H);
+  // Mask with blob shape
+  colorCtx.globalCompositeOperation = 'destination-in';
+  colorCtx.drawImage(blobCvs, 0, 0);
+  // Mask with texture circles
+  colorCtx.globalCompositeOperation = 'destination-in';
+  colorCtx.drawImage(maskCvs, 0, 0);
+  colorCtx.globalCompositeOperation = 'source-over';
+
+  // Composite onto main canvas at low opacity
+  ctx.globalAlpha = LAYER_ALPHA;
+  ctx.drawImage(colorCvs, 0, 0);
+  ctx.globalAlpha = 1.0;
+}
+
+// Interleaved rendering: 5 layers of each element, then rotate
+// Tyler Hobbs: "do five layers of a red blob, then five layers of a yellow blob, then five red, etc."
+const BATCH = 5;
+for (let layerGroup = 0; layerGroup < TOTAL_LAYERS; layerGroup += BATCH) {
+  for (const el of elements) {
+    for (let l = 0; l < BATCH && (layerGroup + l) < TOTAL_LAYERS; l++) {
+      drawTexturedLayer(el, layerGroup + l);
+    }
+  }
+}
+
+// ============================================================
+// Mixbox pigment blending post-process
+// ============================================================
+
+if (typeof mixbox !== 'undefined') {
+  const imgData = ctx.getImageData(0, 0, W, H);
+  const d = imgData.data;
+  const paperR = 244, paperG = 237, paperB = 227;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i+1], b = d[i+2];
+    const dr = paperR - r, dg = paperG - g, db = paperB - b;
+    const dev = Math.sqrt(dr*dr + dg*dg + db*db);
+    if (dev > 25) {
+      // Enrich color via Mixbox subtractive mixing
+      const mixed = mixbox.lerp(
+        [r, g, b, 255],
+        [Math.max(0, r - 12), Math.max(0, g - 8), Math.max(0, b - 12), 255],
+        0.12
+      );
+      d[i] = mixed[0]; d[i+1] = mixed[1]; d[i+2] = mixed[2];
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+console.log('Watercolor render complete');
+</script>
+</body>
+</html>

@@ -1,0 +1,287 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Watercolor Lookdev — chef</title>
+<style>*{margin:0;padding:0}body{background:#0d0d0d;overflow:hidden}canvas{display:block}</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const W=430,H=932,dpr=2;
+const canvas=document.getElementById('c');
+canvas.width=W*dpr;canvas.height=H*dpr;
+canvas.style.width=W+'px';canvas.style.height=H+'px';
+const ctx=canvas.getContext('2d');
+ctx.scale(dpr,dpr);
+
+// Seeded PRNG
+function srand(s){return()=>{s=(s*9301+49297)%233280;return s/233280;};}
+function gaussS(rng){let u=0,v=0;while(!u)u=rng();while(!v)v=rng();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+// ═══════════════════════════════════════════
+// TYLER HOBBS WATERCOLOR METHOD
+// ═══════════════════════════════════════════
+
+// Recursive polygon deformation
+// For each edge, insert midpoint displaced perpendicular by Gaussian amount
+function deformPolygon(pts, variance, rng, depth){
+  if(depth<=0)return pts;
+  const out=[];
+  for(let i=0;i<pts.length;i++){
+    const a=pts[i], b=pts[(i+1)%pts.length];
+    out.push(a);
+    // Midpoint + perpendicular displacement
+    const mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2;
+    const dx=b[0]-a[0], dy=b[1]-a[1];
+    const len=Math.sqrt(dx*dx+dy*dy)||1;
+    const nx=-dy/len, ny=dx/len; // perpendicular
+    const disp=gaussS(rng)*variance*len;
+    out.push([mx+nx*disp, my+ny*disp]);
+  }
+  return deformPolygon(out, variance*0.55, rng, depth-1);
+}
+
+// Create base polygon (original + 7 deformation rounds)
+function makeBase(pts, variance, seed){
+  const rng=srand(seed);
+  return deformPolygon(pts, variance, rng, 7);
+}
+
+// Draw one watercolor layer: base → 4 more deformations → fill at low opacity
+function drawWatercolorLayer(ctx, basePts, color, opacity, seed, textureSeed){
+  const rng=srand(seed);
+  const deformed=deformPolygon(basePts, 0.04, rng, 4);
+  
+  ctx.save();
+  ctx.globalAlpha=opacity;
+  ctx.fillStyle=color;
+  ctx.beginPath();
+  ctx.moveTo(deformed[0][0], deformed[0][1]);
+  for(let i=1;i<deformed.length;i++) ctx.lineTo(deformed[i][0], deformed[i][1]);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// Full watercolor blob: 40 layers from same base
+function watercolorBlob(ctx, originalPts, color, opts={}){
+  const layers=opts.layers||40;
+  const opacity=opts.opacity||0.04;
+  const baseVariance=opts.variance||0.08;
+  const seed=opts.seed||12345;
+  
+  // Create base polygon (7 deformation rounds)
+  const base=makeBase(originalPts, baseVariance, seed);
+  
+  // Draw layers
+  for(let i=0;i<layers;i++){
+    drawWatercolorLayer(ctx, base, color, opacity, seed*1000+i*7919, seed*500+i*3571);
+  }
+}
+
+// ═══════════════════════════════════════════
+// SHAPE PRIMITIVES
+// ═══════════════════════════════════════════
+
+// Circle polygon (n vertices)
+function circlePolygon(cx,cy,r,n=32){
+  const pts=[];
+  for(let i=0;i<n;i++){
+    const a=i/n*Math.PI*2;
+    pts.push([cx+Math.cos(a)*r, cy+Math.sin(a)*r]);
+  }
+  return pts;
+}
+
+// Petal polygon (ogee/almond shape)
+function petalPolygon(cx,cy,len,wid,angle){
+  const pts=[];
+  const n=24;
+  for(let i=0;i<n;i++){
+    const t=i/n*Math.PI*2;
+    // Ogee shape: pointed at top and bottom, wide in middle
+    const r=wid*(0.5+0.5*Math.sin(t));
+    const y=len*0.5*Math.cos(t);
+    const x=r*Math.sin(t);
+    // Rotate by angle
+    const rx=x*Math.cos(angle)-y*Math.sin(angle)+cx;
+    const ry=x*Math.sin(angle)+y*Math.cos(angle)+cy;
+    pts.push([rx,ry]);
+  }
+  return pts;
+}
+
+// Saz leaf polygon
+function leafPolygon(cx,cy,len,wid,angle){
+  const pts=[];
+  const n=32;
+  for(let i=0;i<n;i++){
+    const t=i/n;
+    // Leaf profile: pointed tip, widest at 30%, narrow base
+    let w;
+    if(t<0.3) w=t/0.3;
+    else w=Math.pow((1-t)/0.7, 0.7);
+    w*=wid;
+    const side=i<n/2?1:-1;
+    const along=t*len-len/2;
+    const perp=side*w*(i<n/2?1:-1);
+    // Slight S-curve
+    const curve=Math.sin(t*Math.PI)*wid*0.15;
+    const x=along*Math.cos(angle)-(perp+curve)*Math.sin(angle)+cx;
+    const y=along*Math.sin(angle)+(perp+curve)*Math.cos(angle)+cy;
+    pts.push([x,y]);
+  }
+  return pts;
+}
+
+// Rectangle polygon (for stalk segments)
+function rectPolygon(cx,cy,w,h,angle){
+  const pts=[[-w/2,-h/2],[w/2,-h/2],[w/2,h/2],[-w/2,h/2]];
+  return pts.map(([x,y])=>[
+    x*Math.cos(angle)-y*Math.sin(angle)+cx,
+    x*Math.sin(angle)+y*Math.cos(angle)+cy
+  ]);
+}
+
+// ═══════════════════════════════════════════
+// PAPER TEXTURE
+// ═══════════════════════════════════════════
+function drawPaperTexture(){
+  const rng=srand(42);
+  // Warm cream noise
+  for(let i=0;i<3000;i++){
+    const x=rng()*W, y=rng()*H;
+    const r=rng()*3+0.5;
+    const v=Math.floor(15+rng()*10);
+    ctx.globalAlpha=0.03+rng()*0.04;
+    ctx.fillStyle=`rgb(${v+5},${v+3},${v})`;
+    ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+
+// ═══════════════════════════════════════════
+// COMPOSE THE SCENE
+// ═══════════════════════════════════════════
+
+// Dark background
+ctx.fillStyle='#0d0d0d';
+ctx.fillRect(0,0,W,H);
+
+// Paper texture
+drawPaperTexture();
+
+// STALK — subdivided into overlapping segments
+const stalkX=215, stalkStartY=750, stalkEndY=450;
+const stalkSegs=[];
+for(let i=0;i<8;i++){
+  const t=i/7;
+  const y=stalkStartY+(stalkEndY-stalkStartY)*t;
+  const x=stalkX+Math.sin(t*Math.PI)*15; // slight S curve
+  stalkSegs.push(rectPolygon(x, y, 8+Math.random()*4, 50, -0.1+t*0.2));
+}
+
+// LEAF — subdivided into sub-polygons
+const leafCx=150, leafCy=500, leafLen=120, leafWid=35;
+const leafSubs=[];
+for(let i=0;i<5;i++){
+  const t=(i+0.5)/5;
+  const along=t*leafLen-leafLen/2;
+  const cx=leafCx+along*Math.cos(-0.5);
+  const cy=leafCy+along*Math.sin(-0.5);
+  const localW=leafWid*(t<0.3?t/0.3:Math.pow((1-t)/0.7,0.7));
+  leafSubs.push(circlePolygon(cx, cy, localW*1.2+5, 16));
+}
+
+// ROSE — subdivided into petal sub-polygons
+const roseCx=230, roseCy=420, roseR=55;
+const roseSubs=[];
+// Outer petals
+for(let i=0;i<6;i++){
+  const a=i/6*Math.PI*2+0.3;
+  const px=roseCx+Math.cos(a)*roseR*0.5;
+  const py=roseCy+Math.sin(a)*roseR*0.5;
+  roseSubs.push({poly:petalPolygon(px,py,roseR*0.8,roseR*0.4,a), ring:'outer'});
+}
+// Inner petals
+for(let i=0;i<5;i++){
+  const a=i/5*Math.PI*2+0.6;
+  const px=roseCx+Math.cos(a)*roseR*0.25;
+  const py=roseCy+Math.sin(a)*roseR*0.25;
+  roseSubs.push({poly:petalPolygon(px,py,roseR*0.5,roseR*0.25,a), ring:'inner'});
+}
+// Center
+roseSubs.push({poly:circlePolygon(roseCx,roseCy,roseR*0.15,16), ring:'center'});
+
+// ═══════════════════════════════════════════
+// RENDER WITH INTERLEAVING
+// ═══════════════════════════════════════════
+
+// Create base polygons for everything
+const stalkBases=stalkSegs.map((p,i)=>({base:makeBase(p,0.06,1000+i), color:'rgb(45,85,30)'}));
+const leafBases=leafSubs.map((p,i)=>({base:makeBase(p,0.07,2000+i), color:'rgb(35,100,25)'}));
+const roseBases=roseSubs.map((s,i)=>({
+  base:makeBase(s.poly,0.06,3000+i),
+  color:s.ring==='outer'?'rgb(200,40,80)':s.ring==='inner'?'rgb(170,25,60)':'rgb(140,20,50)'
+}));
+
+// Interleaved rendering — 5 layers per element group, cycling
+const CYCLES=8;
+const LAYERS_PER_CYCLE=5;
+
+for(let cycle=0;cycle<CYCLES;cycle++){
+  // Stalk layers
+  for(let l=0;l<LAYERS_PER_CYCLE;l++){
+    const layerIdx=cycle*LAYERS_PER_CYCLE+l;
+    for(const s of stalkBases){
+      drawWatercolorLayer(ctx, s.base, s.color, 0.035, layerIdx*7919+1, layerIdx*3571+1);
+    }
+  }
+  // Leaf layers
+  for(let l=0;l<LAYERS_PER_CYCLE;l++){
+    const layerIdx=cycle*LAYERS_PER_CYCLE+l;
+    for(const s of leafBases){
+      drawWatercolorLayer(ctx, s.base, s.color, 0.035, layerIdx*7919+2000, layerIdx*3571+2000);
+    }
+  }
+  // Rose layers (priority: on top)
+  for(let l=0;l<LAYERS_PER_CYCLE;l++){
+    const layerIdx=cycle*LAYERS_PER_CYCLE+l;
+    for(const s of roseBases){
+      drawWatercolorLayer(ctx, s.base, s.color, 0.04, layerIdx*7919+3000, layerIdx*3571+3000);
+    }
+  }
+}
+
+// TAHRIR OUTLINES — crisp pen on top
+ctx.globalAlpha=0.7;
+ctx.strokeStyle='rgb(120,25,50)';
+ctx.lineWidth=1;
+// Rose outline
+for(const s of roseSubs){
+  ctx.beginPath();
+  ctx.moveTo(s.poly[0][0],s.poly[0][1]);
+  for(let i=1;i<s.poly.length;i++)ctx.lineTo(s.poly[i][0],s.poly[i][1]);
+  ctx.closePath();ctx.stroke();
+}
+// Leaf outline  
+ctx.strokeStyle='rgb(25,70,20)';
+const fullLeaf=leafPolygon(leafCx,leafCy,leafLen,leafWid,-0.5);
+ctx.beginPath();
+ctx.moveTo(fullLeaf[0][0],fullLeaf[0][1]);
+for(let i=1;i<fullLeaf.length;i++)ctx.lineTo(fullLeaf[i][0],fullLeaf[i][1]);
+ctx.closePath();ctx.stroke();
+// Leaf vein
+ctx.beginPath();
+ctx.moveTo(leafCx-leafLen/2*Math.cos(-0.5),leafCy-leafLen/2*Math.sin(-0.5));
+ctx.lineTo(leafCx+leafLen/2*Math.cos(-0.5),leafCy+leafLen/2*Math.sin(-0.5));
+ctx.stroke();
+
+ctx.globalAlpha=1;
+console.log('chef watercolor done');
+</script>
+</body>
+</html>
