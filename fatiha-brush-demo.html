@@ -343,8 +343,8 @@ function drawLeaf(x, y, size, tangent, side) {
 
   // 2) WATERCOLOR FILL — organic deformation + layered stamps
   fb.watercolor(leafPoly, {
-    color: green, layers: 14, opacity: 0.07,
-    baseRounds: 3, layerRounds: 1, variance: 0.3,
+    color: green, layers: 20, opacity: 0.08,
+    baseRounds: 3, layerRounds: 2, variance: 0.3,
     layer: 'garden', concentratePigment: true
   });
 
@@ -407,7 +407,7 @@ function drawLeaf(x, y, size, tangent, side) {
 }
 
 function drawBud(x, y, size, tangent) {
-  const s = 20 * size;
+  const s = 28 * size;
   const color = pick(PETAL_HUES);
 
   // 1) PRECISE teardrop polygon
@@ -468,7 +468,7 @@ function drawBud(x, y, size, tangent) {
 }
 
 function drawRose(x, y, size, isGolden) {
-  const s = (isGolden ? 55 : 40) * size;
+  const s = (isGolden ? 55 : 50) * size;
   const rings = isGolden ? 6 : 4;
   const petalCounts = [8, 7, 6, 5, 5, 4];
 
@@ -486,13 +486,13 @@ function drawRose(x, y, size, isGolden) {
       fillColor = [DARK_GOLD, GOLD, GOLD, AMBER, PALE_GOLD, '#E8C850'][ring];
       strokeColor = ['#5A4008', '#6A5010', '#7A6018', '#8A7020', '#A08028', '#B09038'][ring];
     } else {
-      fillColor = ['#C06878', '#B05060', '#9A3848', '#8B2838', '#7A1A2B'][ring];
+      fillColor = ['#D07888', '#C06070', '#B04858', '#9A3040', '#8B2030'][ring];
       strokeColor = DEEP_CRIMSON;
     }
 
     for (let i = 0; i < petalCount; i++) {
       const a = (i / petalCount) * Math.PI * 2 + ring * 0.35;
-      const petalPoly = makeOgeePetalPolygon(x, y, lr * 0.38, lr * 0.18, a);
+      const petalPoly = makeOgeePetalPolygon(x, y, lr * 0.45, lr * 0.22, a);
       allPetals.push({ poly: petalPoly, fillColor, strokeColor, ring });
     }
   }
@@ -551,29 +551,29 @@ function drawRose(x, y, size, isGolden) {
 }
 
 function drawBloom(x, y, size) {
-  const s = 30 * size;
+  const s = 40 * size;
 
   // 1) PRECISE ogee petal polygons
   const petalPolys = [];
   for (let i = 0; i < 6; i++) {
     const a = i * Math.PI / 3;
-    petalPolys.push(makeOgeePetalPolygon(x, y, s * 0.3, s * 0.12, a));
+    petalPolys.push(makeOgeePetalPolygon(x, y, s * 0.4, s * 0.16, a));
   }
 
   // 2) WATERCOLOR FILL
   // Outer atmospheric halo
   const haloPoly = FatihaBrush.makePolygon('circle', x, y, s * 0.7, { points: 12 });
   fb.watercolor(haloPoly, {
-    color: ROSE_PINK, layers: 6, opacity: 0.05,
-    baseRounds: 3, layerRounds: 1, variance: 0.45,
+    color: ROSE_PINK, layers: 10, opacity: 0.06,
+    baseRounds: 3, layerRounds: 2, variance: 0.4,
     layer: 'garden'
   });
 
   // Paint each petal
   for (const poly of petalPolys) {
     fb.watercolor(poly, {
-      color: pick(PETAL_HUES), layers: 8, opacity: 0.07,
-      baseRounds: 2, layerRounds: 1, variance: 0.3,
+      color: pick(PETAL_HUES), layers: 14, opacity: 0.08,
+      baseRounds: 3, layerRounds: 1, variance: 0.3,
       layer: 'garden', concentratePigment: true
     });
   }
@@ -682,23 +682,23 @@ function drawVineTendril(x, y, size, tangent) {
       });
     }
 
-    // Base stroke for the vine
+    // Base stroke for the vine tendril — warm green
     fb.drawStroke(branchPts, {
-      color: VINE_DARK, weight, alpha: 0.15,
-      spacing: 0.25, scatter: 0.08, grain: 0.7,
+      color: STEM_GREEN, weight: weight * 1.3, alpha: 0.3,
+      spacing: 0.2, scatter: 0.05, grain: 0.5,
       pressureStart: 0.7, pressureEnd: 0.05, pressurePeak: 1.0,
       pressureCenter: 0.2, layer: 'garden'
     });
 
     // richWash blobs along the tendril for painted feel
-    const blobInterval = 6;
+    const blobInterval = 4;
     for (let i = 0; i < branchPts.length; i += blobInterval) {
       const pt = branchPts[i];
       const t = i / branchPts.length;
-      const blobR = (weight * 1.5) * (1 - t * 0.7);
+      const blobR = (weight * 2.0) * (1 - t * 0.6);
       fb.richWash(pt.x, pt.y, blobR, {
-        color, layers: 8, opacity: 0.03,
-        variance: 0.35, edgeStipple: 0,
+        color, layers: 10, opacity: 0.06,
+        variance: 0.3, edgeStipple: 0,
         shape: 'circle', layer: 'garden'
       });
     }
@@ -830,7 +830,7 @@ const canvas = document.createElement('canvas');
 document.body.appendChild(canvas);
 
 fb = new FatihaBrush(canvas, {
-  maxStamps: 65536,
+  maxStamps: 131072,
   layers: ['garden', 'glow', 'petals'],
   background: BG,
   width: CW,
