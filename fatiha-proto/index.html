@@ -85,9 +85,9 @@ function normalAt(t){
 // ── Rose palette ─────────────────────────────────────────────
 function pathColor(t){
   const s=[
-    [0,0x8B,0x1A,0x3A],[.15,0xC2,0x18,0x5B],[.30,0xE8,0x3E,0x6C],
-    [.45,0xFF,0x6B,0x8A],[.60,0xFF,0x8E,0x72],[.75,0xFF,0xAA,0x5C],
-    [.90,0xE8,0x7C,0x5E],[1,0xC2,0x52,0x52]
+    [0,0x9E,0x10,0x35],[.15,0xD5,0x10,0x50],[.30,0xF0,0x28,0x58],
+    [.45,0xFF,0x45,0x70],[.60,0xFF,0x65,0x50],[.75,0xFF,0x88,0x38],
+    [.90,0xF0,0x58,0x40],[1,0xD5,0x35,0x35]
   ];
   let i=0;while(i<s.length-1&&s[i+1][0]<t)i++;
   if(i>=s.length-1)return[s[s.length-1][1],s[s.length-1][2],s[s.length-1][3]];
@@ -286,7 +286,7 @@ function drawRose(x, y, maxR, petalCount, bloom, baseRot, col, golden) {
     if(golden) {
       r = Math.round(255 - frac * 40);
       g = Math.round(200 - frac * 60);
-      b = Math.round(80 + frac * 30);
+      b = Math.round(45 + frac * 20);
     } else {
       const lf = frac;
       r = Math.round(col[0] + (255 - col[0]) * (1 - lf) * 0.4);
@@ -339,7 +339,7 @@ function drawStem(fromX, fromY, toX, toY, thickness, bloom, col) {
   ctx.beginPath();
   ctx.moveTo(fromX, fromY);
   ctx.quadraticCurveTo(mx, my, fromX + (toX - fromX) * bloom, fromY + (toY - fromY) * bloom);
-  ctx.strokeStyle = `rgba(70,110,55,${0.55*bloom})`;
+  ctx.strokeStyle = `rgba(45,140,35,${0.55*bloom})`;
   ctx.lineWidth = thickness;
   ctx.stroke();
 }
@@ -354,11 +354,11 @@ function drawLeaf(x, y, angle, size, bloom) {
   ctx.moveTo(0, 0);
   ctx.bezierCurveTo(s*0.4, -s*0.3, s*0.9, -s*0.1, s*0.75, s*0.12);
   ctx.bezierCurveTo(s*0.5, s*0.3, s*0.2, s*0.15, 0, 0);
-  ctx.fillStyle = `rgba(65,105,45,${0.5*bloom})`;
+  ctx.fillStyle = `rgba(40,135,30,${0.5*bloom})`;
   ctx.fill();
   // Leaf vein
   ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(s*0.6, s*0.02);
-  ctx.strokeStyle = `rgba(90,140,60,${0.3*bloom})`; ctx.lineWidth = 0.8*dpr; ctx.stroke();
+  ctx.strokeStyle = `rgba(55,150,35,${0.3*bloom})`; ctx.lineWidth = 0.8*dpr; ctx.stroke();
   ctx.restore();
 }
 
@@ -422,7 +422,7 @@ function drawVine(cx, cy, normal, side, maxLen, width, bloom, leafCount, baseRot
     pts.push({x: vx, y: vy});
     if(i === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
   }
-  ctx.strokeStyle = `rgba(65,105,45,${0.5*bloom})`;
+  ctx.strokeStyle = `rgba(40,135,30,${0.5*bloom})`;
   ctx.lineWidth = width * (1.2 - bloom * 0.3);
   ctx.stroke();
 
@@ -449,11 +449,11 @@ var petalCanvases=[];
 function buildPetals(){
   petalCanvases=[];
   const hues=[
-    ['#FFD0D8','#E83E6C','#8B1A3A'],
-    ['#FFDDD0','#FF6B8A','#C2185B'],
-    ['#FFE0E8','#FF8E72','#E87C5E'],
-    ['#FFC8D0','#E83E6C','#A01040'],
-    ['#FFD8C0','#FFAA5C','#C25252'],
+    ['#FF90A8','#E8265C','#8B1A3A'],
+    ['#FFB0A0','#FF4870','#C2185B'],
+    ['#FFB0C0','#FF6050','#E85C3E'],
+    ['#FF90A0','#E8265C','#A01040'],
+    ['#FFB898','#FF8830','#C23232'],
   ];
   for(let v=0;v<5;v++){
     const pc=document.createElement('canvas');
@@ -634,7 +634,7 @@ function animate(){
     const baseW = 3.5 * dpr;
     const tipW = 1.0 * dpr;
     // Draw with gradient stroke (approximate with lineWidth)
-    const stalkGreen = strand === 0 ? 'rgba(45,90,30,0.7)' : 'rgba(35,75,25,0.65)';
+    const stalkGreen = strand === 0 ? 'rgba(30,120,20,0.7)' : 'rgba(22,100,15,0.65)';
     ctx.strokeStyle = stalkGreen;
     ctx.lineWidth = (baseW + tipW) / 2; // average width
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
@@ -879,6 +879,68 @@ function animate(){
     const p=curveAt(progress);
     ctx.beginPath();ctx.arc(p.x,p.y,4*dpr,0,Math.PI*2);
     ctx.fillStyle='rgba(255,255,255,0.6)';ctx.fill();
+  }
+
+  // ── Bismillah text — word-by-word highlight synced to audio ──
+  if(isPlaying || progress > 0) {
+    const WORDS = [
+      { text: 'بسم',     start: 0.0, end: 0.9  },
+      { text: 'الله',    start: 0.9, end: 2.1  },
+      { text: 'الرحمن',  start: 2.1, end: 3.9  },
+      { text: 'الرحيم',  start: 3.9, end: 5.5  },
+    ];
+    const fontSize = Math.round(28 * dpr);
+    ctx.font = `${fontSize}px "Scheherazade New", "Amiri", "Noto Naskh Arabic", serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Measure total width to center the whole phrase
+    const gap = 18 * dpr; // space between words
+    const wordWidths = WORDS.map(w => ctx.measureText(w.text).width);
+    const totalW = wordWidths.reduce((a, b) => a + b, 0) + gap * (WORDS.length - 1);
+    const textY = H - 32 * dpr;
+
+    // Draw right-to-left (Arabic): first word is rightmost
+    let curX = W / 2 + totalW / 2;
+
+    for (let i = 0; i < WORDS.length; i++) {
+      const w = WORDS[i];
+      const ww = wordWidths[i];
+      const wx = curX - ww / 2; // center of this word
+
+      // Sharp highlight: fully on if current time is within this word's range
+      const isActive = time >= w.start && time < w.end;
+      const isPast = time >= w.end;
+
+      if (isActive) {
+        // Bright white with glow
+        ctx.save();
+        ctx.shadowColor = 'rgba(255,255,255,0.6)';
+        ctx.shadowBlur = 12 * dpr;
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(w.text, wx, textY);
+        // Double-draw for extra brightness
+        ctx.shadowBlur = 20 * dpr;
+        ctx.shadowColor = 'rgba(255,255,255,0.3)';
+        ctx.fillText(w.text, wx, textY);
+        ctx.restore();
+      } else if (isPast) {
+        // Already spoken — moderate brightness
+        ctx.globalAlpha = 0.45;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(w.text, wx, textY);
+        ctx.globalAlpha = 1.0;
+      } else {
+        // Not yet spoken — very dim
+        ctx.globalAlpha = 0.15;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(w.text, wx, textY);
+        ctx.globalAlpha = 1.0;
+      }
+
+      curX -= ww + gap;
+    }
   }
 }
 
