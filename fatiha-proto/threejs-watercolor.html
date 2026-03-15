@@ -17,6 +17,7 @@ canvas{display:block}
 </head>
 <body>
 <button id="play-btn">▶</button>
+<script src="mixbox.js"></script>
 <script type="importmap">
 {"imports":{
   "three":"https://esm.sh/three@0.170.0",
@@ -903,12 +904,25 @@ function drawVine(cx,cy,normal,side,maxLen,width,bl,leafCount,baseRot,col){
 }
 
 /* ═══════════════════════════════════════════════════
-   WATERCOLOR SYSTEM — Tyler Hobbs method (correct)
-   Key: many (40+) layers of slightly-deformed polygons
-   at VERY LOW opacity (2-3%), each deformed independently
-   from the ORIGINAL base shape. Small variance = subtle
-   edge bleed, not giant blobs.
+   WATERCOLOR SYSTEM — Tyler Hobbs method (CORRECT)
+
+   The key insight: it's the ACCUMULATION of MANY
+   SLIGHTLY DIFFERENT deformed shapes that creates
+   watercolor. Not one shape at low opacity.
+
+   For EACH element:
+   1. Create polygon approximation (circle)
+   2. Run 40 deformation passes, each with FRESH random
+      but SMALL variance (3% of polygon radius)
+   3. Fill each pass at 2% opacity DIRECTLY on canvas
+   4. Result: center = dense opaque (40 overlaps),
+      edges = soft transparent (only a few reach)
+
+   Mixbox used for pigment-realistic color blending
+   where different-colored elements overlap.
    ═══════════════════════════════════════════════════ */
+const _hasMixbox = typeof mixbox !== 'undefined' && mixbox.lerp;
+
 function wcSrand(s){return function(){s=(s*9301+49297)%233280;return s/233280;};}
 
 function wcGauss(rng) {
@@ -917,21 +931,34 @@ function wcGauss(rng) {
   return u * Math.sqrt(-2 * Math.log(s) / s);
 }
 
-// Create base polygon — circle with enough points for good deformation
+// Create base polygon — circle with enough points for smooth deformation
 function wcCirclePoly(cx, cy, r, n) {
   const pts = [];
   for (let i = 0; i < n; i++) {
     const a = (i/n) * Math.PI * 2;
-    pts.push({x: cx + Math.cos(a)*r, y: cy + Math.sin(a)*r, v: 1.0});
+    pts.push({x: cx + Math.cos(a)*r, y: cy + Math.sin(a)*r});
+  }
+  return pts;
+}
+
+// Create leaf-shaped polygon (ellipse elongated along angle)
+function wcLeafPoly(cx, cy, len, wid, angle, n) {
+  const pts = [];
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  for (let i = 0; i < n; i++) {
+    const a = (i/n) * Math.PI * 2;
+    const lx = Math.cos(a) * len; // along leaf
+    const ly = Math.sin(a) * wid; // across leaf
+    pts.push({x: cx + lx*ca - ly*sa, y: cy + lx*sa + ly*ca});
   }
   return pts;
 }
 
 // Midpoint displacement deformation (Tyler Hobbs method)
-// Each point carries a variance multiplier 'v' — children inherit with slight reduction + randomization.
-// This lets different edges of the same polygon have different amounts of bleed.
+// SMALL variance — 2-5% of radius. Creates subtle irregular edges.
+// Each pass from the ORIGINAL polygon with a different random seed.
 function wcDeform(pts, iterations, baseVariance, rng) {
-  let poly = pts.map(p => ({x:p.x, y:p.y, v: p.v !== undefined ? p.v : 1.0}));
+  let poly = pts.map(p => ({x:p.x, y:p.y}));
   for (let iter = 0; iter < iterations; iter++) {
     const next = [];
     for (let i = 0; i < poly.length; i++) {
@@ -940,18 +967,16 @@ function wcDeform(pts, iterations, baseVariance, rng) {
       const mx = (a.x+b.x)*0.5, my = (a.y+b.y)*0.5;
       const dx = b.x-a.x, dy = b.y-a.y;
       const segLen = Math.sqrt(dx*dx + dy*dy) || 1;
-      // Inherit parent variance (average), slightly reduced + randomized
-      const parentV = (a.v + b.v) * 0.5;
-      const childV = parentV * (0.85 + rng() * 0.3); // slight variation
-      const disp = wcGauss(rng) * baseVariance * parentV * segLen;
+      const disp = wcGauss(rng) * baseVariance * segLen;
       // Perpendicular displacement
-      next.push({x: mx + (-dy/segLen)*disp, y: my + (dx/segLen)*disp, v: childV});
+      next.push({x: mx + (-dy/segLen)*disp, y: my + (dx/segLen)*disp});
     }
     poly = next;
   }
   return poly;
 }
 
+// Fill a polygon directly — no gradients, just flat color at tiny alpha
 function wcFillPoly(c, poly, color, alpha) {
   if (poly.length < 3) return;
   c.beginPath();
@@ -963,62 +988,72 @@ function wcFillPoly(c, poly, color, alpha) {
   c.fill();
 }
 
-// Gradient version — transparent center, soft colored rim (edge-only bleed)
-function wcFillPolyEdge(c, poly, cx, cy, innerR, outerR, color, alpha) {
-  if (poly.length < 3) return;
-  c.beginPath();
-  c.moveTo(poly[0].x, poly[0].y);
-  for (let i = 1; i < poly.length; i++) c.lineTo(poly[i].x, poly[i].y);
-  c.closePath();
-  const grad = c.createRadialGradient(cx, cy, 0, cx, cy, outerR);
-  // Very gradual transition — smooth fadeup from transparent to colored
-  grad.addColorStop(0, 'rgba(0,0,0,0)');
-  grad.addColorStop(0.35, 'rgba(0,0,0,0)');     // transparent through flower center
-  grad.addColorStop(0.6, color.replace('rgb', 'rgba').replace(')', ',0.3)')); // starts fading in
-  grad.addColorStop(0.8, color.replace('rgb', 'rgba').replace(')', ',0.7)')); // builds up
-  grad.addColorStop(0.95, color);                // peak at outer edge
-  grad.addColorStop(1, color.replace('rgb', 'rgba').replace(')', ',0.4)'));   // fades at very edge
-  c.globalAlpha = alpha;
-  c.fillStyle = grad;
-  c.fill();
+// Mixbox compositing: blend element watercolor onto accumulation canvas using pigment mixing
+// elemCanvas has the element's watercolor layers (RGB alpha-blended)
+// accCanvas accumulates ALL elements with Mixbox pigment blending
+function wcMixboxComposite(accCtx, elemCanvas, bounds) {
+  if (!_hasMixbox) {
+    // Fallback: just draw normally
+    accCtx.globalAlpha = 1;
+    accCtx.drawImage(elemCanvas, 0, 0);
+    return;
+  }
+  const {x, y, w, h} = bounds;
+  // Clamp to canvas bounds
+  const sx = Math.max(0, Math.floor(x)), sy = Math.max(0, Math.floor(y));
+  const ex = Math.min(elemCanvas.width, Math.ceil(x+w)), ey = Math.min(elemCanvas.height, Math.ceil(y+h));
+  const sw = ex - sx, sh = ey - sy;
+  if (sw <= 0 || sh <= 0) return;
+
+  const accData = accCtx.getImageData(sx, sy, sw, sh);
+  const elemCtx = elemCanvas.getContext('2d');
+  const elemData = elemCtx.getImageData(sx, sy, sw, sh);
+  const acc = accData.data, elem = elemData.data;
+
+  for (let i = 0; i < acc.length; i += 4) {
+    const ea = elem[i+3]; // element alpha (0-255)
+    if (ea === 0) continue;
+    const aa = acc[i+3]; // accumulator alpha
+    if (aa === 0) {
+      // Nothing in accumulator yet — just copy
+      acc[i] = elem[i]; acc[i+1] = elem[i+1]; acc[i+2] = elem[i+2]; acc[i+3] = ea;
+    } else {
+      // Both have color — Mixbox pigment blend
+      const t = ea / (aa + ea); // blend ratio based on alpha weights
+      const mixed = mixbox.lerp([acc[i], acc[i+1], acc[i+2]], [elem[i], elem[i+1], elem[i+2]], t);
+      acc[i] = mixed[0]; acc[i+1] = mixed[1]; acc[i+2] = mixed[2];
+      acc[i+3] = Math.min(255, aa + ea - Math.floor(aa * ea / 255)); // standard alpha composite
+    }
+  }
+  accCtx.putImageData(accData, sx, sy);
 }
 
-// Pre-cache: for each element, store its base polygon (deformed 5x from original circle)
-// and per-layer deformed versions. Rebuilt when element set changes.
-const wcCache = new Map(); // key: element index → {basePoly, layers: [...]}
-const WC_LAYERS = 50;         // Tyler recommends 30-80
-const WC_BASE_ITER = 5;       // iterations to shape the base polygon
-const WC_LAYER_ITER = 3;      // additional iterations per layer
-const WC_BASE_VAR = 0.025;    // moderate base variance
-const WC_LAYER_VAR = 0.065;   // higher per-layer variance — wider feathery spread
-const WC_LAYER_ALPHA = 0.03;  // 3% per layer — saturates center, gradient at edges
-const WC_POLY_PTS = 20;       // base circle resolution
-// Temp canvas for watercolor compositing
-const wcTempCanvas = document.createElement('canvas');
-wcTempCanvas.width = WD; wcTempCanvas.height = HD;
-const wcCtx = wcTempCanvas.getContext('2d');
-// Apply same transform as main canvas
-wcCtx.translate(0, HD); wcCtx.scale(1, -1);
+// Watercolor accumulation canvas — all watercolor drawn here with Mixbox, then composited to main
+const wcAccCanvas = document.createElement('canvas');
+wcAccCanvas.width = WD; wcAccCanvas.height = HD;
+const wcAccCtx = wcAccCanvas.getContext('2d');
+// Per-element temp canvas (reused)
+const wcElemCanvas = document.createElement('canvas');
+wcElemCanvas.width = WD; wcElemCanvas.height = HD;
+const wcElemCtx = wcElemCanvas.getContext('2d');
 
-function wcBuildLayers(cx, cy, r, seed) {
-  const basePoly = wcCirclePoly(cx, cy, r, WC_POLY_PTS);
-  // Deform base shape (shared foundation for all layers)
-  const baseRng = wcSrand(seed);
-  const base = wcDeform(basePoly, WC_BASE_ITER, WC_BASE_VAR, baseRng);
+// Pre-cache deformed polygon layers per element
+const wcCache = new Map();
+const WC_LAYERS = 45;         // 45 overlapping deformed polygons per element
+const WC_DEFORM_ITER = 3;     // midpoint subdivision iterations per layer
+const WC_VARIANCE = 0.18;     // ~4.5% of radius — visible irregular edges
+const WC_LAYER_ALPHA = 0.018; // 1.8% per layer — 45 layers ≈ 50% center, fades to ~5% at edges
+const WC_POLY_PTS = 30;       // base circle resolution
 
-  // Assign random variance to base points — some edges bleed more
-  for (const pt of base) {
-    const vRng = wcSrand(seed + Math.floor(pt.x * 100 + pt.y * 73));
-    pt.v = 0.3 + vRng() * 1.4; // 0.3 to 1.7 — some edges sharp, some bleed a lot
-  }
-
-  // Generate each layer by deforming the BASE (not previous layer!)
+// Build all 40 deformed layers from a single base polygon
+function wcBuildLayers(basePoly, seed) {
   const layers = [];
   for (let l = 0; l < WC_LAYERS; l++) {
+    // Each layer deforms the ORIGINAL base polygon with a DIFFERENT seed
     const layerRng = wcSrand(seed + l * 7919 + 1);
-    layers.push(wcDeform(base, WC_LAYER_ITER, WC_LAYER_VAR, layerRng));
+    layers.push(wcDeform(basePoly, WC_DEFORM_ITER, WC_VARIANCE, layerRng));
   }
-  return {cx, cy, r, layers};
+  return layers;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -1105,11 +1140,10 @@ function animate(){
   // glows rendering removed
 
   // === WATERCOLOR PASS — Tyler Hobbs method ===
-  // Render deformed polygon layers to temp canvas, then composite at controlled opacity.
-  // This gives proper accumulation: center dense, edges feathered.
-  wcCtx.clearRect(0, 0, WD, HD);
-  let wcCount = 0;
-  for (let gi = 0; gi < garden.length && wcCount < 30; gi++) {
+  // Draw 40 slightly-deformed polygons per element DIRECTLY on canvas at 2% opacity.
+  // Accumulation creates watercolor: dense opaque center, soft transparent edges.
+  // Drawn BEFORE garden elements so watercolor halos sit behind crisp flowers.
+  for (let gi = 0; gi < garden.length; gi++) {
     const g = garden[gi];
     const elapsed = progress - g.born;
     if (elapsed < 0) continue;
@@ -1121,70 +1155,74 @@ function animate(){
     const wby = curvePoints[wci].y + wcn.y*wcd*wcwv;
     let wbl = Math.min(1, elapsed / (g.growDur||0.06));
     if (g.forceBloom !== undefined) wbl = Math.max(wbl, Math.min(1, (progress-g.forceBloom)/0.04));
-    if (wbl < 0.2) continue;
+    if (wbl < 0.15) continue;
 
-    let wcx, wcy, wcr, wcCol;
+    let wcx, wcy, basePoly, wcCol, cacheR;
+    const seed = Math.floor((g.born*100000 + g.baseRot*10000 + wci) % 233280);
+
     switch(g.kind) {
       case 'rose': {
         const sB = Math.min(1, wbl*2);
         const tx = wbx + wcn.x*g.stemLen*g.side, ty = wby + wcn.y*g.stemLen*g.side;
         wcx = wbx + (tx-wbx)*sB; wcy = wby + (ty-wby)*sB;
-        wcr = g.maxR * wbl * (g.golden ? 1.12 : 1.2); // wider for feathery spread
+        const wcr = g.maxR * wbl * 1.15;
+        if (wcr < 8*dpr) continue;
+        cacheR = wcr;
+        basePoly = wcCirclePoly(wcx, wcy, wcr, WC_POLY_PTS);
         wcCol = g.golden ? [240,175,30] : g.col;
         break;
       }
-      case 'bud': continue;
+      case 'bud': {
+        const tx = wbx + wcn.x*g.stemLen*g.side, ty = wby + wcn.y*g.stemLen*g.side;
+        wcx = wbx + (tx-wbx)*wbl; wcy = wby + (ty-wby)*wbl;
+        const wcr = g.maxR * wbl * 1.1;
+        if (wcr < 6*dpr) continue;
+        cacheR = wcr;
+        basePoly = wcCirclePoly(wcx, wcy, wcr, WC_POLY_PTS);
+        wcCol = g.col;
+        break;
+      }
       case 'leaf': {
         wcx = wbx; wcy = wby;
-        wcr = g.leafSize * wbl * 0.35;
+        const len = g.leafSize * wbl * 0.5;
+        const wid = len * 0.25;
+        if (len < 6*dpr) continue;
+        cacheR = len;
+        basePoly = wcLeafPoly(wcx, wcy, len, wid, g.leafAngle||0, WC_POLY_PTS);
         wcCol = [25, 140, 20];
         break;
       }
       default: continue;
     }
 
-    if (wcr < 10*dpr) continue;
-    wcCount++;
-
-    const seed = Math.floor((g.born*100000 + g.baseRot*10000 + wci) % 233280);
-
+    // Cache check — rebuild if position/size changed significantly
     const cacheKey = gi;
-    let wc = wcCache.get(cacheKey);
-    if (!wc || Math.abs(wc.cx-wcx)>2 || Math.abs(wc.cy-wcy)>2 || Math.abs(wc.r-wcr)>2) {
-      wc = wcBuildLayers(wcx, wcy, wcr, seed);
-      wcCache.set(cacheKey, wc);
+    let layers = wcCache.get(cacheKey);
+    if (!layers || !layers._cx || Math.abs(layers._cx-wcx)>3 || Math.abs(layers._cy-wcy)>3 || Math.abs(layers._r-cacheR)>3) {
+      const built = wcBuildLayers(basePoly, seed);
+      built._cx = wcx; built._cy = wcy; built._r = cacheR;
+      wcCache.set(cacheKey, built);
+      layers = built;
     }
 
-    // Element color on temp canvas
-    const colStr = `rgb(${wcCol[0]},${wcCol[1]},${wcCol[2]})`;
-
-    for (let l = 0; l < wc.layers.length; l++) {
-      wcFillPoly(wcCtx, wc.layers[l], colStr, WC_LAYER_ALPHA * wbl);
+    // Draw all 40 deformed polygons directly on main canvas
+    // Each at 2% opacity — accumulation IS the watercolor effect
+    // Mixbox: vary color per layer for pigment granulation
+    const layerAlpha = WC_LAYER_ALPHA * wbl;
+    for (let l = 0; l < layers.length; l++) {
+      let r = wcCol[0], g2 = wcCol[1], b2 = wcCol[2];
+      if (_hasMixbox) {
+        // Slight pigment variation per layer — simulates granulation
+        const varRng = wcSrand(seed + l * 131 + 7);
+        const shift = varRng() * 0.15; // 0-15% blend toward a warm complement
+        const warm = g.kind === 'leaf' ? [107, 148, 4] : [255, 105, 0]; // sap green / cadmium orange
+        const mixed = mixbox.lerp(wcCol, warm, shift);
+        r = mixed[0]; g2 = mixed[1]; b2 = mixed[2];
+      }
+      const colStr = `rgb(${Math.round(r)},${Math.round(g2)},${Math.round(b2)})`;
+      wcFillPoly(ctx, layers[l], colStr, layerAlpha);
     }
-
-    // Texture mask — erase random circles for papery watercolor texture
-    wcCtx.globalCompositeOperation = 'destination-out';
-    const maskRng = wcSrand(seed + 99999);
-    const maskCount = Math.max(8, Math.floor(wcr * 0.15));
-    for (let m = 0; m < maskCount; m++) {
-      const ma = maskRng() * Math.PI * 2;
-      const md = wcr * (0.2 + maskRng() * 0.8);
-      const mr = wcr * (0.05 + maskRng() * 0.12);
-      wcCtx.beginPath();
-      wcCtx.arc(wcx + Math.cos(ma)*md, wcy + Math.sin(ma)*md, mr, 0, Math.PI*2);
-      wcCtx.globalAlpha = 0.3 + maskRng() * 0.5; // partial erasure
-      wcCtx.fill();
-    }
-    wcCtx.globalCompositeOperation = 'source-over';
   }
-  wcCtx.globalAlpha = 1;
-
-  // Composite temp canvas onto main canvas at low opacity — controls total intensity
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform for drawImage
-  ctx.globalAlpha = 0.09; // very subtle — organic colored haze behind flowers
-  ctx.drawImage(wcTempCanvas, 0, 0);
-  ctx.restore();
   ctx.globalAlpha = 1;
 
   // Garden elements
