@@ -21,7 +21,7 @@
 <button id="playBtn">&#9654; Bismillah</button>
 
 <script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.0-beta/dist/p5.brush.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.0-beta/dist/p5.brush.js"></script>
 
 <script>
 // ── CONSTANTS ──────────────────────────────────────────────
@@ -30,28 +30,28 @@ const PHI = 1.618033988749;
 const TOTAL_DUR = 6.0;
 const BG = '#0d0d0d';
 
-// ── COLOR PALETTE (from threejs.html) ──────────────────────
+// ── COLOR PALETTE ──────────────────────────────────────────
 const CRIMSON   = '#C00830';
 const ROSE_PINK = '#FF1455';
 const HOT_PINK  = '#FF286E';
 const AMBER     = '#FF7020';
 const GOLD      = '#F8AA19';
 const DARK_GOLD = '#C36E08';
-const LEAF_GREEN   = '#148210';
-const DARK_GREEN   = '#085508';
-const FOREST_GREEN = '#0A550A';
-const STEM_GREEN   = '#14820F';
-const LIGHT_GREEN  = '#23AF19';
+const LEAF_GREEN   = '#1CA812';
+const DARK_GREEN   = '#0A7A0A';
+const FOREST_GREEN = '#0C6E0C';
+const STEM_GREEN   = '#1CA80F';
+const LIGHT_GREEN  = '#30C820';
 
 const PETAL_HUES = [
-  '#FF60A0','#E8105C','#A0082E',
-  '#FF5888','#FF1860','#D0105A',
-  '#FF7060','#FF2838','#D0282A',
-  '#FF5898','#E8105C','#B00838',
-  '#FF8838','#FF5010','#C01818'
+  '#FF70B0','#F01868','#C00838',
+  '#FF6898','#FF2068','#E01868',
+  '#FF8068','#FF3848','#E03838',
+  '#FF68A8','#F01868','#C80848',
+  '#FF9848','#FF6018','#D82020'
 ];
 
-// ── TAJWEED EVENTS (from threejs.html) ─────────────────────
+// ── TAJWEED EVENTS ─────────────────────────────────────────
 const TAJWEED = [
   {t:0.05,type:'bud',size:0.35,side:-1},
   {t:0.15,type:'leaf',size:0.3,side:1},
@@ -99,7 +99,7 @@ const TAJWEED = [
   {t:5.50,type:'leaf',size:0.1,side:-1}
 ];
 
-// ── GOLDEN SPIRAL ARC MATH (from threejs.html) ─────────────
+// ── GOLDEN SPIRAL ARC MATH ─────────────────────────────────
 function buildSpiralPoints() {
   const margin = 24;
   const avW = CW - margin * 2;
@@ -110,11 +110,10 @@ function buildSpiralPoints() {
   const ox = (CW - gw) / 2;
   const oy = (CH - gh) / 2;
 
-  // Recursive golden rectangle subdivision → arcs
   const arcs = [];
   let rx = ox, ry = oy, rw = gw, rh = gh;
   for (let i = 0; i < 9; i++) {
-    const d = i % 4; // 0=bottom,1=left,2=top,3=right
+    const d = i % 4;
     const sq = Math.min(rw, rh);
     let cx, cy, sa, ea;
     if (d === 0)      { cx = rx + sq; cy = ry;      sa = Math.PI/2;   ea = Math.PI; }
@@ -129,7 +128,6 @@ function buildSpiralPoints() {
     else              { rx += sq; ry += sq; rw -= sq; rh -= sq; }
   }
 
-  // Sample points along arcs
   const totalR = arcs.reduce((s, a) => s + a.r, 0);
   const TARGET = 900;
   const pts = [];
@@ -164,95 +162,57 @@ let tajweedIdx = 0;
 
 // ── DRAWING STATE ──────────────────────────────────────────
 let spiralPts;
-let drawnVineIdx = 0;     // how far along the vine we've drawn
-let spawnedElements = [];  // garden elements spawned by tajweed
+let drawnVineIdx = 0;
+let spawnedElements = [];
 let fallingPetals = [];
+
+// ── SYNTHETIC TIME (for headless capture) ──────────────────
+function getTime() {
+  if (typeof window._synthTime === 'number') return window._synthTime;
+  if (audio) return audio.currentTime;
+  return 0;
+}
+
+function isFinished() {
+  if (typeof window._synthTime === 'number') return window._synthTime >= TOTAL_DUR;
+  if (audio) return audio.ended || audio.currentTime >= TOTAL_DUR;
+  return false;
+}
 
 // ── p5.js SKETCH ───────────────────────────────────────────
 function setup() {
   createCanvas(CW, CH, WEBGL);
   brush.load();
-
-  // Register custom brushes
-  brush.add('vine', {
-    type: 'custom',
-    weight: 4,
-    vibration: 0.8,
-    opacity: 200,
-    spacing: 1.5,
-    pressure: [0.3, 1.2, 0.3],
-    rotate: 'natural',
-    tip: (_m) => {
-      _m.circle(0, 0, 1);
-    }
-  });
-
-  brush.add('saz_leaf', {
-    type: 'custom',
-    weight: 18,
-    vibration: 0.3,
-    opacity: 180,
-    spacing: 0.5,
-    pressure: [0.1, 1.0, 0.1],
-    rotate: 'natural',
-    tip: (_m) => {
-      // Elongated saz-leaf shape
-      _m.beginShape();
-      _m.vertex(0, -0.6);
-      _m.bezierVertex(0.35, -0.3, 0.4, 0.2, 0, 0.6);
-      _m.bezierVertex(-0.4, 0.2, -0.35, -0.3, 0, -0.6);
-      _m.endShape(CLOSE);
-    }
-  });
-
-  brush.add('rose_stamp', {
-    type: 'custom',
-    weight: 30,
-    vibration: 0,
-    opacity: 220,
-    spacing: 0.3,
-    pressure: [1, 1, 1],
-    rotate: 'random',
-    tip: (_m) => {
-      // Rose petal cluster stamp
-      for (let i = 0; i < 5; i++) {
-        const a = (i / 5) * TWO_PI;
-        _m.push();
-        _m.rotate(a);
-        _m.ellipse(0.2, 0, 0.4, 0.25);
-        _m.pop();
-      }
-    }
-  });
-
-  brush.add('petal_fall', {
-    type: 'custom',
-    weight: 8,
-    vibration: 1.5,
-    opacity: 140,
-    spacing: 2,
-    pressure: [0.5, 1, 0.2],
-    rotate: 'random',
-    tip: (_m) => {
-      _m.ellipse(0, 0, 0.5, 0.3);
-    }
-  });
+  brush.scaleBrushes(2.0);
 
   spiralPts = buildSpiralPoints();
   background(BG);
+
+  // Auto-start if synthetic time is being used (headless capture)
+  if (typeof window._synthTime === 'number') {
+    isPlaying = true;
+    document.getElementById('playBtn').classList.add('hidden');
+  }
 }
 
 function draw() {
-  // ── Audio sync ──
-  let progress = 0;
-  let energy = 0;
+  // Synthetic time auto-start
+  if (typeof window._synthTime === 'number' && !isPlaying) {
+    isPlaying = true;
+  }
 
-  if (isPlaying && audio) {
-    const time = audio.currentTime;
+  let progress = 0;
+  let energy = 0.6; // default energy for synthetic/no-audio mode
+
+  if (isPlaying) {
+    const time = getTime();
     progress = Math.min(time / TOTAL_DUR, 1);
-    const rawAmp = getAmp();
-    smoothAmp += (rawAmp - smoothAmp) * 0.12;
-    energy = Math.min(1, smoothAmp * 3);
+
+    if (audio && analyser && timeData) {
+      const rawAmp = getAmp();
+      smoothAmp += (rawAmp - smoothAmp) * 0.12;
+      energy = Math.min(1, smoothAmp * 3);
+    }
 
     // Dispatch tajweed events
     while (tajweedIdx < TAJWEED.length && time >= TAJWEED[tajweedIdx].t) {
@@ -260,8 +220,7 @@ function draw() {
       tajweedIdx++;
     }
 
-    // Check if done
-    if (audio.ended || progress >= 1) {
+    if (isFinished()) {
       isPlaying = false;
       document.getElementById('playBtn').classList.remove('hidden');
     }
@@ -269,7 +228,7 @@ function draw() {
 
   if (!isPlaying && drawnVineIdx === 0) return;
 
-  // ── COORDINATE SYSTEM: translate to top-left origin ──
+  // ── WEBGL origin is center — translate to top-left ──
   push();
   translate(-CW / 2, -CH / 2);
 
@@ -279,24 +238,24 @@ function draw() {
     const batchSize = Math.max(1, targetIdx - drawnVineIdx);
 
     if (batchSize > 0 && drawnVineIdx < spiralPts.length - 1) {
-      // Vine stroke segments
       const segStart = Math.max(0, drawnVineIdx - 1);
       const segEnd = Math.min(spiralPts.length - 1, drawnVineIdx + batchSize);
 
-      // Collect segment points for a spline
       const segPts = [];
       for (let i = segStart; i <= segEnd; i += 3) {
         segPts.push([spiralPts[i].x, spiralPts[i].y]);
       }
 
       if (segPts.length >= 2) {
-        const vineWeight = 2.5 + energy * 3;
-        brush.set('vine', STEM_GREEN, vineWeight);
-        brush.spline(segPts);
+        const vineWeight = 8 + energy * 10;
+
+        // Primary vine stroke — bright green
+        brush.set('marker', STEM_GREEN, vineWeight);
+        brush.spline(segPts, 0.5);
 
         // Secondary darker vine for depth
-        brush.set('vine', DARK_GREEN, vineWeight * 0.6);
-        brush.spline(segPts);
+        brush.set('marker', DARK_GREEN, vineWeight * 0.5);
+        brush.spline(segPts, 0.5);
       }
 
       drawnVineIdx = segEnd;
@@ -313,31 +272,35 @@ function draw() {
     const ptIdx = Math.floor(spiralT * (spiralPts.length - 1));
     const pt = spiralPts[ptIdx];
     const norm = getNormal(spiralPts, ptIdx);
-    const offDist = 25 * el.size * el.side;
+    const offDist = 50 * el.size * el.side;
     const ex = pt.x + norm.x * offDist;
     const ey = pt.y + norm.y * offDist;
 
-    switch (el.type) {
-      case 'leaf':
-        drawLeaf(ex, ey, el.size, ptIdx);
-        break;
-      case 'bud':
-      case 'bloom':
-        drawBud(ex, ey, el.size);
-        break;
-      case 'rose':
-      case 'golden_rose':
-        drawRose(ex, ey, el.size, el.type === 'golden_rose');
-        break;
-      case 'ghunnah':
-        drawGhunnah(ex, ey, el.size);
-        break;
-      case 'thorn':
-        drawThorn(pt.x, pt.y, el.size, ptIdx);
-        break;
-      case 'vine':
-        drawVineTendril(ex, ey, el.size, ptIdx);
-        break;
+    try {
+      switch (el.type) {
+        case 'leaf':
+          drawLeaf(ex, ey, el.size, ptIdx);
+          break;
+        case 'bud':
+        case 'bloom':
+          drawBud(ex, ey, el.size);
+          break;
+        case 'rose':
+        case 'golden_rose':
+          drawRose(ex, ey, el.size, el.type === 'golden_rose');
+          break;
+        case 'ghunnah':
+          drawGhunnah(ex, ey, el.size);
+          break;
+        case 'thorn':
+          drawThorn(pt.x, pt.y, el.size, ptIdx);
+          break;
+        case 'vine':
+          drawVineTendril(ex, ey, el.size, ptIdx);
+          break;
+      }
+    } catch (err) {
+      console.warn(`Garden element "${el.type}" at t=${el.t} failed:`, err.message);
     }
   }
 
@@ -362,7 +325,7 @@ function draw() {
     p.y += p.vy;
     p.life--;
     if (p.life > 40) {
-      brush.set('petal_fall', p.color, 6);
+      brush.set('spray', p.color, 12);
       brush.line(p.x, p.y, p.x + p.vx * 3, p.y + p.vy * 3);
     }
     if (p.life <= 0) fallingPetals.splice(i, 1);
@@ -374,44 +337,46 @@ function draw() {
 // ── GARDEN ELEMENT DRAWING ─────────────────────────────────
 
 function drawLeaf(x, y, size, ptIdx) {
-  const s = 12 * size;
+  const s = 30 * size;
   const angle = getAngleAt(ptIdx);
   const leafPts = [];
   for (let i = 0; i <= 8; i++) {
     const t = i / 8;
     const lx = t * s * 2;
-    const ly = Math.sin(t * Math.PI) * s * 0.6;
+    const ly = Math.sin(t * Math.PI) * s * 0.7;
     const rx = lx * Math.cos(angle) - ly * Math.sin(angle);
     const ry = lx * Math.sin(angle) + ly * Math.cos(angle);
     leafPts.push([x + rx, y + ry]);
   }
   const greens = [LEAF_GREEN, LIGHT_GREEN, FOREST_GREEN];
-  brush.set('saz_leaf', greens[Math.floor(Math.random() * 3)], s * 0.8);
-  if (leafPts.length >= 2) brush.spline(leafPts);
+  brush.set('marker', greens[Math.floor(Math.random() * 3)], s * 1.2);
+  if (leafPts.length >= 2) brush.spline(leafPts, 0.5);
 
   // Leaf vein
-  brush.set('vine', DARK_GREEN, 1);
+  brush.set('rotring', DARK_GREEN, 2.5);
   const veinPts = leafPts.filter((_, i) => i % 2 === 0);
-  if (veinPts.length >= 2) brush.spline(veinPts);
+  if (veinPts.length >= 2) brush.spline(veinPts, 0.5);
 }
 
 function drawBud(x, y, size) {
-  const s = 8 * size;
+  const s = 20 * size;
   const color = PETAL_HUES[Math.floor(Math.random() * PETAL_HUES.length)];
-  brush.set('rose_stamp', color, s);
-  // Small cluster of strokes
-  for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI * 2;
-    const r = s * 0.3;
+  brush.set('marker', color, s);
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2;
+    const r = s * 0.5;
     brush.line(x, y, x + Math.cos(a) * r, y + Math.sin(a) * r);
   }
+  // Brighter center
+  brush.set('spray', PETAL_HUES[Math.floor(Math.random() * PETAL_HUES.length)], s * 0.6);
+  brush.line(x - 1, y - 1, x + 1, y + 1);
   // Sepal
-  brush.set('vine', DARK_GREEN, 2);
-  brush.line(x, y + s * 0.5, x, y + s * 1.2);
+  brush.set('rotring', DARK_GREEN, 3);
+  brush.line(x, y + s * 0.5, x, y + s * 1.5);
 }
 
 function drawRose(x, y, size, isGolden) {
-  const s = 15 * size;
+  const s = 35 * size;
   const layers = isGolden ? 5 : 4;
   for (let layer = layers; layer > 0; layer--) {
     const lr = s * (layer / layers);
@@ -421,43 +386,42 @@ function drawRose(x, y, size, isGolden) {
     } else {
       color = PETAL_HUES[Math.floor(Math.random() * PETAL_HUES.length)];
     }
-    brush.set('rose_stamp', color, lr);
+    brush.set('marker', color, lr * 0.8);
     const petalCount = 5 + layer;
     for (let i = 0; i < petalCount; i++) {
-      const a = (i / petalCount) * TWO_PI + layer * 0.3;
-      const px = x + Math.cos(a) * lr * 0.4;
-      const py = y + Math.sin(a) * lr * 0.4;
+      const a = (i / petalCount) * Math.PI * 2 + layer * 0.3;
+      const px = x + Math.cos(a) * lr * 0.5;
+      const py = y + Math.sin(a) * lr * 0.5;
       brush.line(x, y, px, py);
     }
   }
   // Bright center
-  brush.set('rose_stamp', isGolden ? '#FFE850' : '#FF88AA', s * 0.3);
-  brush.line(x - 1, y - 1, x + 1, y + 1);
+  brush.set('spray', isGolden ? '#FFE850' : '#FF88CC', s * 0.4);
+  brush.line(x - 2, y - 2, x + 2, y + 2);
 }
 
 function drawGhunnah(x, y, size) {
-  // Ghunnah = resonance burst — spray of soft color
-  const s = 20 * size;
-  for (let i = 0; i < 6; i++) {
-    const a = Math.random() * TWO_PI;
+  const s = 40 * size;
+  for (let i = 0; i < 8; i++) {
+    const a = Math.random() * Math.PI * 2;
     const r = Math.random() * s;
     const color = PETAL_HUES[Math.floor(Math.random() * PETAL_HUES.length)];
-    brush.set('petal_fall', color, 4 + Math.random() * 4);
+    brush.set('spray', color, 6 + Math.random() * 6);
     brush.line(x, y, x + Math.cos(a) * r, y + Math.sin(a) * r);
   }
 }
 
 function drawThorn(x, y, size, ptIdx) {
   const angle = getAngleAt(ptIdx);
-  const s = 6 * size;
-  brush.set('vine', DARK_GREEN, 1.5);
+  const s = 10 * size;
+  brush.set('rotring', DARK_GREEN, 3.5);
   const tx = x + Math.cos(angle + Math.PI / 2) * s;
   const ty = y + Math.sin(angle + Math.PI / 2) * s;
   brush.line(x, y, tx, ty);
 }
 
 function drawVineTendril(x, y, size, ptIdx) {
-  const s = 20 * size;
+  const s = 45 * size;
   const pts = [];
   const baseAngle = getAngleAt(ptIdx);
   for (let i = 0; i <= 6; i++) {
@@ -469,8 +433,8 @@ function drawVineTendril(x, y, size, ptIdx) {
       y + Math.sin(baseAngle + curl) * r * t
     ]);
   }
-  brush.set('vine', STEM_GREEN, 1.5 * size);
-  if (pts.length >= 2) brush.spline(pts);
+  brush.set('marker', STEM_GREEN, 5 * size);
+  if (pts.length >= 2) brush.spline(pts, 0.5);
 }
 
 function getAngleAt(idx) {
