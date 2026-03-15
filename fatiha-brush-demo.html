@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Fatiha — fatiha.brush Ottoman Garden</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0d0d0d; display:flex; justify-content:center; align-items:center;
+         height:100vh; overflow:hidden; font-family:sans-serif; }
+  canvas { display:block; }
+  #playBtn { position:fixed; bottom:40px; left:50%; transform:translateX(-50%);
+    background:rgba(192,8,48,0.85); color:#fff; border:none; border-radius:28px;
+    padding:14px 36px; font-size:16px; cursor:pointer; z-index:10;
+    letter-spacing:1px; transition:opacity 0.4s; }
+  #playBtn:hover { background:rgba(232,8,72,0.95); }
+  #playBtn.hidden { opacity:0; pointer-events:none; }
+  #stats { position:fixed; top:10px; left:10px; color:#555; font-size:11px;
+    font-family:monospace; z-index:10; pointer-events:none; }
+</style>
+</head>
+<body>
+<button id="playBtn">&#9654; Bismillah</button>
+<div id="stats"></div>
+
+<script src="fatiha-brush.js"></script>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  FATIHA — Ottoman Garden Demo using fatiha.brush
+// ══════════════════════════════════════════════════════════════
+
+const CW = 430, CH = 932;
+const PHI = 1.618033988749;
+const TOTAL_DUR = 6.0;
+const BG = '#0d0d0d';
+
+// ── COLOR PALETTE — Ottoman Illumination ─────────────────────
+const CRIMSON      = '#C00830';
+const DEEP_CRIMSON = '#8B0020';
+const ROSE_PINK    = '#FF1455';
+const HOT_PINK     = '#FF286E';
+const AMBER        = '#FF7020';
+const GOLD         = '#F8AA19';
+const DARK_GOLD    = '#C36E08';
+const PALE_GOLD    = '#FFD232';
+const LEAF_GREEN   = '#1CA812';
+const DARK_GREEN   = '#0A7A0A';
+const FOREST_GREEN = '#0C6E0C';
+const STEM_GREEN   = '#1CA80F';
+const LIGHT_GREEN  = '#30C820';
+const VINE_DARK    = '#085808';
+
+const PETAL_HUES = [
+  '#FF70B0','#F01868','#C00838','#FF6898','#FF2068',
+  '#E01868','#FF8068','#FF3848','#E03838','#FF68A8',
+  '#F01868','#C80848','#FF9848','#FF6018','#D82020'
+];
+const GREENS = [LEAF_GREEN, LIGHT_GREEN, FOREST_GREEN, DARK_GREEN];
+
+// ── TAJWEED EVENTS ───────────────────────────────────────────
+const TAJWEED = [
+  {t:0.05,type:'bud',size:0.35,side:-1},
+  {t:0.15,type:'leaf',size:0.3,side:1},
+  {t:0.28,type:'thorn',size:0.35,side:1},
+  {t:0.38,type:'leaf',size:0.25,side:-1},
+  {t:0.50,type:'ghunnah',size:0.5,side:-1},
+  {t:0.58,type:'bud',size:0.3,side:1},
+  {t:0.68,type:'leaf',size:0.2,side:-1},
+  {t:0.78,type:'bud',size:0.3,side:1},
+  {t:0.85,type:'golden_rose',size:1.0,side:1},
+  {t:0.95,type:'vine_tendril',size:0.5,side:-1},
+  {t:1.08,type:'leaf',size:0.35,side:1},
+  {t:1.18,type:'leaf',size:0.3,side:-1},
+  {t:1.30,type:'bud',size:0.2,side:-1},
+  {t:1.38,type:'leaf',size:0.15,side:1},
+  {t:1.52,type:'leaf',size:0.25,side:1},
+  {t:1.60,type:'rose',size:0.8,side:1},
+  {t:1.72,type:'leaf',size:0.35,side:-1},
+  {t:1.85,type:'bud',size:0.4,side:1},
+  {t:1.98,type:'thorn',size:0.3,side:-1},
+  {t:2.08,type:'leaf',size:0.2,side:1},
+  {t:2.18,type:'ghunnah',size:0.55,side:-1},
+  {t:2.28,type:'vine_tendril',size:0.75,side:1},
+  {t:2.42,type:'leaf',size:0.35,side:-1},
+  {t:2.55,type:'leaf',size:0.3,side:1},
+  {t:2.68,type:'ghunnah',size:0.45,side:-1},
+  {t:2.78,type:'bud',size:0.3,side:1},
+  {t:2.88,type:'leaf',size:0.2,side:-1},
+  {t:3.05,type:'leaf',size:0.25,side:1},
+  {t:3.15,type:'rose',size:0.7,side:-1},
+  {t:3.28,type:'leaf',size:0.3,side:1},
+  {t:3.40,type:'bud',size:0.35,side:-1},
+  {t:3.55,type:'bud',size:0.25,side:1},
+  {t:3.65,type:'leaf',size:0.2,side:-1},
+  {t:3.78,type:'vine_tendril',size:1.0,side:1},
+  {t:3.95,type:'leaf',size:0.4,side:-1},
+  {t:4.15,type:'leaf',size:0.35,side:1},
+  {t:4.35,type:'leaf',size:0.3,side:-1},
+  {t:4.55,type:'bud',size:0.3,side:1},
+  {t:4.75,type:'ghunnah',size:0.4,side:-1},
+  {t:4.88,type:'bud',size:0.3,side:1},
+  {t:5.00,type:'leaf',size:0.2,side:-1},
+  {t:5.15,type:'bloom',size:0.7,side:1},
+  {t:5.35,type:'leaf',size:0.15,side:1},
+  {t:5.50,type:'leaf',size:0.1,side:-1}
+];
+
+// ══════════════════════════════════════════════════════════════
+//  GOLDEN SPIRAL GEOMETRY
+// ══════════════════════════════════════════════════════════════
+
+function buildSpiralPoints() {
+  const margin = 24;
+  const avW = CW - margin * 2;
+  const avH = CH - margin * 2;
+  let gw, gh;
+  if (avW * PHI <= avH) { gw = avW; gh = avW * PHI; }
+  else { gh = avH; gw = avH / PHI; }
+  const ox = (CW - gw) / 2;
+  const oy = (CH - gh) / 2;
+
+  const arcs = [];
+  let rx = ox, ry = oy, rw = gw, rh = gh;
+  for (let i = 0; i < 9; i++) {
+    const d = i % 4;
+    const sq = Math.min(rw, rh);
+    let cx, cy, sa, ea;
+    if (d === 0)      { cx = rx + sq; cy = ry;       sa = Math.PI/2;   ea = Math.PI; }
+    else if (d === 1) { cx = rx + sq; cy = ry + sq;   sa = Math.PI;     ea = 3*Math.PI/2; }
+    else if (d === 2) { cx = rx;      cy = ry + sq;   sa = 3*Math.PI/2; ea = 2*Math.PI; }
+    else              { cx = rx;      cy = ry;         sa = 0;           ea = Math.PI/2; }
+    arcs.push({ cx, cy, r: sq, sa, ea });
+    if (d === 0)      { ry += sq; rh -= sq; }
+    else if (d === 1) { rw -= sq; }
+    else if (d === 2) { rh -= sq; }
+    else              { rx += sq; ry += sq; rw -= sq; rh -= sq; }
+  }
+
+  const totalR = arcs.reduce((s, a) => s + a.r, 0);
+  const TARGET = 900;
+  const pts = [];
+  for (const arc of arcs) {
+    const n = Math.max(6, Math.round(TARGET * arc.r / totalR));
+    for (let j = 0; j <= n; j++) {
+      const t = j / n;
+      const angle = arc.sa + (arc.ea - arc.sa) * t;
+      pts.push({
+        x: arc.cx + arc.r * Math.cos(angle),
+        y: arc.cy + arc.r * Math.sin(angle)
+      });
+    }
+  }
+  return pts;
+}
+
+function getAngleAt(pts, idx) {
+  const i = Math.max(1, Math.min(idx, pts.length - 2));
+  const dx = pts[i + 1].x - pts[i - 1].x;
+  const dy = pts[i + 1].y - pts[i - 1].y;
+  return Math.atan2(dy, dx);
+}
+
+function getNormal(pts, idx) {
+  const i = Math.max(1, Math.min(idx, pts.length - 2));
+  const dx = pts[i + 1].x - pts[i - 1].x;
+  const dy = pts[i + 1].y - pts[i - 1].y;
+  const l = Math.sqrt(dx * dx + dy * dy) || 1;
+  return { x: -dy / l, y: dx / l };
+}
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// ══════════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════════
+
+let fb;                // FatihaBrush instance
+let spiralPts;
+let audio, audioCtx, analyser, timeData;
+let isPlaying = false;
+let tajweedIdx = 0;
+let drawnVineIdx = 0;
+let fallingPetals = [];
+let frameCount = 0;
+let lastTime = 0;
+
+function getTime() {
+  if (typeof window._synthTime === 'number') return window._synthTime;
+  if (audio) return audio.currentTime;
+  return 0;
+}
+function isFinished() {
+  if (typeof window._synthTime === 'number') return window._synthTime >= TOTAL_DUR;
+  if (audio) return audio.ended || audio.currentTime >= TOTAL_DUR;
+  return false;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  GARDEN ELEMENT DRAWING — stamp-based equivalents
+// ══════════════════════════════════════════════════════════════
+
+// Each element creates a cluster of stamps that approximates
+// the p5.brush version's appearance.
+
+function drawLeaf(x, y, size, tangent, side) {
+  const s = 30 * size;
+  const leafAngle = tangent + side * 0.6;
+  const green = pick(GREENS);
+
+  // Watercolor wash base — multiple overlapping soft stamps
+  fb.addWash({
+    x, y, color: green, a: 0.25, layer: 'garden',
+    scaleX: s * 0.5, scaleY: s * 1.1,
+    rotation: leafAngle, bleed: 6, bleedRadius: s * 0.15
+  });
+
+  // Darker core
+  fb.addWash({
+    x, y, color: DARK_GREEN, a: 0.2, layer: 'garden',
+    scaleX: s * 0.25, scaleY: s * 0.6,
+    rotation: leafAngle, bleed: 3, bleedRadius: s * 0.08
+  });
+
+  // Leaf shape stamps along the leaf path
+  const steps = 8;
+  for (let i = 0; i < steps; i++) {
+    const t = (i / steps) * 2 - 1; // -1 to 1
+    const px = x + Math.cos(leafAngle) * s * t * 0.85;
+    const py = y + Math.sin(leafAngle) * s * t * 0.85;
+    const width = (1 - t * t) * s * 0.4; // parabolic width
+
+    fb.addStamp({
+      x: px, y: py, color: green,
+      a: 0.35, rotation: leafAngle,
+      scaleX: width * 0.3, scaleY: width * 0.7,
+      texture: 'pointed_leaf', layer: 'garden'
+    });
+  }
+
+  // Vein hatching — thin lines along leaf
+  fb.addHatch(x, y, s * 0.6, leafAngle + Math.PI / 2, s * 0.2, {
+    color: VINE_DARK, a: 0.25, layer: 'garden', weight: 0
+  });
+
+  // Central vein
+  const veinLen = s * 0.85;
+  for (let i = 0; i < 5; i++) {
+    const t = i / 4;
+    const vx = x + Math.cos(leafAngle) * veinLen * (t - 0.3);
+    const vy = y + Math.sin(leafAngle) * veinLen * (t - 0.3);
+    fb.addStamp({
+      x: vx, y: vy, color: VINE_DARK, a: 0.5,
+      rotation: leafAngle, scaleX: 0.8, scaleY: s * 0.12,
+      texture: 'hatch_line', layer: 'garden'
+    });
+  }
+
+  // Outline — scattered leaf-tip stamps around edge
+  for (let i = 0; i < 12; i++) {
+    const t = i / 12;
+    const theta = t * Math.PI * 2;
+    const rx = Math.sin(theta) * s * 0.35 * (1 + 0.3 * Math.sin(theta));
+    const ry = Math.cos(theta) * s;
+    const ox = rx * Math.cos(leafAngle) - ry * Math.sin(leafAngle);
+    const oy = rx * Math.sin(leafAngle) + ry * Math.cos(leafAngle);
+    fb.addStamp({
+      x: x + ox * 0.9, y: y + oy * 0.9, color: FOREST_GREEN,
+      a: 0.2, rotation: leafAngle + theta, scaleX: 2, scaleY: 2,
+      texture: 'soft_round', layer: 'garden'
+    });
+  }
+}
+
+function drawBud(x, y, size, tangent) {
+  const s = 20 * size;
+  const color = pick(PETAL_HUES);
+
+  // Watercolor body
+  fb.addWash({
+    x, y, color, a: 0.4, layer: 'garden',
+    scaleX: s * 0.6, scaleY: s * 0.8,
+    rotation: tangent, bleed: 8, bleedRadius: s * 0.25
+  });
+
+  // Deeper center
+  fb.addWash({
+    x, y, color: CRIMSON, a: 0.3, layer: 'garden',
+    scaleX: s * 0.25, scaleY: s * 0.3,
+    rotation: tangent, bleed: 4, bleedRadius: s * 0.08
+  });
+
+  // Bud shape stamps radiating outward
+  for (let i = 0; i < 5; i++) {
+    const a = tangent + (i / 5) * Math.PI * 2;
+    const d = s * 0.3;
+    fb.addStamp({
+      x: x + Math.cos(a) * d, y: y + Math.sin(a) * d,
+      color, a: 0.4, rotation: a,
+      scaleX: s * 0.2, scaleY: s * 0.35,
+      texture: 'bud', layer: 'garden'
+    });
+  }
+
+  // Sepal lines
+  const sepalLen = s * 1.2;
+  for (let dx = -1; dx <= 1; dx += 2) {
+    for (let i = 0; i < 3; i++) {
+      const t = i / 2;
+      fb.addStamp({
+        x: x + dx * 2, y: y + s * 0.3 + sepalLen * t * 0.5,
+        color: DARK_GREEN, a: 0.5, rotation: 0,
+        scaleX: 0.6, scaleY: s * 0.15,
+        texture: 'hatch_line', layer: 'garden'
+      });
+    }
+  }
+
+  // Stem
+  fb.addStamp({
+    x, y: y + sepalLen, color: STEM_GREEN, a: 0.4,
+    rotation: 0, scaleX: 0.8, scaleY: s * 0.3,
+    texture: 'hatch_line', layer: 'garden'
+  });
+}
+
+function drawRose(x, y, size, isGolden) {
+  const s = 40 * size;
+  const layers = isGolden ? 5 : 4;
+  const petalCounts = [10, 8, 6, 5, 4];
+
+  for (let layer = 0; layer < layers; layer++) {
+    const lr = s * (1 - layer * 0.18);
+    const petalCount = petalCounts[layer] || 5;
+
+    let fillColor, strokeColor;
+    if (isGolden) {
+      fillColor = [DARK_GOLD, GOLD, GOLD, PALE_GOLD, '#FFE850'][layer];
+      strokeColor = ['#8A5500', '#A06800', '#B87800', '#C08800', '#D8A800'][layer];
+    } else {
+      fillColor = pick(PETAL_HUES);
+      strokeColor = DEEP_CRIMSON;
+    }
+
+    // Watercolor wash for this ring
+    fb.addWash({
+      x, y, color: fillColor,
+      a: 0.2 + layer * 0.06,
+      layer: 'garden',
+      scaleX: lr * 0.55, scaleY: lr * 0.55,
+      bleed: 6 + layer * 2, bleedRadius: lr * 0.15
+    });
+
+    // Hatch on inner layers
+    if (layer >= 1) {
+      fb.addHatch(x, y, lr * 0.35, Math.PI / 4 + layer * 0.5,
+        lr * 0.12, { color: strokeColor, a: 0.2, layer: 'garden' });
+    }
+
+    // Petal stamps rotating around center
+    for (let i = 0; i < petalCount; i++) {
+      const a = (i / petalCount) * Math.PI * 2 + layer * 0.3;
+      const d = lr * 0.3;
+      fb.addStamp({
+        x: x + Math.cos(a) * d,
+        y: y + Math.sin(a) * d,
+        color: fillColor, a: 0.45,
+        rotation: a, scaleX: lr * 0.15, scaleY: lr * 0.25,
+        texture: 'petal', layer: 'garden'
+      });
+    }
+  }
+
+  // Bright center highlight
+  fb.addWash({
+    x, y, color: isGolden ? '#FFE850' : '#FF88CC',
+    a: 0.5, layer: 'garden',
+    scaleX: s * 0.1, scaleY: s * 0.1,
+    bleed: 4, bleedRadius: s * 0.06
+  });
+
+  // Spray pollen
+  for (let i = 0; i < 8; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const r = Math.random() * s * 0.2;
+    fb.addStamp({
+      x: x + Math.cos(a) * r, y: y + Math.sin(a) * r,
+      color: isGolden ? PALE_GOLD : ROSE_PINK,
+      a: 0.4, rotation: a,
+      scaleX: 4 + Math.random() * 4, scaleY: 4 + Math.random() * 4,
+      texture: 'spray', layer: 'garden'
+    });
+  }
+}
+
+function drawBloom(x, y, size) {
+  const s = 30 * size;
+
+  // Large soft wash
+  fb.addWash({
+    x, y, color: ROSE_PINK, a: 0.15, layer: 'garden',
+    scaleX: s * 0.7, scaleY: s * 0.7,
+    bleed: 10, bleedRadius: s * 0.3
+  });
+
+  // Core wash
+  fb.addWash({
+    x, y, color: CRIMSON, a: 0.3, layer: 'garden',
+    scaleX: s * 0.3, scaleY: s * 0.3,
+    bleed: 5, bleedRadius: s * 0.1
+  });
+
+  // Cross-hatch
+  fb.addHatch(x, y, s * 0.3, Math.PI / 3, s * 0.1,
+    { color: DEEP_CRIMSON, a: 0.25, layer: 'garden' });
+  fb.addHatch(x, y, s * 0.25, -Math.PI / 6, s * 0.12,
+    { color: '#660020', a: 0.2, layer: 'garden' });
+
+  // Petal stamps
+  for (let i = 0; i < 6; i++) {
+    const a = i * Math.PI / 3;
+    const d = s * 0.25;
+    fb.addStamp({
+      x: x + Math.cos(a) * d, y: y + Math.sin(a) * d,
+      color: pick(PETAL_HUES), a: 0.4,
+      rotation: a, scaleX: s * 0.12, scaleY: s * 0.2,
+      texture: 'petal', layer: 'garden'
+    });
+  }
+
+  // Center dot
+  fb.addStamp({
+    x, y, color: '#FF88CC', a: 0.6,
+    scaleX: 3, scaleY: 3, texture: 'spray', layer: 'garden'
+  });
+}
+
+function drawGhunnah(x, y, size) {
+  const s = 45 * size;
+
+  // Ethereal halo — large atmospheric wash on glow layer
+  fb.addWash({
+    x, y, color: HOT_PINK, a: 0.08, layer: 'glow',
+    scaleX: s * 0.6, scaleY: s * 0.6,
+    bleed: 12, bleedRadius: s * 0.4
+  });
+
+  // Second halo
+  fb.addWash({
+    x, y, color: AMBER, a: 0.06, layer: 'glow',
+    scaleX: s * 0.35, scaleY: s * 0.35,
+    bleed: 8, bleedRadius: s * 0.2
+  });
+
+  // Hatch warmth
+  fb.addHatch(x, y, s * 0.3, Math.random() * Math.PI, s * 0.12,
+    { color: ROSE_PINK, a: 0.15, layer: 'garden' });
+
+  // Spray particles radiating outward
+  for (let i = 0; i < 14; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const r = Math.random() * s * 0.5;
+    fb.addStamp({
+      x: x + Math.cos(a) * r, y: y + Math.sin(a) * r,
+      color: pick(PETAL_HUES), a: 0.25,
+      rotation: a, scaleX: 3 + Math.random() * 5, scaleY: 3 + Math.random() * 5,
+      texture: 'spray', layer: 'glow'
+    });
+  }
+}
+
+function drawThorn(px, py, size, tangent, side) {
+  const s = 12 * size;
+  const thornAngle = tangent + side * Math.PI / 2;
+  const tx = px + Math.cos(thornAngle) * s;
+  const ty = py + Math.sin(thornAngle) * s;
+
+  // Thorn stamps along the spike
+  for (let i = 0; i < 4; i++) {
+    const t = i / 3;
+    fb.addStamp({
+      x: px + (tx - px) * t, y: py + (ty - py) * t,
+      color: DARK_GREEN, a: 0.6 * (1 - t * 0.5),
+      rotation: thornAngle, scaleX: 2 * (1 - t * 0.6), scaleY: 3,
+      texture: 'thorn', layer: 'garden'
+    });
+  }
+
+  // Fine line overlay
+  for (let i = 0; i < 3; i++) {
+    const t = i / 2;
+    fb.addStamp({
+      x: px + (tx - px) * t, y: py + (ty - py) * t,
+      color: VINE_DARK, a: 0.4,
+      rotation: thornAngle, scaleX: 0.6, scaleY: s * 0.2,
+      texture: 'hatch_line', layer: 'garden'
+    });
+  }
+}
+
+function drawVineTendril(x, y, size, tangent) {
+  const s = 50 * size;
+
+  // Simulate flowLine with stamps along a curving path
+  // Use a spiral perturbation for organic curl
+  const steps = 20;
+  for (let branch = 0; branch < 3; branch++) {
+    const angleOff = [0, 0.5, -0.7][branch];
+    const len = s * [1.0, 0.6, 0.4][branch];
+    const color = [STEM_GREEN, LIGHT_GREEN, DARK_GREEN][branch];
+    const weight = [1.2, 0.8, 0.5][branch];
+
+    for (let i = 0; i < steps; i++) {
+      const t = i / steps;
+      const curl = Math.sin(t * Math.PI * 2.5) * len * 0.08;
+      const mainAngle = tangent + angleOff + t * 0.4;
+      const px = x + Math.cos(mainAngle) * len * t + Math.cos(mainAngle + Math.PI/2) * curl;
+      const py = y + Math.sin(mainAngle) * len * t + Math.sin(mainAngle + Math.PI/2) * curl;
+
+      fb.addStamp({
+        x: px, y: py, color,
+        a: 0.35 * (1 - t * 0.6),
+        rotation: mainAngle, scaleX: weight, scaleY: weight * 1.5,
+        texture: 'soft_round', layer: 'garden',
+        jitter: 1.5
+      });
+    }
+  }
+
+  // Tiny leaf at tendril tip
+  const tipX = x + Math.cos(tangent) * s * 0.75;
+  const tipY = y + Math.sin(tangent) * s * 0.75;
+  fb.addWash({
+    x: tipX, y: tipY, color: LEAF_GREEN, a: 0.25,
+    scaleX: 4 * size, scaleY: 8 * size,
+    rotation: tangent, layer: 'garden', bleed: 4, bleedRadius: 3
+  });
+  fb.addStamp({
+    x: tipX, y: tipY, color: DARK_GREEN, a: 0.3,
+    rotation: tangent, scaleX: 3 * size, scaleY: 6 * size,
+    texture: 'pointed_leaf', layer: 'garden'
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  VINE DRAWING
+// ══════════════════════════════════════════════════════════════
+
+function drawVineSegment(startIdx, endIdx, energy) {
+  // Multi-layer vine stamps along the spiral, mimicking p5.brush layering
+  for (let i = startIdx; i <= endIdx; i += 2) {
+    if (i >= spiralPts.length) break;
+    const pt = spiralPts[i];
+    const globalT = i / spiralPts.length;
+    const pressure = 1.0 - globalT * 0.65; // thick at start, thin at center
+    const baseSize = (3 + energy * 5) * pressure;
+
+    // Layer 1: Broad soft green wash (marker-like)
+    fb.addStamp({
+      x: pt.x, y: pt.y, color: STEM_GREEN,
+      a: 0.12, scaleX: baseSize * 1.8, scaleY: baseSize * 1.8,
+      texture: 'soft_round', layer: 'garden',
+      jitter: 1.5
+    });
+
+    // Layer 2: Darker core (charcoal-like texture)
+    fb.addStamp({
+      x: pt.x, y: pt.y, color: VINE_DARK,
+      a: 0.15, scaleX: baseSize * 1.0, scaleY: baseSize * 1.0,
+      texture: 'soft_round', layer: 'garden',
+      jitter: 0.8
+    });
+
+    // Layer 3: Fine green line
+    if (i % 4 === 0) {
+      const angle = getAngleAt(spiralPts, i);
+      fb.addStamp({
+        x: pt.x, y: pt.y, color: DARK_GREEN,
+        a: 0.3, rotation: angle,
+        scaleX: baseSize * 0.4, scaleY: baseSize * 0.8,
+        texture: 'hatch_line', layer: 'garden',
+        jitter: 0.5
+      });
+    }
+
+    // Layer 4: Bright highlight (sparse)
+    if (i % 6 === 0) {
+      fb.addStamp({
+        x: pt.x, y: pt.y, color: LIGHT_GREEN,
+        a: 0.18, scaleX: baseSize * 0.5, scaleY: baseSize * 0.5,
+        texture: 'soft_round', layer: 'garden',
+        jitter: 1.0
+      });
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  FALLING PETALS
+// ══════════════════════════════════════════════════════════════
+
+function spawnPetal() {
+  const ptIdx = Math.floor(Math.random() * drawnVineIdx);
+  if (ptIdx <= 0 || ptIdx >= spiralPts.length) return;
+  fallingPetals.push({
+    x: spiralPts[ptIdx].x + (Math.random() - 0.5) * 40,
+    y: spiralPts[ptIdx].y,
+    vx: (Math.random() - 0.5) * 1.5,
+    vy: Math.random() * 2 + 1,
+    rot: Math.random() * Math.PI * 2,
+    life: 50,
+    color: pick(PETAL_HUES)
+  });
+}
+
+function updatePetals() {
+  for (let i = fallingPetals.length - 1; i >= 0; i--) {
+    const p = fallingPetals[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.rot += 0.05;
+    p.life--;
+
+    if (p.life > 20) {
+      const alpha = Math.min(1, (p.life - 20) / 20) * 0.4;
+      fb.addStamp({
+        x: p.x, y: p.y, color: p.color,
+        a: alpha, rotation: p.rot,
+        scaleX: 4, scaleY: 6,
+        texture: 'petal', layer: 'petals',
+        lifetime: 40
+      });
+    }
+    if (p.life <= 0) fallingPetals.splice(i, 1);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  AUDIO
+// ══════════════════════════════════════════════════════════════
+
+function initAudio() {
+  audio = new Audio('bismillah.mp3');
+  audioCtx = new AudioContext();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0.85;
+  timeData = new Uint8Array(2048);
+  const source = audioCtx.createMediaElementSource(audio);
+  source.connect(analyser);
+  analyser.connect(audioCtx.destination);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════════════
+
+const canvas = document.createElement('canvas');
+document.body.appendChild(canvas);
+
+fb = new FatihaBrush(canvas, {
+  maxStamps: 4096,
+  layers: ['garden', 'glow', 'petals'],
+  background: BG,
+  width: CW,
+  height: CH,
+  grainStrength: 0.35
+});
+
+fb.setLayerBlend('glow', 'additive');
+fb.setLayerOpacity('glow', 0.7);
+fb.setLayerOpacity('petals', 0.9);
+
+spiralPts = buildSpiralPoints();
+
+// Auto-start for headless capture
+if (typeof window._synthTime === 'number') {
+  isPlaying = true;
+  document.getElementById('playBtn').classList.add('hidden');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MAIN LOOP
+// ══════════════════════════════════════════════════════════════
+
+function loop() {
+  requestAnimationFrame(loop);
+  frameCount++;
+
+  if (typeof window._synthTime === 'number' && !isPlaying) {
+    isPlaying = true;
+  }
+
+  let progress = 0;
+  let energy = 0.6;
+
+  if (isPlaying) {
+    const time = getTime();
+    progress = Math.min(time / TOTAL_DUR, 1);
+
+    // Update audio
+    if (analyser && timeData) {
+      fb.updateAudio(analyser, timeData);
+      energy = fb.audio.energy;
+    }
+
+    // ── VINE GROWTH ──────────────────────────────────────
+    const targetIdx = Math.floor(progress * spiralPts.length);
+    if (targetIdx > drawnVineIdx && drawnVineIdx < spiralPts.length - 1) {
+      const segEnd = Math.min(spiralPts.length - 1, targetIdx);
+      drawVineSegment(Math.max(0, drawnVineIdx - 1), segEnd, energy);
+      drawnVineIdx = segEnd;
+    }
+
+    // ── TAJWEED EVENTS ───────────────────────────────────
+    while (tajweedIdx < TAJWEED.length && time >= TAJWEED[tajweedIdx].t) {
+      const el = TAJWEED[tajweedIdx];
+      const spiralT = el.t / TOTAL_DUR;
+      const ptIdx = Math.floor(spiralT * (spiralPts.length - 1));
+
+      if (ptIdx >= 1 && ptIdx < spiralPts.length - 1) {
+        const pt = spiralPts[ptIdx];
+        const norm = getNormal(spiralPts, ptIdx);
+        const offDist = 50 * el.size * el.side;
+        const ex = pt.x + norm.x * offDist;
+        const ey = pt.y + norm.y * offDist;
+        const tangent = getAngleAt(spiralPts, ptIdx);
+
+        switch (el.type) {
+          case 'leaf':         drawLeaf(ex, ey, el.size, tangent, el.side); break;
+          case 'bud':          drawBud(ex, ey, el.size, tangent); break;
+          case 'bloom':        drawBloom(ex, ey, el.size); break;
+          case 'rose':         drawRose(ex, ey, el.size, false); break;
+          case 'golden_rose':  drawRose(ex, ey, el.size, true); break;
+          case 'ghunnah':      drawGhunnah(ex, ey, el.size); break;
+          case 'thorn':        drawThorn(pt.x, pt.y, el.size, tangent, el.side); break;
+          case 'vine_tendril': drawVineTendril(ex, ey, el.size, tangent); break;
+        }
+      }
+      tajweedIdx++;
+    }
+
+    // ── FALLING PETALS ───────────────────────────────────
+    if (energy > 0.3 && frameCount % 10 === 0) {
+      spawnPetal();
+    }
+    updatePetals();
+
+    // ── FINISHED ─────────────────────────────────────────
+    if (isFinished()) {
+      isPlaying = false;
+      document.getElementById('playBtn').classList.remove('hidden');
+    }
+  }
+
+  // ── RENDER ───────────────────────────────────────────────
+  fb.update(1);
+  fb.render();
+
+  // Stats
+  if (frameCount % 30 === 0) {
+    document.getElementById('stats').textContent =
+      `stamps: ${fb.stampCount} | fps: ${Math.round(1000 / Math.max(1, performance.now() - lastTime))}`;
+  }
+  lastTime = performance.now();
+}
+
+loop();
+
+// ══════════════════════════════════════════════════════════════
+//  PLAY BUTTON
+// ══════════════════════════════════════════════════════════════
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  if (!audio) initAudio();
+
+  // Reset
+  drawnVineIdx = 0;
+  tajweedIdx = 0;
+  fallingPetals = [];
+  fb.clearAll();
+
+  audio.currentTime = 0;
+  audio.play().then(() => {
+    isPlaying = true;
+    document.getElementById('playBtn').classList.add('hidden');
+  });
+});
+</script>
+</body>
+</html>
