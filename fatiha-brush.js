@@ -1,10 +1,10 @@
 /**
- * fatiha.brush — Custom Ottoman Brush Engine
+ * fatiha.brush — Custom Ottoman Brush Engine (v2: organic watercolor)
  *
  * WebGL2 instanced-quad renderer for real-time voice-reactive
- * Islamic calligraphic art. Retains the organic natural-media
- * aesthetic of p5.brush (watercolor bleeds, grain, soft edges)
- * while running at 60fps with 2000+ stamps.
+ * Islamic calligraphic art. Organic natural-media aesthetic with
+ * Gaussian-falloff brush tips, per-stamp noise grain, color jitter,
+ * and multi-octave paper texture.
  *
  * Usage:
  *   const fb = new FatihaBrush(canvas, { maxStamps: 4096, layers: ['garden','glow'] });
@@ -51,7 +51,7 @@ out vec2 v_atlasUV;   // atlas UV for this tip
 out float v_atlasSize; // atlas cell size (normalized)
 out vec4 v_color;
 out float v_fade;
-flat out int v_instanceID;
+out vec2 v_stampPos;   // stamp world position for per-stamp jitter
 
 void main() {
     float age = a_life.x;
@@ -86,7 +86,7 @@ void main() {
     v_atlasUV = a_tex.xy;
     v_atlasSize = a_tex.z;
     v_color = a_color;
-    v_instanceID = gl_InstanceID;
+    v_stampPos = a_pos;
 }
 `;
 
@@ -98,23 +98,20 @@ in vec2 v_atlasUV;
 in float v_atlasSize;
 in vec4 v_color;
 in float v_fade;
-flat in int v_instanceID;
+in vec2 v_stampPos;
 
 uniform sampler2D u_atlas;
 uniform sampler2D u_grain;
 uniform float u_grainStrength;
 uniform vec2 u_grainOffset;
+uniform float u_colorJitter;
+
+// Pseudo-random hash for per-stamp variation
+float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+}
 
 out vec4 fragColor;
-
-// Integer hash for per-stamp color jitter
-float ihash(int n) {
-    int x = n;
-    x = ((x >> 16) ^ x) * 0x45d9f3b;
-    x = ((x >> 16) ^ x) * 0x45d9f3b;
-    x = (x >> 16) ^ x;
-    return float(x & 0xFFFF) / 65535.0;
-}
 
 void main() {
     if (v_fade <= 0.0) discard;
@@ -123,22 +120,24 @@ void main() {
     vec2 atlasCoord = v_atlasUV + v_uv * v_atlasSize;
     float tipAlpha = texture(u_atlas, atlasCoord).r;
 
-    // Sample grain texture (tiled) — stronger contrast
+    // Sample grain texture (tiled) — visible paper texture
     vec2 grainCoord = gl_FragCoord.xy / 256.0 + u_grainOffset;
-    float grain = texture(u_grain, grainCoord).r;
-    float grainMod = mix(1.0, grain * 0.6 + 0.2, u_grainStrength);
+    float grainRaw = texture(u_grain, grainCoord).r;
+    // Remap for more contrast: range [0.2, 1.0] instead of [0, 1]
+    float grain = 0.2 + grainRaw * 0.8;
+    float grainMod = mix(1.0, grain, u_grainStrength);
 
     float alpha = tipAlpha * v_color.a * v_fade * grainMod;
 
     if (alpha < 0.003) discard;
 
-    // Color jitter: ±10/255 per RGB channel based on stamp ID
-    float jR = (ihash(v_instanceID * 3 + 0) - 0.5) * (20.0 / 255.0);
-    float jG = (ihash(v_instanceID * 3 + 1) - 0.5) * (20.0 / 255.0);
-    float jB = (ihash(v_instanceID * 3 + 2) - 0.5) * (20.0 / 255.0);
-    vec3 color = clamp(v_color.rgb + vec3(jR, jG, jB), 0.0, 1.0);
+    // Per-stamp color jitter — different offset per RGB channel
+    float jr = (hash(v_stampPos) - 0.5) * u_colorJitter;
+    float jg = (hash(v_stampPos * 1.371) - 0.5) * u_colorJitter;
+    float jb = (hash(v_stampPos * 2.417) - 0.5) * u_colorJitter;
+    vec3 col = clamp(v_color.rgb + vec3(jr, jg, jb), 0.0, 1.0);
 
-    fragColor = vec4(color * alpha, alpha);
+    fragColor = vec4(col * alpha, alpha);
 }
 `;
 
@@ -205,103 +204,138 @@ function linkProgram(gl, vs, fs) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  PROCEDURAL BRUSH TIPS
+//  PROCEDURAL BRUSH TIPS — Gaussian falloff + organic edges
 // ═══════════════════════════════════════════════════════════════
 
 const BUILTIN_TIPS = {
 
-    /** Soft round — Gaussian falloff, the workhorse watercolor stamp. */
+    /** Soft round — very soft Gaussian radial falloff, the workhorse watercolor stamp.
+     *  Uses a gentler falloff (sigma=2.0) so overlapping stamps blend smoothly
+     *  instead of showing hard edges. */
     soft_round(ctx, size) {
-        const cx = size / 2, cy = size / 2, r = size / 2 - 2;
-        const imgData = ctx.getImageData(0, 0, size, size);
-        const d = imgData.data;
-        for (let py = 0; py < size; py++) {
-            for (let px = 0; px < size; px++) {
-                const dx = (px - cx) / r, dy = (py - cy) / r;
-                const dist2 = dx * dx + dy * dy;
-                if (dist2 > 1) continue;
-                const alpha = Math.exp(-dist2 * 3) * 255;
-                const idx = (py * size + px) * 4;
-                d[idx] = 255; d[idx + 1] = 255; d[idx + 2] = 255;
-                d[idx + 3] = alpha;
-            }
+        const cx = size / 2, cy = size / 2, r = size / 2 - 1;
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        // Gentler Gaussian: e^(-2.0 * t^2) — softer edges for better overlap blending
+        for (let i = 0; i <= 24; i++) {
+            const t = i / 24;
+            const a = Math.exp(-2.0 * t * t);
+            g.addColorStop(t, `rgba(255,255,255,${a.toFixed(4)})`);
         }
-        ctx.putImageData(imgData, 0, 0);
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
     },
 
-    /** Pointed leaf — elongated saz leaf silhouette with soft falloff. */
+    /** Pointed leaf — organic wobbled edges with multi-pass softness. */
     pointed_leaf(ctx, size) {
         const cx = size / 2, cy = size / 2;
-        const hw = size * 0.22, hh = size * 0.45;
+        const hw = size * 0.24, hh = size * 0.45;
         ctx.save();
         ctx.translate(cx, cy);
 
-        // Draw leaf shape path
-        ctx.beginPath();
-        ctx.moveTo(0, -hh);
-        ctx.bezierCurveTo(hw * 1.4, -hh * 0.5, hw * 1.4, hh * 0.5, 0, hh);
-        ctx.bezierCurveTo(-hw * 1.4, hh * 0.5, -hw * 1.4, -hh * 0.5, 0, -hh);
-        ctx.closePath();
+        // 3 passes: outer halo, mid body, inner core
+        const passes = [
+            { scale: 1.18, alpha: 0.12 },
+            { scale: 1.0,  alpha: 0.35 },
+            { scale: 0.78, alpha: 0.55 }
+        ];
 
-        // Radial gradient fill for softness
-        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, hh);
-        g.addColorStop(0, 'rgba(255,255,255,1)');
-        g.addColorStop(0.5, 'rgba(255,255,255,0.7)');
-        g.addColorStop(1, 'rgba(255,255,255,0.15)');
-        ctx.fillStyle = g;
-        ctx.fill();
+        for (const p of passes) {
+            const s = p.scale;
+            // Organic wobble on bezier control points
+            const w = () => (Math.random() - 0.5) * size * 0.03;
+
+            ctx.beginPath();
+            ctx.moveTo(w(), -hh * s + w());
+            ctx.bezierCurveTo(
+                hw * 1.5 * s + w(), -hh * 0.4 * s + w(),
+                hw * 1.5 * s + w(), hh * 0.4 * s + w(),
+                w(), hh * s + w()
+            );
+            ctx.bezierCurveTo(
+                -hw * 1.5 * s + w(), hh * 0.4 * s + w(),
+                -hw * 1.5 * s + w(), -hh * 0.4 * s + w(),
+                w(), -hh * s + w()
+            );
+            ctx.closePath();
+
+            const g = ctx.createRadialGradient(0, 0, 0, 0, 0, hh * s * 1.1);
+            for (let i = 0; i <= 12; i++) {
+                const t = i / 12;
+                const a = p.alpha * Math.exp(-2.8 * t * t);
+                g.addColorStop(t, `rgba(255,255,255,${a.toFixed(4)})`);
+            }
+            ctx.fillStyle = g;
+            ctx.fill();
+        }
         ctx.restore();
     },
 
-    /** Petal — rounder ogee shape with soft feathered edges. */
+    /** Petal — wide ogee/almond with Gaussian falloff and multi-pass bleed. */
     petal(ctx, size) {
         const cx = size / 2, cy = size / 2;
-        const hw = size * 0.36, hh = size * 0.36;
+        const hw = size * 0.34, hh = size * 0.42;
         ctx.save();
         ctx.translate(cx, cy);
 
-        // Rounder tips — wider control points, less pointy ends
-        ctx.beginPath();
-        ctx.moveTo(0, -hh);
-        ctx.bezierCurveTo(hw * 2.2, -hh * 0.1, hw * 2.2, hh * 0.1, 0, hh);
-        ctx.bezierCurveTo(-hw * 2.2, hh * 0.1, -hw * 2.2, -hh * 0.1, 0, -hh);
-        ctx.closePath();
+        // 3 passes for watercolor edge bleed
+        const passes = [
+            { scale: 1.2,  alpha: 0.10 },
+            { scale: 1.0,  alpha: 0.40 },
+            { scale: 0.75, alpha: 0.65 }
+        ];
 
-        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, hh);
-        g.addColorStop(0, 'rgba(255,255,255,1)');
-        g.addColorStop(0.3, 'rgba(255,255,255,0.9)');
-        g.addColorStop(0.6, 'rgba(255,255,255,0.5)');
-        g.addColorStop(0.85, 'rgba(255,255,255,0.15)');
-        g.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = g;
-        ctx.fill();
+        for (const p of passes) {
+            const s = p.scale;
+            ctx.beginPath();
+            ctx.moveTo(0, -hh * s);
+            ctx.bezierCurveTo(hw * 2.2 * s, -hh * 0.2 * s, hw * 2.2 * s, hh * 0.2 * s, 0, hh * s);
+            ctx.bezierCurveTo(-hw * 2.2 * s, hh * 0.2 * s, -hw * 2.2 * s, -hh * 0.2 * s, 0, -hh * s);
+            ctx.closePath();
+
+            const g = ctx.createRadialGradient(0, -hh * 0.1, 0, 0, 0, hh * s * 1.1);
+            for (let i = 0; i <= 12; i++) {
+                const t = i / 12;
+                const a = p.alpha * Math.exp(-2.5 * t * t);
+                g.addColorStop(t, `rgba(255,255,255,${a.toFixed(4)})`);
+            }
+            ctx.fillStyle = g;
+            ctx.fill();
+        }
         ctx.restore();
     },
 
-    /** Spray — scattered dots for pollen/atmosphere effects. */
+    /** Spray — scattered soft dots for pollen/atmosphere. */
     spray(ctx, size) {
         const cx = size / 2, cy = size / 2, r = size / 2 - 4;
-        // Multiple small dots in a circular area
-        for (let i = 0; i < 40; i++) {
+        for (let i = 0; i < 50; i++) {
             const a = Math.random() * Math.PI * 2;
-            const d = Math.random() * r;
-            const dr = 1 + Math.random() * 3;
-            const alpha = 0.3 + Math.random() * 0.7;
-            ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+            const d = Math.pow(Math.random(), 0.7) * r; // cluster toward center
+            const dr = 1.5 + Math.random() * 3.5;
+            const alpha = 0.15 + Math.random() * 0.5;
+
+            // Each dot gets a small Gaussian gradient
+            const dx = cx + Math.cos(a) * d;
+            const dy = cy + Math.sin(a) * d;
+            const g = ctx.createRadialGradient(dx, dy, 0, dx, dy, dr);
+            g.addColorStop(0, `rgba(255,255,255,${alpha})`);
+            g.addColorStop(0.5, `rgba(255,255,255,${(alpha * 0.4).toFixed(3)})`);
+            g.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = g;
             ctx.beginPath();
-            ctx.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, dr, 0, Math.PI * 2);
+            ctx.arc(dx, dy, dr, 0, Math.PI * 2);
             ctx.fill();
         }
     },
 
-    /** Hatch line — thin elongated rect with tapered ends. For crosshatching. */
+    /** Hatch line — thin tapered stroke with Gaussian along length. */
     hatch_line(ctx, size) {
         const cx = size / 2, cy = size / 2;
         const hw = size * 0.04, hh = size * 0.45;
         ctx.save();
         ctx.translate(cx, cy);
 
-        // Tapered rectangle
         ctx.beginPath();
         ctx.moveTo(0, -hh);
         ctx.bezierCurveTo(hw, -hh * 0.7, hw, hh * 0.7, 0, hh);
@@ -309,61 +343,126 @@ const BUILTIN_TIPS = {
         ctx.closePath();
 
         const g = ctx.createLinearGradient(0, -hh, 0, hh);
+        // Gaussian taper at both ends
         g.addColorStop(0, 'rgba(255,255,255,0)');
-        g.addColorStop(0.15, 'rgba(255,255,255,0.9)');
+        g.addColorStop(0.08, 'rgba(255,255,255,0.3)');
+        g.addColorStop(0.2, 'rgba(255,255,255,0.8)');
         g.addColorStop(0.5, 'rgba(255,255,255,1)');
-        g.addColorStop(0.85, 'rgba(255,255,255,0.9)');
+        g.addColorStop(0.8, 'rgba(255,255,255,0.8)');
+        g.addColorStop(0.92, 'rgba(255,255,255,0.3)');
         g.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.fillStyle = g;
         ctx.fill();
         ctx.restore();
     },
 
-    /** Thorn — sharp triangle with gradient falloff. */
+    /** Thorn — sharp triangle with soft gradient falloff. */
     thorn(ctx, size) {
         const cx = size / 2, cy = size / 2;
         const hw = size * 0.15, hh = size * 0.45;
         ctx.save();
         ctx.translate(cx, cy);
 
-        ctx.beginPath();
-        ctx.moveTo(0, -hh);
-        ctx.lineTo(hw, hh * 0.6);
-        ctx.lineTo(-hw, hh * 0.6);
-        ctx.closePath();
+        // Two passes: outer glow + inner shape
+        for (let pass = 0; pass < 2; pass++) {
+            const s = pass === 0 ? 1.15 : 1.0;
+            const alpha = pass === 0 ? 0.2 : 0.7;
 
-        const g = ctx.createLinearGradient(0, -hh, 0, hh * 0.6);
-        g.addColorStop(0, 'rgba(255,255,255,1)');
-        g.addColorStop(0.7, 'rgba(255,255,255,0.6)');
-        g.addColorStop(1, 'rgba(255,255,255,0.1)');
-        ctx.fillStyle = g;
-        ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(0, -hh * s);
+            ctx.lineTo(hw * s, hh * 0.6 * s);
+            ctx.lineTo(-hw * s, hh * 0.6 * s);
+            ctx.closePath();
+
+            const g = ctx.createLinearGradient(0, -hh * s, 0, hh * 0.6 * s);
+            g.addColorStop(0, `rgba(255,255,255,${alpha})`);
+            g.addColorStop(0.5, `rgba(255,255,255,${(alpha * 0.7).toFixed(3)})`);
+            g.addColorStop(0.85, `rgba(255,255,255,${(alpha * 0.25).toFixed(3)})`);
+            g.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = g;
+            ctx.fill();
+        }
         ctx.restore();
     },
 
-    /** Bud — teardrop shape. */
+    /** Bud — teardrop with Gaussian softness and multi-pass bleed. */
     bud(ctx, size) {
         const cx = size / 2, cy = size / 2;
         const hw = size * 0.28, hh = size * 0.42;
         ctx.save();
         ctx.translate(cx, cy);
 
-        ctx.beginPath();
-        ctx.moveTo(0, -hh);
-        ctx.bezierCurveTo(hw * 1.8, -hh * 0.2, hw * 1.5, hh * 0.8, 0, hh);
-        ctx.bezierCurveTo(-hw * 1.5, hh * 0.8, -hw * 1.8, -hh * 0.2, 0, -hh);
-        ctx.closePath();
+        const passes = [
+            { scale: 1.15, alpha: 0.12 },
+            { scale: 1.0,  alpha: 0.4 },
+            { scale: 0.8,  alpha: 0.6 }
+        ];
 
-        const g = ctx.createRadialGradient(0, -hh * 0.2, 0, 0, 0, hh);
-        g.addColorStop(0, 'rgba(255,255,255,1)');
-        g.addColorStop(0.4, 'rgba(255,255,255,0.8)');
-        g.addColorStop(0.8, 'rgba(255,255,255,0.25)');
-        g.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = g;
-        ctx.fill();
+        for (const p of passes) {
+            const s = p.scale;
+            ctx.beginPath();
+            ctx.moveTo(0, -hh * s);
+            ctx.bezierCurveTo(hw * 1.8 * s, -hh * 0.2 * s, hw * 1.5 * s, hh * 0.8 * s, 0, hh * s);
+            ctx.bezierCurveTo(-hw * 1.5 * s, hh * 0.8 * s, -hw * 1.8 * s, -hh * 0.2 * s, 0, -hh * s);
+            ctx.closePath();
+
+            const g = ctx.createRadialGradient(0, -hh * 0.2, 0, 0, 0, hh * s * 1.1);
+            for (let i = 0; i <= 10; i++) {
+                const t = i / 10;
+                const a = p.alpha * Math.exp(-2.5 * t * t);
+                g.addColorStop(t, `rgba(255,255,255,${a.toFixed(4)})`);
+            }
+            ctx.fillStyle = g;
+            ctx.fill();
+        }
         ctx.restore();
     }
 };
+
+// ═══════════════════════════════════════════════════════════════
+//  STAMP GRAIN — noise-based opacity variation within each tip
+// ═══════════════════════════════════════════════════════════════
+
+/** Apply paper grain noise to a canvas cell, modulating alpha for absorption. */
+function applyGrainToCell(ctx, ox, oy, size, strength) {
+    const imgData = ctx.getImageData(ox, oy, size, size);
+    const d = imgData.data;
+
+    // Generate noise field
+    const noise = new Float32Array(size * size);
+    for (let i = 0; i < noise.length; i++) noise[i] = Math.random();
+
+    // Box blur for smooth grain (kernel radius 2)
+    const blurred = new Float32Array(size * size);
+    const k = 2;
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            let sum = 0, cnt = 0;
+            for (let dy = -k; dy <= k; dy++) {
+                for (let dx = -k; dx <= k; dx++) {
+                    const ny = y + dy, nx = x + dx;
+                    if (ny >= 0 && ny < size && nx >= 0 && nx < size) {
+                        sum += noise[ny * size + nx]; cnt++;
+                    }
+                }
+            }
+            blurred[y * size + x] = sum / cnt;
+        }
+    }
+
+    // Modulate alpha — simulates uneven paper absorption
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const i = (y * size + x) * 4;
+            if (d[i + 3] === 0) continue;
+            const n = blurred[y * size + x];
+            const mod = 1.0 - strength + strength * n;
+            d[i + 3] = Math.min(255, Math.round(d[i + 3] * mod));
+        }
+    }
+
+    ctx.putImageData(imgData, ox, oy);
+}
 
 // ═══════════════════════════════════════════════════════════════
 //  FATIHA BRUSH — MAIN CLASS
@@ -379,14 +478,16 @@ class FatihaBrush {
      * @param {string} [opts.background='#000000'] — background color hex
      * @param {number} [opts.width] — canvas width (defaults to canvas.width)
      * @param {number} [opts.height] — canvas height (defaults to canvas.height)
-     * @param {number} [opts.grainStrength=0.35] — grain texture intensity (0-1)
+     * @param {number} [opts.grainStrength=0.5] — grain texture intensity (0-1)
+     * @param {number} [opts.colorJitter=0.06] — per-stamp RGB jitter (0-1, ±range)
      */
     constructor(canvas, opts = {}) {
         this.canvas = canvas;
         this.maxStamps = opts.maxStamps || 4096;
         this.layerNames = opts.layers || ['default'];
         this.background = opts.background || '#000000';
-        this.grainStrength = opts.grainStrength !== undefined ? opts.grainStrength : 0.55;
+        this.grainStrength = opts.grainStrength !== undefined ? opts.grainStrength : 0.5;
+        this.colorJitter = opts.colorJitter !== undefined ? opts.colorJitter : 0.06;
 
         this.width = opts.width || canvas.width;
         this.height = opts.height || canvas.height;
@@ -463,7 +564,7 @@ class FatihaBrush {
         };
     }
 
-    /** Build the texture atlas from all registered tips. */
+    /** Build the texture atlas from all registered tips, with per-cell grain noise. */
     _buildAtlas() {
         const gl = this.gl;
         const cols = ATLAS_COLS;
@@ -479,32 +580,18 @@ class FatihaBrush {
         for (let i = 0; i < this._tipList.length; i++) {
             const col = i % cols;
             const row = Math.floor(i / cols);
+            const ox = col * ATLAS_CELL;
+            const oy = row * ATLAS_CELL;
+
             ctx.save();
-            ctx.translate(col * ATLAS_CELL, row * ATLAS_CELL);
-            // Clear cell
+            ctx.translate(ox, oy);
             ctx.clearRect(0, 0, ATLAS_CELL, ATLAS_CELL);
-            // Draw tip
             this._tipList[i].drawFn(ctx, ATLAS_CELL);
             ctx.restore();
-        }
 
-        // Apply noise-based opacity variation to all stamps
-        const fullImg = ctx.getImageData(0, 0, atlasW, atlasH);
-        const px = fullImg.data;
-        for (let y = 0; y < atlasH; y++) {
-            for (let x = 0; x < atlasW; x++) {
-                const idx = (y * atlasW + x) * 4;
-                if (px[idx + 3] === 0) continue;
-                // Perlin-like smooth noise via sine superposition
-                const noise = 0.7 + 0.3 * (
-                    Math.sin(x * 0.15) * Math.cos(y * 0.12) * 0.5 +
-                    Math.sin(x * 0.08 + y * 0.1) * 0.3 +
-                    Math.sin(x * 0.25 - y * 0.18) * 0.2
-                );
-                px[idx + 3] = Math.min(255, px[idx + 3] * noise);
-            }
+            // Apply paper grain noise to this cell — simulates uneven ink absorption
+            applyGrainToCell(ctx, ox, oy, ATLAS_CELL, 0.3);
         }
-        ctx.putImageData(fullImg, 0, 0);
 
         // Upload to WebGL
         this._atlasTex = gl.createTexture();
@@ -520,28 +607,47 @@ class FatihaBrush {
         this._atlasHeight = atlasH;
     }
 
-    /** Build grain noise texture. */
+    /** Build multi-octave grain noise texture for paper feel. */
     _buildGrain() {
         const gl = this.gl;
         const size = GRAIN_SIZE;
-        const data = new Uint8Array(size * size);
 
-        // Generate Perlin-ish noise (simplified: white noise + box blur)
-        for (let i = 0; i < data.length; i++) {
-            data[i] = Math.random() * 255;
-        }
-        // Simple box blur pass for smoother grain
-        const blurred = new Uint8Array(size * size);
-        for (let y = 1; y < size - 1; y++) {
-            for (let x = 1; x < size - 1; x++) {
-                let sum = 0;
-                for (let dy = -1; dy <= 1; dy++) {
-                    for (let dx = -1; dx <= 1; dx++) {
-                        sum += data[(y + dy) * size + (x + dx)];
+        // Helper: box blur with wrapping
+        const blur = (src, radius) => {
+            const dst = new Float32Array(size * size);
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    let sum = 0, cnt = 0;
+                    for (let dy = -radius; dy <= radius; dy++) {
+                        for (let dx = -radius; dx <= radius; dx++) {
+                            const ny = (y + dy + size) % size;
+                            const nx = (x + dx + size) % size;
+                            sum += src[ny * size + nx]; cnt++;
+                        }
                     }
+                    dst[y * size + x] = sum / cnt;
                 }
-                blurred[y * size + x] = sum / 9;
             }
+            return dst;
+        };
+
+        // Octave 1: coarse paper fiber
+        const raw1 = new Float32Array(size * size);
+        for (let i = 0; i < raw1.length; i++) raw1[i] = Math.random();
+        const coarse = blur(raw1, 4);
+
+        // Octave 2: fine grain detail
+        const raw2 = new Float32Array(size * size);
+        for (let i = 0; i < raw2.length; i++) raw2[i] = Math.random();
+        const fine = blur(raw2, 1);
+
+        // Combine: 65% coarse + 35% fine, with contrast boost
+        const result = new Uint8Array(size * size);
+        for (let i = 0; i < result.length; i++) {
+            const v = coarse[i] * 0.65 + fine[i] * 0.35;
+            // Slight contrast boost via power curve
+            const c = Math.pow(v, 0.85);
+            result[i] = Math.round(c * 255);
         }
 
         this._grainTex = gl.createTexture();
@@ -552,7 +658,7 @@ class FatihaBrush {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, size, size, 0,
-                       gl.LUMINANCE, gl.UNSIGNED_BYTE, blurred);
+                       gl.LUMINANCE, gl.UNSIGNED_BYTE, result);
     }
 
     // ─── WEBGL INIT ──────────────────────────────────────────
@@ -591,6 +697,7 @@ class FatihaBrush {
         this._uGrain = gl.getUniformLocation(this._stampProg, 'u_grain');
         this._uGrainStrength = gl.getUniformLocation(this._stampProg, 'u_grainStrength');
         this._uGrainOffset = gl.getUniformLocation(this._stampProg, 'u_grainOffset');
+        this._uColorJitter = gl.getUniformLocation(this._stampProg, 'u_colorJitter');
 
         // Composite shader program
         const cvs = compileShader(gl, gl.VERTEX_SHADER, COMPOSITE_VERT);
@@ -852,6 +959,143 @@ class FatihaBrush {
         }
     }
 
+    // ─── STROKE RENDERING (p5.brush-style) ─────────────────
+
+    /**
+     * Draw a continuous stroke along a path — the core organic rendering technique.
+     * Places densely overlapping stamps along the path with:
+     *   - Gaussian pressure curve (natural tapering at start/end)
+     *   - Direction-aware perpendicular jitter (scatter)
+     *   - Per-stamp opacity and size randomization
+     *   - Probabilistic stamp skipping for grain texture
+     *
+     * @param {Array<{x:number, y:number}>} points — path points
+     * @param {Object} opts
+     * @param {string} [opts.color='#ffffff'] — stroke color
+     * @param {number} [opts.weight=4] — base stroke weight (radius in px)
+     * @param {number} [opts.alpha=0.3] — base opacity per stamp
+     * @param {string} [opts.texture='soft_round'] — brush tip name
+     * @param {string} [opts.layer] — layer name
+     * @param {number} [opts.spacing=0.35] — stamp spacing as fraction of weight (smaller = denser)
+     * @param {number} [opts.scatter=0.3] — perpendicular jitter as fraction of weight
+     * @param {number} [opts.grain=0.7] — probability of placing each stamp (0-1, lower = sketchier)
+     * @param {number} [opts.pressureStart=0.15] — pressure at stroke start (0-1)
+     * @param {number} [opts.pressureEnd=0.15] — pressure at stroke end (0-1)
+     * @param {number} [opts.pressurePeak=1.0] — peak pressure (mid-stroke)
+     * @param {number} [opts.pressureCenter=0.5] — where peak occurs (0-1 along stroke)
+     * @param {number} [opts.alphaJitter=0.25] — per-stamp alpha randomization (±fraction)
+     * @param {number} [opts.sizeJitter=0.15] — per-stamp size randomization (±fraction)
+     * @param {number} [opts.lifetime=99999]
+     */
+    drawStroke(points, opts = {}) {
+        if (!points || points.length < 2) return;
+
+        const color = opts.color || '#ffffff';
+        const weight = opts.weight || 4;
+        const baseAlpha = opts.alpha !== undefined ? opts.alpha : 0.3;
+        const texture = opts.texture || 'soft_round';
+        const layer = opts.layer || this.layerNames[0];
+        const spacing = (opts.spacing !== undefined ? opts.spacing : 0.35) * weight;
+        const scatter = (opts.scatter !== undefined ? opts.scatter : 0.3) * weight;
+        const grain = opts.grain !== undefined ? opts.grain : 0.7;
+        const pStart = opts.pressureStart !== undefined ? opts.pressureStart : 0.15;
+        const pEnd = opts.pressureEnd !== undefined ? opts.pressureEnd : 0.15;
+        const pPeak = opts.pressurePeak !== undefined ? opts.pressurePeak : 1.0;
+        const pCenter = opts.pressureCenter !== undefined ? opts.pressureCenter : 0.5;
+        const alphaJit = opts.alphaJitter !== undefined ? opts.alphaJitter : 0.25;
+        const sizeJit = opts.sizeJitter !== undefined ? opts.sizeJitter : 0.15;
+        const lifetime = opts.lifetime !== undefined ? opts.lifetime : 99999;
+
+        // Compute cumulative arc lengths
+        const dists = [0];
+        for (let i = 1; i < points.length; i++) {
+            const dx = points[i].x - points[i - 1].x;
+            const dy = points[i].y - points[i - 1].y;
+            dists.push(dists[i - 1] + Math.sqrt(dx * dx + dy * dy));
+        }
+        const totalLen = dists[dists.length - 1];
+        if (totalLen < 0.5) return;
+
+        // Walk along the path at fixed spacing intervals
+        const stepSize = Math.max(0.5, spacing);
+        const totalSteps = Math.ceil(totalLen / stepSize);
+        let ptIdx = 0; // current segment index
+
+        for (let step = 0; step <= totalSteps; step++) {
+            // Probabilistic grain: skip some stamps
+            if (Math.random() > grain) continue;
+
+            const d = step * stepSize;
+            const t = d / totalLen; // 0-1 along stroke
+
+            // Advance segment index
+            while (ptIdx < points.length - 2 && dists[ptIdx + 1] < d) ptIdx++;
+
+            // Interpolate position on segment
+            const segLen = dists[ptIdx + 1] - dists[ptIdx];
+            const segT = segLen > 0 ? (d - dists[ptIdx]) / segLen : 0;
+            const x = points[ptIdx].x + (points[ptIdx + 1].x - points[ptIdx].x) * segT;
+            const y = points[ptIdx].y + (points[ptIdx + 1].y - points[ptIdx].y) * segT;
+
+            // Direction (tangent angle)
+            const dx = points[ptIdx + 1].x - points[ptIdx].x;
+            const dy = points[ptIdx + 1].y - points[ptIdx].y;
+            const angle = Math.atan2(dy, dx);
+
+            // Gaussian pressure curve: bell curve centered at pCenter
+            const sigma = 0.4; // controls taper width
+            const gx = (t - pCenter) / sigma;
+            const gaussVal = Math.exp(-0.5 * gx * gx);
+            // Blend between start/end pressure and peak
+            const endLerp = t < pCenter
+                ? pStart + (pPeak - pStart) * (gaussVal - Math.exp(-0.5 * (pCenter / sigma) ** 2)) / (1 - Math.exp(-0.5 * (pCenter / sigma) ** 2))
+                : pEnd + (pPeak - pEnd) * (gaussVal - Math.exp(-0.5 * ((1 - pCenter) / sigma) ** 2)) / (1 - Math.exp(-0.5 * ((1 - pCenter) / sigma) ** 2));
+            const pressure = Math.max(0.05, Math.min(1, endLerp));
+
+            // Direction-aware perpendicular jitter (like p5.brush)
+            const perpJit = (Math.random() * 2 - 1) * scatter * (1 / (pressure + 0.3));
+            const alongJit = (Math.random() * 2 - 1) * scatter * 0.3;
+            const perpX = -Math.sin(angle);
+            const perpY = Math.cos(angle);
+            const jx = perpX * perpJit + Math.cos(angle) * alongJit;
+            const jy = perpY * perpJit + Math.sin(angle) * alongJit;
+
+            // Per-stamp randomization
+            const aRand = 1 + (Math.random() * 2 - 1) * alphaJit;
+            const sRand = 1 + (Math.random() * 2 - 1) * sizeJit;
+            const stampSize = weight * pressure * sRand;
+
+            this.addStamp({
+                x: x + jx,
+                y: y + jy,
+                color,
+                a: baseAlpha * pressure * aRand,
+                rotation: angle + (Math.random() - 0.5) * 0.3,
+                scaleX: stampSize,
+                scaleY: stampSize,
+                texture,
+                layer,
+                lifetime
+            });
+        }
+    }
+
+    /**
+     * Draw a straight line stroke between two points.
+     * Convenience wrapper around drawStroke.
+     */
+    drawLine(x1, y1, x2, y2, opts = {}) {
+        const steps = Math.max(2, Math.ceil(
+            Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) / 2
+        ));
+        const pts = [];
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            pts.push({ x: x1 + (x2 - x1) * t, y: y1 + (y2 - y1) * t });
+        }
+        this.drawStroke(pts, opts);
+    }
+
     // ─── UPDATE ──────────────────────────────────────────────
 
     /**
@@ -901,6 +1145,7 @@ class FatihaBrush {
         gl.uniform1i(this._uGrain, 1);
 
         gl.uniform1f(this._uGrainStrength, this.grainStrength);
+        gl.uniform1f(this._uColorJitter, this.colorJitter);
         // Slowly drift grain for organic feel
         gl.uniform2f(this._uGrainOffset,
             Math.sin(this._frame * 0.01) * 0.5,

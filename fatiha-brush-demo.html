@@ -10,10 +10,10 @@
          height:100vh; overflow:hidden; font-family:sans-serif; }
   canvas { display:block; }
   #playBtn { position:fixed; bottom:40px; left:50%; transform:translateX(-50%);
-    background:rgba(192,8,48,0.85); color:#fff; border:none; border-radius:28px;
+    background:rgba(139,26,43,0.85); color:#fff; border:none; border-radius:28px;
     padding:14px 36px; font-size:16px; cursor:pointer; z-index:10;
     letter-spacing:1px; transition:opacity 0.4s; }
-  #playBtn:hover { background:rgba(232,8,72,0.95); }
+  #playBtn:hover { background:rgba(180,40,60,0.95); }
   #playBtn.hidden { opacity:0; pointer-events:none; }
   #stats { position:fixed; top:10px; left:10px; color:#555; font-size:11px;
     font-family:monospace; z-index:10; pointer-events:none; }
@@ -27,7 +27,7 @@
 
 <script>
 // ══════════════════════════════════════════════════════════════
-//  FATIHA — Ottoman Garden Demo using fatiha.brush
+//  FATIHA — Ottoman Garden Demo using fatiha.brush v2
 // ══════════════════════════════════════════════════════════════
 
 const CW = 430, CH = 932;
@@ -35,26 +35,27 @@ const PHI = 1.618033988749;
 const TOTAL_DUR = 6.0;
 const BG = '#0d0d0d';
 
-// ── COLOR PALETTE — Ottoman Illumination ─────────────────────
-const CRIMSON      = '#C00830';
-const DEEP_CRIMSON = '#8B0020';
-const ROSE_PINK    = '#FF1455';
-const HOT_PINK     = '#FF286E';
-const AMBER        = '#FF7020';
-const GOLD         = '#F8AA19';
-const DARK_GOLD    = '#C36E08';
-const PALE_GOLD    = '#FFD232';
-const LEAF_GREEN   = '#1CA812';
-const DARK_GREEN   = '#0A7A0A';
-const FOREST_GREEN = '#0C6E0C';
-const STEM_GREEN   = '#1CA80F';
-const LIGHT_GREEN  = '#30C820';
-const VINE_DARK    = '#085808';
+// ── COLOR PALETTE — Deep Ottoman Illumination ───────────────
+// Muted, rich tones inspired by hatai reference — NOT neon candy
+const CRIMSON      = '#8B1A2B';   // deep Ottoman crimson
+const DEEP_CRIMSON = '#5A0A18';   // near-black maroon
+const ROSE_PINK    = '#B83050';   // muted rose
+const HOT_PINK     = '#D04868';   // warm pink (muted)
+const AMBER        = '#C47820';   // warm amber
+const GOLD         = '#D4A030';   // Ottoman gold
+const DARK_GOLD    = '#8A6818';   // dark gold/brown
+const PALE_GOLD    = '#E8C050';   // light gold
+const LEAF_GREEN   = '#2A6A1A';   // deep leaf green
+const DARK_GREEN   = '#0E3A0E';   // very dark green
+const FOREST_GREEN = '#1A4A12';   // forest
+const STEM_GREEN   = '#3A5828';   // olive-green with warm undertone
+const LIGHT_GREEN  = '#4A7A2A';   // muted light green
+const VINE_DARK    = '#2A3A18';   // dark olive-brown
 
 const PETAL_HUES = [
-  '#FF70B0','#F01868','#C00838','#FF6898','#FF2068',
-  '#E01868','#FF8068','#FF3848','#E03838','#FF68A8',
-  '#F01868','#C80848','#FF9848','#FF6018','#D82020'
+  '#B83050','#9A2840','#7A1A2B','#C04060','#8B1A2B',
+  '#A02840','#C05050','#9A2030','#7A1820','#B84060',
+  '#9A2840','#8B1830','#C06040','#A04028','#8A2020'
 ];
 const GREENS = [LEAF_GREEN, LIGHT_GREEN, FOREST_GREEN, DARK_GREEN];
 
@@ -197,77 +198,68 @@ function isFinished() {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  GARDEN ELEMENT DRAWING — stamp-based equivalents
+//  GARDEN ELEMENT DRAWING — organic watercolor stamps
 // ══════════════════════════════════════════════════════════════
-
-// Each element creates a cluster of stamps that approximates
-// the p5.brush version's appearance.
 
 function drawLeaf(x, y, size, tangent, side) {
   const s = 30 * size;
   const leafAngle = tangent + side * 0.6;
   const green = pick(GREENS);
 
-  // Watercolor wash base — multiple overlapping soft stamps
+  // Outer watercolor bleed halo — large, faint
   fb.addWash({
-    x, y, color: green, a: 0.25, layer: 'garden',
-    scaleX: s * 0.5, scaleY: s * 1.1,
-    rotation: leafAngle, bleed: 6, bleedRadius: s * 0.15
+    x, y, color: green, a: 0.12, layer: 'garden',
+    scaleX: s * 0.7, scaleY: s * 1.4,
+    rotation: leafAngle, bleed: 10, bleedRadius: s * 0.25
   });
 
-  // Darker core
+  // Mid wash body
+  fb.addWash({
+    x, y, color: green, a: 0.25, layer: 'garden',
+    scaleX: s * 0.45, scaleY: s * 1.0,
+    rotation: leafAngle, bleed: 6, bleedRadius: s * 0.12
+  });
+
+  // Darker core shadow
   fb.addWash({
     x, y, color: DARK_GREEN, a: 0.2, layer: 'garden',
-    scaleX: s * 0.25, scaleY: s * 0.6,
-    rotation: leafAngle, bleed: 3, bleedRadius: s * 0.08
+    scaleX: s * 0.2, scaleY: s * 0.5,
+    rotation: leafAngle, bleed: 4, bleedRadius: s * 0.06
   });
 
   // Leaf shape stamps along the leaf path
-  const steps = 8;
+  const steps = 10;
   for (let i = 0; i < steps; i++) {
     const t = (i / steps) * 2 - 1; // -1 to 1
     const px = x + Math.cos(leafAngle) * s * t * 0.85;
     const py = y + Math.sin(leafAngle) * s * t * 0.85;
-    const width = (1 - t * t) * s * 0.4; // parabolic width
+    const width = (1 - t * t) * s * 0.45; // parabolic width
 
     fb.addStamp({
       x: px, y: py, color: green,
-      a: 0.35, rotation: leafAngle,
-      scaleX: width * 0.3, scaleY: width * 0.7,
-      texture: 'pointed_leaf', layer: 'garden'
+      a: 0.25, rotation: leafAngle + (Math.random() - 0.5) * 0.15,
+      scaleX: width * 0.35, scaleY: width * 0.75,
+      texture: 'pointed_leaf', layer: 'garden',
+      jitter: s * 0.04
     });
   }
 
   // Vein hatching — thin lines along leaf
   fb.addHatch(x, y, s * 0.6, leafAngle + Math.PI / 2, s * 0.2, {
-    color: VINE_DARK, a: 0.25, layer: 'garden', weight: 0
+    color: VINE_DARK, a: 0.2, layer: 'garden', weight: 0
   });
 
   // Central vein
   const veinLen = s * 0.85;
-  for (let i = 0; i < 5; i++) {
-    const t = i / 4;
+  for (let i = 0; i < 6; i++) {
+    const t = i / 5;
     const vx = x + Math.cos(leafAngle) * veinLen * (t - 0.3);
     const vy = y + Math.sin(leafAngle) * veinLen * (t - 0.3);
     fb.addStamp({
-      x: vx, y: vy, color: VINE_DARK, a: 0.5,
+      x: vx, y: vy, color: VINE_DARK, a: 0.4,
       rotation: leafAngle, scaleX: 0.8, scaleY: s * 0.12,
-      texture: 'hatch_line', layer: 'garden'
-    });
-  }
-
-  // Outline — scattered leaf-tip stamps around edge
-  for (let i = 0; i < 12; i++) {
-    const t = i / 12;
-    const theta = t * Math.PI * 2;
-    const rx = Math.sin(theta) * s * 0.35 * (1 + 0.3 * Math.sin(theta));
-    const ry = Math.cos(theta) * s;
-    const ox = rx * Math.cos(leafAngle) - ry * Math.sin(leafAngle);
-    const oy = rx * Math.sin(leafAngle) + ry * Math.cos(leafAngle);
-    fb.addStamp({
-      x: x + ox * 0.9, y: y + oy * 0.9, color: FOREST_GREEN,
-      a: 0.2, rotation: leafAngle + theta, scaleX: 2, scaleY: 2,
-      texture: 'soft_round', layer: 'garden'
+      texture: 'hatch_line', layer: 'garden',
+      jitter: 0.5
     });
   }
 }
@@ -276,29 +268,37 @@ function drawBud(x, y, size, tangent) {
   const s = 20 * size;
   const color = pick(PETAL_HUES);
 
-  // Watercolor body
+  // Outer bleed halo
   fb.addWash({
-    x, y, color, a: 0.4, layer: 'garden',
-    scaleX: s * 0.6, scaleY: s * 0.8,
-    rotation: tangent, bleed: 8, bleedRadius: s * 0.25
+    x, y, color, a: 0.10, layer: 'garden',
+    scaleX: s * 0.9, scaleY: s * 1.2,
+    rotation: tangent, bleed: 10, bleedRadius: s * 0.35
   });
 
-  // Deeper center
+  // Watercolor body
   fb.addWash({
-    x, y, color: CRIMSON, a: 0.3, layer: 'garden',
-    scaleX: s * 0.25, scaleY: s * 0.3,
-    rotation: tangent, bleed: 4, bleedRadius: s * 0.08
+    x, y, color, a: 0.35, layer: 'garden',
+    scaleX: s * 0.55, scaleY: s * 0.75,
+    rotation: tangent, bleed: 8, bleedRadius: s * 0.2
+  });
+
+  // Deeper center (darker crimson)
+  fb.addWash({
+    x, y, color: DEEP_CRIMSON, a: 0.3, layer: 'garden',
+    scaleX: s * 0.2, scaleY: s * 0.25,
+    rotation: tangent, bleed: 4, bleedRadius: s * 0.06
   });
 
   // Bud shape stamps radiating outward
-  for (let i = 0; i < 5; i++) {
-    const a = tangent + (i / 5) * Math.PI * 2;
-    const d = s * 0.3;
+  for (let i = 0; i < 6; i++) {
+    const a = tangent + (i / 6) * Math.PI * 2;
+    const d = s * 0.28;
     fb.addStamp({
       x: x + Math.cos(a) * d, y: y + Math.sin(a) * d,
-      color, a: 0.4, rotation: a,
-      scaleX: s * 0.2, scaleY: s * 0.35,
-      texture: 'bud', layer: 'garden'
+      color, a: 0.3, rotation: a + (Math.random() - 0.5) * 0.3,
+      scaleX: s * 0.18, scaleY: s * 0.32,
+      texture: 'bud', layer: 'garden',
+      jitter: s * 0.05
     });
   }
 
@@ -309,7 +309,7 @@ function drawBud(x, y, size, tangent) {
       const t = i / 2;
       fb.addStamp({
         x: x + dx * 2, y: y + s * 0.3 + sepalLen * t * 0.5,
-        color: DARK_GREEN, a: 0.5, rotation: 0,
+        color: DARK_GREEN, a: 0.4, rotation: 0,
         scaleX: 0.6, scaleY: s * 0.15,
         texture: 'hatch_line', layer: 'garden'
       });
@@ -318,7 +318,7 @@ function drawBud(x, y, size, tangent) {
 
   // Stem
   fb.addStamp({
-    x, y: y + sepalLen, color: STEM_GREEN, a: 0.4,
+    x, y: y + sepalLen, color: STEM_GREEN, a: 0.35,
     rotation: 0, scaleX: 0.8, scaleY: s * 0.3,
     texture: 'hatch_line', layer: 'garden'
   });
@@ -327,67 +327,79 @@ function drawBud(x, y, size, tangent) {
 function drawRose(x, y, size, isGolden) {
   const s = 40 * size;
   const layers = isGolden ? 5 : 4;
-  const petalCounts = [10, 8, 6, 5, 4];
+  const petalCounts = [12, 9, 7, 5, 4];
+
+  // WATERCOLOR BLEED: Large, very faint wash behind everything
+  fb.addWash({
+    x, y, color: isGolden ? GOLD : ROSE_PINK,
+    a: 0.06, layer: 'garden',
+    scaleX: s * 0.9, scaleY: s * 0.9,
+    bleed: 14, bleedRadius: s * 0.35
+  });
 
   for (let layer = 0; layer < layers; layer++) {
     const lr = s * (1 - layer * 0.18);
     const petalCount = petalCounts[layer] || 5;
 
+    // Color gradation: lighter outer → darker inner
     let fillColor, strokeColor;
     if (isGolden) {
-      fillColor = [DARK_GOLD, GOLD, GOLD, PALE_GOLD, '#FFE850'][layer];
-      strokeColor = ['#8A5500', '#A06800', '#B87800', '#C08800', '#D8A800'][layer];
+      fillColor = [DARK_GOLD, GOLD, GOLD, PALE_GOLD, '#E8C850'][layer];
+      strokeColor = ['#5A4008', '#6A5010', '#7A6018', '#8A7020', '#A08028'][layer];
     } else {
-      fillColor = pick(PETAL_HUES);
+      // Light pink outer → deep crimson inner
+      fillColor = ['#C06878', '#B05060', '#9A3848', '#8B2838', '#7A1A2B'][layer];
       strokeColor = DEEP_CRIMSON;
     }
 
-    // Watercolor wash for this ring
+    // Wash for this ring — more opaque toward center
     fb.addWash({
       x, y, color: fillColor,
-      a: 0.2 + layer * 0.06,
+      a: 0.08 + layer * 0.07,
       layer: 'garden',
-      scaleX: lr * 0.55, scaleY: lr * 0.55,
-      bleed: 6 + layer * 2, bleedRadius: lr * 0.15
+      scaleX: lr * 0.6, scaleY: lr * 0.6,
+      bleed: 8 + layer * 2, bleedRadius: lr * 0.2
     });
 
     // Hatch on inner layers
     if (layer >= 1) {
       fb.addHatch(x, y, lr * 0.35, Math.PI / 4 + layer * 0.5,
-        lr * 0.12, { color: strokeColor, a: 0.2, layer: 'garden' });
+        lr * 0.12, { color: strokeColor, a: 0.15, layer: 'garden' });
     }
 
-    // Petal stamps rotating around center
+    // Petal stamps with varying rotation for depth
     for (let i = 0; i < petalCount; i++) {
-      const a = (i / petalCount) * Math.PI * 2 + layer * 0.3;
+      const a = (i / petalCount) * Math.PI * 2 + layer * 0.35;
       const d = lr * 0.3;
+      const rotJitter = (Math.random() - 0.5) * 0.4;
       fb.addStamp({
-        x: x + Math.cos(a) * d,
-        y: y + Math.sin(a) * d,
-        color: fillColor, a: 0.45,
-        rotation: a, scaleX: lr * 0.15, scaleY: lr * 0.25,
-        texture: 'petal', layer: 'garden'
+        x: x + Math.cos(a) * d + (Math.random()-0.5) * lr * 0.08,
+        y: y + Math.sin(a) * d + (Math.random()-0.5) * lr * 0.08,
+        color: fillColor, a: 0.25 + layer * 0.04,
+        rotation: a + rotJitter, scaleX: lr * 0.14, scaleY: lr * 0.26,
+        texture: 'petal', layer: 'garden',
+        jitter: lr * 0.04
       });
     }
   }
 
   // Bright center highlight
   fb.addWash({
-    x, y, color: isGolden ? '#FFE850' : '#FF88CC',
-    a: 0.5, layer: 'garden',
-    scaleX: s * 0.1, scaleY: s * 0.1,
-    bleed: 4, bleedRadius: s * 0.06
+    x, y, color: isGolden ? '#E8D070' : '#D06080',
+    a: 0.35, layer: 'garden',
+    scaleX: s * 0.08, scaleY: s * 0.08,
+    bleed: 5, bleedRadius: s * 0.05
   });
 
   // Spray pollen
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 10; i++) {
     const a = Math.random() * Math.PI * 2;
-    const r = Math.random() * s * 0.2;
+    const r = Math.random() * s * 0.25;
     fb.addStamp({
       x: x + Math.cos(a) * r, y: y + Math.sin(a) * r,
       color: isGolden ? PALE_GOLD : ROSE_PINK,
-      a: 0.4, rotation: a,
-      scaleX: 4 + Math.random() * 4, scaleY: 4 + Math.random() * 4,
+      a: 0.2, rotation: a,
+      scaleX: 3 + Math.random() * 4, scaleY: 3 + Math.random() * 4,
       texture: 'spray', layer: 'garden'
     });
   }
@@ -396,25 +408,25 @@ function drawRose(x, y, size, isGolden) {
 function drawBloom(x, y, size) {
   const s = 30 * size;
 
-  // Large soft wash
+  // Large outer bleed
   fb.addWash({
-    x, y, color: ROSE_PINK, a: 0.15, layer: 'garden',
-    scaleX: s * 0.7, scaleY: s * 0.7,
-    bleed: 10, bleedRadius: s * 0.3
+    x, y, color: ROSE_PINK, a: 0.08, layer: 'garden',
+    scaleX: s * 0.9, scaleY: s * 0.9,
+    bleed: 12, bleedRadius: s * 0.35
   });
 
   // Core wash
   fb.addWash({
-    x, y, color: CRIMSON, a: 0.3, layer: 'garden',
-    scaleX: s * 0.3, scaleY: s * 0.3,
-    bleed: 5, bleedRadius: s * 0.1
+    x, y, color: CRIMSON, a: 0.25, layer: 'garden',
+    scaleX: s * 0.35, scaleY: s * 0.35,
+    bleed: 6, bleedRadius: s * 0.12
   });
 
   // Cross-hatch
   fb.addHatch(x, y, s * 0.3, Math.PI / 3, s * 0.1,
-    { color: DEEP_CRIMSON, a: 0.25, layer: 'garden' });
+    { color: DEEP_CRIMSON, a: 0.2, layer: 'garden' });
   fb.addHatch(x, y, s * 0.25, -Math.PI / 6, s * 0.12,
-    { color: '#660020', a: 0.2, layer: 'garden' });
+    { color: '#4A0A15', a: 0.15, layer: 'garden' });
 
   // Petal stamps
   for (let i = 0; i < 6; i++) {
@@ -422,15 +434,17 @@ function drawBloom(x, y, size) {
     const d = s * 0.25;
     fb.addStamp({
       x: x + Math.cos(a) * d, y: y + Math.sin(a) * d,
-      color: pick(PETAL_HUES), a: 0.4,
-      rotation: a, scaleX: s * 0.12, scaleY: s * 0.2,
-      texture: 'petal', layer: 'garden'
+      color: pick(PETAL_HUES), a: 0.3,
+      rotation: a + (Math.random() - 0.5) * 0.3,
+      scaleX: s * 0.12, scaleY: s * 0.2,
+      texture: 'petal', layer: 'garden',
+      jitter: s * 0.04
     });
   }
 
   // Center dot
   fb.addStamp({
-    x, y, color: '#FF88CC', a: 0.6,
+    x, y, color: '#D06080', a: 0.45,
     scaleX: 3, scaleY: 3, texture: 'spray', layer: 'garden'
   });
 }
@@ -440,21 +454,21 @@ function drawGhunnah(x, y, size) {
 
   // Ethereal halo — large atmospheric wash on glow layer
   fb.addWash({
-    x, y, color: HOT_PINK, a: 0.08, layer: 'glow',
-    scaleX: s * 0.6, scaleY: s * 0.6,
-    bleed: 12, bleedRadius: s * 0.4
+    x, y, color: HOT_PINK, a: 0.06, layer: 'glow',
+    scaleX: s * 0.65, scaleY: s * 0.65,
+    bleed: 14, bleedRadius: s * 0.45
   });
 
   // Second halo
   fb.addWash({
-    x, y, color: AMBER, a: 0.06, layer: 'glow',
-    scaleX: s * 0.35, scaleY: s * 0.35,
+    x, y, color: AMBER, a: 0.04, layer: 'glow',
+    scaleX: s * 0.38, scaleY: s * 0.38,
     bleed: 8, bleedRadius: s * 0.2
   });
 
   // Hatch warmth
   fb.addHatch(x, y, s * 0.3, Math.random() * Math.PI, s * 0.12,
-    { color: ROSE_PINK, a: 0.15, layer: 'garden' });
+    { color: ROSE_PINK, a: 0.12, layer: 'garden' });
 
   // Spray particles radiating outward
   for (let i = 0; i < 14; i++) {
@@ -462,7 +476,7 @@ function drawGhunnah(x, y, size) {
     const r = Math.random() * s * 0.5;
     fb.addStamp({
       x: x + Math.cos(a) * r, y: y + Math.sin(a) * r,
-      color: pick(PETAL_HUES), a: 0.25,
+      color: pick(PETAL_HUES), a: 0.18,
       rotation: a, scaleX: 3 + Math.random() * 5, scaleY: 3 + Math.random() * 5,
       texture: 'spray', layer: 'glow'
     });
@@ -480,7 +494,7 @@ function drawThorn(px, py, size, tangent, side) {
     const t = i / 3;
     fb.addStamp({
       x: px + (tx - px) * t, y: py + (ty - py) * t,
-      color: DARK_GREEN, a: 0.6 * (1 - t * 0.5),
+      color: DARK_GREEN, a: 0.5 * (1 - t * 0.5),
       rotation: thornAngle, scaleX: 2 * (1 - t * 0.6), scaleY: 3,
       texture: 'thorn', layer: 'garden'
     });
@@ -491,7 +505,7 @@ function drawThorn(px, py, size, tangent, side) {
     const t = i / 2;
     fb.addStamp({
       x: px + (tx - px) * t, y: py + (ty - py) * t,
-      color: VINE_DARK, a: 0.4,
+      color: VINE_DARK, a: 0.35,
       rotation: thornAngle, scaleX: 0.6, scaleY: s * 0.2,
       texture: 'hatch_line', layer: 'garden'
     });
@@ -502,13 +516,12 @@ function drawVineTendril(x, y, size, tangent) {
   const s = 50 * size;
 
   // Simulate flowLine with stamps along a curving path
-  // Use a spiral perturbation for organic curl
   const steps = 20;
   for (let branch = 0; branch < 3; branch++) {
     const angleOff = [0, 0.5, -0.7][branch];
     const len = s * [1.0, 0.6, 0.4][branch];
     const color = [STEM_GREEN, LIGHT_GREEN, DARK_GREEN][branch];
-    const weight = [1.2, 0.8, 0.5][branch];
+    const weight = [1.5, 1.0, 0.6][branch];
 
     for (let i = 0; i < steps; i++) {
       const t = i / steps;
@@ -517,13 +530,25 @@ function drawVineTendril(x, y, size, tangent) {
       const px = x + Math.cos(mainAngle) * len * t + Math.cos(mainAngle + Math.PI/2) * curl;
       const py = y + Math.sin(mainAngle) * len * t + Math.sin(mainAngle + Math.PI/2) * curl;
 
+      // Soft wash for continuous blended line
       fb.addStamp({
         x: px, y: py, color,
-        a: 0.35 * (1 - t * 0.6),
-        rotation: mainAngle, scaleX: weight, scaleY: weight * 1.5,
+        a: 0.2 * (1 - t * 0.5),
+        rotation: mainAngle, scaleX: weight * 2.5, scaleY: weight * 2.5,
         texture: 'soft_round', layer: 'garden',
-        jitter: 1.5
+        jitter: 2.0
       });
+
+      // Inner detail
+      if (i % 2 === 0) {
+        fb.addStamp({
+          x: px, y: py, color: VINE_DARK,
+          a: 0.15 * (1 - t * 0.6),
+          rotation: mainAngle, scaleX: weight, scaleY: weight * 1.5,
+          texture: 'soft_round', layer: 'garden',
+          jitter: 1.0
+        });
+      }
     }
   }
 
@@ -531,65 +556,73 @@ function drawVineTendril(x, y, size, tangent) {
   const tipX = x + Math.cos(tangent) * s * 0.75;
   const tipY = y + Math.sin(tangent) * s * 0.75;
   fb.addWash({
-    x: tipX, y: tipY, color: LEAF_GREEN, a: 0.25,
-    scaleX: 4 * size, scaleY: 8 * size,
-    rotation: tangent, layer: 'garden', bleed: 4, bleedRadius: 3
+    x: tipX, y: tipY, color: LEAF_GREEN, a: 0.2,
+    scaleX: 5 * size, scaleY: 9 * size,
+    rotation: tangent, layer: 'garden', bleed: 5, bleedRadius: 4
   });
   fb.addStamp({
-    x: tipX, y: tipY, color: DARK_GREEN, a: 0.3,
+    x: tipX, y: tipY, color: DARK_GREEN, a: 0.25,
     rotation: tangent, scaleX: 3 * size, scaleY: 6 * size,
     texture: 'pointed_leaf', layer: 'garden'
   });
 }
 
 // ══════════════════════════════════════════════════════════════
-//  VINE DRAWING
+//  VINE DRAWING — overlapping washes for continuous organic line
 // ══════════════════════════════════════════════════════════════
 
 function drawVineSegment(startIdx, endIdx, energy) {
-  // Dense overlapping stamps for continuous Ottoman crimson vine
-  for (let i = startIdx; i <= endIdx; i += 1) {
+  // Step every point for continuous overlap (not every 2)
+  for (let i = startIdx; i <= endIdx; i++) {
     if (i >= spiralPts.length) break;
     const pt = spiralPts[i];
     const globalT = i / spiralPts.length;
-    const pressure = 1.0 - globalT * 0.65;
-    const baseSize = (3 + energy * 5) * pressure;
+    const pressure = 1.0 - globalT * 0.6; // thick at base, thin at center
+    const baseSize = (5 + energy * 6) * pressure;
 
-    // Layer 1: Broad crimson wash — overlapping for continuous look
+    // Layer 1: Wide warm olive wash — overlapping creates continuous blended line
     fb.addStamp({
-      x: pt.x, y: pt.y, color: CRIMSON,
-      a: 0.14, scaleX: baseSize * 2.0, scaleY: baseSize * 2.0,
+      x: pt.x, y: pt.y, color: '#4A5828',
+      a: 0.05, scaleX: baseSize * 3.2, scaleY: baseSize * 3.2,
       texture: 'soft_round', layer: 'garden',
-      jitter: 1.2
+      jitter: 3.0
     });
 
-    // Layer 2: Deep crimson core
+    // Layer 2: Medium olive-brown body
     fb.addStamp({
-      x: pt.x, y: pt.y, color: DEEP_CRIMSON,
-      a: 0.18, scaleX: baseSize * 1.2, scaleY: baseSize * 1.2,
+      x: pt.x, y: pt.y, color: '#3A4A20',
+      a: 0.08, scaleX: baseSize * 1.8, scaleY: baseSize * 1.8,
       texture: 'soft_round', layer: 'garden',
-      jitter: 0.6
+      jitter: 1.5
     });
 
-    // Layer 3: Fine dark line along tangent
+    // Layer 3: Darker core
+    fb.addStamp({
+      x: pt.x, y: pt.y, color: VINE_DARK,
+      a: 0.10, scaleX: baseSize * 1.0, scaleY: baseSize * 1.0,
+      texture: 'soft_round', layer: 'garden',
+      jitter: 0.8
+    });
+
+    // Layer 4: Fine directional detail line (every 3 points)
     if (i % 3 === 0) {
       const angle = getAngleAt(spiralPts, i);
       fb.addStamp({
-        x: pt.x, y: pt.y, color: '#660020',
-        a: 0.3, rotation: angle,
-        scaleX: baseSize * 0.4, scaleY: baseSize * 0.9,
+        x: pt.x, y: pt.y, color: '#1A2A10',
+        a: 0.2, rotation: angle,
+        scaleX: baseSize * 0.3, scaleY: baseSize * 1.0,
         texture: 'hatch_line', layer: 'garden',
         jitter: 0.5
       });
     }
 
-    // Layer 4: Rose highlight (sparse)
-    if (i % 5 === 0) {
+    // Layer 5: Warm highlight (every 4 points)
+    if (i % 4 === 0) {
       fb.addStamp({
-        x: pt.x, y: pt.y, color: ROSE_PINK,
-        a: 0.15, scaleX: baseSize * 0.5, scaleY: baseSize * 0.5,
+        x: pt.x, y: pt.y, color: '#5A7830',
+        a: 0.06, scaleX: baseSize * 0.7, scaleY: baseSize * 0.7,
         texture: 'soft_round', layer: 'garden',
-        jitter: 0.8
+        jitter: 1.5
       });
     }
   }
@@ -622,7 +655,7 @@ function updatePetals() {
     p.life--;
 
     if (p.life > 20) {
-      const alpha = Math.min(1, (p.life - 20) / 20) * 0.4;
+      const alpha = Math.min(1, (p.life - 20) / 20) * 0.3;
       fb.addStamp({
         x: p.x, y: p.y, color: p.color,
         a: alpha, rotation: p.rot,
@@ -659,12 +692,13 @@ const canvas = document.createElement('canvas');
 document.body.appendChild(canvas);
 
 fb = new FatihaBrush(canvas, {
-  maxStamps: 4096,
+  maxStamps: 6144,
   layers: ['garden', 'glow', 'petals'],
   background: BG,
   width: CW,
   height: CH,
-  grainStrength: 0.55
+  grainStrength: 0.5,
+  colorJitter: 0.06
 });
 
 fb.setLayerBlend('glow', 'additive');
