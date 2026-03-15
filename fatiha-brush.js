@@ -528,6 +528,7 @@ class FatihaBrush {
         this._buildAtlas();
         this._buildGrain();
         this._initLayers();
+        this._initMixbox();
 
         // Frame counter for grain animation
         this._frame = 0;
@@ -813,6 +814,105 @@ class FatihaBrush {
         // Restore background clear color
         const bg = hexToRGB(this.background);
         gl.clearColor(bg[0], bg[1], bg[2], 1.0);
+    }
+
+    // ─── MIXBOX PIGMENT BLENDING ─────────────────────────────
+
+    _initMixbox() {
+        this._hasMixbox = false;
+        if (typeof mixbox === 'undefined') return;
+
+        const gl = this.gl;
+
+        try {
+            // Get Mixbox LUT texture
+            this._mixboxLUT = mixbox.lutTexture(gl);
+
+            // Build Mixbox compositing fragment shader at runtime
+            // (mixbox.glsl() provides the GLSL code including mixbox_lut uniform)
+            const fragSrc = `#version 300 es
+precision highp float;
+#define texture2D texture
+
+in vec2 v_uv;
+uniform sampler2D u_accumulation;
+uniform sampler2D u_layer;
+uniform float u_opacity;
+uniform int u_additive;
+
+${mixbox.glsl()}
+
+out vec4 fragColor;
+
+void main() {
+    vec4 acc = texture(u_accumulation, v_uv);
+    vec4 layer = texture(u_layer, v_uv);
+
+    float layerAlpha = layer.a * u_opacity;
+
+    if (layerAlpha < 0.001) {
+        fragColor = acc;
+        return;
+    }
+
+    // Unpremultiply layer color (stamps output premultiplied alpha)
+    vec3 layerRGB = layer.rgb / max(layer.a, 0.001);
+
+    if (u_additive == 1) {
+        // Additive (glow) layers — skip pigment mixing
+        fragColor = vec4(clamp(acc.rgb + layerRGB * layerAlpha, 0.0, 1.0), 1.0);
+        return;
+    }
+
+    // Pigment-based blend using Mixbox Kubelka-Munk model
+    vec3 mixed = mixbox_lerp(acc.rgb, layerRGB, layerAlpha);
+    fragColor = vec4(mixed, 1.0);
+}`;
+
+            const vs = compileShader(gl, gl.VERTEX_SHADER, COMPOSITE_VERT);
+            const fs = compileShader(gl, gl.FRAGMENT_SHADER, fragSrc);
+            this._mixboxProg = linkProgram(gl, vs, fs);
+            gl.deleteShader(vs);
+            gl.deleteShader(fs);
+
+            this._uMixAcc = gl.getUniformLocation(this._mixboxProg, 'u_accumulation');
+            this._uMixLayer = gl.getUniformLocation(this._mixboxProg, 'u_layer');
+            this._uMixOpacity = gl.getUniformLocation(this._mixboxProg, 'u_opacity');
+            this._uMixAdditive = gl.getUniformLocation(this._mixboxProg, 'u_additive');
+            this._uMixboxLUT = gl.getUniformLocation(this._mixboxProg, 'mixbox_lut');
+
+            // Create ping-pong accumulation FBOs for Mixbox compositing
+            this._accFBOs = [null, null];
+            this._accTextures = [null, null];
+            for (let i = 0; i < 2; i++) {
+                this._accFBOs[i] = gl.createFramebuffer();
+                this._accTextures[i] = gl.createTexture();
+
+                gl.bindTexture(gl.TEXTURE_2D, this._accTextures[i]);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.width, this.height, 0,
+                               gl.RGBA, gl.UNSIGNED_BYTE, null);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+                gl.bindFramebuffer(gl.FRAMEBUFFER, this._accFBOs[i]);
+                gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+                                         gl.TEXTURE_2D, this._accTextures[i], 0);
+            }
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+            // Restore default clear color
+            const bg = hexToRGB(this.background);
+            gl.clearColor(bg[0], bg[1], bg[2], 1.0);
+
+            this._hasMixbox = true;
+            console.log('FatihaBrush: Mixbox pigment blending enabled');
+
+        } catch (e) {
+            console.warn('FatihaBrush: Mixbox init failed, using standard blending:', e);
+            this._hasMixbox = false;
+        }
     }
 
     // ─── STAMP MANAGEMENT ────────────────────────────────────
@@ -1181,10 +1281,12 @@ class FatihaBrush {
         gl.viewport(0, 0, this.width, this.height);
 
         // Set blend mode
+        // Saturating blend (p5.brush technique): new stamps contribute less
+        // where alpha is already high, preventing ring artifacts at overlap edges
         if (layer.blend === 'additive') {
             gl.blendFunc(gl.ONE, gl.ONE);
         } else {
-            gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+            gl.blendFunc(gl.ONE_MINUS_DST_ALPHA, gl.ONE);
         }
 
         gl.bindVertexArray(layer.vao);
@@ -1193,17 +1295,23 @@ class FatihaBrush {
     }
 
     _composeLayers() {
+        if (this._hasMixbox) {
+            this._composeLayersMixbox();
+        } else {
+            this._composeLayersSimple();
+        }
+    }
+
+    /** Standard compositing fallback (no Mixbox). */
+    _composeLayersSimple() {
         const gl = this.gl;
 
-        // Render to screen
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.viewport(0, 0, this.width, this.height);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
         gl.useProgram(this._compositeProg);
         gl.bindVertexArray(this._fsQuadVAO);
-
-        // Alpha blend for compositing
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
         for (const name of this.layerNames) {
@@ -1215,7 +1323,6 @@ class FatihaBrush {
             gl.uniform1i(this._uCompLayer, 0);
             gl.uniform1f(this._uCompOpacity, layer.opacity);
 
-            // Set blend mode for this layer
             if (layer.blend === 'additive') {
                 gl.blendFunc(gl.ONE, gl.ONE);
             } else {
@@ -1226,6 +1333,72 @@ class FatihaBrush {
         }
 
         gl.bindVertexArray(null);
+    }
+
+    /** Mixbox pigment compositing via ping-pong FBOs. */
+    _composeLayersMixbox() {
+        const gl = this.gl;
+        const bg = hexToRGB(this.background);
+
+        // Initialize accumulation FBO 0 with background color
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this._accFBOs[0]);
+        gl.viewport(0, 0, this.width, this.height);
+        gl.clearColor(bg[0], bg[1], bg[2], 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        gl.useProgram(this._mixboxProg);
+        gl.bindVertexArray(this._fsQuadVAO);
+
+        // Shader handles all blending — disable GL blend
+        gl.disable(gl.BLEND);
+
+        // Bind Mixbox LUT to texture unit 2
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, this._mixboxLUT);
+        gl.uniform1i(this._uMixboxLUT, 2);
+
+        let readIdx = 0, writeIdx = 1;
+
+        for (const name of this.layerNames) {
+            const layer = this._layers[name];
+            if (layer.count === 0) continue;
+
+            // Write to the other accumulation FBO
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this._accFBOs[writeIdx]);
+            gl.viewport(0, 0, this.width, this.height);
+
+            // Read: accumulated result so far
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, this._accTextures[readIdx]);
+            gl.uniform1i(this._uMixAcc, 0);
+
+            // Read: current layer
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, layer.texture);
+            gl.uniform1i(this._uMixLayer, 1);
+
+            gl.uniform1f(this._uMixOpacity, layer.opacity);
+            gl.uniform1i(this._uMixAdditive, layer.blend === 'additive' ? 1 : 0);
+
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+            // Swap read/write
+            const tmp = readIdx; readIdx = writeIdx; writeIdx = tmp;
+        }
+
+        // Blit final accumulation result to screen
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this._accFBOs[readIdx]);
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+        gl.blitFramebuffer(0, 0, this.width, this.height,
+                           0, 0, this.width, this.height,
+                           gl.COLOR_BUFFER_BIT, gl.NEAREST);
+
+        gl.bindVertexArray(null);
+
+        // Restore GL state
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+        gl.clearColor(bg[0], bg[1], bg[2], 1.0);
     }
 
     // ─── LAYER CONTROL ───────────────────────────────────────
@@ -1315,6 +1488,15 @@ class FatihaBrush {
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0,
                            gl.RGBA, gl.UNSIGNED_BYTE, null);
         }
+
+        // Rebuild Mixbox accumulation FBOs
+        if (this._hasMixbox) {
+            for (let i = 0; i < 2; i++) {
+                gl.bindTexture(gl.TEXTURE_2D, this._accTextures[i]);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0,
+                               gl.RGBA, gl.UNSIGNED_BYTE, null);
+            }
+        }
     }
 
     /** Cleanup all WebGL resources. */
@@ -1333,6 +1515,16 @@ class FatihaBrush {
         gl.deleteTexture(this._grainTex);
         gl.deleteProgram(this._stampProg);
         gl.deleteProgram(this._compositeProg);
+
+        // Cleanup Mixbox resources
+        if (this._hasMixbox) {
+            gl.deleteProgram(this._mixboxProg);
+            gl.deleteTexture(this._mixboxLUT);
+            for (let i = 0; i < 2; i++) {
+                gl.deleteFramebuffer(this._accFBOs[i]);
+                gl.deleteTexture(this._accTextures[i]);
+            }
+        }
     }
 }
 
