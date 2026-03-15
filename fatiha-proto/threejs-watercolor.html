@@ -1,0 +1,1203 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>fatiha.app — Three.js Garden (fresh)</title>
+<style>
+*{margin:0;padding:0}
+body{background:#0d0d0d;overflow:hidden;cursor:none}
+canvas{display:block}
+#play-btn{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:transparent;border:1px solid rgba(255,255,255,0.12);
+  color:rgba(255,255,255,0.4);padding:14px 32px;border-radius:10px;
+  font-size:0.9rem;cursor:pointer;z-index:10}
+</style>
+</head>
+<body>
+<button id="play-btn">▶</button>
+<script type="importmap">
+{"imports":{
+  "three":"https://esm.sh/three@0.170.0",
+  "three/addons/":"https://esm.sh/three@0.170.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+/* ═══════════════════════════════════════════════════
+   CONSTANTS — matching 2D v43
+   ═══════════════════════════════════════════════════ */
+const W=window.innerWidth, H=window.innerHeight;
+const dpr=Math.min(window.devicePixelRatio,2);
+const WD=W*dpr, HD=H*dpr;
+const GOLDEN_ANGLE=137.508*Math.PI/180;
+const PHI=1.618033988749;
+const FIB=[3,5,8,5,3,8,2,5,8,3,5,1,8,5,3];
+const WEAVE_FREQ=4.5;
+const TOTAL_DUR=6.0;
+
+/* ═══════════════════════════════════════════════════
+   THREE.JS SCENE
+   ═══════════════════════════════════════════════════ */
+const scene=new THREE.Scene();
+scene.background=null; // offscreen canvas provides the background
+const camera=new THREE.OrthographicCamera(0,WD,HD,0,-1000,1000); // left,right,bottom,top
+camera.position.z=500;
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(W,H);renderer.setPixelRatio(dpr);
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+
+const composer=new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+// Bloom disabled — get structure right first
+// const bloom=new UnrealBloomPass(new THREE.Vector2(W,H),0.35,0.25,0.88);
+// composer.addPass(bloom);
+
+/* ═══════════════════════════════════════════════════
+   GOLDEN RATIO SPIRAL — pixel-precise from reference
+   ═══════════════════════════════════════════════════ */
+const goldenRects=window._gr=[];
+const spiralArcs=window._sa=[];
+const curvePoints=window._cp=[];
+{
+  const PHI=1.618033988749;
+  const M=24*dpr;
+  let gw=WD-M*2, gh=gw*PHI;
+  if(gh>HD-M*2){gh=HD-M*2; gw=gh/PHI;}
+  const gx=(WD-gw)/2, gy=(HD-gh)/2;
+
+  // Recursive golden subdivision — exact match to gen_overlay.py
+  // Direction cycle: 0=bottom, 1=left, 2=top, 3=right
+  let rx=gx, ry=gy, rw=gw, rh=gh;
+  const LEVELS=9;
+  const squares=[];
+  for(let i=0;i<LEVELS;i++){
+    const sq=Math.min(rw,rh);
+    const d=i%4;
+    let sx,sy;
+    if(d===0){sx=rx;sy=ry+rh-sq;rh-=sq;}
+    else if(d===1){sx=rx;sy=ry;rx+=sq;rw-=sq;}
+    else if(d===2){sx=rx;sy=ry;ry+=sq;rh-=sq;}
+    else{sx=rx+rw-sq;sy=ry;rw-=sq;}
+    squares.push({sx,sy,sq});
+    goldenRects.push({x:sx,y:sy,w:sq,h:sq});
+  }
+
+  // Arc parameters — identical to gen_overlay.py PIL arcs
+  // PIL angles (CW from east): point at θ → x=cx+r·cos(θ), y=cy+r·sin(θ) (screen coords)
+  for(let i=0;i<squares.length;i++){
+    const{sx,sy,sq}=squares[i];
+    const d=i%4;
+    let cx,cy,sa,ea;
+    if(d===0){cx=sx+sq;cy=sy;sa=90;ea=180;}       // center=TR
+    else if(d===1){cx=sx+sq;cy=sy+sq;sa=180;ea=270;} // center=BR
+    else if(d===2){cx=sx;cy=sy+sq;sa=270;ea=360;}   // center=BL
+    else{cx=sx;cy=sy;sa=0;ea=90;}                    // center=TL
+    spiralArcs.push({cx,cy,r:sq,sa:sa*Math.PI/180,ea:ea*Math.PI/180});
+  }
+
+  // Sample ~900 curvePoints along arcs (starts bottom-right, spirals inward)
+  const TARGET=900;
+  let totalR=0;
+  for(const a of spiralArcs) totalR+=a.r;
+  for(const arc of spiralArcs){
+    const n=Math.max(6,Math.round(TARGET*arc.r/totalR));
+    for(let j=0;j<n;j++){
+      const t=j/n;
+      const angle=arc.sa+(arc.ea-arc.sa)*t;
+      curvePoints.push({x:arc.cx+Math.cos(angle)*arc.r, y:arc.cy+Math.sin(angle)*arc.r});
+    }
+  }
+  if(spiralArcs.length>0){
+    const last=spiralArcs[spiralArcs.length-1];
+    curvePoints.push({x:last.cx+Math.cos(last.ea)*last.r, y:last.cy+Math.sin(last.ea)*last.r});
+  }
+}
+const CL=curvePoints.length;
+function getNormal(i){
+  const ni=Math.min(i+1,CL-1),pi=Math.max(i-1,0);
+  const dx=curvePoints[ni].x-curvePoints[pi].x,dy=curvePoints[ni].y-curvePoints[pi].y;
+  const l=Math.sqrt(dx*dx+dy*dy)||1;
+  return{x:-dy/l,y:dx/l};
+}
+
+/* ═══════════════════════════════════════════════════
+   PALETTE — identical to 2D v43
+   ═══════════════════════════════════════════════════ */
+function pathColor(t){
+  const s=[[0,0xC0,0x08,0x30],[.15,0xE8,0x08,0x48],[.30,0xFF,0x14,0x55],
+    [.45,0xFF,0x28,0x6E],[.60,0xFF,0x45,0x40],[.75,0xFF,0x70,0x20],
+    [.90,0xF5,0x38,0x30],[1,0xE0,0x18,0x28]];
+  let i=0;while(i<s.length-1&&s[i+1][0]<t)i++;
+  if(i>=s.length-1)return[s[7][1],s[7][2],s[7][3]];
+  const a=s[i],b=s[i+1],f=(t-a[0])/(b[0]-a[0]);
+  return[a[1]+(b[1]-a[1])*f,a[2]+(b[2]-a[2])*f,a[3]+(b[3]-a[3])*f];
+}
+
+/* ═══════════════════════════════════════════════════
+   2D CANVAS RENDERER — same draw functions as v43
+   This is the key insight: use an offscreen 2D canvas
+   for all the garden drawing (identical to v43),
+   then upload it as a Three.js texture each frame.
+   Three.js only adds bloom post-processing.
+   ═══════════════════════════════════════════════════ */
+const offscreen=document.createElement('canvas');
+offscreen.width=WD;offscreen.height=HD;
+const ctx=offscreen.getContext('2d');
+// Flip canvas vertically to match Three.js texture orientation
+ctx.translate(0,HD);ctx.scale(1,-1);
+
+const offTex=new THREE.CanvasTexture(offscreen);
+offTex.minFilter=THREE.LinearFilter;offTex.magFilter=THREE.LinearFilter;
+offTex.flipY=false; // canvas Y=0 is top, camera bottom=HD top=0 — both inverted = correct
+const quadGeo=new THREE.PlaneGeometry(WD,HD);
+const quadMat=new THREE.MeshBasicMaterial({map:offTex,transparent:false});
+const quad=new THREE.Mesh(quadGeo,quadMat);
+quad.position.set(WD/2,HD/2,0);
+scene.add(quad);
+
+/* ═══════════════════════════════════════════════════
+   PETAL TEXTURES — identical to 2D v43
+   ═══════════════════════════════════════════════════ */
+const petalCanvases=[];
+const PETAL_HUES=[['#FF60A0','#E8105C','#A0082E'],['#FF5888','#FF1860','#D0105A'],
+  ['#FF7060','#FF2838','#D0282A'],['#FF5898','#E8105C','#B00838'],['#FF8838','#FF5010','#C01818']];
+for(let v=0;v<5;v++){
+  const pc=document.createElement('canvas');
+  const sz=Math.round(64*dpr);pc.width=sz;pc.height=sz;
+  const c=pc.getContext('2d');c.translate(sz/2,sz/2);c.rotate(v*0.5-1.2);
+  const s=sz*0.38;c.beginPath();c.moveTo(0,-s);
+  const bx=s*(0.5+v*0.06),by=s*0.3;
+  c.bezierCurveTo(bx,-by,bx,by*1.5,0,s*0.7);c.bezierCurveTo(-bx,by*1.5,-bx,-by,0,-s);c.closePath();
+  const g=c.createRadialGradient(0,-s*0.15,s*0.1,0,s*0.1,s);
+  g.addColorStop(0,PETAL_HUES[v][0]);g.addColorStop(0.5,PETAL_HUES[v][1]);g.addColorStop(1,PETAL_HUES[v][2]);
+  c.fillStyle=g;c.fill();
+  c.beginPath();c.moveTo(0,-s*0.8);c.lineTo(0,s*0.5);
+  c.strokeStyle='rgba(255,255,255,0.30)';c.lineWidth=1;c.stroke();
+  petalCanvases.push(pc);
+}
+
+/* ═══════════════════════════════════════════════════
+   AUDIO — identical to 2D v43
+   ═══════════════════════════════════════════════════ */
+let audioCtx,analyser,audio,timeData,isPlaying=false,smoothAmp=0;
+let waveformData=null;
+fetch('bismillah-wave.json').then(r=>r.json()).then(d=>{waveformData=d;});
+function getAmp(){
+  if(analyser&&timeData){
+    analyser.getByteTimeDomainData(timeData);
+    let rms=0;for(let i=0;i<timeData.length;i++){const v=(timeData[i]-128)/128;rms+=v*v;}
+    const live=Math.sqrt(rms/timeData.length);if(live>.005)return live;
+  }
+  if(waveformData){
+    const t=(typeof window._synthTime==='number')?window._synthTime/TOTAL_DUR:(audio?audio.currentTime/TOTAL_DUR:0);
+    if(t>0)return waveformData[Math.min(Math.floor(t*waveformData.length),waveformData.length-1)]||0;
+  }
+  return 0;
+}
+
+/* ═══════════════════════════════════════════════════
+   TAJWEED — identical to 2D v43
+   ═══════════════════════════════════════════════════ */
+const TAJWEED=[
+  {t:0.05,type:'bud',size:0.35,side:-1},{t:0.15,type:'leaf',size:0.3,side:1},
+  {t:0.28,type:'thorn',size:0.35,side:1},{t:0.38,type:'leaf',size:0.25,side:-1},
+  {t:0.50,type:'ghunnah',size:0.5,side:-1},{t:0.58,type:'bud',size:0.3,side:1},
+  {t:0.68,type:'leaf',size:0.2,side:-1},
+  {t:0.78,type:'bud',size:0.3,side:1},{t:0.85,type:'golden_rose',size:1.0,side:1},
+  {t:0.95,type:'vine',size:0.5,side:-1},{t:1.08,type:'leaf',size:0.35,side:1},
+  {t:1.18,type:'leaf',size:0.3,side:-1},{t:1.30,type:'bud',size:0.2,side:-1},
+  {t:1.38,type:'leaf',size:0.15,side:1},
+  {t:1.52,type:'leaf',size:0.25,side:1},{t:1.60,type:'rose',size:0.8,side:1},
+  {t:1.72,type:'leaf',size:0.35,side:-1},{t:1.85,type:'bud',size:0.4,side:1},
+  {t:1.98,type:'thorn',size:0.3,side:-1},{t:2.08,type:'leaf',size:0.2,side:1},
+  {t:2.18,type:'ghunnah',size:0.55,side:-1},{t:2.28,type:'vine',size:0.75,side:1},
+  {t:2.42,type:'leaf',size:0.35,side:-1},{t:2.55,type:'leaf',size:0.3,side:1},
+  {t:2.68,type:'ghunnah',size:0.45,side:-1},{t:2.78,type:'bud',size:0.3,side:1},
+  {t:2.88,type:'leaf',size:0.2,side:-1},
+  {t:3.05,type:'leaf',size:0.25,side:1},{t:3.15,type:'rose',size:0.7,side:-1},
+  {t:3.28,type:'leaf',size:0.3,side:1},{t:3.40,type:'bud',size:0.35,side:-1},
+  {t:3.55,type:'bud',size:0.25,side:1},{t:3.65,type:'leaf',size:0.2,side:-1},
+  {t:3.78,type:'vine',size:1.0,side:1},{t:3.95,type:'leaf',size:0.4,side:-1},
+  {t:4.15,type:'leaf',size:0.35,side:1},{t:4.35,type:'leaf',size:0.3,side:-1},
+  {t:4.55,type:'bud',size:0.3,side:1},{t:4.75,type:'ghunnah',size:0.4,side:-1},
+  {t:4.88,type:'bud',size:0.3,side:1},{t:5.00,type:'leaf',size:0.2,side:-1},
+  {t:5.15,type:'bloom',size:0.7,side:1},{t:5.35,type:'leaf',size:0.15,side:1},
+  {t:5.50,type:'leaf',size:0.1,side:-1},
+];
+
+/* ═══════════════════════════════════════════════════
+   GARDEN STATE — identical to 2D v43
+   ═══════════════════════════════════════════════════ */
+const garden=[];
+const glows=[];
+let tajweedIdx=0;
+
+function spawnGardenElement(evt,progress){
+  const ci=Math.min(Math.floor(progress*(CL-1)),CL-1);
+  const col=pathColor(progress);
+  const base={ci,side:evt.side,born:progress,col,baseRot:Math.random()*Math.PI*2};
+  switch(evt.type){
+    case 'golden_rose':{
+      const mr=(55+evt.size*70)*dpr;
+      garden.push({...base,kind:'rose',maxR:mr,petalCount:Math.floor(26+evt.size*24),
+        stemLen:Math.min(mr*2.5,mr*PHI),stemW:(3.5+evt.size*3)*dpr,golden:true,growDur:0.08});break;}
+    case 'rose':{
+      const mr=(30+evt.size*50)*dpr;
+      garden.push({...base,kind:'rose',maxR:mr,petalCount:Math.floor(14+evt.size*22),
+        stemLen:Math.min(mr*2.5,mr*PHI),stemW:(2.5+evt.size*3)*dpr,golden:false,growDur:0.06});break;}
+    case 'bud':{
+      const mr=Math.max(12*dpr,(8+evt.size*12)*dpr);
+      garden.push({...base,kind:'bud',maxR:mr,stemLen:mr*1.8,
+        stemW:(1+evt.size)*dpr,growDur:0.04});break;}
+    case 'thorn':
+      garden.push({...base,kind:'thorn',len:(10+evt.size*15)*dpr,growDur:0.03});break;
+    case 'vine':
+      garden.push({...base,kind:'vine',maxLen:(100+evt.size*300)*dpr,width:(2+evt.size*3)*dpr,
+        growDur:0.10+evt.size*0.08,leafCount:Math.floor(4+evt.size*10)});break;
+    case 'leaf':
+      garden.push({...base,kind:'leaf',leafSize:(10+evt.size*20)*dpr,
+        leafAngle:base.baseRot+evt.side*0.5,growDur:0.08});break;
+    case 'ghunnah':
+      glows.push({ci,born:progress,maxR:(40+evt.size*60)*dpr,col,dur:0.12});break;
+    case 'bloom':
+      for(const g of garden)if(g.kind==='rose'||g.kind==='bud')g.forceBloom=progress;break;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   2D DRAW FUNCTIONS — copied verbatim from v43
+   ═══════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════
+   FLOWER PRIMITIVES — from Palestine wildflower references
+   Construction: contour → flat fill → tahrir outline
+   ═══════════════════════════════════════════════════ */
+
+function drawPencFlower(x,y,R,n,bl,baseRot,col,golden){
+  // Penç v7: Single scalloped outline — 5 lobes with V-notches between
+  // Draw the WHOLE flower as one closed path, then fill + stroke
+  if(bl<0.05)return;
+  const r=R*bl;
+  const petalN=n||5;
+  const lineW=Math.max(0.5,0.8*dpr);
+  const fillR=golden?240:col[0], fillG=golden?175:col[1], fillB=golden?30:col[2];
+  const darkR=golden?190:Math.round(col[0]*0.7), darkG=golden?120:Math.round(col[1]*0.5), darkB=golden?10:Math.round(col[2]*0.45);
+  const lineCol=golden?'rgba(160,100,10,0.7)':`rgba(${darkR},${darkG},${darkB},0.7)`;
+  const centerR=r*0.22;
+  const outerR=r*0.85;
+  const notchR=r*0.52; // how far in the notch dips (between lobes)
+  const sliceA=Math.PI*2/petalN;
+
+  // Build scalloped outline as one continuous path
+  ctx.beginPath();
+  for(let i=0;i<petalN;i++){
+    if(i>=bl*(petalN+0.5))break;
+    const a=baseRot+i*sliceA;
+    const aNext=baseRot+(i+1)*sliceA;
+    // Lobe apex (outermost point of this petal)
+    const apexX=x+Math.cos(a)*outerR;
+    const apexY=y+Math.sin(a)*outerR;
+    // Notch between this petal and next (valley)
+    const notchA=a+sliceA*0.5;
+    const notchX=x+Math.cos(notchA)*notchR;
+    const notchY=y+Math.sin(notchA)*notchR;
+    // Control points for the rounded lobe
+    const cpLA=a-sliceA*0.25;
+    const cpLx=x+Math.cos(cpLA)*outerR*1.05;
+    const cpLy=y+Math.sin(cpLA)*outerR*1.05;
+    const cpRA=a+sliceA*0.25;
+    const cpRx=x+Math.cos(cpRA)*outerR*1.05;
+    const cpRy=y+Math.sin(cpRA)*outerR*1.05;
+
+    if(i===0){
+      // Start from the notch before first petal
+      const prevNotchA=a-sliceA*0.5;
+      ctx.moveTo(x+Math.cos(prevNotchA)*notchR, y+Math.sin(prevNotchA)*notchR);
+    }
+    // Curve up to lobe apex
+    ctx.quadraticCurveTo(cpLx, cpLy, apexX, apexY);
+    // Curve down to next notch
+    ctx.quadraticCurveTo(cpRx, cpRy, notchX, notchY);
+  }
+  ctx.closePath();
+
+  // Fill
+  ctx.globalAlpha=bl*0.85;
+  ctx.fillStyle=`rgb(${fillR},${fillG},${fillB})`;ctx.fill();
+  // Tahrir outline
+  ctx.globalAlpha=bl;
+  ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
+
+  // Internal petal division lines (radial lines from center to notches)
+  for(let i=0;i<petalN;i++){
+    if(i>=bl*(petalN+0.5))break;
+    const notchA=baseRot+i*sliceA+sliceA*0.5;
+    ctx.beginPath();
+    ctx.moveTo(x+Math.cos(notchA)*centerR, y+Math.sin(notchA)*centerR);
+    ctx.lineTo(x+Math.cos(notchA)*notchR, y+Math.sin(notchA)*notchR);
+    ctx.strokeStyle=lineCol;ctx.lineWidth=lineW*0.7;ctx.globalAlpha=bl*0.6;ctx.stroke();
+  }
+
+  // Center circle
+  ctx.beginPath();ctx.arc(x,y,centerR,0,Math.PI*2);
+  ctx.globalAlpha=bl*0.95;
+  ctx.fillStyle=golden?'rgb(200,145,15)':`rgb(${darkR},${darkG},${darkB})`;ctx.fill();
+  ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
+  // Inner dot
+  ctx.beginPath();ctx.arc(x,y,centerR*0.4,0,Math.PI*2);
+  ctx.fillStyle=golden?'rgb(255,200,40)':`rgb(${fillR},${fillG},${fillB})`;ctx.fill();
+}
+
+function drawCarnation(x,y,R,bl,baseRot,col){
+  // Carnation: ruffled/serrated petal mass in a cup calyx
+  if(bl<0.1)return;
+  const r=R*bl;
+  const lineW=Math.max(0.5,0.8*dpr);
+  const darkR=Math.round(col[0]*0.55), darkG=Math.round(col[1]*0.45), darkB=Math.round(col[2]*0.45);
+  const lineCol=`rgba(${darkR},${darkG},${darkB},0.7)`;
+  // Serrated petal mass — irregular curved top edge
+  const petalCount=Math.floor(8+bl*6);
+  for(let i=0;i<petalCount;i++){
+    const frac=i/petalCount;
+    const a=baseRot+frac*Math.PI*2;
+    const dist=r*(0.4+Math.random()*0.3);
+    const px=x+Math.cos(a)*dist;
+    const py=y+Math.sin(a)*dist;
+    const s=r*(0.15+Math.random()*0.15);
+    // Small ruffled petal — jagged edge
+    ctx.beginPath();
+    ctx.moveTo(px,py);
+    const tipA=a+(-0.15+Math.random()*0.3);
+    const tipDist=s*(0.8+Math.random()*0.4);
+    const tx=px+Math.cos(tipA)*tipDist, ty=py+Math.sin(tipA)*tipDist;
+    // Serrated edge via small zigzag
+    const perpA=tipA+Math.PI*0.5;
+    const w=s*0.35;
+    ctx.quadraticCurveTo(px+Math.cos(tipA)*s*0.4+Math.cos(perpA)*w,
+                         py+Math.sin(tipA)*s*0.4+Math.sin(perpA)*w, tx,ty);
+    ctx.quadraticCurveTo(px+Math.cos(tipA)*s*0.4-Math.cos(perpA)*w,
+                         py+Math.sin(tipA)*s*0.4-Math.sin(perpA)*w, px,py);
+    ctx.closePath();
+    ctx.globalAlpha=bl*(0.5+frac*0.3);
+    ctx.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;ctx.fill();
+    ctx.globalAlpha=bl*0.8;
+    ctx.strokeStyle=lineCol;ctx.lineWidth=lineW*0.7;ctx.stroke();
+  }
+  // Calyx — cup shape at base
+  if(bl>0.3){
+    const cx1=x-r*0.2,cy1=y+r*0.3;
+    const cx2=x+r*0.2,cy2=y+r*0.3;
+    ctx.beginPath();ctx.moveTo(cx1,cy1);
+    ctx.quadraticCurveTo(x,y+r*0.5,cx2,cy2);
+    ctx.globalAlpha=bl*0.6;
+    ctx.strokeStyle='rgba(10,100,8,0.6)';ctx.lineWidth=lineW;ctx.stroke();
+  }
+}
+
+function drawTulipBud(x,y,R,bl,baseRot,col){
+  // Tulip bud: 3 elongated pointed petals, flame-like tips curving outward
+  if(bl<0.1)return;
+  const r=R*bl;
+  const lineW=Math.max(0.5,0.8*dpr);
+  const darkR=Math.round(col[0]*0.5), darkG=Math.round(col[1]*0.4), darkB=Math.round(col[2]*0.4);
+  const lineCol=`rgba(${darkR},${darkG},${darkB},0.7)`;
+  for(let i=0;i<3;i++){
+    const a=baseRot+i*(Math.PI*2/3);
+    const tipX=x+Math.cos(a)*r*0.9;
+    const tipY=y+Math.sin(a)*r*0.9;
+    const perpA=a+Math.PI*0.5;
+    const w=r*0.22;
+    // Elongated petal with curving tip
+    ctx.beginPath();ctx.moveTo(x,y);
+    ctx.bezierCurveTo(
+      x+Math.cos(a)*r*0.3+Math.cos(perpA)*w, y+Math.sin(a)*r*0.3+Math.sin(perpA)*w,
+      tipX+Math.cos(perpA)*w*0.6, tipY+Math.sin(perpA)*w*0.6,
+      tipX+Math.cos(a+0.3)*r*0.15, tipY+Math.sin(a+0.3)*r*0.15 // curving tip
+    );
+    ctx.bezierCurveTo(
+      tipX-Math.cos(perpA)*w*0.6, tipY-Math.sin(perpA)*w*0.6,
+      x+Math.cos(a)*r*0.3-Math.cos(perpA)*w, y+Math.sin(a)*r*0.3-Math.sin(perpA)*w,
+      x,y
+    );
+    ctx.closePath();
+    ctx.globalAlpha=bl*0.75;
+    ctx.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;ctx.fill();
+    ctx.globalAlpha=bl;
+    ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
+  }
+}
+
+// Layered rose — 3-ring petal structure from Palestine wildflower refs
+function drawRose(x,y,maxR,petalCount,bl,baseRot,col,golden){
+  if(bl<0.01)return;
+  if(maxR*bl<1)return;
+  // Seeded PRNG — deterministic per flower
+  function srand(s){return function(){s=(s*9301+49297)%233280;return s/233280;};}
+  const rng=srand(Math.floor(baseRot*10000));
+
+  const lineW=Math.max(0.5,0.8*dpr);
+  // Per-flower color tint shift for variety
+  const tintShift=((rng()-0.5)*10)|0;
+  const fillR=golden?248:Math.min(255,Math.max(0,col[0]+tintShift)), fillG=golden?170:Math.min(255,Math.max(0,col[1]+((rng()-0.5)*6)|0)), fillB=golden?25:Math.min(255,Math.max(0,col[2]+((rng()-0.5)*6)|0));
+  // Dark stays in-hue — keep saturation high (don't crush toward gray)
+  const darkR=golden?195:Math.round(fillR*0.82), darkG=golden?110:Math.round(fillG*0.45), darkB=golden?8:Math.round(fillB*0.40);
+  const midR=golden?252:Math.min(255,fillR+5), midG=golden?185:Math.min(255,fillG), midB=golden?30:Math.min(255,fillB);
+  const litR=golden?255:Math.min(255,fillR+15), litG=golden?210:Math.min(255,Math.round(fillG*0.75+45)), litB=golden?50:Math.min(255,Math.round(fillB*0.75+35));
+  const lineCol=golden?'rgba(170,105,5,0.75)':`rgba(${darkR},${darkG},${darkB},0.75)`;
+  // Per-flower variation: petal width factor, layer rotation offsets
+  const widVar=0.8+rng()*0.4; // ±20% petal width variation
+  const layerRotA=rng()*0.4; // extra rotation offset per layer
+  const layerRotB=rng()*0.4;
+
+  // Petal with openness: 0=tight closed bud, 1=fully spread
+  // Per-petal gradient: darker at base, lighter at tip/edges
+  function petal(px,py,angle,len,widBase,fillC,alpha,openness,layerIdx){
+    ctx.save();ctx.translate(px,py);ctx.rotate(angle);
+    const wid=widBase*(0.12+openness*0.88);
+    const w=len*wid;
+    const notch=len*0.06;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.bezierCurveTo(w*0.6,-len*0.25, w*0.85,-len*0.65, notch*0.5,-len+notch);
+    ctx.lineTo(0,-len);
+    ctx.lineTo(-notch*0.5,-len+notch);
+    ctx.bezierCurveTo(-w*0.85,-len*0.65, -w*0.6,-len*0.25, 0,0);
+    ctx.closePath();
+    // Per-petal gradient: dark at base → light at tip
+    const grad=ctx.createLinearGradient(0,0,0,-len);
+    const li=layerIdx||0; // 0=outer,1=mid,2=inner
+    const baseDk=li===2?0.55:li===1?0.65:0.75; // inner petals darker at base
+    const tipLt=li===2?1.0:li===1?0.95:0.9;
+    grad.addColorStop(0,`rgba(${Math.round(darkR+(fillR-darkR)*baseDk)},${Math.round(darkG+(fillG-darkG)*baseDk)},${Math.round(darkB+(fillB-darkB)*baseDk)},1)`);
+    grad.addColorStop(0.6,fillC);
+    grad.addColorStop(1,`rgba(${Math.min(255,Math.round(litR*tipLt))},${Math.min(255,Math.round(litG*tipLt))},${Math.min(255,Math.round(litB*tipLt))},1)`);
+    ctx.globalAlpha=alpha;
+    ctx.fillStyle=grad;ctx.fill();
+    ctx.globalAlpha=alpha*0.9;
+    ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
+    ctx.restore();
+  }
+
+  // Layer-local bloom: maps bl to 0→1 within layer's active range
+  function lbl(minB,maxB){return Math.max(0,Math.min(1,(bl-minB)/(maxB-minB)));}
+  // Smoothstep ease for organic opening
+  function ease(t){return t*t*(3-2*t);}
+
+  // Petal counts per layer
+  const outerN=Math.max(4,Math.min(8,Math.floor(petalCount*0.35)));
+  const midN=Math.max(5,Math.min(10,Math.floor(petalCount*0.4)));
+  const innerN=Math.max(4,Math.min(7,Math.floor(petalCount*0.25)+2));
+  const outerSlice=Math.PI*2/outerN;
+
+  // Pre-generate all rng values so sequence is stable at every bl
+  const outerJit=[],outerLenV=[];
+  for(let i=0;i<outerN;i++){outerJit.push((rng()-0.5)*0.15);outerLenV.push(0.92+rng()*0.16);}
+  const midOff=outerSlice*0.5+rng()*0.2;
+  const midJit=[],midLenV=[];
+  for(let i=0;i<midN;i++){midJit.push((rng()-0.5)*0.12);midLenV.push(0.9+rng()*0.2);}
+  const inOff=outerSlice*0.33+rng()*0.3;
+  const inJit=[],inLenV=[];
+  for(let i=0;i<innerN;i++){inJit.push((rng()-0.5)*0.1);inLenV.push(0.88+rng()*0.24);}
+
+  // === Draw back→front: outer, mid, inner, center ===
+  // Bloom order: center appears first, outer appears last
+  // Wider ranges + higher stagger = slower, more gradual unfurl
+
+  // OUTER petals — bloom range 0.5→1.0
+  const outerBl=lbl(0.50,1.0);
+  if(outerBl>0){
+    const baseLen=maxR*0.88*(0.5+bl*0.5);
+    for(let i=0;i<outerN;i++){
+      const stagger=i/outerN*0.55;
+      const pBl=Math.max(0,Math.min(1,(outerBl-stagger)/0.45));
+      if(pBl<=0)continue;
+      const a=baseRot+i*outerSlice+outerJit[i];
+      const lenVar=baseLen*outerLenV[i]*(0.3+pBl*0.7);
+      petal(x,y,a,lenVar,0.8*widVar,`rgb(${fillR},${fillG},${fillB})`,pBl*0.85,ease(pBl),0);
+    }
+  }
+
+  // MID petals — bloom range 0.25→0.78
+  const midBl=lbl(0.25,0.78);
+  if(midBl>0){
+    const midSlice=Math.PI*2/midN;
+    const baseLen=maxR*0.62*(0.35+bl*0.65);
+    for(let i=0;i<midN;i++){
+      const stagger=i/midN*0.5;
+      const pBl=Math.max(0,Math.min(1,(midBl-stagger)/0.5));
+      if(pBl<=0)continue;
+      const a=baseRot+midOff+layerRotA+i*midSlice+midJit[i];
+      const lenVar=baseLen*midLenV[i]*(0.25+pBl*0.75);
+      const op=ease(pBl);
+      petal(x,y,a,lenVar,0.75*widVar,`rgb(${midR},${midG},${midB})`,pBl*0.9,op*op,1);
+    }
+  }
+
+  // INNER petals — bloom range 0.08→0.55
+  const innerBl=lbl(0.08,0.55);
+  if(innerBl>0){
+    const inSlice=Math.PI*2/innerN;
+    const baseLen=maxR*0.38*(0.25+bl*0.75);
+    for(let i=0;i<innerN;i++){
+      const stagger=i/innerN*0.45;
+      const pBl=Math.max(0,Math.min(1,(innerBl-stagger)/0.55));
+      if(pBl<=0)continue;
+      const a=baseRot+inOff+layerRotB+i*inSlice+inJit[i];
+      const lenVar=baseLen*inLenV[i]*(0.2+pBl*0.8);
+      const op=ease(pBl);
+      petal(x,y,a,lenVar,0.7*widVar,`rgb(${litR},${litG},${litB})`,pBl*0.95,op*op*op,2);
+    }
+  }
+
+  // CENTER — packed dots (dense stamen cluster), bl 0.0→0.35
+  const centerBl=lbl(0.0,0.35);
+  if(centerBl>0.05){
+    const cR=maxR*0.18*(0.3+bl*0.7);
+    // Packed dots — many small circles of varying sizes filling center area
+    const dotCount=Math.max(6,Math.floor(cR*cR*0.08));
+    const placed=[];
+    for(let attempt=0;attempt<dotCount*4;attempt++){
+      // Random position within center radius using seeded rng
+      const a=rng()*Math.PI*2;
+      const dist=cR*Math.sqrt(rng())*0.95; // sqrt for uniform disk distribution
+      const dx=x+Math.cos(a)*dist, dy=y+Math.sin(a)*dist;
+      const dotR=Math.max(0.4,cR*(0.06+rng()*0.12));
+      // Simple overlap check
+      let ok=true;
+      for(const p of placed){
+        const px=p[0]-dx,py=p[1]-dy;
+        if(px*px+py*py<(p[2]+dotR)*(p[2]+dotR)*0.7){ok=false;break;}
+      }
+      if(!ok)continue;
+      placed.push([dx,dy,dotR]);
+      ctx.beginPath();ctx.arc(dx,dy,dotR,0,Math.PI*2);
+      ctx.globalAlpha=centerBl*(0.55+rng()*0.4);
+      const tint=rng();
+      if(golden){
+        const g=Math.round(140+tint*50),r=Math.round(210+tint*40);
+        ctx.fillStyle=`rgb(${r},${g},${Math.round(10+tint*40)})`;
+      }else{
+        ctx.fillStyle=`rgb(${Math.round(darkR+(litR-darkR)*tint)},${Math.round(darkG+(litG-darkG)*tint)},${Math.round(darkB+(litB-darkB)*tint)})`;
+      }
+      ctx.fill();
+      if(placed.length>=dotCount)break;
+    }
+  }
+  ctx.globalAlpha=1;
+}
+function drawStem(fx,fy,tx,ty,thick,bl){
+  if(bl<0.05)return;
+  const dx=tx-fx,dy=ty-fy;
+  // Gentle S-curve: outward sway near base, straighten toward tip
+  const c1x=fx+dx*0.25-dy*0.22,c1y=fy+dy*0.25+dx*0.22;
+  const c2x=fx+dx*0.7+dy*0.08,c2y=fy+dy*0.7-dx*0.08;
+  const ex=fx+(tx-fx)*bl,ey=fy+(ty-fy)*bl;
+  ctx.beginPath();ctx.moveTo(fx,fy);ctx.bezierCurveTo(c1x,c1y,c2x,c2y,ex,ey);
+  ctx.strokeStyle=`rgba(20,130,15,${0.9*bl})`;ctx.lineWidth=thick;ctx.stroke();
+}
+function drawLeaf(x,y,angle,size,bl){
+  if(bl<0.2)return;
+  // Seeded PRNG for stable leaf variation
+  function srand(s){return function(){s=(s*9301+49297)%233280;return s/233280;};}
+  const rng=srand(Math.floor(Math.abs(angle)*10000+size*100));
+
+  ctx.save();ctx.translate(x,y);ctx.rotate(angle);
+  const s=size*bl;
+  if(s<2){ctx.restore();return;}
+
+  // Saz leaf parameters
+  const isSmall=size<14*dpr; // small pointed leaf variant (bud accompaniment)
+  const nSerr=isSmall?0:(3+Math.floor(rng()*2)); // 3-4 serrations for large saz leaves
+  const asymm=0.88+rng()*0.24; // asymmetry factor 0.88-1.12
+  const curve=(rng()-0.5)*0.2*s; // S-curve bend magnitude
+  const len=s;
+  const maxW=s*(isSmall?0.18:0.22);
+
+  // Central vein (spine) — gentle S-curve
+  function spine(t){
+    return{x:t*len,y:Math.sin(t*Math.PI)*curve*(1-t*0.6)};
+  }
+  function spineNormal(t){
+    const dt=0.005;
+    const a=spine(Math.max(0,t-dt)),b=spine(Math.min(1,t+dt));
+    const dx=b.x-a.x,dy=b.y-a.y;
+    const l=Math.sqrt(dx*dx+dy*dy)||1;
+    return{nx:-dy/l,ny:dx/l};
+  }
+
+  // Width profile: saz leaf widens quickly, peaks at ~30%, then long graceful taper
+  function widthAt(t){
+    if(t<0.06)return t/0.06*0.65;
+    if(t<0.3)return 0.65+(t-0.06)/0.24*0.35;
+    return Math.pow((1-t)/0.7,0.8);
+  }
+
+  // Serration: pointed lobes with V-notch dips (feathered saz edge)
+  function serrMod(t,offset){
+    if(nSerr===0||t<0.12||t>0.92)return 1;
+    const phase=((t-0.12)/0.8*nSerr+offset);
+    const frac=phase-Math.floor(phase);
+    // Lobe rises smoothly, drops sharply — creates pointed barb effect
+    const lobe=frac<0.65?frac/0.65:1-(frac-0.65)/0.35;
+    return 0.82+0.18*lobe;
+  }
+
+  // Sample outline points along both sides of the leaf
+  const N=Math.max(20,Math.round(s*0.7));
+  const topEdge=[],botEdge=[];
+  for(let i=0;i<=N;i++){
+    const t=i/N;
+    const sp=spine(t);
+    const nm=spineNormal(t);
+    const w=widthAt(t)*maxW;
+    const wTop=w*asymm*serrMod(t,0);
+    const wBot=w*(2-asymm)*serrMod(t,0.5);
+    topEdge.push({x:sp.x+nm.nx*wTop,y:sp.y+nm.ny*wTop});
+    botEdge.push({x:sp.x-nm.nx*wBot,y:sp.y-nm.ny*wBot});
+  }
+
+  // Draw filled leaf shape
+  ctx.beginPath();
+  ctx.moveTo(topEdge[0].x,topEdge[0].y);
+  for(let i=1;i<topEdge.length;i++)ctx.lineTo(topEdge[i].x,topEdge[i].y);
+  for(let i=botEdge.length-1;i>=0;i--)ctx.lineTo(botEdge[i].x,botEdge[i].y);
+  ctx.closePath();
+
+  // Gradient fill: darker at base, lighter at tip
+  const grad=ctx.createLinearGradient(0,0,len,0);
+  grad.addColorStop(0,`rgba(10,85,10,${0.95*bl})`);
+  grad.addColorStop(0.4,`rgba(20,130,18,${0.92*bl})`);
+  grad.addColorStop(1,`rgba(35,175,25,${0.85*bl})`);
+  ctx.fillStyle=grad;ctx.fill();
+
+  // Outline
+  ctx.strokeStyle=`rgba(8,70,8,${0.55*bl})`;
+  ctx.lineWidth=Math.max(0.5,0.5*dpr);ctx.stroke();
+
+  // Central vein (curved line along spine)
+  ctx.beginPath();
+  const v0=spine(0);ctx.moveTo(v0.x,v0.y);
+  for(let i=1;i<=10;i++){const v=spine(i/10);ctx.lineTo(v.x,v.y);}
+  ctx.strokeStyle=`rgba(30,150,20,${0.4*bl})`;
+  ctx.lineWidth=Math.max(0.6,0.9*dpr);ctx.stroke();
+
+  // Side veins branching from central vein (saz feather detail)
+  if(!isSmall&&s>10*dpr){
+    ctx.strokeStyle=`rgba(30,150,20,${0.2*bl})`;
+    ctx.lineWidth=Math.max(0.3,0.4*dpr);
+    const nVeins=nSerr+1;
+    for(let i=1;i<=nVeins;i++){
+      const t=0.15+(i/(nVeins+1))*0.7;
+      const sp=spine(t);
+      const nm=spineNormal(t);
+      const w=widthAt(t)*maxW*0.6;
+      // Angled toward tip — side veins point slightly forward
+      const fwd=len*0.04;
+      ctx.beginPath();ctx.moveTo(sp.x,sp.y);
+      ctx.lineTo(sp.x+nm.nx*w*asymm+fwd,sp.y+nm.ny*w*asymm);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(sp.x,sp.y);
+      ctx.lineTo(sp.x-nm.nx*w*(2-asymm)+fwd,sp.y-nm.ny*w*(2-asymm));ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+function drawBud(x,y,maxR,bl,col,baseRot){
+  if(bl<0.05)return;
+  // Seeded PRNG — stable variant from baseRot
+  function srand(s){return function(){s=(s*9301+49297)%233280;return s/233280;};}
+  const rng=srand(Math.floor((baseRot||0)*10000));
+  const variant=Math.floor(rng()*3); // 0=tight, 1=opening, 2=rosebud
+  const r=maxR*Math.min(1,bl*1.4);
+  const lineW=Math.max(0.5,0.7*dpr);
+  // Light direction for per-element shading (light from upper-left)
+  const lightAng=-Math.PI*0.3;
+
+  // Color helpers
+  function shade(c,amt){return[Math.round(c[0]*amt),Math.round(c[1]*amt),Math.round(c[2]*amt)];}
+  function tint(c,amt){return[Math.min(255,Math.round(c[0]+(255-c[0])*amt)),Math.min(255,Math.round(c[1]+(255-c[1])*amt)),Math.min(255,Math.round(c[2]+(255-c[2])*amt))];}
+  function rgb(c){return`rgb(${c[0]},${c[1]},${c[2]})`;}
+  function rgba(c,a){return`rgba(${c[0]},${c[1]},${c[2]},${a})`;}
+  // Shading factor based on angle relative to light
+  function shadeFactor(ang){const d=Math.cos(ang-lightAng);return d*0.5+0.5;} // 0=dark side, 1=light side
+
+  // Sepal/calyx colors
+  const sepalBase=[15,130,15];
+  const sepalDark=shade(sepalBase,0.6);
+  const sepalLight=tint(sepalBase,0.3);
+  const petalDark=shade(col,0.55);
+  const petalLine=rgba(petalDark,0.6);
+  const sepalLine=rgba(shade(sepalBase,0.4),0.6);
+
+  // ── Draw calyx sepals (shared by all variants) ──
+  function drawCalyx(sepalCount,sepalH,spreadAng){
+    for(let i=0;i<sepalCount;i++){
+      const a=(i-((sepalCount-1)*0.5))*spreadAng;
+      const sf=shadeFactor(a);
+      const sc=sf>0.5?tint(sepalBase,(sf-0.5)*0.5):shade(sepalBase,0.7+sf*0.6);
+      const sw=r*0.22*(0.9+rng()*0.2);
+      const sh=sepalH*(0.9+rng()*0.15);
+      ctx.save();ctx.translate(x,y);ctx.rotate(a);
+      ctx.beginPath();
+      // Pointed sepal — narrow base, widens, then sharp tip (Ottoman style)
+      ctx.moveTo(0,r*0.05);
+      ctx.bezierCurveTo(sw*0.3,r*0.02, sw*0.9,-sh*0.25, sw*0.7,-sh*0.5);
+      ctx.bezierCurveTo(sw*0.4,-sh*0.8, sw*0.1,-sh*0.95, 0,-sh);
+      ctx.bezierCurveTo(-sw*0.1,-sh*0.95, -sw*0.4,-sh*0.8, -sw*0.7,-sh*0.5);
+      ctx.bezierCurveTo(-sw*0.9,-sh*0.25, -sw*0.3,r*0.02, 0,r*0.05);
+      ctx.closePath();
+      ctx.globalAlpha=bl*0.85;
+      ctx.fillStyle=rgb(sc);ctx.fill();
+      ctx.strokeStyle=sepalLine;ctx.lineWidth=lineW*0.7;ctx.globalAlpha=bl*0.5;ctx.stroke();
+      // Center vein on sepal
+      ctx.beginPath();ctx.moveTo(0,r*0.02);ctx.lineTo(0,-sh*0.85);
+      ctx.strokeStyle=rgba(sepalDark,0.4*bl);ctx.lineWidth=lineW*0.5;ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  if(variant===0){
+    // ── TIGHT BUD — fully closed, pointed tip, sepals dominant ──
+    // Calyx first (behind bud body)
+    drawCalyx(3,r*0.75,0.55);
+
+    // Bud body — teardrop/ovoid, no petals showing
+    ctx.save();ctx.translate(x,y);
+    ctx.beginPath();
+    const bw=r*0.32, bh=r*0.85;
+    ctx.moveTo(0,r*0.08);
+    ctx.bezierCurveTo(bw,r*0.02, bw*1.1,-bh*0.4, 0,-bh);
+    ctx.bezierCurveTo(-bw*1.1,-bh*0.4, -bw,r*0.02, 0,r*0.08);
+    ctx.closePath();
+    // Gradient from light side to dark side
+    const grd=ctx.createLinearGradient(-bw,0,bw,0);
+    grd.addColorStop(0,rgb(tint(col,0.25)));
+    grd.addColorStop(0.5,rgb(col));
+    grd.addColorStop(1,rgb(shade(col,0.65)));
+    ctx.globalAlpha=bl*0.9;ctx.fillStyle=grd;ctx.fill();
+    ctx.strokeStyle=petalLine;ctx.lineWidth=lineW;ctx.globalAlpha=bl*0.5;ctx.stroke();
+    // Tight seam line down center
+    ctx.beginPath();ctx.moveTo(0,r*0.0);ctx.lineTo(0,-bh*0.9);
+    ctx.strokeStyle=rgba(petalDark,0.3*bl);ctx.lineWidth=lineW*0.5;ctx.stroke();
+    // Pointed tip highlight
+    ctx.beginPath();ctx.arc(0,-bh*0.85,r*0.06,0,Math.PI*2);
+    ctx.globalAlpha=bl*0.5;ctx.fillStyle=rgb(tint(col,0.45));ctx.fill();
+    ctx.restore();
+
+  }else if(variant===1){
+    // ── OPENING BUD — sepals parting, 2-3 petal tips peeking ──
+    // Calyx with wider spread (sepals opening)
+    drawCalyx(3,r*0.6,0.7);
+
+    // Bud body — wider ovoid
+    ctx.save();ctx.translate(x,y);
+    const bw=r*0.38, bh=r*0.75;
+    ctx.beginPath();
+    ctx.moveTo(0,r*0.08);
+    ctx.bezierCurveTo(bw*1.1,r*0.0, bw*1.2,-bh*0.35, 0,-bh*0.7);
+    ctx.bezierCurveTo(-bw*1.2,-bh*0.35, -bw*1.1,r*0.0, 0,r*0.08);
+    ctx.closePath();
+    const grd=ctx.createLinearGradient(-bw,0,bw,0);
+    grd.addColorStop(0,rgb(tint(col,0.2)));
+    grd.addColorStop(0.6,rgb(col));
+    grd.addColorStop(1,rgb(shade(col,0.6)));
+    ctx.globalAlpha=bl*0.85;ctx.fillStyle=grd;ctx.fill();
+    ctx.strokeStyle=petalLine;ctx.lineWidth=lineW;ctx.globalAlpha=bl*0.45;ctx.stroke();
+    ctx.restore();
+
+    // Petal tips peeking out at top (2-3 tips above bud body)
+    const tipN=2+Math.floor(rng()*2);
+    for(let i=0;i<tipN;i++){
+      const a=(i-(tipN-1)*0.5)*0.45+rng()*0.15-0.07;
+      const sf=shadeFactor(a);
+      const pc=sf>0.5?tint(col,(sf-0.5)*0.4):shade(col,0.7+sf*0.5);
+      const tipH=r*(0.2+rng()*0.12);
+      const tipW=r*(0.1+rng()*0.06);
+      const ty=-r*0.55-tipH*0.3; // positioned at top of bud body
+      ctx.save();ctx.translate(x,y+ty);ctx.rotate(a*0.5);
+      ctx.beginPath();
+      ctx.moveTo(-tipW*0.5,tipH*0.3);
+      ctx.bezierCurveTo(-tipW*0.3,-tipH*0.2, -tipW*0.1,-tipH*0.7, 0,-tipH);
+      ctx.bezierCurveTo(tipW*0.1,-tipH*0.7, tipW*0.3,-tipH*0.2, tipW*0.5,tipH*0.3);
+      ctx.closePath();
+      ctx.globalAlpha=bl*0.8;ctx.fillStyle=rgb(pc);ctx.fill();
+      ctx.strokeStyle=petalLine;ctx.lineWidth=lineW*0.6;ctx.globalAlpha=bl*0.4;ctx.stroke();
+      ctx.restore();
+    }
+
+  }else{
+    // ── ROSEBUD — spiral of wrapped petals, sepals curled back ──
+    // Sepals curled back (drawn first, shorter and wider spread)
+    drawCalyx(4,r*0.5,0.85);
+
+    // Outer wrap petal (back)
+    ctx.save();ctx.translate(x,y);
+    const ow=r*0.42, oh=r*0.8;
+    ctx.beginPath();
+    ctx.moveTo(0,r*0.06);
+    ctx.bezierCurveTo(ow*1.1,-oh*0.1, ow*0.9,-oh*0.65, ow*0.15,-oh*0.85);
+    ctx.bezierCurveTo(-ow*0.1,-oh*0.9, -ow*0.8,-oh*0.5, -ow*0.3,-oh*0.15);
+    ctx.bezierCurveTo(-ow*0.6,oh*0.0, -ow*0.2,r*0.05, 0,r*0.06);
+    ctx.closePath();
+    ctx.globalAlpha=bl*0.8;ctx.fillStyle=rgb(shade(col,0.75));ctx.fill();
+    ctx.strokeStyle=petalLine;ctx.lineWidth=lineW*0.7;ctx.globalAlpha=bl*0.4;ctx.stroke();
+    ctx.restore();
+
+    // Middle wrap petal
+    ctx.save();ctx.translate(x,y);
+    const mw=r*0.35, mh=r*0.75;
+    ctx.beginPath();
+    ctx.moveTo(0,r*0.04);
+    ctx.bezierCurveTo(-mw*0.9,-mh*0.1, -mw*1.0,-mh*0.55, -mw*0.1,-mh*0.8);
+    ctx.bezierCurveTo(mw*0.3,-mh*0.85, mw*0.8,-mh*0.4, mw*0.2,-mh*0.05);
+    ctx.bezierCurveTo(mw*0.4,r*0.02, mw*0.1,r*0.04, 0,r*0.04);
+    ctx.closePath();
+    ctx.globalAlpha=bl*0.85;ctx.fillStyle=rgb(col);ctx.fill();
+    ctx.strokeStyle=petalLine;ctx.lineWidth=lineW*0.6;ctx.globalAlpha=bl*0.4;ctx.stroke();
+    ctx.restore();
+
+    // Inner spiral petal (lightest, most visible)
+    ctx.save();ctx.translate(x,y);
+    const iw=r*0.22, ih=r*0.65;
+    ctx.beginPath();
+    ctx.moveTo(0,r*0.0);
+    ctx.bezierCurveTo(iw*0.8,-ih*0.2, iw*1.0,-ih*0.55, iw*0.1,-ih*0.75);
+    ctx.bezierCurveTo(-iw*0.2,-ih*0.8, -iw*0.6,-ih*0.35, 0,r*0.0);
+    ctx.closePath();
+    ctx.globalAlpha=bl*0.9;ctx.fillStyle=rgb(tint(col,0.3));ctx.fill();
+    ctx.strokeStyle=petalLine;ctx.lineWidth=lineW*0.5;ctx.globalAlpha=bl*0.35;ctx.stroke();
+    ctx.restore();
+
+    // Spiral center curl
+    ctx.save();ctx.translate(x,y-r*0.45);
+    ctx.beginPath();
+    ctx.arc(r*0.04,0,r*0.08,Math.PI*0.3,Math.PI*1.8);
+    ctx.strokeStyle=rgba(petalDark,0.4*bl);ctx.lineWidth=lineW*0.6;ctx.stroke();
+    ctx.restore();
+  }
+  ctx.globalAlpha=1;
+}
+function drawThorn(x,y,len,angle,bl){
+  if(bl<0.1)return;ctx.save();ctx.translate(x,y);ctx.rotate(angle);
+  const l=len*bl;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(l*0.15,-l*0.3);ctx.lineTo(0,-l);ctx.lineTo(-l*0.15,-l*0.3);ctx.closePath();
+  ctx.fillStyle=`rgba(100,80,60,${0.6*bl})`;ctx.fill();ctx.restore();
+}
+function drawVine(cx,cy,normal,side,maxLen,width,bl,leafCount,baseRot,col){
+  if(bl<0.05)return;const len=maxLen*bl;const steps=30;ctx.beginPath();const pts=[];
+  for(let i=0;i<=steps;i++){const f=i/steps,along=len*f;
+    const sway=Math.sin(f*Math.PI*2+baseRot)*along*0.15;
+    const vx=cx+normal.x*along*side+normal.y*sway,vy=cy+normal.y*along*side-normal.x*sway;
+    pts.push({x:vx,y:vy});i===0?ctx.moveTo(vx,vy):ctx.lineTo(vx,vy);}
+  ctx.strokeStyle=`rgba(15,125,12,${0.55*bl})`;ctx.lineWidth=width*(1.2-bl*0.3);ctx.stroke();
+  for(let i=0;i<leafCount;i++){const f=(i+1)/(leafCount+1);
+    const bloomF=Math.max(0,Math.min(1,(bl-f*0.3)*2.5));if(bloomF<0.1)continue;
+    const pi=Math.floor(f*(pts.length-1)),p=pts[pi];
+    drawLeaf(p.x,p.y,baseRot+i*GOLDEN_ANGLE+Math.PI*side*0.3,(8+i*3)*dpr,bloomF);}
+  if(bl>0.6){const tip=pts[pts.length-1];drawBud(tip.x,tip.y,6*dpr,Math.min(1,(bl-0.6)*3),col,baseRot);}
+}
+
+/* ═══════════════════════════════════════════════════
+   TRAVELING DOTS + FALLING PETALS — from v43
+   ═══════════════════════════════════════════════════ */
+let dots=[],lastT=-1,fallingPetals=[];
+
+/* ═══════════════════════════════════════════════════
+   CONTINUOUS FILL — from v43
+   ═══════════════════════════════════════════════════ */
+let _lastFillT=0,_fibIdx=0,_occ=[];
+
+function continuousFill(progress,energy){
+  const fillRate=0.000015-energy*0.000012;
+  if(progress-_lastFillT<fillRate)return;
+  const ci=Math.min(Math.floor(progress*(CL-1)),CL-1);
+  const col=pathColor(progress);
+  let up=0,dn=0;
+  for(const o of _occ)if(Math.abs(o.ci-ci)<25){if(o.s>0)up++;else dn++;}
+  let side;if(up>dn+2)side=-1;else if(dn>up+2)side=1;else side=Math.random()>.5?1:-1;
+  const fibS=FIB[_fibIdx%FIB.length]/4;_fibIdx++;
+  let nearD=Infinity,nearR=0;
+  for(const o of _occ){const d=Math.abs(o.ci-ci);if(o.s===side&&d<nearD){nearD=d;nearR=o.r;}}
+  let sv;
+  if(nearD<5&&nearR>0){sv=(nearR/(10*dpr))/PHI+0.3;sv=Math.max(0.2,Math.min(5,sv));}
+  else if(nearD<20){sv=fibS*(0.6+energy*3.0);}
+  else{sv=fibS*PHI*(0.5+energy*3.5);}
+  const propR=(6+energy*18)*dpr*sv;
+  let crowded=false;for(const o of _occ)if(o.s===side&&Math.abs(o.ci-ci)<3){crowded=true;break;}
+  if(crowded)sv*=0.4;
+  const roll=Math.random();let newR=propR;
+  if(roll<0.55){
+    const ls=(8+energy*35+Math.random()*20)*dpr*sv;newR=ls*0.5;
+    garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
+      kind:'leaf',leafSize:ls,leafAngle:Math.random()*Math.PI*2,growDur:0.06+Math.random()*0.05});
+  }else if(roll<0.78){
+    const mr=Math.max(10*dpr,(6+energy*20+Math.random()*14)*dpr*sv);newR=mr;
+    garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
+      kind:'bud',maxR:mr,stemLen:mr*1.8,stemW:(0.8+energy*1.5)*dpr,growDur:0.02});
+  }else if(roll<0.93){
+    const mr=Math.max(14*dpr,(8+energy*22)*dpr*sv);newR=mr;
+    garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
+      kind:'rose',maxR:mr,petalCount:Math.floor(4+Math.random()*4),
+      stemLen:Math.min(mr*2.5,mr*PHI),stemW:(0.8+energy*1.2)*dpr,golden:false,growDur:0.025});
+  }else{
+    const tl=(5+energy*15)*dpr*sv;newR=tl;
+    garden.push({ci,side,born:progress,col,baseRot:Math.random()*Math.PI*2,
+      kind:'thorn',len:tl,growDur:0.015});
+  }
+  _occ.push({ci,s:side,r:newR});if(_occ.length>500)_occ.shift();
+  _lastFillT=progress;
+}
+
+/* ═══════════════════════════════════════════════════
+   MAIN ANIMATION LOOP
+   ═══════════════════════════════════════════════════ */
+function animate(){
+  requestAnimationFrame(animate);
+  ctx.fillStyle='#0d0d0d';ctx.fillRect(0,0,WD,HD);
+
+  const time=(typeof window._synthTime==='number')?window._synthTime:(audio?audio.currentTime:0);
+  const progress=Math.min(time/TOTAL_DUR,1);
+  if(typeof window._synthTime==='number')isPlaying=true;
+  const rawAmp=isPlaying?getAmp():0;
+  smoothAmp+=(rawAmp-smoothAmp)*0.12;
+  const energy=Math.min(1,smoothAmp*3);
+
+  // Tajweed events
+  while(tajweedIdx<TAJWEED.length&&time>=TAJWEED[tajweedIdx].t){
+    spawnGardenElement(TAJWEED[tajweedIdx],TAJWEED[tajweedIdx].t/TOTAL_DUR);tajweedIdx++;}
+
+  // Dot-presence displacement — from v43
+  const splitGap=(60+energy*180)*dpr; // wide weave at front, settles to BASE_GAP behind
+  const dotPresence=new Float32Array(CL);
+  for(const d of dots){const ci=Math.min(d.ci,CL-1),age=(progress-d.born)/0.09,str=Math.max(0,1-age);
+    for(let j=-40;j<=40;j++){const idx=ci+j;if(idx>=0&&idx<CL)dotPresence[idx]=Math.max(dotPresence[idx],str*(1-Math.abs(j)/40)**2);}}
+  for(let pass=0;pass<3;pass++)for(let i=2;i<CL-2;i++)
+    dotPresence[i]=dotPresence[i]*.4+(dotPresence[i-1]+dotPresence[i+1])*.2+(dotPresence[i-2]+dotPresence[i+2])*.1;
+  const BASE_GAP=2*dpr; // always 2px apart even without dots
+  const disp=[];
+  for(let i=0;i<CL;i++)disp.push(BASE_GAP+splitGap*dotPresence[i]);
+
+  // Ghunnah glows disabled — structure first
+  // glows rendering removed
+
+  // Garden elements
+  for(const g of garden){
+    const elapsed=progress-g.born,ci=Math.min(g.ci,CL-1),n=getNormal(ci),d=disp[ci]||0;
+    const wt=ci/(CL-1),wp=g.side>0?0:Math.PI,w=Math.sin(wt*Math.PI*2*WEAVE_FREQ+wp);
+    const bx=curvePoints[ci].x+n.x*d*w,by=curvePoints[ci].y+n.y*d*w;
+    let bl=Math.min(1,elapsed/(g.growDur||0.06));
+    if(g.forceBloom!==undefined)bl=Math.max(bl,Math.min(1,(progress-g.forceBloom)/0.04));
+    // Botanical angles from vine geometry
+    const outAngle=Math.atan2(n.y*g.side,n.x*g.side); // perpendicular outward from vine
+    const tangentAngle=Math.atan2(-n.x,n.y); // along vine growth direction
+    const jitter=(g.baseRot%0.52)-0.26; // ±15° natural variation from stored seed
+    switch(g.kind){
+      case 'rose':{
+        const tx=bx+n.x*g.stemLen*g.side,ty=by+n.y*g.stemLen*g.side;
+        const sB=Math.min(1,bl*2),rB=Math.max(0,bl*2-1);
+        drawStem(bx,by,tx,ty,g.stemW,sB);
+        if(sB>0.5){const lx=bx+(tx-bx)*0.4,ly=by+(ty-by)*0.4;
+          drawLeaf(lx,ly,Math.atan2(ty-by,tx-bx)+0.5*g.side,g.stemW*5,sB);}
+        const rx=bx+(tx-bx)*sB,ry=by+(ty-by)*sB;
+        drawRose(rx,ry,g.maxR,g.petalCount,rB,outAngle+jitter,g.col,g.golden);break;}
+      case 'bud':{
+        const tx=bx+n.x*g.stemLen*g.side,ty=by+n.y*g.stemLen*g.side;
+        drawStem(bx,by,tx,ty,g.stemW,bl);
+        const budRot=Math.atan2(ty-by,tx-bx)+jitter;
+        drawBud(bx+(tx-bx)*bl,by+(ty-by)*bl,g.maxR,bl,g.col,budRot);break;}
+      case 'thorn':drawThorn(bx,by,g.len,Math.atan2(n.y*g.side,n.x*g.side),bl);break;
+      case 'vine':drawVine(bx,by,n,g.side,g.maxLen,g.width,bl,g.leafCount,g.baseRot,g.col);break;
+      case 'leaf':{
+        const leafRot=tangentAngle+g.side*(0.6+jitter);
+        // Smooth ease-out growth: starts fast, decelerates
+        const leafBl=1-Math.pow(1-bl,2.5);
+        // Slight rotation during growth — unfurling from curled
+        const unfurlRot=leafRot+(1-leafBl)*0.4*g.side;
+        drawLeaf(bx,by,unfurlRot,g.leafSize,leafBl);break;}
+    }
+  }
+
+  // Growing vine stalks
+  const growCI=Math.min(Math.floor(progress*(CL-1)),CL-1);
+  for(let strand=0;strand<2;strand++){
+    const phase=strand===0?0:Math.PI;
+    ctx.beginPath();
+    for(let i=0;i<=growCI;i++){const t=i/(CL-1),w=Math.sin(t*Math.PI*2*WEAVE_FREQ+phase);
+      const n=getNormal(i),dd=disp[i]||0;
+      const px=curvePoints[i].x+n.x*dd*w,py=curvePoints[i].y+n.y*dd*w;
+      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}
+    ctx.strokeStyle=strand===0?'rgba(12,110,8,1.0)':'rgba(8,90,5,1.0)';
+    ctx.lineWidth=2.5*dpr;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
+    ctx.beginPath();
+    for(let i=0;i<=growCI;i++){const t=i/(CL-1),w=Math.sin(t*Math.PI*2*WEAVE_FREQ+phase);
+      const n=getNormal(i),dd=disp[i]||0;
+      const px=curvePoints[i].x+n.x*dd*w,py=curvePoints[i].y+n.y*dd*w;
+      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}
+    ctx.strokeStyle='rgba(50,150,25,0.6)';ctx.lineWidth=1.5*dpr;ctx.stroke();
+  }
+
+  // Continuous fill
+  if(isPlaying&&progress>0&&energy>0.02)continuousFill(progress,energy);
+
+  // Traveling dots
+  if(isPlaying&&progress>0){
+    const spacing=0.005+Math.random()*0.004;
+    if(lastT<0||progress-lastT>=spacing){
+      const col=pathColor(progress),ci=Math.min(Math.floor(progress*(CL-1)),CL-1);
+      const minR=4*dpr,maxR=28*dpr,r=Math.min(maxR,Math.max(minR,minR+energy*(maxR-minR)*4));
+      const sp=4+energy*10;
+      for(const s of[1,-1])dots.push({ci,side:s,offX:(Math.random()-.5)*sp*dpr,offY:(Math.random()-.5)*sp*dpr,
+        r:Math.min(maxR,r*(0.5+Math.random()*.7)),col:[...col],born:progress,rot:Math.random()*Math.PI*2,petal:(Math.random()*5)|0});
+      lastT=progress;
+    }
+    const alive=[];
+    for(const d of dots){
+      if(progress-d.born>=0.09){
+        const ci=Math.min(d.ci,CL-1),n=getNormal(ci),dd=disp[ci]||0;
+        const fwt=ci/(CL-1),fwv=Math.sin(fwt*Math.PI*2*WEAVE_FREQ+(d.side>0?0:Math.PI));
+        const da=Math.atan2(1,0)+Math.PI+(Math.random()-.5)*1.4,ds=(0.5+Math.random()*1.2)*dpr;
+        fallingPetals.push({x:curvePoints[ci].x+n.x*dd*fwv+d.offX,y:curvePoints[ci].y+n.y*dd*fwv+d.offY,
+          vx:Math.cos(da)*ds,vy:Math.sin(da)*ds+0.2*dpr,rot:d.rot,r:d.r*(0.2+Math.random()*0.35),
+          col:d.col,petal:d.petal,alpha:0.5,age:0,startR:0,
+          wf:0.02+Math.random()*0.07,wa:(0.4+Math.random()*2)*dpr,wp:Math.random()*Math.PI*2,ts:0.03+Math.random()*0.18});
+        fallingPetals[fallingPetals.length-1].startR=fallingPetals[fallingPetals.length-1].r;
+      }else alive.push(d);
+    }
+    dots=alive;
+  }
+
+  // Draw traveling dots
+  for(const d of dots){
+    const age=(progress-d.born)/0.09,alpha=Math.max(0,1-age*age);
+    const ci=Math.min(d.ci,CL-1),n=getNormal(ci),dd=disp[ci]||0;
+    const dwt=ci/(CL-1),dwv=Math.sin(dwt*Math.PI*2*WEAVE_FREQ+(d.side>0?0:Math.PI));
+    const px=curvePoints[ci].x+n.x*dd*dwv+d.offX,py=curvePoints[ci].y+n.y*dd*dwv+d.offY;
+    const sz=d.r*2.2;
+    ctx.save();ctx.translate(px,py);ctx.rotate(d.rot+age*0.8);ctx.globalAlpha=alpha*0.85;
+    ctx.drawImage(petalCanvases[d.petal],-sz/2,-sz/2,sz,sz);ctx.restore();
+  }
+
+  // Falling petals
+  for(let i=fallingPetals.length-1;i>=0;i--){
+    const f=fallingPetals[i];f.age++;
+    f.vy+=0.01033*dpr;
+    const wave=Math.sin(f.age*f.wf+f.wp)*f.wa;
+    const wave2=Math.sin(f.age*f.wf*0.37+f.wp*2.1)*f.wa*0.4;
+    const da=Math.atan2(f.vy,f.vx);
+    f.x+=f.vx+Math.cos(da+Math.PI/2)*(wave+wave2);f.y+=f.vy+Math.sin(da+Math.PI/2)*(wave+wave2);
+    f.vx*=0.992;f.vy*=0.992;f.rot+=f.ts;f.ts+=(Math.random()-0.5)*0.004;
+    const floorY=HD*0.95,dist=Math.max(0,floorY-f.y),total=floorY-HD*0.1;
+    const life=Math.max(0,dist/total);
+    f.r=f.startR*(0.30+life*0.70);f.alpha=0.15+life*0.45;
+    if(life<0.02||f.y>floorY){fallingPetals.splice(i,1);continue;}
+    const sz=f.r*2.2;
+    ctx.save();ctx.translate(f.x,f.y);ctx.rotate(f.rot);ctx.globalAlpha=f.alpha;
+    ctx.drawImage(petalCanvases[f.petal],-sz/2,-sz/2,sz,sz);ctx.restore();
+  }
+
+  // Leading dot + tech demo tracking box
+  if(isPlaying&&progress>0&&progress<1){
+    const fi=progress*(CL-1),idx=Math.floor(fi),frac=fi-idx;
+    const a=curvePoints[Math.min(idx,CL-1)],b=curvePoints[Math.min(idx+1,CL-1)];
+    const px=a.x+(b.x-a.x)*frac,py=a.y+(b.y-a.y)*frac;
+    // Crosshair at leading edge — HIDDEN
+    // const chS=8*dpr;
+    // ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=0.8*dpr;
+    // ctx.beginPath();ctx.moveTo(px-chS,py);ctx.lineTo(px+chS,py);ctx.stroke();
+    // ctx.beginPath();ctx.moveTo(px,py-chS);ctx.lineTo(px,py+chS);ctx.stroke();
+    // ctx.beginPath();ctx.arc(px,py,1.5*dpr,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,0.6)';ctx.fill();
+    // DISABLED: Tracking box — replaced by golden rectangle frame
+    // const leadDisp=disp[Math.min(idx,CL-1)]||0;
+    // const breatheTarget=60*dpr+leadDisp*1.8;
+    // if(!window._smoothBreath)window._smoothBreath=breatheTarget;
+    // window._smoothBreath+=(breatheTarget-window._smoothBreath)*0.08;
+    // const edgeMargin=80*dpr;
+    // const distL=px, distR=WD-px, distT=py, distB=HD-py;
+    // const minDist=Math.min(distL,distR,distT,distB);
+    // const edgeScale=minDist<edgeMargin?minDist/edgeMargin:1;
+    // const boxW=window._smoothBreath*edgeScale,boxH=window._smoothBreath*edgeScale;
+    // const bx=px-boxW/2,by=py-boxH/2;
+    // const cSz=6*dpr;
+    // ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=0.8*dpr;
+    // ctx.strokeRect(bx,by,boxW,boxH);
+    // ctx.fillStyle='rgba(255,255,255,0.35)';
+    // ctx.fillRect(bx-cSz/2,by-cSz/2,cSz,cSz);
+    // ctx.fillRect(bx+boxW-cSz/2,by-cSz/2,cSz,cSz);
+    // ctx.fillRect(bx-cSz/2,by+boxH-cSz/2,cSz,cSz);
+    // ctx.fillRect(bx+boxW-cSz/2,by+boxH-cSz/2,cSz,cSz);
+  }
+
+  // ── BISMILLAH PROGRESSIVE TEXT (disabled) ──
+  if(false){
+    const bismillah='بسم الله الرحمن الرحيم';
+    // Syllable groups with progress breakpoints (right-to-left visual order)
+    const groups=[
+      {text:'بسم',start:0.0,end:0.15},
+      {text:' ',start:0.15,end:0.15},
+      {text:'الله',start:0.15,end:0.35},
+      {text:' ',start:0.35,end:0.35},
+      {text:'الرحمن',start:0.35,end:0.65},
+      {text:' ',start:0.65,end:0.65},
+      {text:'الرحيم',start:0.65,end:1.0}
+    ];
+    const fontSize=Math.round(24*dpr);
+    ctx.font=fontSize+'px "Noto Naskh Arabic","Traditional Arabic","Arial"';
+    ctx.textAlign='center';ctx.textBaseline='bottom';
+    const tx=WD/2, ty=40*dpr; // top of screen in y-flipped canvas (low y = screen top)
+    // Measure total width to position groups
+    const totalW=ctx.measureText(bismillah).width;
+    // Draw each group with appropriate opacity
+    let xCursor=tx+totalW/2; // start from visual right (Arabic RTL)
+    for(const g of groups){
+      const gw=ctx.measureText(g.text).width;
+      const p=isPlaying?progress:0;
+      const lit=p>=g.end?1:p>=g.start?(p-g.start)/(g.end-g.start):0;
+      const alpha=0.3+lit*0.7;
+      ctx.globalAlpha=alpha;
+      ctx.fillStyle='#ffffff';
+      // Position each group: draw right-aligned at xCursor
+      ctx.textAlign='right';
+      ctx.fillText(g.text,xCursor,ty);
+      xCursor-=gw;
+    }
+    ctx.globalAlpha=1;ctx.textAlign='start';
+  }
+
+  // ── OVERLAY FROM REFERENCE IMAGE ──
+  // Overlay hidden
+  if(false&&window._overlayImg&&window._overlayImg.complete){
+    ctx.globalAlpha=0.2;
+    ctx.drawImage(window._overlayImg,0,0,WD,HD);
+    ctx.globalAlpha=1;
+  }
+
+  // Upload to Three.js and render
+  offTex.needsUpdate=true;
+  composer.render();
+}
+
+/* ═══════════════════════════════════════════════════
+   START
+   ═══════════════════════════════════════════════════ */
+document.getElementById('play-btn').addEventListener('click',async()=>{
+  document.getElementById('play-btn').style.display='none';
+  audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  analyser=audioCtx.createAnalyser();analyser.fftSize=2048;analyser.smoothingTimeConstant=0.85;
+  timeData=new Uint8Array(analyser.fftSize);
+  audio=new Audio('bismillah.mp3');
+  const src=audioCtx.createMediaElementSource(audio);src.connect(analyser);analyser.connect(audioCtx.destination);
+  await audio.play();isPlaying=true;
+});
+
+// Load overlay reference image
+window._overlayImg=new Image();
+window._overlayImg.src='overlay.png'; // white-on-transparent version of reference
+animate();
+</script>
+</body>
+</html>
