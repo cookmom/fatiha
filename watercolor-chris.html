@@ -550,7 +550,7 @@ leafPolys.forEach((poly, i) => {
     layerVariance: 0.08,
     hardEdge: true,
     isLeaf: true,
-    startFrame: 5,
+    startFrame: 12,
     priority: 1, index: i
   });
 });
@@ -563,7 +563,7 @@ calyxPolys.forEach((poly, i) => {
     layerVariance: 0.06,
     hardEdge: false,
     isLeaf: false,
-    startFrame: 8,
+    startFrame: 18,
     priority: 1, index: 100 + i
   });
 });
@@ -577,7 +577,7 @@ budElements.filter(b => b.type === 'sepal').forEach((b, i) => {
     hardEdge: false,
     isLeaf: false,
     alphaScale: 1.0,
-    startFrame: 3,
+    startFrame: 10,
     priority: 1, index: 200 + i
   });
 });
@@ -589,7 +589,7 @@ budElements.filter(b => b.type === 'bud').forEach((b, i) => {
     hardEdge: false,
     isLeaf: false,
     alphaScale: 1.2,
-    startFrame: 6,
+    startFrame: 18,
     priority: 1, index: 300 + i
   });
 });
@@ -603,7 +603,7 @@ rosePetals.filter(p => p.ring === 'outer').forEach((p, i) => {
     hardEdge: false,
     isLeaf: false,
     alphaScale: 1.8,
-    startFrame: 15,
+    startFrame: 35,
     priority: 2, index: i
   });
 });
@@ -615,7 +615,7 @@ rosePetals.filter(p => p.ring === 'mid').forEach((p, i) => {
     hardEdge: false,
     isLeaf: false,
     alphaScale: 1.3,
-    startFrame: 25,
+    startFrame: 55,
     priority: 3, index: i
   });
 });
@@ -626,7 +626,7 @@ rosePetals.filter(p => p.ring === 'inner').forEach((p, i) => {
     layerVariance: 0.09,
     hardEdge: false,
     isLeaf: false,
-    startFrame: 35,
+    startFrame: 70,
     priority: 4, index: i
   });
 });
@@ -634,12 +634,12 @@ rosePetals.filter(p => p.ring === 'inner').forEach((p, i) => {
 elements.sort((a, b) => a.priority - b.priority || a.index - b.index);
 
 // ============================================================
-// Rendering — Performance-Aware Progressive System
-// "Watching paint dry": elements build up over ~60 frames
+// Rendering — Progressive "Watching Paint Dry" System
+// Elements stagger in by priority, each builds up over many frames
 // ============================================================
 
-const TARGET_LAYERS = 40;     // layers per element
-const LAYERS_PER_FRAME = 2;   // layers rendered per element per frame
+const TARGET_LAYERS = 40;          // layers per element
+const LAYERS_PER_EL_PER_FRAME = 2; // max layers an element gains per frame
 const LAYER_ALPHA = 0.07;
 
 // Pre-compute texture masks: large overlapping circles that SUBTRACT from solid fill
@@ -838,7 +838,8 @@ function doPostProcessing() {
 
 // ============================================================
 // Progressive render loop — "watching paint dry"
-// Elements stagger in by startFrame, accumulate layers over time
+// Elements stagger in by startFrame, each builds watercolor
+// layers gradually. Supports _synthFrame for headless capture.
 // ============================================================
 
 window._renderComplete = false;
@@ -847,48 +848,73 @@ window._fps = 0;
 
 let frameCount = 0;
 let lastTimestamp = 0;
+let postDone = false;
 const totalLayersAll = elements.length * TARGET_LAYERS;
 
-function progressiveRender(timestamp) {
+// Synth mode: when window._synthFrame is set, render advances one
+// step per rAF (for headless frame-by-frame capture).
+// Detected on first frame — set _synthFrame = true before page load.
+let synthMode = false;
+
+function renderStep(timestamp) {
+  // Detect synth mode on first frame
+  if (frameCount === 0 && window._synthFrame) synthMode = true;
+
+  // In synth mode, only advance if _synthFrame is set
+  if (synthMode && !window._synthFrame) {
+    requestAnimationFrame(renderStep);
+    return;
+  }
+  if (synthMode) window._synthFrame = false; // consume trigger
+
   if (!lastTimestamp) lastTimestamp = timestamp;
   const dt = timestamp - lastTimestamp;
   lastTimestamp = timestamp;
   window._fps = dt > 0 ? Math.round(1000 / dt) : 60;
 
   let layersDoneTotal = 0;
+  const allDone = elements.every(el => el._done);
 
-  for (const el of elements) {
-    if (el._done) {
-      layersDoneTotal += TARGET_LAYERS;
-      continue;
-    }
-    if (frameCount < el.startFrame) {
+  if (!allDone) {
+    // Each frame: give every active element up to LAYERS_PER_EL_PER_FRAME layers
+    for (const el of elements) {
+      if (el._done) {
+        layersDoneTotal += TARGET_LAYERS;
+        continue;
+      }
+      if (frameCount < el.startFrame) {
+        layersDoneTotal += el._layersRendered;
+        continue;
+      }
+
+      for (let l = 0; l < LAYERS_PER_EL_PER_FRAME && el._layersRendered < TARGET_LAYERS; l++) {
+        drawTexturedLayer(el, el._layersRendered);
+        el._layersRendered++;
+      }
+
       layersDoneTotal += el._layersRendered;
-      continue;
+      if (el._layersRendered >= TARGET_LAYERS) el._done = true;
     }
 
-    for (let l = 0; l < LAYERS_PER_FRAME && el._layersRendered < TARGET_LAYERS; l++) {
-      drawTexturedLayer(el, el._layersRendered);
-      el._layersRendered++;
-    }
-
-    layersDoneTotal += el._layersRendered;
-    if (el._layersRendered >= TARGET_LAYERS) el._done = true;
+    frameCount++;
+    window._renderProgress = layersDoneTotal / totalLayersAll;
   }
 
-  frameCount++;
-  window._renderProgress = layersDoneTotal / totalLayersAll;
-
-  if (elements.every(el => el._done)) {
+  if (elements.every(el => el._done) && !postDone) {
     doPostProcessing();
+    postDone = true;
+    window._renderProgress = 1;
     window._renderComplete = true;
     console.log('Watercolor render complete — ' + frameCount + ' frames');
-  } else {
-    requestAnimationFrame(progressiveRender);
+    return;
+  }
+
+  if (!window._renderComplete) {
+    requestAnimationFrame(renderStep);
   }
 }
 
-requestAnimationFrame(progressiveRender);
+requestAnimationFrame(renderStep);
 </script>
 </body>
 </html>
