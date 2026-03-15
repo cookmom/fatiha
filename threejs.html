@@ -131,9 +131,9 @@ function getNormal(i){
    PALETTE — identical to 2D v43
    ═══════════════════════════════════════════════════ */
 function pathColor(t){
-  const s=[[0,0x9E,0x10,0x35],[.15,0xD5,0x10,0x50],[.30,0xF0,0x28,0x58],
-    [.45,0xFF,0x45,0x70],[.60,0xFF,0x65,0x50],[.75,0xFF,0x88,0x38],
-    [.90,0xF0,0x58,0x40],[1,0xD5,0x35,0x35]];
+  const s=[[0,0xC0,0x08,0x30],[.15,0xE8,0x08,0x48],[.30,0xFF,0x14,0x55],
+    [.45,0xFF,0x28,0x6E],[.60,0xFF,0x45,0x40],[.75,0xFF,0x70,0x20],
+    [.90,0xF5,0x38,0x30],[1,0xE0,0x18,0x28]];
   let i=0;while(i<s.length-1&&s[i+1][0]<t)i++;
   if(i>=s.length-1)return[s[7][1],s[7][2],s[7][3]];
   const a=s[i],b=s[i+1],f=(t-a[0])/(b[0]-a[0]);
@@ -166,8 +166,8 @@ scene.add(quad);
    PETAL TEXTURES — identical to 2D v43
    ═══════════════════════════════════════════════════ */
 const petalCanvases=[];
-const PETAL_HUES=[['#FF90A8','#E8265C','#8B1A3A'],['#FFB0A0','#FF4870','#C2185B'],
-  ['#FFB0C0','#FF6050','#E85C3E'],['#FF90A0','#E8265C','#A01040'],['#FFB898','#FF8830','#C23232']];
+const PETAL_HUES=[['#FF60A0','#E8105C','#A0082E'],['#FF5888','#FF1860','#D0105A'],
+  ['#FF7060','#FF2838','#D0282A'],['#FF5898','#E8105C','#B00838'],['#FF8838','#FF5010','#C01818']];
 for(let v=0;v<5;v++){
   const pc=document.createElement('canvas');
   const sz=Math.round(64*dpr);pc.width=sz;pc.height=sz;
@@ -286,9 +286,9 @@ function drawPencFlower(x,y,R,n,bl,baseRot,col,golden){
   const r=R*bl;
   const petalN=n||5;
   const lineW=Math.max(0.5,0.8*dpr);
-  const fillR=golden?220:col[0], fillG=golden?190:col[1], fillB=golden?80:col[2];
-  const darkR=golden?180:Math.round(col[0]*0.6), darkG=golden?140:Math.round(col[1]*0.5), darkB=golden?40:Math.round(col[2]*0.5);
-  const lineCol=golden?'rgba(140,100,30,0.7)':`rgba(${darkR},${darkG},${darkB},0.7)`;
+  const fillR=golden?240:col[0], fillG=golden?175:col[1], fillB=golden?30:col[2];
+  const darkR=golden?190:Math.round(col[0]*0.7), darkG=golden?120:Math.round(col[1]*0.5), darkB=golden?10:Math.round(col[2]*0.45);
+  const lineCol=golden?'rgba(160,100,10,0.7)':`rgba(${darkR},${darkG},${darkB},0.7)`;
   const centerR=r*0.22;
   const outerR=r*0.85;
   const notchR=r*0.52; // how far in the notch dips (between lobes)
@@ -347,11 +347,11 @@ function drawPencFlower(x,y,R,n,bl,baseRot,col,golden){
   // Center circle
   ctx.beginPath();ctx.arc(x,y,centerR,0,Math.PI*2);
   ctx.globalAlpha=bl*0.95;
-  ctx.fillStyle=golden?'rgb(200,170,60)':`rgb(${darkR},${darkG},${darkB})`;ctx.fill();
+  ctx.fillStyle=golden?'rgb(200,145,15)':`rgb(${darkR},${darkG},${darkB})`;ctx.fill();
   ctx.strokeStyle=lineCol;ctx.lineWidth=lineW;ctx.stroke();
   // Inner dot
   ctx.beginPath();ctx.arc(x,y,centerR*0.4,0,Math.PI*2);
-  ctx.fillStyle=golden?'rgb(240,220,120)':`rgb(${fillR},${fillG},${fillB})`;ctx.fill();
+  ctx.fillStyle=golden?'rgb(255,200,40)':`rgb(${fillR},${fillG},${fillB})`;ctx.fill();
 }
 
 function drawCarnation(x,y,R,bl,baseRot,col){
@@ -396,7 +396,7 @@ function drawCarnation(x,y,R,bl,baseRot,col){
     ctx.beginPath();ctx.moveTo(cx1,cy1);
     ctx.quadraticCurveTo(x,y+r*0.5,cx2,cy2);
     ctx.globalAlpha=bl*0.6;
-    ctx.strokeStyle='rgba(25,110,20,0.6)';ctx.lineWidth=lineW;ctx.stroke();
+    ctx.strokeStyle='rgba(10,100,8,0.6)';ctx.lineWidth=lineW;ctx.stroke();
   }
 }
 
@@ -444,12 +444,12 @@ function drawRose(x,y,maxR,petalCount,bl,baseRot,col,golden){
   const lineW=Math.max(0.5,0.8*dpr);
   // Per-flower color tint shift for variety
   const tintShift=((rng()-0.5)*10)|0;
-  const fillR=golden?245:Math.min(255,Math.max(0,col[0]+tintShift)), fillG=golden?195:Math.min(255,Math.max(0,col[1]+((rng()-0.5)*6)|0)), fillB=golden?45:Math.min(255,Math.max(0,col[2]+((rng()-0.5)*6)|0));
-  // Dark stays in-hue (scale toward deeper version of same color, not gray)
-  const darkR=golden?175:Math.round(fillR*0.78), darkG=golden?125:Math.round(fillG*0.55), darkB=golden?20:Math.round(fillB*0.50);
-  const midR=golden?248:Math.min(255,fillR+5), midG=golden?205:Math.min(255,fillG), midB=golden?55:Math.min(255,fillB);
-  const litR=golden?255:Math.min(255,fillR+15), litG=golden?225:Math.min(255,Math.round(fillG*0.85+45)), litB=golden?80:Math.min(255,Math.round(fillB*0.85+35));
-  const lineCol=golden?'rgba(160,110,10,0.75)':`rgba(${darkR},${darkG},${darkB},0.75)`;
+  const fillR=golden?248:Math.min(255,Math.max(0,col[0]+tintShift)), fillG=golden?170:Math.min(255,Math.max(0,col[1]+((rng()-0.5)*6)|0)), fillB=golden?25:Math.min(255,Math.max(0,col[2]+((rng()-0.5)*6)|0));
+  // Dark stays in-hue — keep saturation high (don't crush toward gray)
+  const darkR=golden?195:Math.round(fillR*0.82), darkG=golden?110:Math.round(fillG*0.45), darkB=golden?8:Math.round(fillB*0.40);
+  const midR=golden?252:Math.min(255,fillR+5), midG=golden?185:Math.min(255,fillG), midB=golden?30:Math.min(255,fillB);
+  const litR=golden?255:Math.min(255,fillR+15), litG=golden?210:Math.min(255,Math.round(fillG*0.75+45)), litB=golden?50:Math.min(255,Math.round(fillB*0.75+35));
+  const lineCol=golden?'rgba(170,105,5,0.75)':`rgba(${darkR},${darkG},${darkB},0.75)`;
   // Per-flower variation: petal width factor, layer rotation offsets
   const widVar=0.8+rng()*0.4; // ±20% petal width variation
   const layerRotA=rng()*0.4; // extra rotation offset per layer
@@ -580,8 +580,8 @@ function drawRose(x,y,maxR,petalCount,bl,baseRot,col,golden){
       ctx.globalAlpha=centerBl*(0.55+rng()*0.4);
       const tint=rng();
       if(golden){
-        const g=Math.round(170+tint*60),r=Math.round(200+tint*45);
-        ctx.fillStyle=`rgb(${r},${g},${Math.round(40+tint*80)})`;
+        const g=Math.round(140+tint*50),r=Math.round(210+tint*40);
+        ctx.fillStyle=`rgb(${r},${g},${Math.round(10+tint*40)})`;
       }else{
         ctx.fillStyle=`rgb(${Math.round(darkR+(litR-darkR)*tint)},${Math.round(darkG+(litG-darkG)*tint)},${Math.round(darkB+(litB-darkB)*tint)})`;
       }
@@ -599,7 +599,7 @@ function drawStem(fx,fy,tx,ty,thick,bl){
   const c2x=fx+dx*0.7+dy*0.08,c2y=fy+dy*0.7-dx*0.08;
   const ex=fx+(tx-fx)*bl,ey=fy+(ty-fy)*bl;
   ctx.beginPath();ctx.moveTo(fx,fy);ctx.bezierCurveTo(c1x,c1y,c2x,c2y,ex,ey);
-  ctx.strokeStyle=`rgba(45,140,35,${0.9*bl})`;ctx.lineWidth=thick;ctx.stroke();
+  ctx.strokeStyle=`rgba(20,130,15,${0.9*bl})`;ctx.lineWidth=thick;ctx.stroke();
 }
 function drawLeaf(x,y,angle,size,bl){
   if(bl<0.2)return;
@@ -671,25 +671,25 @@ function drawLeaf(x,y,angle,size,bl){
 
   // Gradient fill: darker at base, lighter at tip
   const grad=ctx.createLinearGradient(0,0,len,0);
-  grad.addColorStop(0,`rgba(25,100,20,${0.95*bl})`);
-  grad.addColorStop(0.4,`rgba(40,135,30,${0.92*bl})`);
-  grad.addColorStop(1,`rgba(60,170,40,${0.85*bl})`);
+  grad.addColorStop(0,`rgba(10,85,10,${0.95*bl})`);
+  grad.addColorStop(0.4,`rgba(20,130,18,${0.92*bl})`);
+  grad.addColorStop(1,`rgba(35,175,25,${0.85*bl})`);
   ctx.fillStyle=grad;ctx.fill();
 
   // Outline
-  ctx.strokeStyle=`rgba(20,85,15,${0.55*bl})`;
+  ctx.strokeStyle=`rgba(8,70,8,${0.55*bl})`;
   ctx.lineWidth=Math.max(0.5,0.5*dpr);ctx.stroke();
 
   // Central vein (curved line along spine)
   ctx.beginPath();
   const v0=spine(0);ctx.moveTo(v0.x,v0.y);
   for(let i=1;i<=10;i++){const v=spine(i/10);ctx.lineTo(v.x,v.y);}
-  ctx.strokeStyle=`rgba(55,150,35,${0.4*bl})`;
+  ctx.strokeStyle=`rgba(30,150,20,${0.4*bl})`;
   ctx.lineWidth=Math.max(0.6,0.9*dpr);ctx.stroke();
 
   // Side veins branching from central vein (saz feather detail)
   if(!isSmall&&s>10*dpr){
-    ctx.strokeStyle=`rgba(55,150,35,${0.2*bl})`;
+    ctx.strokeStyle=`rgba(30,150,20,${0.2*bl})`;
     ctx.lineWidth=Math.max(0.3,0.4*dpr);
     const nVeins=nSerr+1;
     for(let i=1;i<=nVeins;i++){
@@ -728,7 +728,7 @@ function drawBud(x,y,maxR,bl,col,baseRot){
   function shadeFactor(ang){const d=Math.cos(ang-lightAng);return d*0.5+0.5;} // 0=dark side, 1=light side
 
   // Sepal/calyx colors
-  const sepalBase=[35,140,35];
+  const sepalBase=[15,130,15];
   const sepalDark=shade(sepalBase,0.6);
   const sepalLight=tint(sepalBase,0.3);
   const petalDark=shade(col,0.55);
@@ -894,7 +894,7 @@ function drawVine(cx,cy,normal,side,maxLen,width,bl,leafCount,baseRot,col){
     const sway=Math.sin(f*Math.PI*2+baseRot)*along*0.15;
     const vx=cx+normal.x*along*side+normal.y*sway,vy=cy+normal.y*along*side-normal.x*sway;
     pts.push({x:vx,y:vy});i===0?ctx.moveTo(vx,vy):ctx.lineTo(vx,vy);}
-  ctx.strokeStyle=`rgba(40,135,30,${0.55*bl})`;ctx.lineWidth=width*(1.2-bl*0.3);ctx.stroke();
+  ctx.strokeStyle=`rgba(15,125,12,${0.55*bl})`;ctx.lineWidth=width*(1.2-bl*0.3);ctx.stroke();
   for(let i=0;i<leafCount;i++){const f=(i+1)/(leafCount+1);
     const bloomF=Math.max(0,Math.min(1,(bl-f*0.3)*2.5));if(bloomF<0.1)continue;
     const pi=Math.floor(f*(pts.length-1)),p=pts[pi];
@@ -1031,14 +1031,14 @@ function animate(){
       const n=getNormal(i),dd=disp[i]||0;
       const px=curvePoints[i].x+n.x*dd*w,py=curvePoints[i].y+n.y*dd*w;
       i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}
-    ctx.strokeStyle=strand===0?'rgba(30,120,20,1.0)':'rgba(22,100,15,1.0)';
+    ctx.strokeStyle=strand===0?'rgba(12,110,8,1.0)':'rgba(8,90,5,1.0)';
     ctx.lineWidth=2.5*dpr;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
     ctx.beginPath();
     for(let i=0;i<=growCI;i++){const t=i/(CL-1),w=Math.sin(t*Math.PI*2*WEAVE_FREQ+phase);
       const n=getNormal(i),dd=disp[i]||0;
       const px=curvePoints[i].x+n.x*dd*w,py=curvePoints[i].y+n.y*dd*w;
       i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}
-    ctx.strokeStyle='rgba(80,140,50,0.6)';ctx.lineWidth=1.5*dpr;ctx.stroke();
+    ctx.strokeStyle='rgba(50,150,25,0.6)';ctx.lineWidth=1.5*dpr;ctx.stroke();
   }
 
   // Continuous fill
