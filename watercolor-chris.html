@@ -83,7 +83,7 @@ function makeRect(cx, cy, w, h, rotation) {
 // width = max width at widest point
 function makePetalPoly(baseX, baseY, angle, length, width, curvature) {
   const pts = [];
-  const n = 40;
+  const n = 24;
   // Right edge: from base to tip
   for (let i = 0; i <= n; i++) {
     const t = i / n;
@@ -225,7 +225,7 @@ function deformN(poly, n, variance) {
 }
 
 function makeBase(poly) {
-  return deformN(poly, 8, 0.18);  // higher subdivision for finer edge detail
+  return deformN(poly, 6, 0.18);  // 6-level deformation for performance
 }
 
 // ============================================================
@@ -262,26 +262,20 @@ drawPaperBackground();
 // Colors
 // ============================================================
 
-// Petal colors: inner petals darker, outer petals lighter
-const PETAL_INNER = [
-  [175, 45, 70],   // crimson
-  [185, 55, 78],   // berry
-  [190, 50, 80],   // deep rose
-  [165, 40, 65],   // dark crimson
-];
-const PETAL_MID = [
-  [220, 80, 100],  // dusty rose
-  [210, 70, 90],   // muted rose
-  [200, 60, 70],   // dark rose
-  [215, 75, 95],   // warm rose
-];
-const PETAL_OUTER = [
-  [235, 110, 125], // mid pink
-  [240, 125, 135], // light blush
-  [230, 95, 115],  // warm pink
-  [245, 140, 145], // pale blush
-  [238, 118, 128], // soft rose
-];
+// Ottoman three-shade: light→medium→dark from outside→inside
+// Each petal gets ±8 random hue shift so no two are identical
+function varyColor(base) {
+  const shift = gauss(0, 8);
+  return [
+    clamp(Math.round(base[0] + shift), 0, 255),
+    clamp(Math.round(base[1] + shift * 0.4), 0, 255),
+    clamp(Math.round(base[2] + shift * 0.6), 0, 255)
+  ];
+}
+const PETAL_CENTER_BASE = [100, 15, 35];   // burgundy/maroon
+const PETAL_INNER_BASE = [140, 20, 50];    // deep dark crimson
+const PETAL_MID_BASE   = [180, 35, 65];    // medium crimson
+const PETAL_OUTER_BASE = [220, 60, 90];    // lightest pink
 
 const LEAF_COLORS = [
   [38, 100, 45],   // deep green
@@ -313,7 +307,7 @@ for (let i = 0; i < 8; i++) {
   const sizeVar = 0.7 + rand() * 0.6;
   rosePetals.push({
     poly: makePetalPoly(bx, by, angle + gauss(0, 0.35), gauss(36, 4) * sizeVar, gauss(28, 3) * sizeVar, gauss(0, 0.6)),
-    color: PETAL_INNER[i % PETAL_INNER.length],
+    color: varyColor(PETAL_INNER_BASE),
     ring: 'inner'
   });
 }
@@ -322,7 +316,7 @@ for (let i = 0; i < 5; i++) {
   const angle = (i / 5) * Math.PI * 2 + gauss(0, 0.5);
   rosePetals.push({
     poly: makePetalPoly(roseCx + gauss(0, 3), roseCy + gauss(0, 3), angle, gauss(16, 2), gauss(14, 2), gauss(0, 0.4)),
-    color: [165, 38, 60], // darkest crimson for center
+    color: varyColor(PETAL_CENTER_BASE), // burgundy/maroon center
     ring: 'inner'
   });
 }
@@ -335,7 +329,7 @@ for (let i = 0; i < 9; i++) {
   const by = roseCy + Math.sin(angle) * dist;
   rosePetals.push({
     poly: makePetalPoly(bx, by, angle + gauss(0, 0.18), gauss(58, 5), gauss(44, 4), gauss(0, 0.7)),
-    color: PETAL_MID[i % PETAL_MID.length],
+    color: varyColor(PETAL_MID_BASE),
     ring: 'mid'
   });
 }
@@ -348,7 +342,7 @@ for (let i = 0; i < 5; i++) {
   const by = roseCy + Math.sin(angle) * dist;
   rosePetals.push({
     poly: makePetalPoly(bx, by, angle + gauss(0, 0.2), gauss(60, 5), gauss(42, 4), gauss(0, 0.8)),
-    color: PETAL_MID[(i + 2) % PETAL_MID.length],
+    color: varyColor(PETAL_MID_BASE),
     ring: 'mid'
   });
 }
@@ -362,7 +356,7 @@ for (let i = 0; i < 8; i++) {
   const sizeVar = 0.9 + rand() * 0.35;
   rosePetals.push({
     poly: makePetalPoly(bx, by, angle + gauss(0, 0.3), gauss(85, 8) * sizeVar, gauss(62, 6) * sizeVar, gauss(0, 1.2)),
-    color: PETAL_OUTER[i % PETAL_OUTER.length],
+    color: varyColor(PETAL_OUTER_BASE),
     ring: 'outer'
   });
 }
@@ -489,7 +483,7 @@ for (let i = 0; i < numBuds; i++) {
     const budPoly = makePetalPoly(budX, budY, budAngle, 22 * budScale, 12 * budScale, gauss(0, 0.3));
     budElements.push({
       poly: budPoly,
-      color: PETAL_INNER[i % PETAL_INNER.length],
+      color: varyColor(PETAL_INNER_BASE),
       type: 'bud'
     });
     // Sepal behind each bud
@@ -511,7 +505,7 @@ for (let i = 0; i < numBuds; i++) {
       const pPoly = makePetalPoly(budX, budY, pAngle, pLen, pWid, gauss(0, 0.5));
       budElements.push({
         poly: pPoly,
-        color: PETAL_OUTER[p % PETAL_OUTER.length],
+        color: varyColor(PETAL_OUTER_BASE),
         type: 'bud'
       });
     }
@@ -628,20 +622,19 @@ elements.sort((a, b) => a.priority - b.priority || a.index - b.index);
 // IMPROVEMENT #2: Hard/soft edge contrast (drying halos)
 // ============================================================
 
-const TOTAL_LAYERS = 90;
-const LAYER_ALPHA = 0.036;
+const TOTAL_LAYERS = 40;
+const LAYER_ALPHA = 0.07;
 
-const blobCvs = document.createElement('canvas');
-blobCvs.width = W; blobCvs.height = H;
-const blobCtx = blobCvs.getContext('2d');
-
-const maskCvs = document.createElement('canvas');
-maskCvs.width = W; maskCvs.height = H;
-const maskCtx = maskCvs.getContext('2d');
-
-const colorCvs = document.createElement('canvas');
-colorCvs.width = W; colorCvs.height = H;
-const colorCtx = colorCvs.getContext('2d');
+// Pre-compute 4 sets of circle data (800 circles each) for texture masks
+const NUM_MASKS = 4;
+const maskData = [];
+for (let m = 0; m < NUM_MASKS; m++) {
+  const circles = [];
+  for (let j = 0; j < 800; j++) {
+    circles.push([rand() * W, rand() * H, Math.abs(gauss(W * 0.013, W * 0.009))]);
+  }
+  maskData.push(circles);
+}
 
 function fillPoly(tCtx, poly) {
   tCtx.beginPath();
@@ -659,41 +652,50 @@ function strokePoly(tCtx, poly) {
   tCtx.stroke();
 }
 
+// Pre-compute 2 deformed variants per element for reuse
+const PRE_DEFORM_COUNT = 2;
+for (const el of elements) {
+  el._preDeformed = [];
+  for (let d = 0; d < PRE_DEFORM_COUNT; d++) {
+    el._preDeformed.push(deformN(el.base, 1, el.layerVariance || 0.08));
+  }
+}
+
 function drawTexturedLayer(el, layerIdx) {
-  const deformCount = 6 + (layerIdx % 2);
-  const layerPoly = deformN(el.base, deformCount, el.layerVariance || 0.08);
+  // Pick a pre-computed variant and apply 1 fresh deformation
+  const preIdx = layerIdx % PRE_DEFORM_COUNT;
+  const layerPoly = deformOnce(el._preDeformed[preIdx], (el.layerVariance || 0.08) * 0.7);
   const [r, g, b] = el.color;
 
-  // Blob mask
-  blobCtx.clearRect(0, 0, W, H);
-  blobCtx.fillStyle = 'white';
-  fillPoly(blobCtx, layerPoly);
-
-  // Texture mask: random circles for granulation
-  maskCtx.clearRect(0, 0, W, H);
-  maskCtx.fillStyle = 'white';
-  for (let j = 0; j < 2200; j++) {
-    const cx = rand() * W;
-    const cy = rand() * H;
-    const radius = Math.abs(gauss(W * 0.013, W * 0.009));
-    maskCtx.beginPath();
-    maskCtx.arc(cx, cy, radius, 0, Math.PI * 2);
-    maskCtx.fill();
+  // Compute bounding box for early circle culling
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const [px, py] of layerPoly) {
+    if (px < minX) minX = px;
+    if (px > maxX) maxX = px;
+    if (py < minY) minY = py;
+    if (py > maxY) maxY = py;
   }
 
-  // Color layer = blob ∩ texture
-  colorCtx.clearRect(0, 0, W, H);
-  colorCtx.globalCompositeOperation = 'source-over';
-  colorCtx.fillStyle = `rgb(${r},${g},${b})`;
-  colorCtx.fillRect(0, 0, W, H);
-  colorCtx.globalCompositeOperation = 'destination-in';
-  colorCtx.drawImage(blobCvs, 0, 0);
-  colorCtx.globalCompositeOperation = 'destination-in';
-  colorCtx.drawImage(maskCvs, 0, 0);
-  colorCtx.globalCompositeOperation = 'source-over';
+  // Clip to deformed polygon, draw colored circles directly
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(layerPoly[0][0], layerPoly[0][1]);
+  for (let i = 1; i < layerPoly.length; i++) ctx.lineTo(layerPoly[i][0], layerPoly[i][1]);
+  ctx.closePath();
+  ctx.clip();
 
   ctx.globalAlpha = LAYER_ALPHA * (el.alphaScale || 1.0);
-  ctx.drawImage(colorCvs, 0, 0);
+  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  const circles = maskData[layerIdx % NUM_MASKS];
+  for (let j = 0; j < circles.length; j++) {
+    const cx = circles[j][0], cy = circles[j][1], cr = circles[j][2];
+    if (cx + cr < minX || cx - cr > maxX || cy + cr < minY || cy - cr > maxY) continue;
+    ctx.beginPath();
+    ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
   ctx.globalAlpha = 1.0;
 }
 
@@ -730,28 +732,17 @@ function drawDryingHalo(el) {
 // Progressive rendering
 // ============================================================
 
-const LAYERS_PER_FRAME = 3;
-window._layersDone = 0;
-window._totalLayers = TOTAL_LAYERS;
 window._renderComplete = false;
 
-let currentLayer = 0;
-
 function renderFrame() {
-  const endLayer = Math.min(currentLayer + LAYERS_PER_FRAME, TOTAL_LAYERS);
-
-  for (let l = currentLayer; l < endLayer; l++) {
+  const t0 = performance.now();
+  for (let l = 0; l < TOTAL_LAYERS; l++) {
     for (const el of elements) {
       drawTexturedLayer(el, l);
     }
   }
 
-  window._layersDone = endLayer;
-  currentLayer = endLayer;
-
-  if (currentLayer < TOTAL_LAYERS) {
-    requestAnimationFrame(renderFrame);
-  } else {
+  {
     // Subtle pigment pooling on leaves + very subtle petal outlines (20% strength)
     for (const el of elements) {
       const [r, g, b] = el.color;
@@ -849,8 +840,9 @@ function renderFrame() {
       }
       ctx.putImageData(imgData, 0, 0);
     }
+    const elapsed = performance.now() - t0;
     window._renderComplete = true;
-    console.log('Watercolor render complete');
+    console.log('Watercolor render complete in ' + Math.round(elapsed) + 'ms');
   }
 }
 
