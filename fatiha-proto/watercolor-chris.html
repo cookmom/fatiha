@@ -750,20 +750,46 @@ function renderFrame() {
   if (currentLayer < TOTAL_LAYERS) {
     requestAnimationFrame(renderFrame);
   } else {
-    // Subtle pigment pooling — very faint, no hard outlines
-    // Only on leaves (soft bloom, no petal outlines at all)
+    // Subtle pigment pooling on leaves + very subtle petal outlines (20% strength)
     for (const el of elements) {
+      const [r, g, b] = el.color;
+      const dr = Math.max(0, Math.round(r * 0.55));
+      const dg = Math.max(0, Math.round(g * 0.50));
+      const db = Math.max(0, Math.round(b * 0.55));
+
       if (el.priority === 1) {
-        const [r, g, b] = el.color;
-        const dr = Math.max(0, Math.round(r * 0.55));
-        const dg = Math.max(0, Math.round(g * 0.50));
-        const db = Math.max(0, Math.round(b * 0.55));
+        // Leaves: soft bloom
         const bloomPoly = deformN(el.base, 6, 0.07);
         ctx.globalAlpha = 0.02;
         ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
         ctx.lineWidth = 2.5;
         ctx.lineJoin = 'round';
         strokePoly(ctx, bloomPoly);
+        ctx.globalAlpha = 1.0;
+      }
+
+      if (el.priority >= 2 && el.priority <= 4) {
+        // Petal outlines at 20% of original dryingHalo strength
+        // Original hard edge: alpha 0.09/0.07/0.05, lineWidth 1.0
+        // At 20%: alpha 0.018/0.014/0.010
+        for (let pass = 0; pass < 3; pass++) {
+          const haloPoly = deformN(el.base, 5, 0.04 + pass * 0.008);
+          ctx.globalAlpha = (0.09 - pass * 0.02) * 0.2;
+          ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
+          ctx.lineWidth = 1.0;
+          ctx.lineJoin = 'round';
+          strokePoly(ctx, haloPoly);
+        }
+        // Original soft bloom: alpha 0.035, lineWidth 2.5/4.0
+        // At 20%: alpha 0.007
+        for (let pass = 0; pass < 2; pass++) {
+          const bloomPoly = deformN(el.base, 6, 0.07 + pass * 0.02);
+          ctx.globalAlpha = 0.035 * 0.2;
+          ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
+          ctx.lineWidth = 2.5 + pass * 1.5;
+          ctx.lineJoin = 'round';
+          strokePoly(ctx, bloomPoly);
+        }
         ctx.globalAlpha = 1.0;
       }
     }
