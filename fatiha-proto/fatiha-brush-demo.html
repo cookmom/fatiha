@@ -243,119 +243,163 @@ function isFinished() {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  GARDEN ELEMENT DRAWING — organic watercolor stamps
+//  GARDEN ELEMENT DRAWING — precise polygon geometry + watercolor fill + tahrir outline
+//  Pipeline: 1) PRECISE polygon shape  2) watercolor() fill  3) tahrir outline stroke
 // ══════════════════════════════════════════════════════════════
 
-function drawLeaf(x, y, size, tangent, side) {
-  const s = 75 * size;   // 2.5x larger for proper saz proportions
-  const leafAngle = tangent + side * 0.5;
-  const green = pick(GREENS);
-  const leafCurve = side * 0.15;  // slight saz curve
+// Build a precise saz leaf polygon — long pointed almond with characteristic curve
+function makeSazLeafPolygon(x, y, size, angle, side) {
+  const leafLen = size * 1.2;
+  const leafWidth = size * 0.28;
+  const leafCurve = side * 0.15;
+  const steps = 24;
+  const pts = [];
 
-  // Build saz leaf outline — long pointed almond shape with curve
-  const leafLen = s * 1.2;
-  const leafWidth = s * 0.28;
-  const steps = 20;
-
-  // Right side of leaf (base to tip)
-  const rightPts = [];
+  // Right side: base to tip
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
     const along = leafLen * t;
     const width = Math.sin(t * Math.PI) * leafWidth * (1 - t * 0.3);
     const curveOff = Math.sin(t * Math.PI) * leafCurve * leafLen;
-    const ax = leafAngle + curveOff / leafLen;
-    rightPts.push({
+    const ax = angle + curveOff / leafLen;
+    pts.push({
       x: x + Math.cos(ax) * along + Math.cos(ax + Math.PI / 2) * width,
       y: y + Math.sin(ax) * along + Math.sin(ax + Math.PI / 2) * width
     });
   }
-
-  // Left side of leaf (tip back to base)
-  const leftPts = [];
+  // Left side: tip back to base
   for (let i = steps; i >= 0; i--) {
     const t = i / steps;
     const along = leafLen * t;
     const width = Math.sin(t * Math.PI) * leafWidth * (1 - t * 0.3);
     const curveOff = Math.sin(t * Math.PI) * leafCurve * leafLen;
-    const ax = leafAngle + curveOff / leafLen;
-    leftPts.push({
+    const ax = angle + curveOff / leafLen;
+    pts.push({
       x: x + Math.cos(ax) * along + Math.cos(ax - Math.PI / 2) * width,
       y: y + Math.sin(ax) * along + Math.sin(ax - Math.PI / 2) * width
     });
   }
+  return pts;
+}
 
-  const fullOutline = rightPts.concat(leftPts);
+// Build a precise ogee/almond petal polygon for roses and buds
+function makeOgeePetalPolygon(cx, cy, petalLen, petalWidth, angle) {
+  const steps = 14;
+  const pts = [];
+  // Right side
+  for (let j = 0; j <= steps; j++) {
+    const t = j / steps;
+    const r = petalLen * t;
+    const bulge = Math.sin(t * Math.PI) * petalWidth;
+    pts.push({
+      x: cx + Math.cos(angle) * r + Math.cos(angle + Math.PI / 2) * bulge,
+      y: cy + Math.sin(angle) * r + Math.sin(angle + Math.PI / 2) * bulge
+    });
+  }
+  // Left side back
+  for (let j = steps; j >= 0; j--) {
+    const t = j / steps;
+    const r = petalLen * t;
+    const bulge = Math.sin(t * Math.PI) * petalWidth;
+    pts.push({
+      x: cx + Math.cos(angle) * r + Math.cos(angle - Math.PI / 2) * bulge,
+      y: cy + Math.sin(angle) * r + Math.sin(angle - Math.PI / 2) * bulge
+    });
+  }
+  return pts;
+}
 
-  // Central spine path for vein
-  const spinePts = [];
+// Build a precise teardrop polygon for buds
+function makeTeardropPolygon(cx, cy, radius, angle) {
+  const steps = 20;
+  const pts = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const a = t * Math.PI * 2;
+    // Teardrop: circle squashed at bottom, pointed at top
+    const r = radius * (1 + 0.3 * Math.cos(a));
+    const px = Math.sin(a) * r * 0.6;
+    const py = -Math.cos(a) * r;
+    // Rotate into desired angle
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    pts.push({
+      x: cx + px * cos - py * sin,
+      y: cy + px * sin + py * cos
+    });
+  }
+  return pts;
+}
+
+function drawLeaf(x, y, size, tangent, side) {
+  const s = 75 * size;
+  const leafAngle = tangent + side * 0.5;
+  const green = pick(GREENS);
+
+  // 1) PRECISE saz leaf polygon
+  const leafPoly = makeSazLeafPolygon(x, y, s, leafAngle, side);
+
+  // 2) WATERCOLOR FILL — organic deformation + low-opacity layering + Mixbox blending
+  fb.watercolor(leafPoly, {
+    color: green, layers: 35, opacity: 0.035,
+    baseRounds: 4, layerRounds: 2, variance: 0.3,
+    layer: 'garden', concentratePigment: true
+  });
+
+  // Darker core wash along center
+  const leafLen = s * 1.2;
+  const leafCurve = side * 0.15;
+  const spinePoly = [];
+  const steps = 16;
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
     const along = leafLen * t;
     const curveOff = Math.sin(t * Math.PI) * leafCurve * leafLen;
     const ax = leafAngle + curveOff / leafLen;
-    spinePts.push({
-      x: x + Math.cos(ax) * along,
-      y: y + Math.sin(ax) * along
+    const w = s * 0.08 * Math.sin(t * Math.PI);
+    spinePoly.push({
+      x: x + Math.cos(ax) * along + Math.cos(ax + Math.PI/2) * w,
+      y: y + Math.sin(ax) * along + Math.sin(ax + Math.PI/2) * w
     });
   }
-
-  // Fill: wide soft wash stroke tracing the full outline
-  fb.drawStroke(fullOutline, {
-    color: green, weight: s * 0.35, alpha: 0.08,
-    spacing: 0.15, scatter: 0.2, grain: 0.85,
-    pressureStart: 0.2, pressureEnd: 0.2, pressurePeak: 1.0,
+  for (let i = steps; i >= 0; i--) {
+    const t = i / steps;
+    const along = leafLen * t;
+    const curveOff = Math.sin(t * Math.PI) * leafCurve * leafLen;
+    const ax = leafAngle + curveOff / leafLen;
+    const w = s * 0.08 * Math.sin(t * Math.PI);
+    spinePoly.push({
+      x: x + Math.cos(ax) * along - Math.cos(ax + Math.PI/2) * w,
+      y: y + Math.sin(ax) * along - Math.sin(ax + Math.PI/2) * w
+    });
+  }
+  fb.watercolor(spinePoly, {
+    color: DARK_GREEN, layers: 20, opacity: 0.04,
+    baseRounds: 3, layerRounds: 2, variance: 0.25,
     layer: 'garden'
   });
 
-  // Dense fill: trace right side, then left side separately for solid coverage
-  fb.drawStroke(rightPts, {
-    color: green, weight: s * 0.5, alpha: 0.12,
-    spacing: 0.15, scatter: 0.15, grain: 0.8,
-    pressureStart: 0.15, pressureEnd: 0.05, pressurePeak: 1.0,
-    layer: 'garden'
-  });
-  fb.drawStroke(leftPts, {
-    color: green, weight: s * 0.5, alpha: 0.12,
-    spacing: 0.15, scatter: 0.15, grain: 0.8,
-    pressureStart: 0.05, pressureEnd: 0.15, pressurePeak: 1.0,
+  // 3) TAHRIR OUTLINE — clean sharp stroke on top
+  fb.drawStroke(leafPoly, {
+    color: VINE_DARK, weight: 1.8, alpha: 0.4,
+    spacing: 0.25, scatter: 0.02, grain: 0.4,
+    pressureStart: 0.5, pressureEnd: 0.5, pressurePeak: 0.95,
     layer: 'garden'
   });
 
-  // Darker core wash
-  fb.drawStroke(spinePts, {
-    color: DARK_GREEN, weight: s * 0.4, alpha: 0.1,
-    spacing: 0.2, scatter: 0.1, grain: 0.8,
-    pressureStart: 0.3, pressureEnd: 0.05, pressurePeak: 1.0,
-    layer: 'garden'
-  });
-
-  // Outline for shape definition
-  fb.drawStroke(fullOutline, {
-    color: VINE_DARK, weight: 1.5, alpha: 0.25,
-    spacing: 0.3, scatter: 0.05, grain: 0.6,
-    pressureStart: 0.3, pressureEnd: 0.3, pressurePeak: 0.9,
-    layer: 'garden'
-  });
-
-  // Pointed leaf stamps along spine for texture
-  fb.drawStroke(spinePts, {
-    color: green, weight: s * 0.3, alpha: 0.2,
-    texture: 'pointed_leaf', spacing: 0.35, scatter: 0.08, grain: 0.7,
-    pressureStart: 0.15, pressureEnd: 0.05, pressurePeak: 1.0,
-    sizeJitter: 0.15, layer: 'garden'
-  });
-
-  // Vein hatching
-  fb.addHatch(x, y, s * 0.5, leafAngle + Math.PI / 2, s * 0.18, {
-    color: VINE_DARK, a: 0.18, layer: 'garden', weight: 0
-  });
-
-  // Central vein
-  fb.drawStroke(spinePts, {
-    color: VINE_DARK, weight: 1.5, alpha: 0.35,
-    texture: 'hatch_line', spacing: 0.35, scatter: 0.04, grain: 0.55,
-    pressureStart: 0.6, pressureEnd: 0.05, pressurePeak: 0.9,
+  // Central vein tahrir
+  const veinPts = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const along = leafLen * t;
+    const curveOff = Math.sin(t * Math.PI) * leafCurve * leafLen;
+    const ax = leafAngle + curveOff / leafLen;
+    veinPts.push({ x: x + Math.cos(ax) * along, y: y + Math.sin(ax) * along });
+  }
+  fb.drawStroke(veinPts, {
+    color: VINE_DARK, weight: 1.2, alpha: 0.45,
+    spacing: 0.3, scatter: 0.02, grain: 0.5,
+    pressureStart: 0.7, pressureEnd: 0.05, pressurePeak: 0.95,
     layer: 'garden'
   });
 }
@@ -364,180 +408,133 @@ function drawBud(x, y, size, tangent) {
   const s = 20 * size;
   const color = pick(PETAL_HUES);
 
-  // Outer wash halo
-  fb.addWash({
-    x, y, color, a: 0.10, layer: 'garden',
-    scaleX: s * 0.9, scaleY: s * 1.2,
-    rotation: tangent, bleed: 10, bleedRadius: s * 0.35
+  // 1) PRECISE teardrop polygon
+  const budPoly = makeTeardropPolygon(x, y, s * 0.5, tangent);
+
+  // 2) WATERCOLOR FILL — painted body with organic bleed
+  fb.watercolor(budPoly, {
+    color, layers: 30, opacity: 0.04,
+    baseRounds: 4, layerRounds: 2, variance: 0.35,
+    layer: 'garden', concentratePigment: true
   });
 
-  // Watercolor body wash
-  fb.addWash({
-    x, y, color, a: 0.35, layer: 'garden',
-    scaleX: s * 0.55, scaleY: s * 0.75,
-    rotation: tangent, bleed: 8, bleedRadius: s * 0.2
+  // Deeper center concentration
+  const innerPoly = makeTeardropPolygon(x, y, s * 0.2, tangent);
+  fb.watercolor(innerPoly, {
+    color: DEEP_CRIMSON, layers: 15, opacity: 0.05,
+    baseRounds: 3, layerRounds: 1, variance: 0.2,
+    layer: 'garden'
   });
 
-  // Deeper center
-  fb.addWash({
-    x, y, color: DEEP_CRIMSON, a: 0.3, layer: 'garden',
-    scaleX: s * 0.2, scaleY: s * 0.25,
-    rotation: tangent, bleed: 4, bleedRadius: s * 0.06
-  });
-
-  // Full ogee petal arcs — 5 complete almond-shaped petals
+  // Small ogee petal overlays — precise polygons with watercolor
   for (let i = 0; i < 5; i++) {
     const a = tangent + (i / 5) * Math.PI * 2;
-    const petalLen = s * 0.35;
-    const petalWidth = s * 0.12;
-    const petalPts = [];
-    const steps = 8;
-    for (let j = 0; j <= steps; j++) {
-      const t = j / steps;
-      const r = petalLen * t;
-      const bulge = Math.sin(t * Math.PI) * petalWidth;
-      petalPts.push({
-        x: x + Math.cos(a) * r + Math.cos(a + Math.PI / 2) * bulge,
-        y: y + Math.sin(a) * r + Math.sin(a + Math.PI / 2) * bulge
-      });
-    }
-    for (let j = steps; j >= 0; j--) {
-      const t = j / steps;
-      const r = petalLen * t;
-      const bulge = Math.sin(t * Math.PI) * petalWidth;
-      petalPts.push({
-        x: x + Math.cos(a) * r + Math.cos(a - Math.PI / 2) * bulge,
-        y: y + Math.sin(a) * r + Math.sin(a - Math.PI / 2) * bulge
-      });
-    }
-    fb.drawStroke(petalPts, {
-      color, weight: s * 0.15, alpha: 0.25,
-      texture: 'bud', spacing: 0.25, scatter: 0.1, grain: 0.8,
-      pressureStart: 0.3, pressureEnd: 0.3, pressurePeak: 1.0,
-      pressureCenter: 0.5, layer: 'garden'
-    });
-  }
-
-  // Sepal strokes
-  const sepalLen = s * 1.2;
-  for (let dx = -1; dx <= 1; dx += 2) {
-    const sepalPts = [
-      { x: x + dx * 2, y: y + s * 0.3 },
-      { x: x + dx * 3, y: y + s * 0.3 + sepalLen * 0.5 }
-    ];
-    fb.drawStroke(sepalPts, {
-      color: DARK_GREEN, weight: 1.2, alpha: 0.35,
-      texture: 'hatch_line', spacing: 0.4, scatter: 0.05, grain: 0.7,
+    const petalPoly = makeOgeePetalPolygon(x, y, s * 0.35, s * 0.12, a);
+    fb.watercolor(petalPoly, {
+      color, layers: 12, opacity: 0.035,
+      baseRounds: 3, layerRounds: 1, variance: 0.25,
       layer: 'garden'
     });
   }
 
-  // Stem stroke
-  fb.drawLine(x, y + s * 0.4, x, y + sepalLen, {
-    color: STEM_GREEN, weight: 1.5, alpha: 0.3,
-    texture: 'hatch_line', spacing: 0.4, scatter: 0.05, grain: 0.7,
+  // 3) TAHRIR OUTLINE — clean sharp strokes on top
+  fb.drawStroke(budPoly, {
+    color: DEEP_CRIMSON, weight: 1.5, alpha: 0.4,
+    spacing: 0.25, scatter: 0.02, grain: 0.4,
+    pressureStart: 0.5, pressureEnd: 0.5, pressurePeak: 0.95,
     layer: 'garden'
   });
+
+  // Sepal tahrir lines
+  const sepalLen = s * 1.2;
+  for (let dx = -1; dx <= 1; dx += 2) {
+    const sepalPoly = makeOgeePetalPolygon(
+      x + dx * 2, y + s * 0.3, sepalLen * 0.4, s * 0.06,
+      tangent + Math.PI / 2 + dx * 0.3
+    );
+    fb.watercolor(sepalPoly, {
+      color: DARK_GREEN, layers: 10, opacity: 0.04,
+      baseRounds: 3, layerRounds: 1, variance: 0.2,
+      layer: 'garden'
+    });
+    fb.drawStroke(sepalPoly, {
+      color: VINE_DARK, weight: 1.0, alpha: 0.35,
+      spacing: 0.3, scatter: 0.02, grain: 0.5,
+      layer: 'garden'
+    });
+  }
 }
 
 function drawRose(x, y, size, isGolden) {
   const s = (isGolden ? 55 : 40) * size;
-  const layers = isGolden ? 6 : 4;
+  const rings = isGolden ? 6 : 4;
   const petalCounts = [8, 7, 6, 5, 5, 4];
 
-  // Large watercolor bleed halo
-  fb.addWash({
-    x, y, color: isGolden ? GOLD : ROSE_PINK,
-    a: 0.08, layer: 'garden',
-    scaleX: s * 1.1, scaleY: s * 1.1,
-    bleed: 16, bleedRadius: s * 0.45
-  });
+  // 1) PRECISE POLYGON PETALS per ring — each petal is a clean ogee shape
+  // Collect all petal polygons first, then watercolor fill, then tahrir outline
 
-  for (let layer = 0; layer < layers; layer++) {
-    const lr = s * (1 - layer * 0.14);
-    const petalCount = petalCounts[layer] || 5;
+  const allPetals = []; // {poly, fillColor, strokeColor, ring}
+
+  for (let ring = 0; ring < rings; ring++) {
+    const lr = s * (1 - ring * 0.14);
+    const petalCount = petalCounts[ring] || 5;
 
     let fillColor, strokeColor;
     if (isGolden) {
-      fillColor = [DARK_GOLD, GOLD, GOLD, AMBER, PALE_GOLD, '#E8C850'][layer];
-      strokeColor = ['#5A4008', '#6A5010', '#7A6018', '#8A7020', '#A08028', '#B09038'][layer];
+      fillColor = [DARK_GOLD, GOLD, GOLD, AMBER, PALE_GOLD, '#E8C850'][ring];
+      strokeColor = ['#5A4008', '#6A5010', '#7A6018', '#8A7020', '#A08028', '#B09038'][ring];
     } else {
-      fillColor = ['#C06878', '#B05060', '#9A3848', '#8B2838', '#7A1A2B'][layer];
+      fillColor = ['#C06878', '#B05060', '#9A3848', '#8B2838', '#7A1A2B'][ring];
       strokeColor = DEEP_CRIMSON;
     }
 
-    // Wash for this ring
-    fb.addWash({
-      x, y, color: fillColor,
-      a: 0.08 + layer * 0.06, layer: 'garden',
-      scaleX: lr * 0.65, scaleY: lr * 0.65,
-      bleed: 8 + layer * 2, bleedRadius: lr * 0.2
-    });
-
-    // Hatch on inner layers
-    if (layer >= 1) {
-      fb.addHatch(x, y, lr * 0.35, Math.PI / 4 + layer * 0.5,
-        lr * 0.12, { color: strokeColor, a: 0.15, layer: 'garden' });
-    }
-
-    // Full ogee/almond petals — two curves meeting at a pointed tip
     for (let i = 0; i < petalCount; i++) {
-      const a = (i / petalCount) * Math.PI * 2 + layer * 0.35;
-      const petalLen = lr * 0.38;
-      const petalWidth = lr * 0.18;
-      const steps = 12;
-
-      // Build almond-shaped petal path: base → tip along right curve, tip → base along left curve
-      const petalPts = [];
-      // Right side: base to tip
-      for (let j = 0; j <= steps; j++) {
-        const t = j / steps;
-        const r = petalLen * t;
-        const bulge = Math.sin(t * Math.PI) * petalWidth;
-        petalPts.push({
-          x: x + Math.cos(a) * r + Math.cos(a + Math.PI / 2) * bulge,
-          y: y + Math.sin(a) * r + Math.sin(a + Math.PI / 2) * bulge
-        });
-      }
-      // Left side: tip back to base
-      for (let j = steps; j >= 0; j--) {
-        const t = j / steps;
-        const r = petalLen * t;
-        const bulge = Math.sin(t * Math.PI) * petalWidth;
-        petalPts.push({
-          x: x + Math.cos(a) * r + Math.cos(a - Math.PI / 2) * bulge,
-          y: y + Math.sin(a) * r + Math.sin(a - Math.PI / 2) * bulge
-        });
-      }
-
-      // Fill stroke — thick, low alpha for watercolor fill
-      fb.drawStroke(petalPts, {
-        color: fillColor, weight: lr * 0.14, alpha: 0.12 + layer * 0.03,
-        texture: 'petal', spacing: 0.2, scatter: 0.1, grain: 0.75,
-        pressureStart: 0.3, pressureEnd: 0.3, pressurePeak: 1.0,
-        pressureCenter: 0.5, alphaJitter: 0.15, sizeJitter: 0.12,
-        layer: 'garden'
-      });
-
-      // Outline stroke — thinner, higher alpha for definition
-      fb.drawStroke(petalPts, {
-        color: strokeColor, weight: 1.5, alpha: 0.2,
-        spacing: 0.3, scatter: 0.05, grain: 0.6,
-        pressureStart: 0.4, pressureEnd: 0.4, pressurePeak: 0.9,
-        layer: 'garden'
-      });
+      const a = (i / petalCount) * Math.PI * 2 + ring * 0.35;
+      const petalPoly = makeOgeePetalPolygon(x, y, lr * 0.38, lr * 0.18, a);
+      allPetals.push({ poly: petalPoly, fillColor, strokeColor, ring });
     }
   }
 
-  // Bright center highlight
-  fb.addWash({
-    x, y, color: isGolden ? '#E8D070' : '#D06080',
-    a: 0.4, layer: 'garden',
-    scaleX: s * 0.1, scaleY: s * 0.1,
-    bleed: 6, bleedRadius: s * 0.06
+  // 2) WATERCOLOR FILL — paint each petal with organic deformation
+  // Outer halo wash first
+  const haloPoly = FatihaBrush.makePolygon('circle', x, y, s * 0.9, { points: 16 });
+  fb.watercolor(haloPoly, {
+    color: isGolden ? GOLD : ROSE_PINK,
+    layers: 15, opacity: 0.02,
+    baseRounds: 4, layerRounds: 2, variance: 0.5,
+    layer: 'garden'
   });
 
-  // Spray pollen
+  // Paint petals from outer ring inward (interleaved watercolor)
+  for (const petal of allPetals) {
+    fb.watercolor(petal.poly, {
+      color: petal.fillColor,
+      layers: 12 + petal.ring * 3, opacity: 0.03 + petal.ring * 0.008,
+      baseRounds: 3, layerRounds: 2, variance: 0.25,
+      layer: 'garden', concentratePigment: true
+    });
+  }
+
+  // Center highlight
+  const centerPoly = FatihaBrush.makePolygon('circle', x, y, s * 0.12, { points: 10 });
+  fb.watercolor(centerPoly, {
+    color: isGolden ? '#E8D070' : '#D06080',
+    layers: 20, opacity: 0.05,
+    baseRounds: 3, layerRounds: 1, variance: 0.2,
+    layer: 'garden'
+  });
+
+  // 3) TAHRIR OUTLINES — clean sharp strokes on top of every petal
+  for (const petal of allPetals) {
+    fb.drawStroke(petal.poly, {
+      color: petal.strokeColor, weight: 1.4, alpha: 0.35,
+      spacing: 0.25, scatter: 0.02, grain: 0.4,
+      pressureStart: 0.5, pressureEnd: 0.5, pressurePeak: 0.95,
+      layer: 'garden'
+    });
+  }
+
+  // Pollen spray
   for (let i = 0; i < 14; i++) {
     const a = Math.random() * Math.PI * 2;
     const r = Math.random() * s * 0.2;
@@ -554,88 +551,69 @@ function drawRose(x, y, size, isGolden) {
 function drawBloom(x, y, size) {
   const s = 30 * size;
 
-  // Large outer bleed
-  fb.addWash({
-    x, y, color: ROSE_PINK, a: 0.08, layer: 'garden',
-    scaleX: s * 0.9, scaleY: s * 0.9,
-    bleed: 12, bleedRadius: s * 0.35
-  });
-
-  // Core wash
-  fb.addWash({
-    x, y, color: CRIMSON, a: 0.25, layer: 'garden',
-    scaleX: s * 0.35, scaleY: s * 0.35,
-    bleed: 6, bleedRadius: s * 0.12
-  });
-
-  // Cross-hatch
-  fb.addHatch(x, y, s * 0.3, Math.PI / 3, s * 0.1,
-    { color: DEEP_CRIMSON, a: 0.2, layer: 'garden' });
-  fb.addHatch(x, y, s * 0.25, -Math.PI / 6, s * 0.12,
-    { color: '#4A0A15', a: 0.15, layer: 'garden' });
-
-  // Full ogee petals — 6 complete almond-shaped petals
+  // 1) PRECISE ogee petal polygons
+  const petalPolys = [];
   for (let i = 0; i < 6; i++) {
     const a = i * Math.PI / 3;
-    const petalLen = s * 0.3;
-    const petalWidth = s * 0.12;
-    const petalPts = [];
-    const steps = 10;
-    // Right side
-    for (let j = 0; j <= steps; j++) {
-      const t = j / steps;
-      const r = petalLen * t;
-      const bulge = Math.sin(t * Math.PI) * petalWidth;
-      petalPts.push({
-        x: x + Math.cos(a) * r + Math.cos(a + Math.PI / 2) * bulge,
-        y: y + Math.sin(a) * r + Math.sin(a + Math.PI / 2) * bulge
-      });
-    }
-    // Left side back
-    for (let j = steps; j >= 0; j--) {
-      const t = j / steps;
-      const r = petalLen * t;
-      const bulge = Math.sin(t * Math.PI) * petalWidth;
-      petalPts.push({
-        x: x + Math.cos(a) * r + Math.cos(a - Math.PI / 2) * bulge,
-        y: y + Math.sin(a) * r + Math.sin(a - Math.PI / 2) * bulge
-      });
-    }
-    fb.drawStroke(petalPts, {
-      color: pick(PETAL_HUES), weight: s * 0.1, alpha: 0.2,
-      texture: 'petal', spacing: 0.2, scatter: 0.08, grain: 0.75,
-      pressureStart: 0.3, pressureEnd: 0.3, pressurePeak: 1.0,
-      pressureCenter: 0.5, layer: 'garden'
+    petalPolys.push(makeOgeePetalPolygon(x, y, s * 0.3, s * 0.12, a));
+  }
+
+  // 2) WATERCOLOR FILL
+  // Outer atmospheric halo
+  const haloPoly = FatihaBrush.makePolygon('circle', x, y, s * 0.7, { points: 12 });
+  fb.watercolor(haloPoly, {
+    color: ROSE_PINK, layers: 12, opacity: 0.025,
+    baseRounds: 4, layerRounds: 2, variance: 0.45,
+    layer: 'garden'
+  });
+
+  // Paint each petal
+  for (const poly of petalPolys) {
+    fb.watercolor(poly, {
+      color: pick(PETAL_HUES), layers: 15, opacity: 0.04,
+      baseRounds: 3, layerRounds: 2, variance: 0.3,
+      layer: 'garden', concentratePigment: true
     });
   }
 
-  // Center dot
-  fb.addStamp({
-    x, y, color: '#D06080', a: 0.45,
-    scaleX: 3, scaleY: 3, texture: 'spray', layer: 'garden'
+  // Core center
+  const corePoly = FatihaBrush.makePolygon('circle', x, y, s * 0.1, { points: 8 });
+  fb.watercolor(corePoly, {
+    color: '#D06080', layers: 15, opacity: 0.06,
+    baseRounds: 2, layerRounds: 1, variance: 0.2,
+    layer: 'garden'
   });
+
+  // 3) TAHRIR OUTLINES
+  for (const poly of petalPolys) {
+    fb.drawStroke(poly, {
+      color: DEEP_CRIMSON, weight: 1.3, alpha: 0.35,
+      spacing: 0.25, scatter: 0.02, grain: 0.4,
+      pressureStart: 0.5, pressureEnd: 0.5, pressurePeak: 0.95,
+      layer: 'garden'
+    });
+  }
 }
 
 function drawGhunnah(x, y, size) {
   const s = 45 * size;
 
-  // Ethereal halo — large atmospheric wash on glow layer
-  fb.addWash({
-    x, y, color: HOT_PINK, a: 0.06, layer: 'glow',
-    scaleX: s * 0.65, scaleY: s * 0.65,
-    bleed: 14, bleedRadius: s * 0.45
+  // Ghunnah is an ethereal resonance — watercolor blobs on glow layer
+  // 1) Outer halo — large soft watercolor circle
+  const outerPoly = FatihaBrush.makePolygon('circle', x, y, s * 0.5, { points: 14 });
+  fb.watercolor(outerPoly, {
+    color: HOT_PINK, layers: 15, opacity: 0.02,
+    baseRounds: 5, layerRounds: 3, variance: 0.55,
+    layer: 'glow'
   });
 
-  // Second halo
-  fb.addWash({
-    x, y, color: AMBER, a: 0.04, layer: 'glow',
-    scaleX: s * 0.38, scaleY: s * 0.38,
-    bleed: 8, bleedRadius: s * 0.2
+  // Inner warm glow
+  const innerPoly = FatihaBrush.makePolygon('circle', x, y, s * 0.25, { points: 10 });
+  fb.watercolor(innerPoly, {
+    color: AMBER, layers: 12, opacity: 0.025,
+    baseRounds: 4, layerRounds: 2, variance: 0.4,
+    layer: 'glow'
   });
-
-  // Hatch warmth
-  fb.addHatch(x, y, s * 0.3, Math.random() * Math.PI, s * 0.12,
-    { color: ROSE_PINK, a: 0.12, layer: 'garden' });
 
   // Spray particles radiating outward
   for (let i = 0; i < 14; i++) {
@@ -656,20 +634,27 @@ function drawThorn(px, py, size, tangent, side) {
   const tx = px + Math.cos(thornAngle) * s;
   const ty = py + Math.sin(thornAngle) * s;
 
-  // Thorn as a tapered stroke from base to tip
-  fb.drawLine(px, py, tx, ty, {
-    color: DARK_GREEN, weight: 3, alpha: 0.4,
-    texture: 'thorn', spacing: 0.3, scatter: 0.05, grain: 0.85,
-    pressureStart: 1.0, pressureEnd: 0.05, pressurePeak: 1.0,
-    pressureCenter: 0.1, layer: 'garden'
+  // 1) Precise triangle polygon for thorn
+  const perpAngle = thornAngle + Math.PI / 2;
+  const baseW = s * 0.2;
+  const thornPoly = [
+    { x: px + Math.cos(perpAngle) * baseW, y: py + Math.sin(perpAngle) * baseW },
+    { x: px - Math.cos(perpAngle) * baseW, y: py - Math.sin(perpAngle) * baseW },
+    { x: tx, y: ty }
+  ];
+
+  // 2) Watercolor fill
+  fb.watercolor(thornPoly, {
+    color: DARK_GREEN, layers: 10, opacity: 0.05,
+    baseRounds: 3, layerRounds: 1, variance: 0.2,
+    layer: 'garden'
   });
 
-  // Fine dark line overlay
-  fb.drawLine(px, py, tx, ty, {
-    color: VINE_DARK, weight: 1.0, alpha: 0.3,
-    texture: 'hatch_line', spacing: 0.4, scatter: 0.03, grain: 0.6,
-    pressureStart: 0.8, pressureEnd: 0.05, pressurePeak: 0.9,
-    pressureCenter: 0.15, layer: 'garden'
+  // 3) Tahrir outline
+  fb.drawStroke(thornPoly.concat([thornPoly[0]]), {
+    color: VINE_DARK, weight: 1.0, alpha: 0.4,
+    spacing: 0.25, scatter: 0.02, grain: 0.4,
+    layer: 'garden'
   });
 }
 
@@ -695,35 +680,43 @@ function drawVineTendril(x, y, size, tangent) {
       });
     }
 
-    // Soft wash stroke
+    // Base stroke for the vine
     fb.drawStroke(branchPts, {
-      color, weight: weight * 2, alpha: 0.08,
-      spacing: 0.2, scatter: 0.3, grain: 0.8,
-      pressureStart: 0.8, pressureEnd: 0.05, pressurePeak: 1.0,
-      pressureCenter: 0.2, layer: 'garden'
-    });
-
-    // Core stroke
-    fb.drawStroke(branchPts, {
-      color: VINE_DARK, weight, alpha: 0.12,
-      spacing: 0.25, scatter: 0.1, grain: 0.75,
+      color: VINE_DARK, weight, alpha: 0.15,
+      spacing: 0.25, scatter: 0.08, grain: 0.7,
       pressureStart: 0.7, pressureEnd: 0.05, pressurePeak: 1.0,
       pressureCenter: 0.2, layer: 'garden'
     });
+
+    // richWash blobs along the tendril for painted feel
+    const blobInterval = 6;
+    for (let i = 0; i < branchPts.length; i += blobInterval) {
+      const pt = branchPts[i];
+      const t = i / branchPts.length;
+      const blobR = (weight * 1.5) * (1 - t * 0.7);
+      fb.richWash(pt.x, pt.y, blobR, {
+        color, layers: 8, opacity: 0.03,
+        variance: 0.35, edgeStipple: 0,
+        shape: 'circle', layer: 'garden'
+      });
+    }
   }
 
-  // Tiny leaf at tendril tip
+  // Tiny leaf at tendril tip — precise petal polygon + watercolor
   const tipX = x + Math.cos(tangent) * s * 0.75;
   const tipY = y + Math.sin(tangent) * s * 0.75;
-  fb.addWash({
-    x: tipX, y: tipY, color: LEAF_GREEN, a: 0.2,
-    scaleX: 5 * size, scaleY: 9 * size,
-    rotation: tangent, layer: 'garden', bleed: 5, bleedRadius: 4
+  const tipLeafPoly = FatihaBrush.makePolygon('petal', tipX, tipY, 6 * size, {
+    rotation: tangent, aspect: 0.5
   });
-  fb.addStamp({
-    x: tipX, y: tipY, color: DARK_GREEN, a: 0.25,
-    rotation: tangent, scaleX: 3 * size, scaleY: 6 * size,
-    texture: 'pointed_leaf', layer: 'garden'
+  fb.watercolor(tipLeafPoly, {
+    color: LEAF_GREEN, layers: 12, opacity: 0.04,
+    baseRounds: 3, layerRounds: 1, variance: 0.3,
+    layer: 'garden'
+  });
+  fb.drawStroke(tipLeafPoly, {
+    color: DARK_GREEN, weight: 1.0, alpha: 0.35,
+    spacing: 0.25, scatter: 0.02, grain: 0.4,
+    layer: 'garden'
   });
 }
 
@@ -742,46 +735,31 @@ function drawVineSegment(startIdx, endIdx, energy) {
   const globalT = startIdx / spiralPts.length;
   const baseWeight = (5 + energy * 6) * (1.0 - globalT * 0.5);
 
-  // Layer 1: Wide warm olive wash — soft atmospheric halo
+  // Base stroke — the core vine line
   fb.drawStroke(pts, {
-    color: '#4A5828', weight: baseWeight * 3.0, alpha: 0.04,
-    spacing: 0.2, scatter: 0.4, grain: 0.85,
-    pressureStart: 0.3, pressureEnd: 0.15, pressurePeak: 1.0,
-    alphaJitter: 0.3, sizeJitter: 0.2,
-    layer: 'garden'
-  });
-
-  // Layer 2: Medium olive body — dense overlapping for continuous look
-  fb.drawStroke(pts, {
-    color: '#3A4A20', weight: baseWeight * 1.8, alpha: 0.07,
-    spacing: 0.2, scatter: 0.15, grain: 0.9,
-    pressureStart: 0.25, pressureEnd: 0.15, pressurePeak: 1.0,
-    alphaJitter: 0.2, sizeJitter: 0.12,
-    layer: 'garden'
-  });
-
-  // Layer 3: Dark core — adds definition
-  fb.drawStroke(pts, {
-    color: VINE_DARK, weight: baseWeight * 1.0, alpha: 0.1,
+    color: VINE_DARK, weight: baseWeight * 1.0, alpha: 0.12,
     spacing: 0.25, scatter: 0.08, grain: 0.85,
     pressureStart: 0.2, pressureEnd: 0.1, pressurePeak: 1.0,
     layer: 'garden'
   });
 
-  // Layer 4: Fine directional detail line
-  fb.drawStroke(pts, {
-    color: '#1A2A10', weight: baseWeight * 0.5, alpha: 0.15,
-    texture: 'hatch_line', spacing: 0.5, scatter: 0.06, grain: 0.45,
-    pressureStart: 0.1, pressureEnd: 0.08, pressurePeak: 0.9,
-    layer: 'garden'
-  });
+  // richWash blobs along the vine for painted watercolor feel
+  const blobInterval = Math.max(3, Math.floor(pts.length / 8));
+  for (let i = 0; i < pts.length; i += blobInterval) {
+    const pt = pts[i];
+    const blobR = baseWeight * 1.5;
+    fb.richWash(pt.x, pt.y, blobR, {
+      color: '#4A5828', layers: 8, opacity: 0.025,
+      variance: 0.4, edgeStipple: 0,
+      shape: 'circle', layer: 'garden'
+    });
+  }
 
-  // Layer 5: Warm highlight — sparse shimmer
+  // Fine tahrir detail line on top
   fb.drawStroke(pts, {
-    color: '#5A7830', weight: baseWeight * 0.7, alpha: 0.05,
-    spacing: 0.6, scatter: 0.25, grain: 0.3,
-    pressureStart: 0.1, pressureEnd: 0.1, pressurePeak: 0.8,
-    alphaJitter: 0.4,
+    color: '#1A2A10', weight: baseWeight * 0.5, alpha: 0.18,
+    spacing: 0.4, scatter: 0.03, grain: 0.4,
+    pressureStart: 0.15, pressureEnd: 0.1, pressurePeak: 0.9,
     layer: 'garden'
   });
 }
