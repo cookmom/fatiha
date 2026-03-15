@@ -23,9 +23,8 @@
 <button id="playBtn">&#9654; Bismillah</button>
 <div id="stats"></div>
 
-<!-- Mixbox pigment blending disabled: CDN version's GLSL output
-     references mixbox_lut without declaring it, causing compile failure
-     in WebGL2 ES 3.00. Standard alpha blending is used instead. -->
+<!-- Mixbox pigment blending — local copy for proper GLSL integration -->
+<script src="mixbox.js"></script>
 <script src="fatiha-brush.js"></script>
 
 <script>
@@ -341,11 +340,11 @@ function drawLeaf(x, y, size, tangent, side) {
   // 1) PRECISE saz leaf polygon
   const leafPoly = makeSazLeafPolygon(x, y, s, leafAngle, side);
 
-  // 2) WATERCOLOR FILL — organic deformation + layered stamps
-  fb.watercolor(leafPoly, {
-    color: green, layers: 20, opacity: 0.08,
-    baseRounds: 3, layerRounds: 2, variance: 0.3,
-    layer: 'garden', concentratePigment: true
+  // 2) WET WATERCOLOR FILL — progressive "paint drying" deformation
+  fb.wetWatercolor(leafPoly, {
+    color: green, layers: 55, opacity: 0.035,
+    peakBaseRounds: 7, peakLayerRounds: 5, variance: 0.4,
+    maxWetness: 60, layer: 'garden', concentratePigment: true
   });
 
   // Darker core wash along center
@@ -375,10 +374,10 @@ function drawLeaf(x, y, size, tangent, side) {
       y: y + Math.sin(ax) * along - Math.sin(ax + Math.PI/2) * w
     });
   }
-  fb.watercolor(spinePoly, {
-    color: DARK_GREEN, layers: 8, opacity: 0.08,
-    baseRounds: 2, layerRounds: 1, variance: 0.25,
-    layer: 'garden'
+  fb.wetWatercolor(spinePoly, {
+    color: DARK_GREEN, layers: 20, opacity: 0.04,
+    peakBaseRounds: 5, peakLayerRounds: 3, variance: 0.3,
+    maxWetness: 40, layer: 'garden'
   });
 
   // 3) TAHRIR OUTLINE — clean sharp stroke on top
@@ -413,29 +412,29 @@ function drawBud(x, y, size, tangent) {
   // 1) PRECISE teardrop polygon
   const budPoly = makeTeardropPolygon(x, y, s * 0.5, tangent);
 
-  // 2) WATERCOLOR FILL — painted body with organic bleed
-  fb.watercolor(budPoly, {
-    color, layers: 18, opacity: 0.09,
-    baseRounds: 3, layerRounds: 1, variance: 0.35,
-    layer: 'garden', concentratePigment: true
+  // 2) WET WATERCOLOR FILL — progressive deformation
+  fb.wetWatercolor(budPoly, {
+    color, layers: 40, opacity: 0.04,
+    peakBaseRounds: 6, peakLayerRounds: 4, variance: 0.4,
+    maxWetness: 50, layer: 'garden', concentratePigment: true
   });
 
   // Deeper center concentration
   const innerPoly = makeTeardropPolygon(x, y, s * 0.2, tangent);
-  fb.watercolor(innerPoly, {
-    color: DEEP_CRIMSON, layers: 8, opacity: 0.09,
-    baseRounds: 2, layerRounds: 1, variance: 0.2,
-    layer: 'garden'
+  fb.wetWatercolor(innerPoly, {
+    color: DEEP_CRIMSON, layers: 18, opacity: 0.04,
+    peakBaseRounds: 4, peakLayerRounds: 2, variance: 0.25,
+    maxWetness: 30, layer: 'garden'
   });
 
-  // Small ogee petal overlays — precise polygons with watercolor
+  // Small ogee petal overlays — progressive watercolor
   for (let i = 0; i < 5; i++) {
     const a = tangent + (i / 5) * Math.PI * 2;
     const petalPoly = makeOgeePetalPolygon(x, y, s * 0.35, s * 0.12, a);
-    fb.watercolor(petalPoly, {
-      color, layers: 6, opacity: 0.07,
-      baseRounds: 2, layerRounds: 1, variance: 0.25,
-      layer: 'garden'
+    fb.wetWatercolor(petalPoly, {
+      color, layers: 15, opacity: 0.04,
+      peakBaseRounds: 5, peakLayerRounds: 3, variance: 0.3,
+      maxWetness: 35, layer: 'garden'
     });
   }
 
@@ -454,10 +453,10 @@ function drawBud(x, y, size, tangent) {
       x + dx * 2, y + s * 0.3, sepalLen * 0.4, s * 0.06,
       tangent + Math.PI / 2 + dx * 0.3
     );
-    fb.watercolor(sepalPoly, {
-      color: DARK_GREEN, layers: 5, opacity: 0.08,
-      baseRounds: 2, layerRounds: 1, variance: 0.2,
-      layer: 'garden'
+    fb.wetWatercolor(sepalPoly, {
+      color: DARK_GREEN, layers: 12, opacity: 0.04,
+      peakBaseRounds: 4, peakLayerRounds: 2, variance: 0.25,
+      maxWetness: 25, layer: 'garden'
     });
     fb.drawStroke(sepalPoly, {
       color: VINE_DARK, weight: 1.0, alpha: 0.35,
@@ -497,33 +496,33 @@ function drawRose(x, y, size, isGolden) {
     }
   }
 
-  // 2) WATERCOLOR FILL — paint each petal with organic deformation
+  // 2) WET WATERCOLOR FILL — progressive deformation for rich watercolor
   // Outer halo wash first
   const haloPoly = FatihaBrush.makePolygon('circle', x, y, s * 0.9, { points: 16 });
-  fb.watercolor(haloPoly, {
+  fb.wetWatercolor(haloPoly, {
     color: isGolden ? GOLD : ROSE_PINK,
-    layers: 14, opacity: 0.05,
-    baseRounds: 3, layerRounds: 2, variance: 0.45,
-    layer: 'garden'
+    layers: 35, opacity: 0.035,
+    peakBaseRounds: 7, peakLayerRounds: 5, variance: 0.5,
+    maxWetness: 70, layer: 'garden'
   });
 
-  // Paint petals from outer ring inward (interleaved watercolor)
+  // Paint petals — progressive watercolor with more layers for inner rings
   for (const petal of allPetals) {
-    fb.watercolor(petal.poly, {
+    fb.wetWatercolor(petal.poly, {
       color: petal.fillColor,
-      layers: 12 + petal.ring * 3, opacity: 0.08 + petal.ring * 0.015,
-      baseRounds: 3, layerRounds: 1, variance: 0.25,
-      layer: 'garden', concentratePigment: true
+      layers: 25 + petal.ring * 5, opacity: 0.035 + petal.ring * 0.005,
+      peakBaseRounds: 6, peakLayerRounds: 4, variance: 0.35,
+      maxWetness: 55 + petal.ring * 5, layer: 'garden', concentratePigment: true
     });
   }
 
   // Center highlight
   const centerPoly = FatihaBrush.makePolygon('circle', x, y, s * 0.12, { points: 10 });
-  fb.watercolor(centerPoly, {
+  fb.wetWatercolor(centerPoly, {
     color: isGolden ? '#E8D070' : '#D06080',
-    layers: 10, opacity: 0.08,
-    baseRounds: 2, layerRounds: 1, variance: 0.2,
-    layer: 'garden'
+    layers: 20, opacity: 0.04,
+    peakBaseRounds: 4, peakLayerRounds: 2, variance: 0.25,
+    maxWetness: 30, layer: 'garden'
   });
 
   // 3) TAHRIR OUTLINES — clean sharp strokes on top of every petal
@@ -560,30 +559,30 @@ function drawBloom(x, y, size) {
     petalPolys.push(makeOgeePetalPolygon(x, y, s * 0.4, s * 0.16, a));
   }
 
-  // 2) WATERCOLOR FILL
+  // 2) WET WATERCOLOR FILL — progressive deformation
   // Outer atmospheric halo
   const haloPoly = FatihaBrush.makePolygon('circle', x, y, s * 0.7, { points: 12 });
-  fb.watercolor(haloPoly, {
-    color: ROSE_PINK, layers: 10, opacity: 0.06,
-    baseRounds: 3, layerRounds: 2, variance: 0.4,
-    layer: 'garden'
+  fb.wetWatercolor(haloPoly, {
+    color: ROSE_PINK, layers: 30, opacity: 0.035,
+    peakBaseRounds: 7, peakLayerRounds: 5, variance: 0.45,
+    maxWetness: 65, layer: 'garden'
   });
 
-  // Paint each petal
+  // Paint each petal — progressive watercolor
   for (const poly of petalPolys) {
-    fb.watercolor(poly, {
-      color: pick(PETAL_HUES), layers: 14, opacity: 0.08,
-      baseRounds: 3, layerRounds: 1, variance: 0.3,
-      layer: 'garden', concentratePigment: true
+    fb.wetWatercolor(poly, {
+      color: pick(PETAL_HUES), layers: 30, opacity: 0.035,
+      peakBaseRounds: 6, peakLayerRounds: 4, variance: 0.35,
+      maxWetness: 55, layer: 'garden', concentratePigment: true
     });
   }
 
   // Core center
   const corePoly = FatihaBrush.makePolygon('circle', x, y, s * 0.1, { points: 8 });
-  fb.watercolor(corePoly, {
-    color: '#D06080', layers: 8, opacity: 0.09,
-    baseRounds: 2, layerRounds: 1, variance: 0.2,
-    layer: 'garden'
+  fb.wetWatercolor(corePoly, {
+    color: '#D06080', layers: 15, opacity: 0.04,
+    peakBaseRounds: 4, peakLayerRounds: 2, variance: 0.25,
+    maxWetness: 25, layer: 'garden'
   });
 
   // 3) TAHRIR OUTLINES
@@ -600,30 +599,30 @@ function drawBloom(x, y, size) {
 function drawGhunnah(x, y, size) {
   const s = 45 * size;
 
-  // Ghunnah is an ethereal resonance — watercolor blobs on glow layer
+  // Ghunnah is an ethereal resonance — progressive watercolor on glow layer
   // 1) Outer halo — large soft watercolor circle
   const outerPoly = FatihaBrush.makePolygon('circle', x, y, s * 0.5, { points: 14 });
-  fb.watercolor(outerPoly, {
-    color: HOT_PINK, layers: 8, opacity: 0.04,
-    baseRounds: 3, layerRounds: 1, variance: 0.55,
-    layer: 'glow'
+  fb.wetWatercolor(outerPoly, {
+    color: HOT_PINK, layers: 15, opacity: 0.02,
+    peakBaseRounds: 6, peakLayerRounds: 4, variance: 0.55,
+    maxWetness: 70, layer: 'glow'
   });
 
   // Inner warm glow
   const innerPoly = FatihaBrush.makePolygon('circle', x, y, s * 0.25, { points: 10 });
-  fb.watercolor(innerPoly, {
-    color: AMBER, layers: 6, opacity: 0.05,
-    baseRounds: 2, layerRounds: 1, variance: 0.4,
-    layer: 'glow'
+  fb.wetWatercolor(innerPoly, {
+    color: AMBER, layers: 10, opacity: 0.025,
+    peakBaseRounds: 4, peakLayerRounds: 3, variance: 0.45,
+    maxWetness: 50, layer: 'glow'
   });
 
-  // Spray particles radiating outward
-  for (let i = 0; i < 14; i++) {
+  // Spray particles radiating outward — softer
+  for (let i = 0; i < 10; i++) {
     const a = Math.random() * Math.PI * 2;
     const r = Math.random() * s * 0.5;
     fb.addStamp({
       x: x + Math.cos(a) * r, y: y + Math.sin(a) * r,
-      color: pick(PETAL_HUES), a: 0.18,
+      color: pick(PETAL_HUES), a: 0.08,
       rotation: a, scaleX: 3 + Math.random() * 5, scaleY: 3 + Math.random() * 5,
       texture: 'spray', layer: 'glow'
     });
@@ -645,11 +644,11 @@ function drawThorn(px, py, size, tangent, side) {
     { x: tx, y: ty }
   ];
 
-  // 2) Watercolor fill
-  fb.watercolor(thornPoly, {
-    color: DARK_GREEN, layers: 5, opacity: 0.09,
-    baseRounds: 2, layerRounds: 1, variance: 0.2,
-    layer: 'garden'
+  // 2) Wet watercolor fill — quick dry for small shapes
+  fb.wetWatercolor(thornPoly, {
+    color: DARK_GREEN, layers: 12, opacity: 0.04,
+    peakBaseRounds: 5, peakLayerRounds: 3, variance: 0.25,
+    maxWetness: 20, layer: 'garden'
   });
 
   // 3) Tahrir outline
@@ -710,10 +709,10 @@ function drawVineTendril(x, y, size, tangent) {
   const tipLeafPoly = FatihaBrush.makePolygon('petal', tipX, tipY, 6 * size, {
     rotation: tangent, aspect: 0.5
   });
-  fb.watercolor(tipLeafPoly, {
-    color: LEAF_GREEN, layers: 6, opacity: 0.08,
-    baseRounds: 2, layerRounds: 1, variance: 0.3,
-    layer: 'garden'
+  fb.wetWatercolor(tipLeafPoly, {
+    color: LEAF_GREEN, layers: 15, opacity: 0.04,
+    peakBaseRounds: 5, peakLayerRounds: 3, variance: 0.35,
+    maxWetness: 30, layer: 'garden'
   });
   fb.drawStroke(tipLeafPoly, {
     color: DARK_GREEN, weight: 1.0, alpha: 0.35,
@@ -793,13 +792,13 @@ function updatePetals() {
     p.life--;
 
     if (p.life > 20) {
-      const alpha = Math.min(1, (p.life - 20) / 20) * 0.3;
+      const alpha = Math.min(1, (p.life - 20) / 20) * 0.2;
       fb.addStamp({
         x: p.x, y: p.y, color: p.color,
         a: alpha, rotation: p.rot,
-        scaleX: 4, scaleY: 6,
+        scaleX: 3, scaleY: 4,
         texture: 'petal', layer: 'petals',
-        lifetime: 40
+        lifetime: 8
       });
     }
     if (p.life <= 0) fallingPetals.splice(i, 1);
@@ -830,7 +829,7 @@ const canvas = document.createElement('canvas');
 document.body.appendChild(canvas);
 
 fb = new FatihaBrush(canvas, {
-  maxStamps: 131072,
+  maxStamps: 262144,
   layers: ['garden', 'glow', 'petals'],
   background: BG,
   width: CW,
@@ -840,7 +839,7 @@ fb = new FatihaBrush(canvas, {
 });
 
 fb.setLayerBlend('glow', 'additive');
-fb.setLayerOpacity('glow', 0.7);
+fb.setLayerOpacity('glow', 0.35);
 fb.setLayerOpacity('petals', 0.9);
 
 spiralPts = buildSpiralPoints();
@@ -913,7 +912,7 @@ function loop() {
     }
 
     // ── FALLING PETALS ───────────────────────────────────
-    if (energy > 0.3 && frameCount % 10 === 0) {
+    if (energy > 0.3 && frameCount % 20 === 0) {
       spawnPetal();
     }
     updatePetals();
@@ -932,7 +931,7 @@ function loop() {
   // Stats
   if (frameCount % 30 === 0) {
     document.getElementById('stats').textContent =
-      `stamps: ${fb.stampCount} | fps: ${Math.round(1000 / Math.max(1, performance.now() - lastTime))}`;
+      `stamps: ${fb.stampCount} | wet: ${fb._wetElements.length} | fps: ${Math.round(1000 / Math.max(1, performance.now() - lastTime))}`;
   }
   lastTime = performance.now();
 }
