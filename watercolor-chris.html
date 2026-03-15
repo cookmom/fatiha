@@ -13,7 +13,8 @@
 <script src="mixbox.js"></script>
 <script>
 // ============================================================
-// Tyler Hobbs Watercolor — faithful implementation
+// Tyler Hobbs Watercolor — v2 with proper petals, saz leaves,
+// drying halos, curved stalk, varied paper texture
 // ============================================================
 
 const W = 430, H = 932;
@@ -31,21 +32,41 @@ function gauss(mean, std) {
   return mean + std * Math.sqrt(-2 * Math.log(u1 || 0.001)) * Math.cos(2 * Math.PI * u2);
 }
 function randInt(a, b) { return Math.floor(rand() * (b - a + 1)) + a; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+// ============================================================
+// Simple value noise for paper texture variation
+// ============================================================
+const NOISE_SIZE = 64;
+const noiseGrid = [];
+for (let i = 0; i < NOISE_SIZE * NOISE_SIZE; i++) noiseGrid.push(rand());
+
+function smoothNoise(x, y) {
+  const ix = Math.floor(x) % NOISE_SIZE, iy = Math.floor(y) % NOISE_SIZE;
+  const fx = x - Math.floor(x), fy = y - Math.floor(y);
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  const i00 = noiseGrid[iy * NOISE_SIZE + ix];
+  const i10 = noiseGrid[iy * NOISE_SIZE + (ix + 1) % NOISE_SIZE];
+  const i01 = noiseGrid[((iy + 1) % NOISE_SIZE) * NOISE_SIZE + ix];
+  const i11 = noiseGrid[((iy + 1) % NOISE_SIZE) * NOISE_SIZE + (ix + 1) % NOISE_SIZE];
+  return lerp(lerp(i00, i10, sx), lerp(i01, i11, sx), sy);
+}
+
+function fbmNoise(x, y, octaves) {
+  let val = 0, amp = 1, freq = 1, total = 0;
+  for (let i = 0; i < octaves; i++) {
+    val += amp * smoothNoise(x * freq, y * freq);
+    total += amp;
+    amp *= 0.5;
+    freq *= 2;
+  }
+  return val / total;
+}
 
 // ============================================================
 // Shape generators
 // ============================================================
-
-function makeEllipsePoly(cx, cy, rx, ry, n, rotation) {
-  const pts = [];
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2;
-    const x = cx + rx * Math.cos(a) * Math.cos(rotation) - ry * Math.sin(a) * Math.sin(rotation);
-    const y = cy + rx * Math.cos(a) * Math.sin(rotation) + ry * Math.sin(a) * Math.cos(rotation);
-    pts.push([x, y]);
-  }
-  return pts;
-}
 
 function makeRect(cx, cy, w, h, rotation) {
   const corners = [[-w/2,-h/2],[w/2,-h/2],[w/2,h/2],[-w/2,h/2]];
@@ -55,109 +76,120 @@ function makeRect(cx, cy, w, h, rotation) {
   ]);
 }
 
-// Saz leaf: elongated S-curve with pointed tip
-function makeSazLeafPoly(cx, cy, length, maxWidth, rotation, curveStrength) {
+// Teardrop petal: narrow at base, wide rounded tip
+// baseX,baseY = attachment point (near flower center)
+// angle = direction petal points outward
+// length = petal length
+// width = max width at widest point
+function makePetalPoly(baseX, baseY, angle, length, width, curvature) {
   const pts = [];
   const n = 20;
-  // Right edge (outer curve)
+  // Right edge: from base to tip
   for (let i = 0; i <= n; i++) {
     const t = i / n;
-    // S-curve along the length
-    const along = (t - 0.3) * length;
-    // Width tapers at both ends, widest at ~40%
-    const widthProfile = Math.pow(Math.sin(t * Math.PI), 0.6) * (t < 0.15 ? t / 0.15 : 1);
-    // S-curve lateral displacement
-    const sCurve = curveStrength * Math.sin(t * Math.PI * 1.2) * (1 - t * 0.3);
-    const across = maxWidth * widthProfile + sCurve;
-    const x = cx + along * Math.cos(rotation) - across * Math.sin(rotation);
-    const y = cy + along * Math.sin(rotation) + across * Math.cos(rotation);
+    // Width profile: narrow stem at base, swells quickly to full width, rounded tip
+    let w;
+    if (t < 0.08) {
+      w = t / 0.08 * 0.2; // very narrow base stem
+    } else if (t < 0.3) {
+      w = 0.2 + (t - 0.08) / 0.22 * 0.8; // rapidly widening
+    } else if (t < 0.75) {
+      w = 1.0; // full width plateau (fat petal body)
+    } else {
+      w = Math.cos((t - 0.75) / 0.25 * Math.PI * 0.5); // rounded tip
+    }
+    const along = t * length;
+    const across = w * width * 0.5;
+    const curveOffset = curvature * Math.sin(t * Math.PI) * length * 0.08;
+    const x = baseX + along * Math.cos(angle) - (across + curveOffset) * Math.sin(angle);
+    const y = baseY + along * Math.sin(angle) + (across + curveOffset) * Math.cos(angle);
     pts.push([x, y]);
   }
-  // Left edge (inner curve) — reverse
+  // Left edge: tip back to base
   for (let i = n; i >= 0; i--) {
     const t = i / n;
-    const along = (t - 0.3) * length;
-    const widthProfile = Math.pow(Math.sin(t * Math.PI), 0.6) * (t < 0.15 ? t / 0.15 : 1);
-    const sCurve = curveStrength * Math.sin(t * Math.PI * 1.2) * (1 - t * 0.3);
-    const across = -maxWidth * widthProfile * 0.15 + sCurve; // thin inner edge
-    const x = cx + along * Math.cos(rotation) - across * Math.sin(rotation);
-    const y = cy + along * Math.sin(rotation) + across * Math.cos(rotation);
+    let w;
+    if (t < 0.08) {
+      w = t / 0.08 * 0.2;
+    } else if (t < 0.3) {
+      w = 0.2 + (t - 0.08) / 0.22 * 0.8;
+    } else if (t < 0.75) {
+      w = 1.0;
+    } else {
+      w = Math.cos((t - 0.75) / 0.25 * Math.PI * 0.5);
+    }
+    const along = t * length;
+    const across = -w * width * 0.5;
+    const curveOffset = curvature * Math.sin(t * Math.PI) * length * 0.08;
+    const x = baseX + along * Math.cos(angle) - (across + curveOffset) * Math.sin(angle);
+    const y = baseY + along * Math.sin(angle) + (across + curveOffset) * Math.cos(angle);
     pts.push([x, y]);
   }
   return pts;
 }
 
-// ============================================================
-// Define elements
-// ============================================================
+// Proper saz leaf with serrated edges along an S-curve spine
+function makeSazLeaf(spinePoints, maxWidth, serrationsPerSide) {
+  // spinePoints: array of [x,y] along the S-curve
+  const n = spinePoints.length;
+  const rightEdge = [];
+  const leftEdge = [];
 
-// ROSE — center-right area, 10 overlapping petal sub-polygons
-const roseCx = W * 0.52, roseCy = H * 0.35;
-const rosePetals = [];
-// Inner petals (smaller, tighter)
-for (let i = 0; i < 4; i++) {
-  const angle = (i / 4) * Math.PI * 2 + gauss(0, 0.2);
-  const dist = gauss(12, 4);
-  const px = roseCx + Math.cos(angle) * dist;
-  const py = roseCy + Math.sin(angle) * dist;
-  rosePetals.push(makeEllipsePoly(px, py, gauss(25, 3), gauss(18, 3), 14, angle + gauss(0, 0.3)));
-}
-// Outer petals (larger, more spread)
-for (let i = 0; i < 6; i++) {
-  const angle = (i / 6) * Math.PI * 2 + gauss(0, 0.15);
-  const dist = gauss(32, 6);
-  const px = roseCx + Math.cos(angle) * dist;
-  const py = roseCy + Math.sin(angle) * dist;
-  rosePetals.push(makeEllipsePoly(px, py, gauss(38, 5), gauss(24, 4), 14, angle + gauss(0, 0.4)));
-}
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    // Width profile: pointed at both ends, widest at ~35%
+    let wProfile;
+    if (t < 0.05) wProfile = t / 0.05 * 0.15;
+    else if (t < 0.35) wProfile = 0.15 + (t - 0.05) / 0.3 * 0.85;
+    else if (t < 0.92) wProfile = 1.0 - (t - 0.35) / 0.57 * 0.85;
+    else wProfile = 0.15 * (1 - (t - 0.92) / 0.08);
 
-// SAZ LEAF — one large cohesive saz leaf, left side
-// Build as 5 overlapping sub-polygons that all follow the same curve spine
-// Leaf grows from the stalk near the rose, sweeps out left and curves up
-const leafBaseX = W * 0.45, leafBaseY = H * 0.45;
-const leafTipX = W * 0.10, leafTipY = H * 0.28;
-const leafMidX = W * 0.15, leafMidY = H * 0.48; // S-curve control point sweeps left
-const leafPolys = [];
+    // Get tangent direction
+    const prev = spinePoints[Math.max(0, i - 1)];
+    const next = spinePoints[Math.min(n - 1, i + 1)];
+    const dx = next[0] - prev[0], dy = next[1] - prev[1];
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const nx = -dy / len, ny = dx / len; // normal
 
-// Spine points along a quadratic bezier for S-curve
-function leafSpine(t) {
-  const u = 1 - t;
-  return [
-    u*u*leafBaseX + 2*u*t*leafMidX + t*t*leafTipX,
-    u*u*leafBaseY + 2*u*t*leafMidY + t*t*leafTipY
-  ];
-}
-function leafTangentAngle(t) {
-  const dt = 0.01;
-  const [x0, y0] = leafSpine(Math.max(0, t - dt));
-  const [x1, y1] = leafSpine(Math.min(1, t + dt));
-  return Math.atan2(y1 - y0, x1 - x0);
-}
+    const w = maxWidth * wProfile;
 
-for (let i = 0; i < 5; i++) {
-  const tCenter = (i + 0.5) / 5;
-  const [cx, cy] = leafSpine(tCenter);
-  const angle = leafTangentAngle(tCenter);
-  // Width tapers toward both ends, widest at ~40%
-  const widthMult = Math.sin(tCenter * Math.PI) * (tCenter < 0.2 ? tCenter / 0.2 : 1);
-  const segLen = gauss(120, 10);
-  const segWidth = gauss(35, 3) * widthMult;
-  const curve = gauss(10, 3) * (tCenter < 0.5 ? 1 : -0.5);
-  leafPolys.push(makeSazLeafPoly(cx + gauss(0, 2), cy + gauss(0, 2), segLen, Math.max(8, segWidth), angle + gauss(0, 0.04), curve));
+    // Serration: sharp barbs like saz feather teeth
+    const serrFreq = serrationsPerSide;
+    const serrPhase = t * serrFreq * Math.PI * 2;
+    const serrAmp = (t > 0.06 && t < 0.93) ? maxWidth * 0.18 * wProfile : 0;
+    // Sawtooth wave for sharper teeth (asymmetric — steep rise, gradual fall)
+    const saw = (phase) => {
+      const p = ((phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      return p < Math.PI * 0.6 ? p / (Math.PI * 0.6) : 1 - (p - Math.PI * 0.6) / (Math.PI * 1.4);
+    };
+    const serrR = saw(serrPhase) * serrAmp;
+    const serrL = saw(serrPhase + Math.PI * 0.5) * serrAmp * 0.7;
+
+    rightEdge.push([
+      spinePoints[i][0] + nx * (w * 0.65 + serrR),
+      spinePoints[i][1] + ny * (w * 0.65 + serrR)
+    ]);
+    leftEdge.push([
+      spinePoints[i][0] - nx * (w * 0.35 + serrL),
+      spinePoints[i][1] - ny * (w * 0.35 + serrL)
+    ]);
+  }
+
+  return [...rightEdge, ...leftEdge.reverse()];
 }
 
-// STALK — bottom up to rose, 14 heavily overlapping very thin rectangles
-const stalkPolys = [];
-const stalkStartY = H * 0.78, stalkEndY = roseCy + 20;
-const stalkBaseX = W * 0.50;
-const stalkLen = stalkStartY - stalkEndY;
-for (let i = 0; i < 14; i++) {
-  const t = i / 13;
-  const cy = stalkStartY + (stalkEndY - stalkStartY) * t;
-  const cx = stalkBaseX + Math.sin(t * 2.0) * 8 + gauss(0, 1);
-  const segH = stalkLen * 0.22;
-  const segW = gauss(3.5, 0.5); // very thin stem
-  stalkPolys.push(makeRect(cx, cy, segW, segH, gauss(0, 0.01)));
+// Generate S-curve spine as array of points
+function makeSpinePoints(p0, p1, p2, p3, numPoints) {
+  const pts = [];
+  for (let i = 0; i < numPoints; i++) {
+    const t = i / (numPoints - 1);
+    const u = 1 - t;
+    pts.push([
+      u*u*u*p0[0] + 3*u*u*t*p1[0] + 3*u*t*t*p2[0] + t*t*t*p3[0],
+      u*u*u*p0[1] + 3*u*u*t*p1[1] + 3*u*t*t*p2[1] + t*t*t*p3[1]
+    ]);
+  }
+  return pts;
 }
 
 // ============================================================
@@ -175,7 +207,7 @@ function deformOnce(poly, variance) {
     const dx = c[0] - a[0];
     const dy = c[1] - a[1];
     const len = Math.sqrt(dx * dx + dy * dy);
-    if (len < 0.5) continue; // skip degenerate edges
+    if (len < 0.5) continue;
     const nx = -dy / len;
     const ny = dx / len;
     const offset = gauss(0, variance * len);
@@ -192,13 +224,12 @@ function deformN(poly, n, variance) {
   return p;
 }
 
-// BASE POLYGON: deform 7 times (Tyler Hobbs spec)
 function makeBase(poly) {
   return deformN(poly, 7, 0.15);
 }
 
 // ============================================================
-// Paper background
+// Paper background with LOCAL texture variation (improvement #5)
 // ============================================================
 
 function drawPaperBackground() {
@@ -206,11 +237,20 @@ function drawPaperBackground() {
   ctx.fillRect(0, 0, W, H);
   const imgData = ctx.getImageData(0, 0, W, H);
   const d = imgData.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const n = gauss(0, 6);
-    d[i]   = Math.max(0, Math.min(255, d[i] + n));
-    d[i+1] = Math.max(0, Math.min(255, d[i+1] + n));
-    d[i+2] = Math.max(0, Math.min(255, d[i+2] + n - 1));
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const idx = (y * W + x) * 4;
+      // Per-pixel random grain
+      const grain = gauss(0, 4);
+      // Local texture variation: large-scale brightness modulation
+      const localVar = (fbmNoise(x * 0.012, y * 0.012, 4) - 0.5) * 18;
+      // Fiber-like streaks (horizontal bias)
+      const fiber = (fbmNoise(x * 0.04, y * 0.008, 3) - 0.5) * 8;
+      const total = grain + localVar + fiber;
+      d[idx]     = clamp(d[idx] + total, 0, 255);
+      d[idx + 1] = clamp(d[idx + 1] + total, 0, 255);
+      d[idx + 2] = clamp(d[idx + 2] + total - 1.5, 0, 255); // slightly warm
+    }
   }
   ctx.putImageData(imgData, 0, 0);
 }
@@ -220,61 +260,267 @@ drawPaperBackground();
 // Colors
 // ============================================================
 
-const ROSE_COLORS = [
-  [220, 80, 100],  // dusty rose
-  [230, 95, 115],  // warm pink
-  [190, 50, 80],   // deep rose
-  [240, 125, 135], // light blush
-  [200, 60, 70],   // dark rose
-  [175, 45, 70],   // crimson center
-  [235, 110, 125], // mid pink
-  [210, 70, 90],   // muted rose
-  [245, 140, 145], // pale blush
+// Petal colors: inner petals darker, outer petals lighter
+const PETAL_INNER = [
+  [175, 45, 70],   // crimson
   [185, 55, 78],   // berry
+  [190, 50, 80],   // deep rose
+  [165, 40, 65],   // dark crimson
 ];
+const PETAL_MID = [
+  [220, 80, 100],  // dusty rose
+  [210, 70, 90],   // muted rose
+  [200, 60, 70],   // dark rose
+  [215, 75, 95],   // warm rose
+];
+const PETAL_OUTER = [
+  [235, 110, 125], // mid pink
+  [240, 125, 135], // light blush
+  [230, 95, 115],  // warm pink
+  [245, 140, 145], // pale blush
+  [238, 118, 128], // soft rose
+];
+
 const LEAF_COLORS = [
-  [45, 115, 55],   // deep green
-  [65, 135, 50],   // sap green
-  [35, 95, 45],    // forest green
-  [55, 125, 60],   // mid green
-  [75, 140, 65],   // bright green
+  [38, 100, 45],   // deep green
+  [55, 120, 48],   // sap green
+  [30, 85, 38],    // forest green
+  [48, 110, 52],   // mid green
+  [60, 125, 55],   // bright green
 ];
 const STALK_COLORS = [
-  [40, 95, 40],    // dark green
-  [50, 105, 45],   // mid green
-  [55, 85, 35],    // olive
+  [35, 88, 35],    // dark green
+  [45, 98, 40],    // mid green
+  [50, 80, 32],    // olive
 ];
 
 // ============================================================
-// Build element list with base polygons
+// Define elements — IMPROVEMENT #1: Actual petal shapes
+// ============================================================
+
+const roseCx = W * 0.50, roseCy = H * 0.36;
+const rosePetals = [];
+
+// Center cluster: 8 tight petals (darkest) — dense peony core, varied angles
+for (let i = 0; i < 8; i++) {
+  const angle = (i / 8) * Math.PI * 2 + gauss(0, 0.3);
+  const dist = gauss(5, 2);
+  const bx = roseCx + Math.cos(angle) * dist;
+  const by = roseCy + Math.sin(angle) * dist;
+  // Vary sizes: some small, some medium, to break symmetry
+  const sizeVar = 0.7 + rand() * 0.6;
+  rosePetals.push({
+    poly: makePetalPoly(bx, by, angle + gauss(0, 0.35), gauss(36, 4) * sizeVar, gauss(28, 3) * sizeVar, gauss(0, 0.6)),
+    color: PETAL_INNER[i % PETAL_INNER.length],
+    ring: 'inner'
+  });
+}
+// Extra center fill: short fat petals + a center dot to close the gap
+for (let i = 0; i < 5; i++) {
+  const angle = (i / 5) * Math.PI * 2 + gauss(0, 0.5);
+  rosePetals.push({
+    poly: makePetalPoly(roseCx + gauss(0, 3), roseCy + gauss(0, 3), angle, gauss(16, 2), gauss(14, 2), gauss(0, 0.4)),
+    color: [165, 38, 60], // darkest crimson for center
+    ring: 'inner'
+  });
+}
+
+// Middle ring: 9 medium petals — heavy overlap for fullness
+for (let i = 0; i < 9; i++) {
+  const angle = (i / 9) * Math.PI * 2 + gauss(0, 0.12) + 0.18;
+  const dist = gauss(20, 4);
+  const bx = roseCx + Math.cos(angle) * dist;
+  const by = roseCy + Math.sin(angle) * dist;
+  rosePetals.push({
+    poly: makePetalPoly(bx, by, angle + gauss(0, 0.18), gauss(58, 5), gauss(44, 4), gauss(0, 0.7)),
+    color: PETAL_MID[i % PETAL_MID.length],
+    ring: 'mid'
+  });
+}
+
+// Fill ring: 5 petals between mid and outer for density
+for (let i = 0; i < 5; i++) {
+  const angle = (i / 5) * Math.PI * 2 + gauss(0, 0.15) + 1.1;
+  const dist = gauss(26, 4);
+  const bx = roseCx + Math.cos(angle) * dist;
+  const by = roseCy + Math.sin(angle) * dist;
+  rosePetals.push({
+    poly: makePetalPoly(bx, by, angle + gauss(0, 0.2), gauss(60, 5), gauss(42, 4), gauss(0, 0.8)),
+    color: PETAL_MID[(i + 2) % PETAL_MID.length],
+    ring: 'mid'
+  });
+}
+
+// Outer ring: 8 large floppy petals — big romantic peony
+for (let i = 0; i < 8; i++) {
+  const angle = (i / 8) * Math.PI * 2 + gauss(0, 0.1) + 0.4;
+  const dist = gauss(35, 6);
+  const bx = roseCx + Math.cos(angle) * dist;
+  const by = roseCy + Math.sin(angle) * dist;
+  const sizeVar = 0.85 + rand() * 0.3;
+  rosePetals.push({
+    poly: makePetalPoly(bx, by, angle + gauss(0, 0.22), gauss(80, 7) * sizeVar, gauss(58, 5) * sizeVar, gauss(0, 1.0)),
+    color: PETAL_OUTER[i % PETAL_OUTER.length],
+    ring: 'outer'
+  });
+}
+
+// Calyx: 5 small green sepals radiating out from beneath the flower
+const calyxPolys = [];
+for (let i = 0; i < 5; i++) {
+  const angle = (i / 5) * Math.PI * 2 + gauss(0, 0.15);
+  // Point outward and slightly downward from flower base
+  const outAngle = angle + gauss(0, 0.2);
+  const bx = roseCx + Math.cos(angle) * 12;
+  const by = roseCy + 40 + Math.sin(angle) * 6;
+  calyxPolys.push(makePetalPoly(bx, by, outAngle, gauss(26, 3), gauss(8, 1.5), gauss(0, 0.3)));
+}
+
+// ============================================================
+// IMPROVEMENT #3: Proper saz leaves with serrated edges
+// ============================================================
+
+// Left saz leaf: emerges from mid-stalk, sweeps left and up
+// Asymmetric: starts lower than the right leaf
+const leftLeafSpine = makeSpinePoints(
+  [W * 0.46, H * 0.52],   // base below flower region
+  [W * 0.18, H * 0.50],   // sweeps left
+  [W * 0.06, H * 0.38],   // gentle upward curve
+  [W * 0.04, H * 0.18],   // tip far upper-left
+  60
+);
+const leftLeafPoly = makeSazLeaf(leftLeafSpine, 44, 11);
+
+// Right saz leaf: emerges well below flower, sweeps right and up
+const rightLeafSpine = makeSpinePoints(
+  [W * 0.54, H * 0.52],   // base below flower region
+  [W * 0.76, H * 0.48],   // sweeps right
+  [W * 0.88, H * 0.36],   // upward
+  [W * 0.90, H * 0.20],   // tip upper-right
+  50
+);
+const rightLeafPoly = makeSazLeaf(rightLeafSpine, 34, 9);
+
+// Small accent leaf: droops from lower stalk, down and left
+const smallLeafSpine = makeSpinePoints(
+  [W * 0.46, H * 0.58],   // base on lower stalk
+  [W * 0.30, H * 0.62],   // droops down-left
+  [W * 0.20, H * 0.60],   // continues down
+  [W * 0.16, H * 0.54],   // tip hangs
+  30
+);
+const smallLeafPoly = makeSazLeaf(smallLeafSpine, 16, 6);
+
+const leafPolys = [leftLeafPoly, rightLeafPoly, smallLeafPoly];
+
+// ============================================================
+// IMPROVEMENT #4: Curved stalk — single continuous polygon
+// ============================================================
+
+const stalkStartY = H * 0.78, stalkEndY = roseCy + 20;
+const stalkN = 30;
+const stalkCurveX = (s) => W * 0.50 + Math.sin(s * Math.PI * 1.1) * 10 - s * 4;
+
+// Build stalk as a single ribbon polygon (right edge + left edge reversed)
+const stalkRight = [], stalkLeft = [];
+for (let i = 0; i <= stalkN; i++) {
+  const t = i / stalkN;
+  const y = lerp(stalkStartY, stalkEndY, t);
+  const x = stalkCurveX(t);
+  // Width tapers: wider at base (5px), thin at top (2px)
+  const w = lerp(5.0, 2.0, t);
+  // Tangent for perpendicular offset
+  const dt = 0.01;
+  const x0 = stalkCurveX(Math.max(0, t - dt)), y0 = lerp(stalkStartY, stalkEndY, Math.max(0, t - dt));
+  const x1 = stalkCurveX(Math.min(1, t + dt)), y1 = lerp(stalkStartY, stalkEndY, Math.min(1, t + dt));
+  const dx = x1 - x0, dy = y1 - y0;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const nx = -dy / len, ny = dx / len;
+  stalkRight.push([x + nx * w, y + ny * w]);
+  stalkLeft.push([x - nx * w, y - ny * w]);
+}
+const stalkPoly = [...stalkRight, ...stalkLeft.reverse()];
+
+// Split into 3 overlapping sections for color variation
+const stalkPolys = [];
+const third = Math.floor(stalkRight.length / 3);
+for (let s = 0; s < 3; s++) {
+  const start = Math.max(0, s * third - 3);
+  const end = Math.min(stalkRight.length, (s + 1) * third + 3);
+  const rSlice = stalkRight.slice(start, end);
+  const lSlice = stalkLeft.slice(start, end).slice().reverse();
+  stalkPolys.push([...rSlice, ...lSlice]);
+}
+
+// ============================================================
+// Build element list
 // ============================================================
 
 const elements = [];
 
+// Stalk segments (back layer)
 stalkPolys.forEach((poly, i) => {
   elements.push({
-    base: deformN(poly, 6, 0.05), // gentle variance for painterly edges
+    base: deformN(poly, 5, 0.04),
     color: STALK_COLORS[i % STALK_COLORS.length],
-    layerVariance: 0.035,
+    layerVariance: 0.03,
+    hardEdge: false,
     priority: 0, index: i
   });
 });
 
+// Leaves (mid layer)
 leafPolys.forEach((poly, i) => {
   elements.push({
     base: makeBase(poly),
     color: LEAF_COLORS[i % LEAF_COLORS.length],
-    layerVariance: 0.10,
+    layerVariance: 0.08,
+    hardEdge: true,
     priority: 1, index: i
   });
 });
 
-rosePetals.forEach((poly, i) => {
+// Calyx (between stalk and flower)
+calyxPolys.forEach((poly, i) => {
   elements.push({
-    base: makeBase(poly),
-    color: ROSE_COLORS[i % ROSE_COLORS.length],
-    layerVariance: 0.10,
+    base: deformN(poly, 6, 0.10),
+    color: [45, 95, 42],
+    layerVariance: 0.06,
+    hardEdge: false,
+    priority: 1, index: 100 + i
+  });
+});
+
+// Rose petals — outer first, inner on top
+// Outer ring
+rosePetals.filter(p => p.ring === 'outer').forEach((p, i) => {
+  elements.push({
+    base: makeBase(p.poly),
+    color: p.color,
+    layerVariance: 0.09,
+    hardEdge: true,
+    alphaScale: 0.82, // outer petals: slightly lighter wash
     priority: 2, index: i
+  });
+});
+// Middle ring
+rosePetals.filter(p => p.ring === 'mid').forEach((p, i) => {
+  elements.push({
+    base: makeBase(p.poly),
+    color: p.color,
+    layerVariance: 0.08,
+    hardEdge: true,
+    priority: 3, index: i
+  });
+});
+// Inner ring
+rosePetals.filter(p => p.ring === 'inner').forEach((p, i) => {
+  elements.push({
+    base: makeBase(p.poly),
+    color: p.color,
+    layerVariance: 0.07,
+    hardEdge: true,
+    priority: 4, index: i
   });
 });
 
@@ -282,12 +528,12 @@ elements.sort((a, b) => a.priority - b.priority || a.index - b.index);
 
 // ============================================================
 // Rendering with Tyler Hobbs texture masking
+// IMPROVEMENT #2: Hard/soft edge contrast (drying halos)
 // ============================================================
 
-const TOTAL_LAYERS = 50;
-const LAYER_ALPHA = 0.05;
+const TOTAL_LAYERS = 60;
+const LAYER_ALPHA = 0.052;
 
-// Reusable offscreen canvases
 const blobCvs = document.createElement('canvas');
 blobCvs.width = W; blobCvs.height = H;
 const blobCtx = blobCvs.getContext('2d');
@@ -308,9 +554,17 @@ function fillPoly(tCtx, poly) {
   tCtx.fill();
 }
 
+function strokePoly(tCtx, poly) {
+  tCtx.beginPath();
+  tCtx.moveTo(poly[0][0], poly[0][1]);
+  for (let i = 1; i < poly.length; i++) tCtx.lineTo(poly[i][0], poly[i][1]);
+  tCtx.closePath();
+  tCtx.stroke();
+}
+
 function drawTexturedLayer(el, layerIdx) {
   const deformCount = 4 + (layerIdx % 2);
-  const layerPoly = deformN(el.base, deformCount, el.layerVariance || 0.10);
+  const layerPoly = deformN(el.base, deformCount, el.layerVariance || 0.08);
   const [r, g, b] = el.color;
 
   // Blob mask
@@ -318,45 +572,68 @@ function drawTexturedLayer(el, layerIdx) {
   blobCtx.fillStyle = 'white';
   fillPoly(blobCtx, layerPoly);
 
-  // Texture mask: 900 random circles
+  // Texture mask: random circles for granulation
   maskCtx.clearRect(0, 0, W, H);
   maskCtx.fillStyle = 'white';
-  for (let j = 0; j < 900; j++) {
+  for (let j = 0; j < 850; j++) {
     const cx = rand() * W;
     const cy = rand() * H;
-    const radius = Math.abs(gauss(W * 0.018, W * 0.012));
+    const radius = Math.abs(gauss(W * 0.016, W * 0.011));
     maskCtx.beginPath();
     maskCtx.arc(cx, cy, radius, 0, Math.PI * 2);
     maskCtx.fill();
   }
 
-  // Color layer = blob ∩ texture, then tinted
+  // Color layer = blob ∩ texture
   colorCtx.clearRect(0, 0, W, H);
   colorCtx.globalCompositeOperation = 'source-over';
   colorCtx.fillStyle = `rgb(${r},${g},${b})`;
   colorCtx.fillRect(0, 0, W, H);
-  // Mask with blob shape
   colorCtx.globalCompositeOperation = 'destination-in';
   colorCtx.drawImage(blobCvs, 0, 0);
-  // Mask with texture circles
   colorCtx.globalCompositeOperation = 'destination-in';
   colorCtx.drawImage(maskCvs, 0, 0);
   colorCtx.globalCompositeOperation = 'source-over';
 
-  // Composite onto main canvas at low opacity
-  ctx.globalAlpha = LAYER_ALPHA;
+  ctx.globalAlpha = LAYER_ALPHA * (el.alphaScale || 1.0);
   ctx.drawImage(colorCvs, 0, 0);
   ctx.globalAlpha = 1.0;
 }
 
+// Drying halo: dark edge line that simulates pigment pooling
+function drawDryingHalo(el) {
+  const [r, g, b] = el.color;
+  // Much darker version for edge pooling
+  const dr = Math.max(0, Math.round(r * 0.55));
+  const dg = Math.max(0, Math.round(g * 0.50));
+  const db = Math.max(0, Math.round(b * 0.55));
+
+  // Hard edge: thin dark lines at the boundary
+  for (let pass = 0; pass < 3; pass++) {
+    const haloPoly = deformN(el.base, 5, 0.04 + pass * 0.008);
+    ctx.globalAlpha = 0.09 - pass * 0.02;
+    ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
+    ctx.lineWidth = 1.0;
+    ctx.lineJoin = 'round';
+    strokePoly(ctx, haloPoly);
+  }
+  // Soft bloom: wider faint halo
+  for (let pass = 0; pass < 2; pass++) {
+    const bloomPoly = deformN(el.base, 6, 0.07 + pass * 0.02);
+    ctx.globalAlpha = 0.035;
+    ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
+    ctx.lineWidth = 2.5 + pass * 1.5;
+    ctx.lineJoin = 'round';
+    strokePoly(ctx, bloomPoly);
+  }
+  ctx.globalAlpha = 1.0;
+}
+
 // ============================================================
-// Progressive rendering — requestAnimationFrame loop
-// Interleaved: each frame renders LAYERS_PER_FRAME layers of
-// every element (same interleaving as before, just spread over time)
+// Progressive rendering
 // ============================================================
 
-const BATCH = 5;           // layers per element per group (unchanged)
-const LAYERS_PER_FRAME = 2; // layers to advance per animation frame
+const LAYERS_PER_FRAME = 3;
 window._layersDone = 0;
 window._totalLayers = TOTAL_LAYERS;
 window._renderComplete = false;
@@ -378,7 +655,67 @@ function renderFrame() {
   if (currentLayer < TOTAL_LAYERS) {
     requestAnimationFrame(renderFrame);
   } else {
-    // Mixbox pigment blending post-process (once, at the end)
+    // Draw drying halos — petals only (leaf halos would overlap flower)
+    for (const el of elements) {
+      if (el.hardEdge && el.priority >= 2) {
+        drawDryingHalo(el);
+      }
+    }
+    // Leaf halos: draw them but with much softer intensity
+    for (const el of elements) {
+      if (el.hardEdge && el.priority === 1) {
+        const saved = el.color;
+        // Just use the soft bloom, skip hard edge for leaves
+        const [r, g, b] = el.color;
+        const dr = Math.max(0, Math.round(r * 0.55));
+        const dg = Math.max(0, Math.round(g * 0.50));
+        const db = Math.max(0, Math.round(b * 0.55));
+        for (let pass = 0; pass < 2; pass++) {
+          const haloPoly = deformN(el.base, 5, 0.04 + pass * 0.01);
+          ctx.globalAlpha = 0.04;
+          ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
+          ctx.lineWidth = 0.8;
+          ctx.lineJoin = 'round';
+          strokePoly(ctx, haloPoly);
+        }
+        ctx.globalAlpha = 1.0;
+      }
+    }
+
+    // Draw leaf veins — darker line along each spine
+    function drawLeafVein(spinePoints, color) {
+      const [r, g, b] = color;
+      const vr = Math.max(0, Math.round(r * 0.45));
+      const vg = Math.max(0, Math.round(g * 0.45));
+      const vb = Math.max(0, Math.round(b * 0.45));
+      ctx.strokeStyle = `rgb(${vr},${vg},${vb})`;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      // Main central vein
+      ctx.globalAlpha = 0.18;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(spinePoints[0][0], spinePoints[0][1]);
+      for (let i = 1; i < spinePoints.length; i++) {
+        ctx.lineTo(spinePoints[i][0], spinePoints[i][1]);
+      }
+      ctx.stroke();
+      // Fainter wider wash along vein
+      ctx.globalAlpha = 0.06;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(spinePoints[0][0], spinePoints[0][1]);
+      for (let i = 1; i < spinePoints.length; i++) {
+        ctx.lineTo(spinePoints[i][0], spinePoints[i][1]);
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1.0;
+    }
+    drawLeafVein(leftLeafSpine, LEAF_COLORS[0]);
+    drawLeafVein(rightLeafSpine, LEAF_COLORS[1]);
+    drawLeafVein(smallLeafSpine, LEAF_COLORS[2]);
+
+    // Mixbox pigment blending post-process
     if (typeof mixbox !== 'undefined') {
       const imgData = ctx.getImageData(0, 0, W, H);
       const d = imgData.data;
