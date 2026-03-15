@@ -368,6 +368,10 @@ class FatihaBrush {
 
         // Frame counter for grain animation
         this._frame = 0;
+
+        // Wet watercolor elements — progressive "watching paint dry" system
+        // Each element starts crisp and deforms more over consecutive frames
+        this._wetElements = [];
     }
 
     // ─── BRUSH TYPE REGISTRY ─────────────────────────────────
@@ -1134,6 +1138,150 @@ void main() {
         }
     }
 
+    // ── Wet Watercolor — "Watching Paint Dry" Progressive System ──
+
+    /**
+     * Progressive watercolor — "watching paint dry" effect.
+     * Instead of rendering all layers immediately, each element starts crisp
+     * and progressively deforms over consecutive frames. Early frames: tight
+     * shape. Later frames: full Tyler Hobbs watercolor bleed.
+     *
+     * @param {Array<{x:number, y:number}>} polygon — simple input polygon
+     * @param {Object} [opts] — same as watercolor() plus:
+     * @param {number} [opts.maxWetness=80] — frames to reach full deformation
+     * @param {number} [opts.layers=50] — total layers to render over lifetime
+     * @param {number} [opts.peakBaseRounds=7] — max base deformation rounds at full wetness
+     * @param {number} [opts.peakLayerRounds=5] — max per-layer deformation rounds at full wetness
+     * @param {number} [opts.variance=0.4] — deformation variance
+     * @param {number} [opts.opacity=0.04] — per-layer opacity
+     * @param {boolean} [opts.concentratePigment=true] — pigment concentration
+     * @param {string} [opts.color='#4488aa']
+     * @param {string} [opts.layer]
+     * @param {number} [opts.lifetime=99999]
+     */
+    wetWatercolor(polygon, opts = {}) {
+        if (!polygon || polygon.length < 3) return;
+
+        // Compute centroid and bounding radius
+        let cx = 0, cy = 0;
+        for (const p of polygon) { cx += p.x; cy += p.y; }
+        cx /= polygon.length;
+        cy /= polygon.length;
+        let boundR = 0;
+        for (const p of polygon) {
+            const d = Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2);
+            if (d > boundR) boundR = d;
+        }
+
+        this._wetElements.push({
+            polygon: polygon.map(p => ({ x: p.x, y: p.y })),
+            color: opts.color || '#4488aa',
+            layer: opts.layer || this.layerNames[0],
+            lifetime: opts.lifetime !== undefined ? opts.lifetime : 99999,
+            opacity: opts.opacity !== undefined ? opts.opacity : 0.04,
+            variance: opts.variance !== undefined ? opts.variance : 0.4,
+            peakBaseRounds: opts.peakBaseRounds !== undefined ? opts.peakBaseRounds : 7,
+            peakLayerRounds: opts.peakLayerRounds !== undefined ? opts.peakLayerRounds : 5,
+            concentrate: opts.concentratePigment !== false,
+            textureDots: opts.textureDots || 0,
+            textureRadius: opts.textureRadius || 3,
+            cx, cy, boundR,
+            wetness: 0,
+            maxWetness: opts.maxWetness !== undefined ? opts.maxWetness : 80,
+            targetLayers: opts.layers || 50,
+            layersRendered: 0,
+            _cachedBase: null,
+            _cachedBaseLevel: -1
+        });
+    }
+
+    /**
+     * Advance all wet watercolor elements by one frame.
+     * Called automatically from update(). Each frame, elements gain wetness
+     * and render 1+ new watercolor layers at the current deformation level.
+     * @private
+     */
+    _advanceWetElements() {
+        for (let i = this._wetElements.length - 1; i >= 0; i--) {
+            const el = this._wetElements[i];
+            el.wetness = Math.min(el.wetness + 1, el.maxWetness);
+
+            // How many layers to add this frame (spread evenly over lifetime)
+            const layersPerFrame = Math.max(1, Math.ceil(el.targetLayers / el.maxWetness));
+            const layersThisFrame = Math.min(layersPerFrame, el.targetLayers - el.layersRendered);
+
+            if (layersThisFrame <= 0) {
+                this._wetElements.splice(i, 1);
+                continue;
+            }
+
+            // Deformation quality ramps up with wetness (the "paint drying" effect)
+            const t = el.wetness / el.maxWetness; // 0→1
+
+            // Base deformation: 1 round at start → peakBaseRounds at full wetness
+            const baseRounds = Math.max(1, Math.round(1 + t * (el.peakBaseRounds - 1)));
+            // Per-layer deformation: 0 at start → peakLayerRounds at full wetness
+            const layerRounds = Math.round(t * el.peakLayerRounds);
+            // Variance grows as paint spreads
+            const variance = el.variance * (0.3 + t * 0.7);
+
+            // Recompute base polygon when deformation level changes
+            if (el._cachedBaseLevel !== baseRounds) {
+                el._cachedBase = this.deformPolygon(el.polygon, {
+                    rounds: baseRounds,
+                    variance: el.variance
+                });
+                el._cachedBaseLevel = baseRounds;
+            }
+
+            for (let l = 0; l < layersThisFrame; l++) {
+                const layerT = el.layersRendered / el.targetLayers;
+
+                // Pigment concentration: early layers → tight; late → feathered
+                let extraRounds = layerRounds;
+                if (el.concentrate) {
+                    if (layerT < 0.33) extraRounds = Math.max(0, Math.floor(layerRounds * 0.3));
+                    else if (layerT < 0.66) extraRounds = Math.max(0, Math.floor(layerRounds * 0.6));
+                }
+
+                const layerPoly = extraRounds > 0
+                    ? this.deformPolygon(el._cachedBase, {
+                        rounds: extraRounds,
+                        variance: variance * 0.6
+                      })
+                    : el._cachedBase;
+
+                this._renderPolygonFill(layerPoly, el.cx, el.cy, {
+                    color: el.color,
+                    a: el.opacity,
+                    layer: el.layer,
+                    lifetime: el.lifetime,
+                    texture: 'soft_round'
+                });
+
+                // Texture masking dots
+                if (el.textureDots > 0) {
+                    for (let d = 0; d < el.textureDots; d++) {
+                        const tx = el.cx + FatihaBrush.gaussian(0, el.boundR * 0.6);
+                        const ty = el.cy + FatihaBrush.gaussian(0, el.boundR * 0.6);
+                        this.addStamp({
+                            x: tx, y: ty,
+                            color: el.color,
+                            a: el.opacity * 0.5,
+                            scaleX: el.textureRadius * (0.5 + Math.random()),
+                            scaleY: el.textureRadius * (0.5 + Math.random()),
+                            texture: 'soft_round',
+                            layer: el.layer,
+                            lifetime: el.lifetime
+                        });
+                    }
+                }
+
+                el.layersRendered++;
+            }
+        }
+    }
+
     /**
      * Internal: fill a deformed polygon using triangle-fan scatter.
      * Places stamps at random positions inside the polygon by sampling
@@ -1640,6 +1788,10 @@ void main() {
      */
     update(dt = 1) {
         this._frame++;
+
+        // Advance wet watercolor elements (progressive deformation)
+        this._advanceWetElements();
+
         for (const name of this.layerNames) {
             const layer = this._layers[name];
             if (layer.count === 0) continue;
@@ -1863,6 +2015,7 @@ void main() {
         for (const name of this.layerNames) {
             this.clearLayer(name);
         }
+        this._wetElements = [];
     }
 
     // ─── AUDIO BUS ───────────────────────────────────────────
