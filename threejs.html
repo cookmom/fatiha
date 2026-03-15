@@ -1147,8 +1147,8 @@ function animate(){
     ];
     const fontSize=Math.round(24*dpr);
     ctx.font=fontSize+'px "Noto Naskh Arabic","Traditional Arabic","Arial"';
-    ctx.textAlign='center';ctx.textBaseline='top';
-    const tx=WD/2, ty=HD-40*dpr; // top of screen in y-flipped canvas
+    ctx.textAlign='center';ctx.textBaseline='bottom';
+    const tx=WD/2, ty=40*dpr; // top of screen in y-flipped canvas (low y = screen top)
     // Measure total width to position groups
     const totalW=ctx.measureText(bismillah).width;
     // Draw each group with appropriate opacity
