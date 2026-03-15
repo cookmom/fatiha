@@ -4,10 +4,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Ottoman Rose — 3D</title>
+<title>Ottoman Rose — 3D v2</title>
 <style>
 *{margin:0;padding:0}
-body{background:#0d0d0d;overflow:hidden}
+body{background:#0a0608;overflow:hidden}
 canvas{display:block}
 </style>
 </head>
@@ -21,99 +21,278 @@ canvas{display:block}
 <script type="module">
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {RGBELoader} from 'three/addons/loaders/RGBELoader.js';
 
 /* ═══════════════════════════════════════════════════
-   SCENE SETUP
+   CONSTANTS & UTILS
+   ═══════════════════════════════════════════════════ */
+const PHI = (1 + Math.sqrt(5)) / 2;
+const GOLDEN_ANGLE = Math.PI * 2 / (PHI * PHI); // ~137.5° in radians
+
+// Simple seeded PRNG for reproducible randomness
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(42);
+
+/* ═══════════════════════════════════════════════════
+   SCENE
    ═══════════════════════════════════════════════════ */
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0d0d0d);
+scene.background = new THREE.Color(0x0a0608);
 
-const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 100);
-camera.position.set(2.5, 3, 4);
-camera.lookAt(0, 1.2, 0);
+const camera = new THREE.PerspectiveCamera(40, innerWidth/innerHeight, 0.1, 100);
+camera.position.set(2.2, 2.8, 3.5);
+camera.lookAt(0, 1.0, 0);
 
-const renderer = new THREE.WebGLRenderer({antialias:true});
+const renderer = new THREE.WebGLRenderer({antialias: true});
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 1.2, 0);
+controls.target.set(0, 1.0, 0);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 controls.autoRotate = true;
-controls.autoRotateSpeed = 1.2;
+controls.autoRotateSpeed = 0.8;
+controls.minDistance = 2;
+controls.maxDistance = 12;
 controls.update();
 
 /* ═══════════════════════════════════════════════════
-   LIGHTING
+   ENVIRONMENT MAP — procedural gradient for reflections
    ═══════════════════════════════════════════════════ */
-// Warm key light from upper-left
-const keyLight = new THREE.DirectionalLight(0xffeedd, 2.2);
-keyLight.position.set(-3, 5, 2);
-keyLight.castShadow = true;
-scene.add(keyLight);
-
-// Cool blue rim light from behind
-const rimLight = new THREE.DirectionalLight(0x4488cc, 1.2);
-rimLight.position.set(2, 2, -4);
-scene.add(rimLight);
-
-// Soft ambient
-const ambient = new THREE.AmbientLight(0x222233, 0.6);
-scene.add(ambient);
-
-// Subtle fill from below for translucency glow
-const fillLight = new THREE.PointLight(0xff6699, 0.5, 8);
-fillLight.position.set(0, -0.5, 0);
-scene.add(fillLight);
+function createEnvMap() {
+  const size = 256;
+  const data = new Float32Array(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const ny = y / size;
+      // Warm above, cool below, with a soft horizon glow
+      const horizonGlow = Math.exp(-Math.pow((ny - 0.5) * 4, 2)) * 0.6;
+      data[i]     = 0.02 + horizonGlow * 0.8 + ny * 0.05;  // R
+      data[i + 1] = 0.01 + horizonGlow * 0.3 + ny * 0.03;  // G
+      data[i + 2] = 0.03 + horizonGlow * 0.2 + (1-ny)*0.06; // B
+      data[i + 3] = 1;
+    }
+  }
+  const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat, THREE.FloatType);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  tex.needsUpdate = true;
+  return tex;
+}
+const envMap = createEnvMap();
+scene.environment = envMap;
 
 /* ═══════════════════════════════════════════════════
-   PETAL GEOMETRY BUILDER
+   LIGHTING — Ottoman atmosphere
    ═══════════════════════════════════════════════════ */
-function createPetalGeometry(width, height, curl, segments) {
-  const sw = segments || 12;
-  const sh = segments || 16;
+// Warm key light — upper left, casts shadows
+const keyLight = new THREE.DirectionalLight(0xffeedd, 2.5);
+keyLight.position.set(-3, 6, 2);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(1024, 1024);
+keyLight.shadow.camera.near = 1;
+keyLight.shadow.camera.far = 15;
+keyLight.shadow.camera.left = -3;
+keyLight.shadow.camera.right = 3;
+keyLight.shadow.camera.top = 3;
+keyLight.shadow.camera.bottom = -3;
+scene.add(keyLight);
+
+// BACKLIGHT — warm, behind/below for transmission glow through petals
+const backLight = new THREE.DirectionalLight(0xffaa66, 2.0);
+backLight.position.set(0, -1, -3);
+scene.add(backLight);
+
+// Cool rim light — subtle edge definition
+const rimLight = new THREE.DirectionalLight(0x6688cc, 0.8);
+rimLight.position.set(3, 2, -2);
+scene.add(rimLight);
+
+// Warm point light inside the rose for inner glow
+const innerGlow = new THREE.PointLight(0xff4466, 1.2, 3, 2);
+innerGlow.position.set(0, 1.55, 0);
+scene.add(innerGlow);
+
+// Soft ambient — slightly warm
+const ambient = new THREE.AmbientLight(0x1a1015, 0.8);
+scene.add(ambient);
+
+// Hemisphere for natural sky/ground bounce
+const hemi = new THREE.HemisphereLight(0x332244, 0x221111, 0.4);
+scene.add(hemi);
+
+/* ═══════════════════════════════════════════════════
+   BEZIER SURFACE PATCH EVALUATOR
+   ═══════════════════════════════════════════════════ */
+
+// Bernstein basis polynomial degree 3
+function bernstein3(i, t) {
+  const s = 1 - t;
+  switch(i) {
+    case 0: return s * s * s;
+    case 1: return 3 * s * s * t;
+    case 2: return 3 * s * t * t;
+    case 3: return t * t * t;
+  }
+}
+
+// Bernstein derivative degree 3
+function dbernstein3(i, t) {
+  const s = 1 - t;
+  switch(i) {
+    case 0: return -3 * s * s;
+    case 1: return 3 * s * s - 6 * s * t;
+    case 2: return 6 * s * t - 3 * t * t;
+    case 3: return 3 * t * t;
+  }
+}
+
+// Evaluate bicubic Bezier surface at (u, v)
+// controlPoints: 4x4 array of THREE.Vector3
+function evalBezierPatch(cp, u, v) {
+  const p = new THREE.Vector3();
+  for (let i = 0; i < 4; i++) {
+    const bi = bernstein3(i, u);
+    for (let j = 0; j < 4; j++) {
+      const bj = bernstein3(j, v);
+      p.addScaledVector(cp[i][j], bi * bj);
+    }
+  }
+  return p;
+}
+
+// Evaluate surface normal via cross product of partial derivatives
+function evalBezierNormal(cp, u, v) {
+  const du = new THREE.Vector3();
+  const dv = new THREE.Vector3();
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      const w = cp[i][j];
+      du.addScaledVector(w, dbernstein3(i, u) * bernstein3(j, v));
+      dv.addScaledVector(w, bernstein3(i, u) * dbernstein3(j, v));
+    }
+  }
+  const n = new THREE.Vector3().crossVectors(du, dv);
+  n.normalize();
+  return n;
+}
+
+/* ═══════════════════════════════════════════════════
+   PETAL CONTROL POINT PRESETS
+   ═══════════════════════════════════════════════════
+
+   Layout: cp[u][v] where
+     u = 0..3 across petal width (left edge → right edge)
+     v = 0..3 from base → tip
+
+   Petal is centered at x=0, base at y=0, growing upward
+   ═══════════════════════════════════════════════════ */
+
+function V(x,y,z) { return new THREE.Vector3(x,y,z); }
+
+// --- OUTER PETAL: wide, recurved tip, slight edge ruffle ---
+const OUTER_CP = [
+  // u=0 (left edge)
+  [V(-0.04, 0, 0.02), V(-0.18, 0.25, 0.10), V(-0.28, 0.55, 0.06), V(-0.10, 0.82, -0.18)],
+  // u=1 (left-center)
+  [V(-0.02, 0, 0.00), V(-0.10, 0.28, 0.14), V(-0.14, 0.58, 0.12), V(-0.04, 0.88, -0.22)],
+  // u=2 (right-center)
+  [V( 0.02, 0, 0.00), V( 0.10, 0.28, 0.14), V( 0.14, 0.58, 0.12), V( 0.04, 0.88, -0.22)],
+  // u=3 (right edge)
+  [V( 0.04, 0, 0.02), V( 0.18, 0.25, 0.10), V( 0.28, 0.55, 0.06), V( 0.10, 0.82, -0.18)],
+];
+
+// --- MID PETAL: cupped bowl, less recurved ---
+const MID_CP = [
+  [V(-0.03, 0, 0.01), V(-0.14, 0.22, 0.12), V(-0.20, 0.48, 0.14), V(-0.08, 0.68, -0.06)],
+  [V(-0.01, 0, 0.00), V(-0.06, 0.24, 0.16), V(-0.08, 0.52, 0.18), V(-0.02, 0.72, -0.08)],
+  [V( 0.01, 0, 0.00), V( 0.06, 0.24, 0.16), V( 0.08, 0.52, 0.18), V( 0.02, 0.72, -0.08)],
+  [V( 0.03, 0, 0.01), V( 0.14, 0.22, 0.12), V( 0.20, 0.48, 0.14), V( 0.08, 0.68, -0.06)],
+];
+
+// --- INNER PETAL: tight, nearly vertical, slight spiral ---
+const INNER_CP = [
+  [V(-0.02, 0, 0.01), V(-0.08, 0.18, 0.10), V(-0.10, 0.38, 0.16), V(-0.04, 0.52, 0.06)],
+  [V(-0.01, 0, 0.00), V(-0.03, 0.20, 0.12), V(-0.04, 0.40, 0.20), V(-0.01, 0.55, 0.04)],
+  [V( 0.01, 0, 0.00), V( 0.03, 0.20, 0.12), V( 0.04, 0.40, 0.20), V( 0.01, 0.55, 0.04)],
+  [V( 0.02, 0, 0.01), V( 0.08, 0.18, 0.10), V( 0.10, 0.38, 0.16), V( 0.04, 0.52, 0.06)],
+];
+
+// --- BUD PETAL: tightly wrapped, minimal opening ---
+const BUD_CP = [
+  [V(-0.01, 0, 0.01), V(-0.05, 0.12, 0.08), V(-0.06, 0.28, 0.14), V(-0.02, 0.38, 0.10)],
+  [V(-0.005,0, 0.00), V(-0.02, 0.14, 0.10), V(-0.03, 0.30, 0.18), V(-0.005,0.40, 0.08)],
+  [V( 0.005,0, 0.00), V( 0.02, 0.14, 0.10), V( 0.03, 0.30, 0.18), V( 0.005,0.40, 0.08)],
+  [V( 0.01, 0, 0.01), V( 0.05, 0.12, 0.08), V( 0.06, 0.28, 0.14), V( 0.02, 0.38, 0.10)],
+];
+
+/* ═══════════════════════════════════════════════════
+   PETAL GEOMETRY FROM BEZIER PATCH
+   ═══════════════════════════════════════════════════ */
+
+function createBezierPetalGeometry(controlPoints, uSegs, vSegs, noiseAmp) {
+  uSegs = uSegs || 12;
+  vSegs = vSegs || 16;
+  noiseAmp = noiseAmp || 0;
+
   const positions = [];
   const normals = [];
   const uvs = [];
+  const colors = [];
   const indices = [];
 
-  for (let iy = 0; iy <= sh; iy++) {
-    const v = iy / sh;
-    for (let ix = 0; ix <= sw; ix++) {
-      const u = ix / sw;
+  for (let iv = 0; iv <= vSegs; iv++) {
+    const v = iv / vSegs;
+    for (let iu = 0; iu <= uSegs; iu++) {
+      const u = iu / uSegs;
 
-      // Petal outline: wider in middle, tapered at base and tip
-      const envelope = Math.sin(v * Math.PI) * (0.5 + 0.5 * v);
-      const xBase = (u - 0.5) * width * envelope;
+      const p = evalBezierPatch(controlPoints, u, v);
+      const n = evalBezierNormal(controlPoints, u, v);
 
-      // Height along petal
-      const yBase = v * height;
+      // Edge ruffle — sinusoidal displacement on edges, increasing toward tip
+      const edgeness = Math.pow(Math.abs(u - 0.5) * 2, 2);
+      const tipness = v * v;
+      const ruffle = Math.sin(u * Math.PI * 6 + v * 4) * 0.008 * edgeness * tipness;
+      p.addScaledVector(n, ruffle);
 
-      // Cupping / curling: petal curves backward
-      // More curl at the edges and tip
-      const edgeFactor = Math.abs(u - 0.5) * 2; // 0 center, 1 edge
-      const tipFactor = v;
-      const curlAmount = curl * (0.3 * edgeFactor * edgeFactor + 0.7 * tipFactor * tipFactor);
-      const zBase = -curlAmount * (edgeFactor * 0.4 + tipFactor * 0.6);
+      // Organic noise displacement
+      if (noiseAmp > 0) {
+        const noiseVal = Math.sin(u * 17.3 + v * 23.7) * Math.cos(u * 11.1 - v * 19.3);
+        p.addScaledVector(n, noiseVal * noiseAmp);
+      }
 
-      // Add slight waviness for organic feel
-      const wave = Math.sin(u * Math.PI * 3) * 0.02 * v;
-
-      positions.push(xBase, yBase, zBase + wave);
+      positions.push(p.x, p.y, p.z);
+      normals.push(n.x, n.y, n.z);
       uvs.push(u, v);
+
+      // Three-shade vertex colors: dark edges, light center, medium tip
+      // This creates the Ottoman tezhip three-tone effect
+      const centerBright = 1.0 - edgeness * 0.35;
+      const tipDarken = 1.0 - tipness * 0.15;
+      const baseLighten = (1.0 - v) * 0.12;
+      const shade = centerBright * tipDarken + baseLighten;
+      colors.push(shade, shade * 0.95, shade * 0.92);
     }
   }
 
-  // Compute indices
-  for (let iy = 0; iy < sh; iy++) {
-    for (let ix = 0; ix < sw; ix++) {
-      const a = iy * (sw + 1) + ix;
+  for (let iv = 0; iv < vSegs; iv++) {
+    for (let iu = 0; iu < uSegs; iu++) {
+      const a = iv * (uSegs + 1) + iu;
       const b = a + 1;
-      const c = a + (sw + 1);
+      const c = a + (uSegs + 1);
       const d = c + 1;
       indices.push(a, c, b);
       indices.push(b, c, d);
@@ -122,208 +301,356 @@ function createPetalGeometry(width, height, curl, segments) {
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geo.setIndex(indices);
-  geo.computeVertexNormals();
   return geo;
 }
 
 /* ═══════════════════════════════════════════════════
-   ROSE CONSTRUCTION
+   PERTURB CONTROL POINTS — organic variation per petal
    ═══════════════════════════════════════════════════ */
+
+function perturbControlPoints(base, amount, asymmetry) {
+  amount = amount || 0.06;
+  asymmetry = asymmetry || 0.03;
+  const cp = base.map(row => row.map(p => p.clone()));
+
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      cp[i][j].x += (rand() - 0.5) * amount;
+      cp[i][j].y += (rand() - 0.5) * amount * 0.5;
+      cp[i][j].z += (rand() - 0.5) * amount;
+    }
+  }
+
+  // Asymmetry: shift left edge slightly different from right
+  for (let j = 0; j < 4; j++) {
+    cp[0][j].x -= asymmetry * rand();
+    cp[0][j].y += asymmetry * rand() * 0.5;
+    cp[3][j].x += asymmetry * rand() * 0.3;
+  }
+
+  return cp;
+}
+
+/* ═══════════════════════════════════════════════════
+   PETAL MATERIALS — Deep Crimson Ottoman Palette
+   ═══════════════════════════════════════════════════ */
+
+// Deep crimson base — NOT hot pink
+const CRIMSON_DEEP   = 0x8B1A2B;  // dark crimson for inner
+const CRIMSON_MID    = 0xA82035;  // rich rose-crimson
+const CRIMSON_OUTER  = 0xBE2840;  // slightly brighter outer
+const CRIMSON_EDGE   = 0x6B0F1E;  // very dark edge tones
+
+function createPetalMaterial(color, transmission, roughness, iridescence) {
+  return new THREE.MeshPhysicalMaterial({
+    color: color,
+    roughness: roughness || 0.45,
+    metalness: 0.0,
+
+    // Thin-wall transmission
+    transmission: transmission || 0.2,
+    thickness: 0,  // thin-wall mode — correct for petals
+    ior: 1.45,
+
+    // Iridescence — subtle color shift
+    iridescence: iridescence || 0.3,
+    iridescenceIOR: 1.3,
+    iridescenceThicknessRange: [100, 350],
+
+    // Sheen — velvet/silk petal surface
+    sheen: 0.9,
+    sheenColor: new THREE.Color(0xdd6688),
+    sheenRoughness: 0.25,
+
+    // Clearcoat — waxy fresh-petal surface
+    clearcoat: 0.12,
+    clearcoatRoughness: 0.4,
+
+    side: THREE.DoubleSide,
+    vertexColors: true,
+    envMap: envMap,
+    envMapIntensity: 0.4,
+  });
+}
+
+const outerPetalMat = createPetalMaterial(CRIMSON_OUTER, 0.28, 0.38, 0.35);
+const midPetalMat   = createPetalMaterial(CRIMSON_MID,   0.20, 0.42, 0.30);
+const innerPetalMat = createPetalMaterial(CRIMSON_DEEP,  0.12, 0.50, 0.25);
+innerPetalMat.sheenColor = new THREE.Color(0xcc5577);
+const budPetalMat   = createPetalMaterial(0x7A1525,      0.08, 0.55, 0.20);
+budPetalMat.sheenColor = new THREE.Color(0xbb4466);
+
+/* ═══════════════════════════════════════════════════
+   ROSE CONSTRUCTION — Golden-angle phyllotaxis
+   ═══════════════════════════════════════════════════ */
+
 const roseGroup = new THREE.Group();
-roseGroup.position.set(0, 1.5, 0);
+roseGroup.position.set(0, 1.3, 0);
 scene.add(roseGroup);
 
-// Petal material — hot pink with slight translucency
-const petalMat = new THREE.MeshPhysicalMaterial({
-  color: 0xE83E6C,
-  roughness: 0.4,
-  metalness: 0.0,
-  transmission: 0.15,
-  thickness: 0.3,
-  side: THREE.DoubleSide,
-  clearcoat: 0.3,
-  clearcoatRoughness: 0.4,
-  sheen: 1.0,
-  sheenColor: new THREE.Color(0xff99bb),
-  sheenRoughness: 0.3,
-});
+// Petal layers with phyllotaxis
+const petalConfigs = [
+  // { preset, material, count, startIndex, scale, tiltBase, yBase, radiusBase, noiseAmp }
 
-// Darker inner petal material
-const innerPetalMat = petalMat.clone();
-innerPetalMat.color = new THREE.Color(0xcc2255);
+  // OUTER LAYER — 5 large recurved petals
+  { preset: OUTER_CP, mat: outerPetalMat, count: 5, startIdx: 0,
+    scale: 1.15, tiltBase: 1.15, yBase: -0.20, radiusBase: 0.42, noise: 0.004 },
 
-function addPetalRing(count, radius, width, height, curl, tiltAngle, yOffset, material, scaleVar) {
-  const angleStep = (Math.PI * 2) / count;
-  for (let i = 0; i < count; i++) {
-    const geo = createPetalGeometry(width, height, curl, 14);
-    const mesh = new THREE.Mesh(geo, material);
+  // OUTER-MID — 6 petals, slightly smaller, offset
+  { preset: OUTER_CP, mat: outerPetalMat, count: 6, startIdx: 5,
+    scale: 0.95, tiltBase: 0.95, yBase: -0.12, radiusBase: 0.35, noise: 0.003 },
 
-    // Slight random variation for organic feel
-    const rScale = 1 + (Math.random() - 0.5) * (scaleVar || 0.12);
-    const rAngle = (Math.random() - 0.5) * 0.15;
-    const rTilt = (Math.random() - 0.5) * 0.1;
+  // MID LAYER — 7 cupped petals
+  { preset: MID_CP, mat: midPetalMat, count: 7, startIdx: 11,
+    scale: 0.88, tiltBase: 0.72, yBase: -0.02, radiusBase: 0.26, noise: 0.003 },
 
-    const angle = angleStep * i + rAngle;
+  // MID-INNER — 8 petals transitioning
+  { preset: MID_CP, mat: midPetalMat, count: 8, startIdx: 18,
+    scale: 0.72, tiltBase: 0.52, yBase: 0.06, radiusBase: 0.18, noise: 0.002 },
 
-    // Position petal at the ring radius
+  // INNER — 9 tight petals
+  { preset: INNER_CP, mat: innerPetalMat, count: 9, startIdx: 26,
+    scale: 0.62, tiltBase: 0.35, yBase: 0.12, radiusBase: 0.11, noise: 0.002 },
+
+  // BUD CENTER — 6 tightly wrapped
+  { preset: BUD_CP, mat: budPetalMat, count: 6, startIdx: 35,
+    scale: 0.48, tiltBase: 0.18, yBase: 0.18, radiusBase: 0.05, noise: 0.001 },
+];
+
+petalConfigs.forEach(cfg => {
+  for (let i = 0; i < cfg.count; i++) {
+    const petalIdx = cfg.startIdx + i;
+
+    // Golden-angle phyllotaxis
+    const angle = petalIdx * GOLDEN_ANGLE;
+
+    // Perturb control points for this specific petal
+    const cp = perturbControlPoints(cfg.preset, 0.012, 0.008);
+    const geo = createBezierPetalGeometry(cp, 14, 18, cfg.noise);
+
+    const mesh = new THREE.Mesh(geo, cfg.mat);
+
+    // Scale variation
+    const s = cfg.scale * (0.92 + rand() * 0.16);
+    mesh.scale.set(s, s, s);
+
+    // Position via phyllotaxis
+    const r = cfg.radiusBase + (rand() - 0.5) * 0.02;
     mesh.position.set(
-      Math.cos(angle) * radius,
-      yOffset,
-      Math.sin(angle) * radius
+      Math.cos(angle) * r,
+      cfg.yBase + (rand() - 0.5) * 0.02,
+      Math.sin(angle) * r
     );
 
-    // Orient petal: face outward, then tilt back
+    // Orient: face outward, then tilt
     mesh.rotation.y = -angle + Math.PI / 2;
-    mesh.rotation.x = -(Math.PI / 2 - tiltAngle) + rTilt;
+    const tilt = cfg.tiltBase + (rand() - 0.5) * 0.12;
+    mesh.rotation.x = -(Math.PI / 2 - tilt);
 
-    mesh.scale.set(rScale, rScale, rScale);
+    // Slight z-twist for spiral effect
+    mesh.rotation.z = (rand() - 0.5) * 0.08;
+
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
     roseGroup.add(mesh);
   }
-}
-
-// Layer 1: 5 large outer petals — cupped/curved outward
-addPetalRing(5, 0.45, 0.7, 0.8, 0.9, 1.1, -0.15, petalMat, 0.15);
-
-// Layer 2: 6 mid petals — less open, rotated offset
-addPetalRing(6, 0.3, 0.55, 0.7, 0.7, 0.75, 0.0, petalMat, 0.1);
-
-// Layer 3: 8 inner petals — tight, more vertical
-addPetalRing(8, 0.15, 0.35, 0.55, 0.5, 0.45, 0.1, innerPetalMat, 0.1);
-
-// Extra tight center whorl
-addPetalRing(5, 0.06, 0.2, 0.35, 0.35, 0.25, 0.18, innerPetalMat, 0.08);
+});
 
 /* ═══════════════════════════════════════════════════
-   CENTER — golden stamen dots
+   STAMENS — gold Ottoman accent
    ═══════════════════════════════════════════════════ */
 const stamenMat = new THREE.MeshStandardMaterial({
-  color: 0xdaa520,
-  metalness: 0.8,
-  roughness: 0.25,
-  emissive: 0xaa8800,
-  emissiveIntensity: 0.3,
+  color: 0xd4a017,
+  metalness: 0.85,
+  roughness: 0.2,
+  emissive: 0xaa8500,
+  emissiveIntensity: 0.25,
+  envMap: envMap,
 });
 
-const stamenGeo = new THREE.SphereGeometry(0.025, 8, 8);
-for (let i = 0; i < 18; i++) {
-  const dot = new THREE.Mesh(stamenGeo, stamenMat);
-  const angle = Math.random() * Math.PI * 2;
-  const r = Math.random() * 0.08;
-  dot.position.set(
-    Math.cos(angle) * r,
-    0.28 + Math.random() * 0.06,
-    Math.sin(angle) * r
+// Stamen filaments + anthers
+const filamentGeo = new THREE.CylinderGeometry(0.004, 0.003, 0.12, 4);
+const antherGeo = new THREE.SphereGeometry(0.012, 6, 6);
+for (let i = 0; i < 22; i++) {
+  const angle = rand() * Math.PI * 2;
+  const r = rand() * 0.06;
+  const h = 0.24 + rand() * 0.08;
+
+  // Filament
+  const fil = new THREE.Mesh(filamentGeo, stamenMat);
+  fil.position.set(Math.cos(angle) * r, h - 0.06, Math.sin(angle) * r);
+  fil.rotation.x = (rand() - 0.5) * 0.3;
+  fil.rotation.z = (rand() - 0.5) * 0.3;
+  roseGroup.add(fil);
+
+  // Anther (pollen grain)
+  const anther = new THREE.Mesh(antherGeo, stamenMat);
+  anther.position.set(
+    Math.cos(angle) * r + (rand()-0.5)*0.01,
+    h,
+    Math.sin(angle) * r + (rand()-0.5)*0.01
   );
-  const s = 0.7 + Math.random() * 0.6;
-  dot.scale.set(s, s, s);
-  roseGroup.add(dot);
+  const as = 0.6 + rand() * 0.8;
+  anther.scale.set(as, as * 0.7, as);
+  roseGroup.add(anther);
 }
 
 /* ═══════════════════════════════════════════════════
-   CALYX — small green leaves at base of flower
+   CALYX — green sepals at base
    ═══════════════════════════════════════════════════ */
 const calyxMat = new THREE.MeshPhysicalMaterial({
-  color: 0x2d7a3a,
-  roughness: 0.6,
+  color: 0x1e5a2a,
+  roughness: 0.55,
   metalness: 0.0,
   side: THREE.DoubleSide,
+  transmission: 0.04,
+  thickness: 0,
+  sheen: 0.3,
+  sheenColor: new THREE.Color(0x88cc88),
+  sheenRoughness: 0.5,
+  envMap: envMap,
+  envMapIntensity: 0.2,
 });
 
+// Sepal control points — pointed, slightly cupped leaf shapes
+const SEPAL_CP = [
+  [V(-0.02,0,0.01), V(-0.12,0.15,0.06), V(-0.14,0.35,0.03), V(-0.02,0.50,-0.02)],
+  [V(-0.01,0,0.00), V(-0.05,0.16,0.08), V(-0.06,0.38,0.05), V(-0.005,0.52,-0.03)],
+  [V( 0.01,0,0.00), V( 0.05,0.16,0.08), V( 0.06,0.38,0.05), V( 0.005,0.52,-0.03)],
+  [V( 0.02,0,0.01), V( 0.12,0.15,0.06), V( 0.14,0.35,0.03), V( 0.02,0.50,-0.02)],
+];
+
 for (let i = 0; i < 5; i++) {
-  const geo = createPetalGeometry(0.25, 0.4, 0.3, 8);
+  const angle = (Math.PI * 2 / 5) * i + 0.3;
+  const cp = perturbControlPoints(SEPAL_CP, 0.008, 0.005);
+  const geo = createBezierPetalGeometry(cp, 8, 10, 0.002);
   const mesh = new THREE.Mesh(geo, calyxMat);
-  const angle = (Math.PI * 2 / 5) * i;
+
   mesh.position.set(
-    Math.cos(angle) * 0.2,
-    -0.35,
-    Math.sin(angle) * 0.2
+    Math.cos(angle) * 0.18,
+    -0.32,
+    Math.sin(angle) * 0.18
   );
   mesh.rotation.y = -angle + Math.PI / 2;
-  mesh.rotation.x = -(Math.PI / 2 - 1.5);
-  mesh.scale.set(0.8, 0.9, 0.8);
+  mesh.rotation.x = -(Math.PI / 2 - 1.45);
+  mesh.scale.set(0.9, 0.85, 0.9);
+  mesh.castShadow = true;
   roseGroup.add(mesh);
 }
 
 /* ═══════════════════════════════════════════════════
-   STEM — curved tube
+   STEM — curved tube with thorns
    ═══════════════════════════════════════════════════ */
-const stemCurve = new THREE.CatmullRomCurve3([
-  new THREE.Vector3(0, 1.5, 0),      // base of flower
-  new THREE.Vector3(0.05, 1.2, 0.02),
-  new THREE.Vector3(-0.03, 0.8, -0.04),
-  new THREE.Vector3(0.02, 0.4, 0.01),
-  new THREE.Vector3(0, 0, 0),         // bottom
-]);
+const stemPoints = [
+  new THREE.Vector3(0, 1.3, 0),
+  new THREE.Vector3(0.04, 1.0, 0.02),
+  new THREE.Vector3(-0.02, 0.65, -0.03),
+  new THREE.Vector3(0.03, 0.35, 0.01),
+  new THREE.Vector3(0, 0, 0),
+];
+const stemCurve = new THREE.CatmullRomCurve3(stemPoints);
 
-const stemGeo = new THREE.TubeGeometry(stemCurve, 24, 0.035, 8, false);
 const stemMat = new THREE.MeshPhysicalMaterial({
-  color: 0x2d6b3a,
-  roughness: 0.55,
+  color: 0x1e5e2e,
+  roughness: 0.5,
   metalness: 0.05,
+  sheen: 0.15,
+  sheenColor: new THREE.Color(0x55aa55),
+  sheenRoughness: 0.6,
+  envMap: envMap,
+  envMapIntensity: 0.15,
 });
+
+const stemGeo = new THREE.TubeGeometry(stemCurve, 32, 0.032, 8, false);
 const stem = new THREE.Mesh(stemGeo, stemMat);
-stem.position.y = -1.5; // align so flower sits at roseGroup origin
+stem.position.y = -1.3;
+stem.castShadow = true;
 scene.add(stem);
 
-// Small thorns on stem
-const thornGeo = new THREE.ConeGeometry(0.015, 0.08, 4);
-const thornMat = stemMat;
-for (let i = 0; i < 4; i++) {
-  const t = 0.2 + i * 0.18;
+// Thorns
+const thornGeo = new THREE.ConeGeometry(0.012, 0.07, 5);
+const thornMat = new THREE.MeshPhysicalMaterial({
+  color: 0x2a5535,
+  roughness: 0.4,
+  metalness: 0.1,
+});
+for (let i = 0; i < 5; i++) {
+  const t = 0.15 + i * 0.16;
   const p = stemCurve.getPointAt(t);
   const thorn = new THREE.Mesh(thornGeo, thornMat);
   thorn.position.copy(p);
-  thorn.position.y -= 1.5;
-  thorn.rotation.z = (i % 2 === 0 ? 1 : -1) * 0.8;
-  thorn.scale.set(1, 1, 1);
+  thorn.position.y -= 1.3;
+  const side = (i % 2 === 0) ? 1 : -1;
+  thorn.rotation.z = side * 0.85;
+  thorn.rotation.y = i * 1.2;
+  thorn.castShadow = true;
   scene.add(thorn);
 }
 
-// Leaf on stem
-const leafGroup = new THREE.Group();
-const leafGeo = createPetalGeometry(0.35, 0.5, 0.2, 10);
+/* ═══════════════════════════════════════════════════
+   LEAVES — Bezier patch, serrated edges
+   ═══════════════════════════════════════════════════ */
+const LEAF_CP = [
+  [V(-0.02,0,0.01), V(-0.16,0.12,0.04), V(-0.22,0.30,0.02), V(-0.04,0.48,-0.01)],
+  [V(-0.01,0,0.00), V(-0.08,0.14,0.06), V(-0.10,0.33,0.04), V(-0.01,0.50,-0.02)],
+  [V( 0.01,0,0.00), V( 0.08,0.14,0.06), V( 0.10,0.33,0.04), V( 0.01,0.50,-0.02)],
+  [V( 0.02,0,0.01), V( 0.16,0.12,0.04), V( 0.22,0.30,0.02), V( 0.04,0.48,-0.01)],
+];
+
 const leafMat = new THREE.MeshPhysicalMaterial({
-  color: 0x3a8a4a,
-  roughness: 0.5,
+  color: 0x2a6e3a,
+  roughness: 0.45,
+  metalness: 0.0,
   side: THREE.DoubleSide,
-  transmission: 0.05,
-  thickness: 0.1,
+  transmission: 0.06,
+  thickness: 0,
+  sheen: 0.25,
+  sheenColor: new THREE.Color(0x66bb66),
+  sheenRoughness: 0.4,
+  envMap: envMap,
+  envMapIntensity: 0.2,
 });
-const leaf = new THREE.Mesh(leafGeo, leafMat);
-leaf.rotation.x = -0.3;
-leaf.rotation.z = 0.8;
-leafGroup.add(leaf);
 
-const stemLeafPt = stemCurve.getPointAt(0.45);
-leafGroup.position.copy(stemLeafPt);
-leafGroup.position.y -= 1.5;
-scene.add(leafGroup);
+function addLeaf(stemT, rotZ, scl) {
+  const cp = perturbControlPoints(LEAF_CP, 0.01, 0.006);
+  const geo = createBezierPetalGeometry(cp, 10, 14, 0.003);
+  const mesh = new THREE.Mesh(geo, leafMat);
 
-// Second leaf, opposite side
-const leafGroup2 = new THREE.Group();
-const leaf2 = new THREE.Mesh(leafGeo, leafMat);
-leaf2.rotation.x = -0.3;
-leaf2.rotation.z = -0.9;
-leafGroup2.add(leaf2);
-const stemLeafPt2 = stemCurve.getPointAt(0.6);
-leafGroup2.position.copy(stemLeafPt2);
-leafGroup2.position.y -= 1.5;
-scene.add(leafGroup2);
+  const p = stemCurve.getPointAt(stemT);
+  const grp = new THREE.Group();
+  grp.position.copy(p);
+  grp.position.y -= 1.3;
+  mesh.rotation.x = -0.25;
+  mesh.rotation.z = rotZ;
+  mesh.scale.set(scl, scl * 1.1, scl);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  grp.add(mesh);
+  scene.add(grp);
+}
+
+addLeaf(0.42, 0.9, 1.1);
+addLeaf(0.42, 0.5, 0.8);   // compound leaf — second leaflet
+addLeaf(0.58, -0.95, 1.0);
+addLeaf(0.58, -0.55, 0.75);
 
 /* ═══════════════════════════════════════════════════
-   GROUND — subtle reflective disc
+   GROUND — subtle dark disc
    ═══════════════════════════════════════════════════ */
-const groundGeo = new THREE.CircleGeometry(5, 64);
+const groundGeo = new THREE.CircleGeometry(6, 64);
 const groundMat = new THREE.MeshStandardMaterial({
-  color: 0x111111,
-  roughness: 0.85,
-  metalness: 0.15,
+  color: 0x0a0a0a,
+  roughness: 0.9,
+  metalness: 0.1,
 });
 const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.rotation.x = -Math.PI / 2;
 ground.position.y = -0.02;
+ground.receiveShadow = true;
 scene.add(ground);
 
 /* ═══════════════════════════════════════════════════
@@ -333,10 +660,14 @@ function animate() {
   requestAnimationFrame(animate);
   controls.update();
 
-  // Gentle sway on the rose
   const t = performance.now() * 0.001;
-  roseGroup.rotation.z = Math.sin(t * 0.5) * 0.02;
-  roseGroup.rotation.x = Math.cos(t * 0.7) * 0.015;
+
+  // Gentle sway
+  roseGroup.rotation.z = Math.sin(t * 0.4) * 0.015;
+  roseGroup.rotation.x = Math.cos(t * 0.6) * 0.01;
+
+  // Subtle inner glow pulse
+  innerGlow.intensity = 1.0 + Math.sin(t * 0.8) * 0.2;
 
   renderer.render(scene, camera);
 }
