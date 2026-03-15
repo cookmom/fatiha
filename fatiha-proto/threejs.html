@@ -1135,7 +1135,7 @@ function animate(){
   // ── OVERLAY FROM REFERENCE IMAGE ──
   // Overlay: boxes only, no spiral — need separate overlay with just rectangles
   if(window._overlayImg&&window._overlayImg.complete){
-    ctx.globalAlpha=0.5;
+    ctx.globalAlpha=0.2;
     ctx.drawImage(window._overlayImg,0,0,WD,HD);
     ctx.globalAlpha=1;
   }
