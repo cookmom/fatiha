@@ -18,13 +18,18 @@
 // ═══════════════════════════════════════════════════════════════
 
 const FLOATS_PER_STAMP = 14;
-// x, y, rotation, scaleX, scaleY, r, g, b, a, texU, texV, texSize, age, lifetime
+// x, y, rotation, scaleX, scaleY, r, g, b, a, brushType, (unused), (unused), age, lifetime
 
-const ATLAS_CELL = 128;   // pixels per brush tip cell
-const ATLAS_COLS = 4;
-const ATLAS_ROWS = 2;
-const ATLAS_SIZE = ATLAS_CELL * ATLAS_COLS; // 512×256 atlas
-const GRAIN_SIZE = 256;
+// Procedural brush type IDs — mapped to SDF functions in the fragment shader
+const BRUSH_TYPES = {
+    soft_round:   0,
+    pointed_leaf: 1,
+    petal:        2,
+    spray:        3,
+    hatch_line:   4,
+    thorn:        5,
+    bud:          6
+};
 
 // ═══════════════════════════════════════════════════════════════
 //  SHADERS
@@ -41,14 +46,13 @@ layout(location = 1) in vec2 a_pos;
 layout(location = 2) in float a_rot;
 layout(location = 3) in vec2 a_scale;
 layout(location = 4) in vec4 a_color;
-layout(location = 5) in vec3 a_tex;   // u, v, size in atlas (normalized)
+layout(location = 5) in vec3 a_tex;   // x = brush type ID, y/z unused
 layout(location = 6) in vec2 a_life;  // age, lifetime
 
 uniform vec2 u_resolution;
 
-out vec2 v_uv;        // local quad UV [0,1]
-out vec2 v_atlasUV;   // atlas UV for this tip
-out float v_atlasSize; // atlas cell size (normalized)
+out vec2 v_uv;         // local quad UV [0,1]
+out float v_brushType; // procedural brush type ID
 out vec4 v_color;
 out float v_fade;
 out vec2 v_stampPos;   // stamp world position for per-stamp jitter
@@ -83,8 +87,7 @@ void main() {
     gl_Position = vec4(ndc, 0.0, 1.0);
 
     v_uv = a_quadPos * 0.5 + 0.5; // [-1,1] → [0,1]
-    v_atlasUV = a_tex.xy;
-    v_atlasSize = a_tex.z;
+    v_brushType = a_tex.x;
     v_color = a_color;
     v_stampPos = a_pos;
 }
@@ -94,38 +97,138 @@ const STAMP_FRAG = `#version 300 es
 precision highp float;
 
 in vec2 v_uv;
-in vec2 v_atlasUV;
-in float v_atlasSize;
+in float v_brushType;
 in vec4 v_color;
 in float v_fade;
 in vec2 v_stampPos;
 
-uniform sampler2D u_atlas;
-uniform sampler2D u_grain;
 uniform float u_grainStrength;
-uniform vec2 u_grainOffset;
 uniform float u_colorJitter;
 
-// Pseudo-random hash for per-stamp variation
+// ── Procedural noise (replaces baked grain texture) ──────────
+
 float hash(vec2 p) {
     return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
 }
+
+// Smooth value noise for organic paper grain
+float valueNoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+// Multi-octave grain: coarse paper fiber + fine detail
+float grainNoise(vec2 p) {
+    return valueNoise(p * 8.0) * 0.6
+         + valueNoise(p * 24.0) * 0.3
+         + valueNoise(p * 64.0) * 0.1;
+}
+
+// ── Procedural SDF brush tips ────────────────────────────────
+// All shapes defined in UV space, centered at origin.
+// Uses fwidth() for resolution-independent antialiasing (like p5.brush).
 
 out vec4 fragColor;
 
 void main() {
     if (v_fade <= 0.0) discard;
 
-    // Sample brush tip from atlas
-    vec2 atlasCoord = v_atlasUV + v_uv * v_atlasSize;
-    float tipAlpha = texture(u_atlas, atlasCoord).r;
+    // Center UV: (0,0) = stamp center, range [-0.5, 0.5]
+    vec2 p = v_uv - 0.5;
+    int brushType = int(v_brushType + 0.5);
 
-    // Sample grain texture (tiled) — visible paper texture
-    vec2 grainCoord = gl_FragCoord.xy / 256.0 + u_grainOffset;
-    float grainRaw = texture(u_grain, grainCoord).r;
-    // Remap for more contrast: range [0.2, 1.0] instead of [0, 1]
-    float grain = 0.2 + grainRaw * 0.8;
-    float grainMod = mix(1.0, grain, u_grainStrength);
+    float tipAlpha = 0.0;
+
+    if (brushType == 0) {
+        // ── soft_round: Gaussian circle ──
+        // The workhorse watercolor stamp. Smooth radial falloff,
+        // no hard edge at any zoom level.
+        float d = length(p) * 2.0;
+        float aa = fwidth(d);
+        float edge = 1.0 - smoothstep(1.0 - aa, 1.0, d);
+        tipAlpha = exp(-2.0 * d * d) * edge;
+    }
+    else if (brushType == 1) {
+        // ── pointed_leaf: narrow vertical ellipse ──
+        // Organic leaf stamp with narrow width, pointed tips.
+        vec2 q = p * vec2(1.0 / 0.24, 1.0 / 0.45);
+        float d = length(q);
+        float aa = fwidth(d);
+        float edge = 1.0 - smoothstep(1.0 - aa, 1.0, d);
+        tipAlpha = exp(-2.8 * d * d) * edge;
+    }
+    else if (brushType == 2) {
+        // ── petal: wide ogee/almond ──
+        // Wider than leaf, used for flower petals and ogee motifs.
+        vec2 q = p * vec2(1.0 / 0.34, 1.0 / 0.42);
+        float d = length(q);
+        float aa = fwidth(d);
+        float edge = 1.0 - smoothstep(1.0 - aa, 1.0, d);
+        tipAlpha = exp(-2.5 * d * d) * edge;
+    }
+    else if (brushType == 3) {
+        // ── spray: scattered soft dots ──
+        // Multiple procedural circles for pollen/atmosphere effects.
+        float total = 0.0;
+        for (int i = 0; i < 12; i++) {
+            float fi = float(i);
+            vec2 center = vec2(
+                hash(vec2(fi, 0.37)) - 0.5,
+                hash(vec2(0.73, fi)) - 0.5
+            ) * 0.8;
+            float radius = 0.03 + hash(vec2(fi, fi * 1.7)) * 0.06;
+            float d = length(p - center) / radius;
+            float dotAlpha = exp(-2.0 * d * d) * (0.3 + hash(vec2(fi * 1.3, fi * 2.7)) * 0.7);
+            total += dotAlpha;
+        }
+        tipAlpha = min(total, 1.0);
+    }
+    else if (brushType == 4) {
+        // ── hatch_line: thin vertical stroke ──
+        // Tapered at both ends via Gaussian along length.
+        float dx = abs(p.x) / 0.04;
+        float dy = abs(p.y) / 0.45;
+        float d = max(dx, dy);
+        float aa = fwidth(d);
+        float shape = 1.0 - smoothstep(1.0 - aa, 1.0, d);
+        float taper = exp(-3.0 * dy * dy);
+        tipAlpha = shape * taper;
+    }
+    else if (brushType == 5) {
+        // ── thorn: sharp triangle/wedge ──
+        // Points upward, wider at base. Soft Gaussian falloff.
+        float ty = (p.y + 0.45) / 0.9;
+        float halfWidth = 0.15 * (1.0 - ty);
+        float dx = abs(p.x);
+        float d = dx / max(halfWidth, 0.001);
+        float aa = fwidth(d);
+        float inBounds = step(0.0, ty) * step(ty, 1.0);
+        float shape = (1.0 - smoothstep(1.0 - aa * 2.0, 1.0, d)) * inBounds;
+        float falloff = exp(-1.5 * d * d) * (0.3 + 0.7 * ty);
+        tipAlpha = shape * falloff;
+    }
+    else if (brushType == 6) {
+        // ── bud: teardrop ──
+        // Wider at top, tapering to a point at bottom.
+        float yNorm = (p.y + 0.42) / 0.84;
+        float widthScale = 0.28 * (1.0 - 0.5 * yNorm * yNorm);
+        vec2 q = vec2(p.x / max(widthScale, 0.001), p.y / 0.42);
+        float d = length(q);
+        float aa = fwidth(d);
+        float edge = 1.0 - smoothstep(1.0 - aa, 1.0, d);
+        tipAlpha = exp(-2.5 * d * d) * edge;
+    }
+
+    // Per-pixel procedural grain (replaces baked grain texture)
+    vec2 grainCoord = gl_FragCoord.xy / 256.0;
+    float grain = grainNoise(grainCoord);
+    float grainMod = mix(1.0, 0.2 + grain * 0.8, u_grainStrength);
 
     float alpha = tipAlpha * v_color.a * v_fade * grainMod;
 
