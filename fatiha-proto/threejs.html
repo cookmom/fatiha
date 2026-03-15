@@ -7,7 +7,7 @@
 <title>fatiha.app — Three.js Garden (fresh)</title>
 <style>
 *{margin:0;padding:0}
-body{background:#0d0d0d;overflow:hidden}
+body{background:#0d0d0d;overflow:hidden;cursor:none}
 canvas{display:block}
 #play-btn{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
   background:transparent;border:1px solid rgba(255,255,255,0.12);
@@ -1105,12 +1105,12 @@ function animate(){
     const fi=progress*(CL-1),idx=Math.floor(fi),frac=fi-idx;
     const a=curvePoints[Math.min(idx,CL-1)],b=curvePoints[Math.min(idx+1,CL-1)];
     const px=a.x+(b.x-a.x)*frac,py=a.y+(b.y-a.y)*frac;
-    // Crosshair at leading edge
-    const chS=8*dpr;
-    ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=0.8*dpr;
-    ctx.beginPath();ctx.moveTo(px-chS,py);ctx.lineTo(px+chS,py);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(px,py-chS);ctx.lineTo(px,py+chS);ctx.stroke();
-    ctx.beginPath();ctx.arc(px,py,1.5*dpr,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,0.6)';ctx.fill();
+    // Crosshair at leading edge — HIDDEN
+    // const chS=8*dpr;
+    // ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=0.8*dpr;
+    // ctx.beginPath();ctx.moveTo(px-chS,py);ctx.lineTo(px+chS,py);ctx.stroke();
+    // ctx.beginPath();ctx.moveTo(px,py-chS);ctx.lineTo(px,py+chS);ctx.stroke();
+    // ctx.beginPath();ctx.arc(px,py,1.5*dpr,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,0.6)';ctx.fill();
     // DISABLED: Tracking box — replaced by golden rectangle frame
     // const leadDisp=disp[Math.min(idx,CL-1)]||0;
     // const breatheTarget=60*dpr+leadDisp*1.8;
@@ -1130,6 +1130,42 @@ function animate(){
     // ctx.fillRect(bx+boxW-cSz/2,by-cSz/2,cSz,cSz);
     // ctx.fillRect(bx-cSz/2,by+boxH-cSz/2,cSz,cSz);
     // ctx.fillRect(bx+boxW-cSz/2,by+boxH-cSz/2,cSz,cSz);
+  }
+
+  // ── BISMILLAH PROGRESSIVE TEXT ──
+  {
+    const bismillah='بسم الله الرحمن الرحيم';
+    // Syllable groups with progress breakpoints (right-to-left visual order)
+    const groups=[
+      {text:'بسم',start:0.0,end:0.15},
+      {text:' ',start:0.15,end:0.15},
+      {text:'الله',start:0.15,end:0.35},
+      {text:' ',start:0.35,end:0.35},
+      {text:'الرحمن',start:0.35,end:0.65},
+      {text:' ',start:0.65,end:0.65},
+      {text:'الرحيم',start:0.65,end:1.0}
+    ];
+    const fontSize=Math.round(24*dpr);
+    ctx.font=fontSize+'px "Noto Naskh Arabic","Traditional Arabic","Arial"';
+    ctx.textAlign='center';ctx.textBaseline='bottom';
+    const tx=WD/2, ty=HD-20*dpr;
+    // Measure total width to position groups
+    const totalW=ctx.measureText(bismillah).width;
+    // Draw each group with appropriate opacity
+    let xCursor=tx+totalW/2; // start from visual right (Arabic RTL)
+    for(const g of groups){
+      const gw=ctx.measureText(g.text).width;
+      const p=isPlaying?progress:0;
+      const lit=p>=g.end?1:p>=g.start?(p-g.start)/(g.end-g.start):0;
+      const alpha=0.3+lit*0.7;
+      ctx.globalAlpha=alpha;
+      ctx.fillStyle='#ffffff';
+      // Position each group: draw right-aligned at xCursor
+      ctx.textAlign='right';
+      ctx.fillText(g.text,xCursor,ty);
+      xCursor-=gw;
+    }
+    ctx.globalAlpha=1;ctx.textAlign='start';
   }
 
   // ── OVERLAY FROM REFERENCE IMAGE ──
