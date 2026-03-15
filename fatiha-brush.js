@@ -4,7 +4,7 @@
  * WebGL2 instanced-quad renderer for real-time voice-reactive
  * Islamic calligraphic art. Resolution-independent brush tips via
  * procedural signed distance fields in the fragment shader — no
- * texture atlas. Per-pixel Gaussian falloff, fwidth() antialiasing,
+ * procedural SDF brush tips. Per-pixel Gaussian falloff, fwidth() antialiasing,
  * procedural grain noise, color jitter, and Mixbox pigment blending.
  *
  * Usage:
@@ -383,16 +383,6 @@ class FatihaBrush {
         this._tipNames.push(name);
     }
 
-    /** Get brush type data for a tip name. Returns { u: typeId, v: 0, size: 0 }. */
-    _getUV(name) {
-        const id = BRUSH_TYPES[name];
-        if (id === undefined) {
-            console.warn(`FatihaBrush: unknown tip "${name}", falling back to soft_round`);
-            return { u: 0, v: 0, size: 0 };
-        }
-        return { u: id, v: 0, size: 0 };
-    }
-
     // ─── WEBGL INIT ──────────────────────────────────────────
 
     _initGL() {
@@ -687,8 +677,8 @@ void main() {
         const jx = jitter ? (Math.random() - 0.5) * jitter : 0;
         const jy = jitter ? (Math.random() - 0.5) * jitter : 0;
 
-        // Get atlas UV
-        const uv = this._getUV(opts.texture || 'soft_round');
+        // Get procedural brush type ID
+        const brushType = BRUSH_TYPES[opts.texture || 'soft_round'] || 0;
 
         const stamps = layer.stamps;
         stamps[off + 0] = (opts.x || 0) + jx;           // x
@@ -700,9 +690,9 @@ void main() {
         stamps[off + 6] = g;                              // g
         stamps[off + 7] = b;                              // b
         stamps[off + 8] = opts.a !== undefined ? opts.a : 1;  // a
-        stamps[off + 9] = uv.u;                           // texU
-        stamps[off + 10] = uv.v;                          // texV
-        stamps[off + 11] = uv.size;                       // texSize
+        stamps[off + 9] = brushType;                      // brush type ID (SDF)
+        stamps[off + 10] = 0;                             // (unused)
+        stamps[off + 11] = 0;                             // (unused)
         stamps[off + 12] = 0;                             // age
         stamps[off + 13] = opts.lifetime !== undefined ? opts.lifetime : 99999; // lifetime
 
@@ -922,6 +912,713 @@ void main() {
             pts.push({ x: x1 + (x2 - x1) * t, y: y1 + (y2 - y1) * t });
         }
         this.drawStroke(pts, opts);
+    }
+
+    // ─── TYLER HOBBS PAINTING TOOLKIT ──────────────────────
+    // Watercolor simulation, soft textures, probability distributions,
+    // and layered painting techniques from Tyler Hobbs' research.
+    // See tyler-hobbs-techniques.md for full documentation.
+
+    // ── Probability Distributions ────────────────────────────
+
+    /**
+     * Gaussian (normal) random number via Box-Muller transform.
+     * The most important distribution for organic variation.
+     * @param {number} [mean=0]
+     * @param {number} [stddev=1]
+     * @returns {number}
+     */
+    static gaussian(mean = 0, stddev = 1) {
+        // Box-Muller transform
+        let u, v, s;
+        do {
+            u = Math.random() * 2 - 1;
+            v = Math.random() * 2 - 1;
+            s = u * u + v * v;
+        } while (s >= 1 || s === 0);
+        const mul = Math.sqrt(-2 * Math.log(s) / s);
+        return mean + stddev * u * mul;
+    }
+
+    /**
+     * Power-law (Pareto) random number — "many small, few large."
+     * Use for element sizing, spacing hierarchy.
+     * @param {number} [min=1] — minimum value
+     * @param {number} [alpha=2] — shape parameter (higher = less extreme)
+     * @returns {number}
+     */
+    static powerLaw(min = 1, alpha = 2) {
+        return min / Math.pow(Math.random(), 1 / alpha);
+    }
+
+    /**
+     * Truncated Gaussian — Gaussian clamped to [lo, hi].
+     * Useful when you need organic variation but within bounds.
+     * @param {number} mean
+     * @param {number} stddev
+     * @param {number} lo
+     * @param {number} hi
+     * @returns {number}
+     */
+    static truncGaussian(mean, stddev, lo, hi) {
+        let val;
+        do {
+            val = FatihaBrush.gaussian(mean, stddev);
+        } while (val < lo || val > hi);
+        return val;
+    }
+
+    // ── Polygon Deformation (Core Watercolor Algorithm) ──────
+
+    /**
+     * Recursively deform a polygon by displacing edge midpoints.
+     * This is Tyler Hobbs' core watercolor technique — creates organic,
+     * paint-like blob shapes from simple input polygons.
+     *
+     * @param {Array<{x:number, y:number, variance?:number}>} points — polygon vertices
+     * @param {Object} [opts]
+     * @param {number} [opts.rounds=5] — deformation iterations
+     * @param {number} [opts.variance=0.5] — base displacement magnitude (fraction of edge length)
+     * @param {number} [opts.varianceDrift=0.1] — how much child variance can differ from parent
+     * @param {number} [opts.angleMean=0] — mean displacement angle offset from perpendicular (radians)
+     * @param {number} [opts.angleVariance=0.3] — displacement angle randomization
+     * @returns {Array<{x:number, y:number, variance:number}>} — deformed polygon
+     */
+    deformPolygon(points, opts = {}) {
+        const rounds = opts.rounds !== undefined ? opts.rounds : 5;
+        const baseVar = opts.variance !== undefined ? opts.variance : 0.5;
+        const varDrift = opts.varianceDrift !== undefined ? opts.varianceDrift : 0.1;
+        const angleMean = opts.angleMean || 0;
+        const angleVar = opts.angleVariance !== undefined ? opts.angleVariance : 0.3;
+
+        let poly = points.map(p => ({
+            x: p.x, y: p.y,
+            variance: p.variance !== undefined ? p.variance : baseVar
+        }));
+
+        for (let round = 0; round < rounds; round++) {
+            const next = [];
+            for (let i = 0; i < poly.length; i++) {
+                const a = poly[i];
+                const b = poly[(i + 1) % poly.length];
+
+                // Midpoint with Gaussian offset along edge
+                const midT = FatihaBrush.truncGaussian(0.5, 0.1, 0.3, 0.7);
+                const mx = a.x + (b.x - a.x) * midT;
+                const my = a.y + (b.y - a.y) * midT;
+
+                // Edge length and perpendicular
+                const edgeLen = Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
+                const edgeAngle = Math.atan2(b.y - a.y, b.x - a.x);
+                const perpAngle = edgeAngle + Math.PI / 2 +
+                    FatihaBrush.gaussian(angleMean, angleVar);
+
+                // Displacement magnitude — Gaussian, scaled by edge length and vertex variance
+                const parentVar = (a.variance + b.variance) / 2;
+                const magnitude = Math.abs(FatihaBrush.gaussian(0, parentVar * edgeLen * 0.5));
+
+                // Displaced midpoint
+                const dx = Math.cos(perpAngle) * magnitude;
+                const dy = Math.sin(perpAngle) * magnitude;
+
+                // Child variance inherits from parent with drift
+                const childVar = Math.max(0.05,
+                    parentVar + FatihaBrush.gaussian(0, varDrift));
+
+                next.push(a);
+                next.push({ x: mx + dx, y: my + dy, variance: childVar });
+            }
+            poly = next;
+        }
+
+        return poly;
+    }
+
+    // ── Watercolor Rendering ─────────────────────────────────
+
+    /**
+     * Render a watercolor blob — the full Tyler Hobbs technique.
+     * Takes a simple polygon, deforms it, and renders 30-100 low-opacity
+     * layers with per-layer deformation and texture masking.
+     *
+     * @param {Array<{x:number, y:number}>} polygon — simple input polygon (3+ vertices)
+     * @param {Object} [opts]
+     * @param {string} [opts.color='#4488aa'] — fill color
+     * @param {number} [opts.layers=50] — number of transparent layers
+     * @param {number} [opts.opacity=0.04] — per-layer opacity
+     * @param {number} [opts.baseRounds=5] — deformation rounds for base shape
+     * @param {number} [opts.layerRounds=3] — extra deformation rounds per layer
+     * @param {number} [opts.variance=0.4] — base deformation variance
+     * @param {number} [opts.textureDots=0] — circles per layer for paper grain (0 = disabled)
+     * @param {number} [opts.textureRadius=3] — radius of grain texture dots
+     * @param {string} [opts.layer] — render layer name
+     * @param {number} [opts.lifetime=99999]
+     * @param {boolean} [opts.concentratePigment=true] — more opacity in center (Hobbs technique)
+     */
+    watercolor(polygon, opts = {}) {
+        if (!polygon || polygon.length < 3) return;
+
+        const color = opts.color || '#4488aa';
+        const numLayers = opts.layers || 50;
+        const baseOpacity = opts.opacity !== undefined ? opts.opacity : 0.04;
+        const baseRounds = opts.baseRounds !== undefined ? opts.baseRounds : 5;
+        const layerRounds = opts.layerRounds !== undefined ? opts.layerRounds : 3;
+        const baseVar = opts.variance !== undefined ? opts.variance : 0.4;
+        const textureDots = opts.textureDots || 0;
+        const textureRadius = opts.textureRadius || 3;
+        const layer = opts.layer || this.layerNames[0];
+        const lifetime = opts.lifetime !== undefined ? opts.lifetime : 99999;
+        const concentrate = opts.concentratePigment !== false;
+
+        // Compute polygon centroid and bounding radius (for texture masking)
+        let cx = 0, cy = 0;
+        for (const p of polygon) { cx += p.x; cy += p.y; }
+        cx /= polygon.length;
+        cy /= polygon.length;
+        let boundR = 0;
+        for (const p of polygon) {
+            const d = Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2);
+            if (d > boundR) boundR = d;
+        }
+
+        // Create base deformed polygon
+        const basePoly = this.deformPolygon(polygon, {
+            rounds: baseRounds,
+            variance: baseVar
+        });
+
+        // Render layers
+        for (let i = 0; i < numLayers; i++) {
+            const t = i / numLayers; // 0-1 progress through layers
+
+            // Pigment concentration: fewer deformation rounds for early layers
+            // (tighter to center), more for later layers (feathered edges)
+            let extraRounds = layerRounds;
+            if (concentrate) {
+                if (t < 0.33) extraRounds = Math.max(1, Math.floor(layerRounds * 0.4));
+                else if (t < 0.66) extraRounds = Math.max(1, Math.floor(layerRounds * 0.7));
+            }
+
+            // Deform base polygon further for this layer
+            const layerPoly = this.deformPolygon(basePoly, {
+                rounds: extraRounds,
+                variance: baseVar * 0.6
+            });
+
+            // Render the deformed polygon as a fan of stamps from centroid
+            this._renderPolygonFill(layerPoly, cx, cy, {
+                color,
+                a: baseOpacity,
+                layer,
+                lifetime,
+                texture: 'soft_round'
+            });
+
+            // Texture masking: scattered dots for paper grain
+            if (textureDots > 0) {
+                for (let d = 0; d < textureDots; d++) {
+                    const tx = cx + FatihaBrush.gaussian(0, boundR * 0.6);
+                    const ty = cy + FatihaBrush.gaussian(0, boundR * 0.6);
+                    this.addStamp({
+                        x: tx, y: ty,
+                        color,
+                        a: baseOpacity * 0.5,
+                        scaleX: textureRadius * (0.5 + Math.random()),
+                        scaleY: textureRadius * (0.5 + Math.random()),
+                        texture: 'soft_round',
+                        layer,
+                        lifetime
+                    });
+                }
+            }
+        }
+    }
+
+    /**
+     * Internal: fill a deformed polygon using stamp fan from centroid.
+     * Approximates polygon fill by placing stamps along edges and
+     * in a radial fan pattern.
+     */
+    _renderPolygonFill(poly, cx, cy, opts) {
+        const n = poly.length;
+        // Place stamps along every edge
+        for (let i = 0; i < n; i++) {
+            const a = poly[i];
+            const b = poly[(i + 1) % n];
+            const edgeLen = Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
+            const steps = Math.max(1, Math.ceil(edgeLen / 6));
+            for (let s = 0; s <= steps; s++) {
+                const t = s / steps;
+                const px = a.x + (b.x - a.x) * t;
+                const py = a.y + (b.y - a.y) * t;
+                // Place stamps from edge point toward centroid
+                const toCx = cx - px;
+                const toCy = cy - py;
+                const dist = Math.sqrt(toCx * toCx + toCy * toCy);
+                const fillSteps = Math.max(1, Math.ceil(dist / 8));
+                for (let f = 0; f <= fillSteps; f++) {
+                    const ft = f / fillSteps;
+                    this.addStamp({
+                        x: px + toCx * ft + FatihaBrush.gaussian(0, 1.5),
+                        y: py + toCy * ft + FatihaBrush.gaussian(0, 1.5),
+                        color: opts.color,
+                        a: opts.a,
+                        scaleX: 5 + FatihaBrush.gaussian(0, 1),
+                        scaleY: 5 + FatihaBrush.gaussian(0, 1),
+                        texture: opts.texture || 'soft_round',
+                        layer: opts.layer,
+                        lifetime: opts.lifetime || 99999
+                    });
+                }
+            }
+        }
+    }
+
+    // ── Soft Textures ────────────────────────────────────────
+
+    /**
+     * Soft edge gradient — layered transparent rectangles with
+     * Gaussian-varied edges. Creates organic fade transitions.
+     *
+     * @param {number} x — left edge
+     * @param {number} y — top edge
+     * @param {number} w — width
+     * @param {number} h — height
+     * @param {Object} [opts]
+     * @param {string} [opts.color='#ffffff']
+     * @param {number} [opts.layers=40] — number of transparent layers
+     * @param {number} [opts.opacity=0.04] — per-layer opacity
+     * @param {number} [opts.variance=30] — Gaussian edge variance in pixels
+     * @param {string} [opts.edge='right'] — which edge to soften ('left','right','top','bottom','all')
+     * @param {string} [opts.layer]
+     * @param {number} [opts.lifetime=99999]
+     */
+    softEdge(x, y, w, h, opts = {}) {
+        const color = opts.color || '#ffffff';
+        const numLayers = opts.layers || 40;
+        const opacity = opts.opacity !== undefined ? opts.opacity : 0.04;
+        const variance = opts.variance || 30;
+        const edge = opts.edge || 'right';
+        const layer = opts.layer || this.layerNames[0];
+        const lifetime = opts.lifetime !== undefined ? opts.lifetime : 99999;
+
+        for (let i = 0; i < numLayers; i++) {
+            // Vary the rectangle edge position with Gaussian noise
+            let lx = x, ly = y, lw = w, lh = h;
+
+            if (edge === 'right' || edge === 'all') {
+                lw += FatihaBrush.gaussian(0, variance);
+            }
+            if (edge === 'left' || edge === 'all') {
+                const shift = FatihaBrush.gaussian(0, variance);
+                lx += shift;
+                lw -= shift;
+            }
+            if (edge === 'bottom' || edge === 'all') {
+                lh += FatihaBrush.gaussian(0, variance);
+            }
+            if (edge === 'top' || edge === 'all') {
+                const shift = FatihaBrush.gaussian(0, variance);
+                ly += shift;
+                lh -= shift;
+            }
+
+            if (lw <= 0 || lh <= 0) continue;
+
+            // Fill with stamps
+            const stampSize = Math.min(lw, lh, 12);
+            const cols = Math.max(1, Math.ceil(lw / stampSize));
+            const rows = Math.max(1, Math.ceil(lh / stampSize));
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    this.addStamp({
+                        x: lx + (c + 0.5) * (lw / cols) + FatihaBrush.gaussian(0, 1),
+                        y: ly + (r + 0.5) * (lh / rows) + FatihaBrush.gaussian(0, 1),
+                        color,
+                        a: opacity,
+                        scaleX: stampSize * 0.6,
+                        scaleY: stampSize * 0.6,
+                        texture: 'soft_round',
+                        layer,
+                        lifetime
+                    });
+                }
+            }
+        }
+    }
+
+    /**
+     * Stipple dots with Gaussian falloff from a path or region edge.
+     * Creates smooth organic fades without directional bias.
+     *
+     * @param {Array<{x:number, y:number}>} edgePoints — points defining the edge to stipple from
+     * @param {Object} [opts]
+     * @param {string} [opts.color='#ffffff']
+     * @param {number} [opts.count=5000] — total dots
+     * @param {number} [opts.spread=60] — Gaussian spread from edge (px)
+     * @param {number} [opts.dotSize=2] — base dot radius
+     * @param {number} [opts.opacity=0.8] — per-dot opacity
+     * @param {string} [opts.direction='outward'] — 'outward', 'inward', or 'both'
+     * @param {string} [opts.layer]
+     * @param {number} [opts.lifetime=99999]
+     */
+    stipple(edgePoints, opts = {}) {
+        if (!edgePoints || edgePoints.length < 2) return;
+
+        const color = opts.color || '#ffffff';
+        const count = opts.count || 5000;
+        const spread = opts.spread || 60;
+        const dotSize = opts.dotSize || 2;
+        const opacity = opts.opacity !== undefined ? opts.opacity : 0.8;
+        const direction = opts.direction || 'outward';
+        const layer = opts.layer || this.layerNames[0];
+        const lifetime = opts.lifetime !== undefined ? opts.lifetime : 99999;
+
+        // Compute cumulative edge lengths for uniform sampling along edge
+        const lengths = [0];
+        for (let i = 1; i < edgePoints.length; i++) {
+            const dx = edgePoints[i].x - edgePoints[i - 1].x;
+            const dy = edgePoints[i].y - edgePoints[i - 1].y;
+            lengths.push(lengths[i - 1] + Math.sqrt(dx * dx + dy * dy));
+        }
+        const totalLen = lengths[lengths.length - 1];
+        if (totalLen < 1) return;
+
+        for (let d = 0; d < count; d++) {
+            // Pick random point along edge
+            const dist = Math.random() * totalLen;
+            let seg = 0;
+            while (seg < edgePoints.length - 2 && lengths[seg + 1] < dist) seg++;
+            const segLen = lengths[seg + 1] - lengths[seg];
+            const segT = segLen > 0 ? (dist - lengths[seg]) / segLen : 0;
+
+            const ex = edgePoints[seg].x + (edgePoints[seg + 1].x - edgePoints[seg].x) * segT;
+            const ey = edgePoints[seg].y + (edgePoints[seg + 1].y - edgePoints[seg].y) * segT;
+
+            // Edge normal (perpendicular)
+            const dx = edgePoints[seg + 1].x - edgePoints[seg].x;
+            const dy = edgePoints[seg + 1].y - edgePoints[seg].y;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            const nx = -dy / (len || 1);
+            const ny = dx / (len || 1);
+
+            // Gaussian offset from edge
+            let offset;
+            if (direction === 'both') {
+                offset = FatihaBrush.gaussian(0, spread);
+            } else if (direction === 'inward') {
+                offset = -Math.abs(FatihaBrush.gaussian(0, spread));
+            } else {
+                offset = Math.abs(FatihaBrush.gaussian(0, spread));
+            }
+
+            this.addStamp({
+                x: ex + nx * offset + FatihaBrush.gaussian(0, 1),
+                y: ey + ny * offset + FatihaBrush.gaussian(0, 1),
+                color,
+                a: opacity * (0.3 + Math.random() * 0.7),
+                scaleX: dotSize * (0.5 + Math.random()),
+                scaleY: dotSize * (0.5 + Math.random()),
+                texture: 'soft_round',
+                layer,
+                lifetime
+            });
+        }
+    }
+
+    /**
+     * Draw clustered line bundles — Tyler Hobbs' "bird's nest" technique.
+     * Groups of 8 closely-related lines create organic texture.
+     *
+     * @param {number} x — center x
+     * @param {number} y — center y
+     * @param {Object} [opts]
+     * @param {string} [opts.color='#ffffff']
+     * @param {number} [opts.groups=20] — number of line groups
+     * @param {number} [opts.linesPerGroup=8] — lines per cluster
+     * @param {number} [opts.spread=60] — Gaussian spread for group placement
+     * @param {number} [opts.clusterTight=5] — tightness within each group (px)
+     * @param {number} [opts.lineLength=40] — base line length
+     * @param {number} [opts.weight=1] — stroke weight
+     * @param {number} [opts.opacity=0.3]
+     * @param {string} [opts.layer]
+     * @param {number} [opts.lifetime=99999]
+     */
+    drawCluster(x, y, opts = {}) {
+        const color = opts.color || '#ffffff';
+        const groups = opts.groups || 20;
+        const linesPerGroup = opts.linesPerGroup || 8;
+        const spread = opts.spread || 60;
+        const tight = opts.clusterTight || 5;
+        const lineLen = opts.lineLength || 40;
+        const weight = opts.weight || 1;
+        const opacity = opts.opacity !== undefined ? opts.opacity : 0.3;
+        const layer = opts.layer || this.layerNames[0];
+        const lifetime = opts.lifetime !== undefined ? opts.lifetime : 99999;
+
+        for (let g = 0; g < groups; g++) {
+            // Group center and direction
+            const gx = x + FatihaBrush.gaussian(0, spread);
+            const gy = y + FatihaBrush.gaussian(0, spread);
+            const angle = Math.random() * Math.PI;
+            const halfLen = Math.abs(FatihaBrush.gaussian(lineLen / 2, lineLen * 0.3));
+
+            for (let l = 0; l < linesPerGroup; l++) {
+                // Tight variation within group
+                const lx1 = gx + FatihaBrush.gaussian(0, tight);
+                const ly1 = gy + FatihaBrush.gaussian(0, tight);
+                const la = angle + FatihaBrush.gaussian(0, 0.15);
+                const lLen = halfLen + FatihaBrush.gaussian(0, tight);
+
+                const lx2 = lx1 + Math.cos(la) * lLen;
+                const ly2 = ly1 + Math.sin(la) * lLen;
+
+                this.drawLine(lx1, ly1, lx2, ly2, {
+                    color,
+                    weight,
+                    alpha: opacity * (0.5 + Math.random() * 0.5),
+                    texture: 'hatch_line',
+                    layer,
+                    spacing: 0.5,
+                    scatter: 0.1,
+                    grain: 0.8,
+                    lifetime
+                });
+            }
+        }
+    }
+
+    // ── Layered Painting (Hack-a-Painting approach) ──────────
+
+    /**
+     * Paint interleaved watercolor blobs — the "hack a painting" technique.
+     * Renders multiple blobs simultaneously, interleaving their layers
+     * for natural color mixing at overlaps.
+     *
+     * @param {Array<{polygon: Array<{x:number, y:number}>, color: string}>} blobs
+     *   Array of blob definitions, each with polygon vertices and color.
+     * @param {Object} [opts]
+     * @param {number} [opts.layers=50] — total layers per blob
+     * @param {number} [opts.opacity=0.04] — per-layer opacity
+     * @param {number} [opts.interleave=5] — layers of each blob before switching
+     * @param {number} [opts.baseRounds=5] — base polygon deformation
+     * @param {number} [opts.layerRounds=3] — per-layer extra deformation
+     * @param {number} [opts.variance=0.4]
+     * @param {string} [opts.layer]
+     * @param {number} [opts.lifetime=99999]
+     */
+    paintInterleaved(blobs, opts = {}) {
+        if (!blobs || blobs.length === 0) return;
+
+        const numLayers = opts.layers || 50;
+        const baseOpacity = opts.opacity !== undefined ? opts.opacity : 0.04;
+        const interleave = opts.interleave || 5;
+        const baseRounds = opts.baseRounds !== undefined ? opts.baseRounds : 5;
+        const layerRounds = opts.layerRounds !== undefined ? opts.layerRounds : 3;
+        const baseVar = opts.variance !== undefined ? opts.variance : 0.4;
+        const layer = opts.layer || this.layerNames[0];
+        const lifetime = opts.lifetime !== undefined ? opts.lifetime : 99999;
+
+        // Pre-compute base polygons and centroids for each blob
+        const blobData = blobs.map(blob => {
+            const basePoly = this.deformPolygon(blob.polygon, {
+                rounds: baseRounds,
+                variance: baseVar
+            });
+            let cx = 0, cy = 0;
+            for (const p of blob.polygon) { cx += p.x; cy += p.y; }
+            cx /= blob.polygon.length;
+            cy /= blob.polygon.length;
+            return { basePoly, cx, cy, color: blob.color || '#4488aa' };
+        });
+
+        // Render interleaved: `interleave` layers of each blob in round-robin
+        const totalPasses = Math.ceil(numLayers / interleave);
+
+        for (let pass = 0; pass < totalPasses; pass++) {
+            for (let bi = 0; bi < blobData.length; bi++) {
+                const b = blobData[bi];
+                const startLayer = pass * interleave;
+                const endLayer = Math.min(startLayer + interleave, numLayers);
+
+                for (let li = startLayer; li < endLayer; li++) {
+                    const t = li / numLayers;
+
+                    // Pigment concentration
+                    let extraRounds = layerRounds;
+                    if (t < 0.33) extraRounds = Math.max(1, Math.floor(layerRounds * 0.4));
+                    else if (t < 0.66) extraRounds = Math.max(1, Math.floor(layerRounds * 0.7));
+
+                    const layerPoly = this.deformPolygon(b.basePoly, {
+                        rounds: extraRounds,
+                        variance: baseVar * 0.6
+                    });
+
+                    this._renderPolygonFill(layerPoly, b.cx, b.cy, {
+                        color: b.color,
+                        a: baseOpacity,
+                        layer,
+                        lifetime,
+                        texture: 'soft_round'
+                    });
+                }
+            }
+        }
+    }
+
+    /**
+     * Create a simple polygon shape for use with watercolor()/paintInterleaved().
+     * Convenience method for common shapes.
+     *
+     * @param {string} type — 'circle', 'triangle', 'quad', 'petal', 'star'
+     * @param {number} cx — center x
+     * @param {number} cy — center y
+     * @param {number} radius — approximate size
+     * @param {Object} [opts]
+     * @param {number} [opts.rotation=0] — rotation in radians
+     * @param {number} [opts.points=12] — vertex count for circle
+     * @param {number} [opts.aspect=1] — width/height ratio
+     * @returns {Array<{x:number, y:number}>}
+     */
+    static makePolygon(type, cx, cy, radius, opts = {}) {
+        const rot = opts.rotation || 0;
+        const aspect = opts.aspect || 1;
+
+        const rotate = (px, py) => {
+            const cos = Math.cos(rot);
+            const sin = Math.sin(rot);
+            return {
+                x: cx + (px * cos - py * sin),
+                y: cy + (px * sin + py * cos)
+            };
+        };
+
+        switch (type) {
+            case 'circle': {
+                const n = opts.points || 12;
+                const pts = [];
+                for (let i = 0; i < n; i++) {
+                    const a = (i / n) * Math.PI * 2;
+                    pts.push(rotate(
+                        Math.cos(a) * radius * aspect,
+                        Math.sin(a) * radius
+                    ));
+                }
+                return pts;
+            }
+            case 'triangle':
+                return [
+                    rotate(0, -radius),
+                    rotate(-radius * aspect * 0.866, radius * 0.5),
+                    rotate(radius * aspect * 0.866, radius * 0.5)
+                ];
+            case 'quad':
+                return [
+                    rotate(-radius * aspect, -radius),
+                    rotate(radius * aspect, -radius),
+                    rotate(radius * aspect, radius),
+                    rotate(-radius * aspect, radius)
+                ];
+            case 'petal':
+                // Ogee/almond shape — 8 control points
+                return [
+                    rotate(0, -radius),
+                    rotate(radius * aspect * 0.4, -radius * 0.6),
+                    rotate(radius * aspect * 0.5, 0),
+                    rotate(radius * aspect * 0.4, radius * 0.6),
+                    rotate(0, radius),
+                    rotate(-radius * aspect * 0.4, radius * 0.6),
+                    rotate(-radius * aspect * 0.5, 0),
+                    rotate(-radius * aspect * 0.4, -radius * 0.6)
+                ];
+            case 'star': {
+                const n = opts.points || 5;
+                const pts = [];
+                for (let i = 0; i < n * 2; i++) {
+                    const a = (i / (n * 2)) * Math.PI * 2;
+                    const r = (i % 2 === 0) ? radius : radius * 0.4;
+                    pts.push(rotate(Math.cos(a) * r * aspect, Math.sin(a) * r));
+                }
+                return pts;
+            }
+            default:
+                return [rotate(-radius, -radius), rotate(radius, -radius),
+                        rotate(radius, radius), rotate(-radius, radius)];
+        }
+    }
+
+    // ── Combined Wash + Texture (Convenience) ────────────────
+
+    /**
+     * Rich watercolor wash — combines watercolor blob with stipple edge
+     * and optional hatch texture. A high-level "just paint something beautiful" method.
+     *
+     * @param {number} cx — center x
+     * @param {number} cy — center y
+     * @param {number} radius — approximate blob radius
+     * @param {Object} [opts]
+     * @param {string} [opts.color='#4488aa']
+     * @param {number} [opts.layers=30] — watercolor layers
+     * @param {number} [opts.opacity=0.04]
+     * @param {number} [opts.edgeStipple=2000] — stipple dots around edge (0 = none)
+     * @param {number} [opts.edgeSpread=20] — stipple spread in px
+     * @param {boolean} [opts.hatch=false] — add hatch texture
+     * @param {number} [opts.hatchSpacing=4]
+     * @param {string} [opts.shape='circle'] — base shape type
+     * @param {number} [opts.variance=0.4]
+     * @param {string} [opts.layer]
+     * @param {number} [opts.lifetime=99999]
+     */
+    richWash(cx, cy, radius, opts = {}) {
+        const color = opts.color || '#4488aa';
+        const shape = opts.shape || 'circle';
+        const layer = opts.layer || this.layerNames[0];
+        const lifetime = opts.lifetime !== undefined ? opts.lifetime : 99999;
+
+        // Create base polygon
+        const polygon = FatihaBrush.makePolygon(shape, cx, cy, radius, {
+            rotation: opts.rotation || 0,
+            aspect: opts.aspect || 1
+        });
+
+        // Main watercolor fill
+        this.watercolor(polygon, {
+            color,
+            layers: opts.layers || 30,
+            opacity: opts.opacity !== undefined ? opts.opacity : 0.04,
+            variance: opts.variance !== undefined ? opts.variance : 0.4,
+            layer,
+            lifetime,
+            baseRounds: opts.baseRounds,
+            layerRounds: opts.layerRounds,
+            concentratePigment: opts.concentratePigment
+        });
+
+        // Edge stipple for soft bleeding
+        if (opts.edgeStipple !== 0) {
+            this.stipple(polygon, {
+                color,
+                count: opts.edgeStipple || 2000,
+                spread: opts.edgeSpread || 20,
+                dotSize: 1.5,
+                opacity: 0.3,
+                direction: 'both',
+                layer,
+                lifetime
+            });
+        }
+
+        // Optional hatch texture
+        if (opts.hatch) {
+            this.addHatch(cx, cy, radius * 0.7,
+                FatihaBrush.gaussian(0, Math.PI / 4),
+                opts.hatchSpacing || 4, {
+                    color,
+                    a: 0.15,
+                    layer,
+                    lifetime
+                });
+        }
     }
 
     // ─── UPDATE ──────────────────────────────────────────────
