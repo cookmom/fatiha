@@ -903,6 +903,58 @@ function drawVine(cx,cy,normal,side,maxLen,width,bl,leafCount,baseRot,col){
 }
 
 /* ═══════════════════════════════════════════════════
+   WATERCOLOR SYSTEM — Tyler Hobbs midpoint deformation
+   Renders deformed polygon halos BEHIND crisp garden.
+   Uses seeded PRNG for stable per-element deformation.
+   ═══════════════════════════════════════════════════ */
+function wcSrand(s){return function(){s=(s*9301+49297)%233280;return s/233280;};}
+
+function wcGaussS(rng) {
+  let u, v, s;
+  do { u = rng()*2-1; v = rng()*2-1; s = u*u+v*v; } while (s >= 1 || s === 0);
+  return u * Math.sqrt(-2 * Math.log(s) / s);
+}
+
+function wcCirclePoly(cx, cy, r, n) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i/n) * Math.PI * 2;
+    pts.push({x: cx + Math.cos(a)*r, y: cy + Math.sin(a)*r});
+  }
+  return pts;
+}
+
+function wcDeform(pts, iterations, variance, rng) {
+  let poly = pts;
+  for (let iter = 0; iter < iterations; iter++) {
+    const next = [];
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i+1) % poly.length];
+      next.push(a);
+      const mx = (a.x+b.x)*0.5, my = (a.y+b.y)*0.5;
+      const dx = b.x-a.x, dy = b.y-a.y;
+      const len = Math.sqrt(dx*dx + dy*dy) || 1;
+      const disp = wcGaussS(rng) * variance * len;
+      next.push({x: mx + (-dy/len)*disp, y: my + (dx/len)*disp});
+    }
+    poly = next;
+    variance *= 0.55;
+  }
+  return poly;
+}
+
+function wcFillPoly(c, poly, color, alpha) {
+  if (poly.length < 3) return;
+  c.beginPath();
+  c.moveTo(poly[0].x, poly[0].y);
+  for (let i = 1; i < poly.length; i++) c.lineTo(poly[i].x, poly[i].y);
+  c.closePath();
+  c.globalAlpha = alpha;
+  c.fillStyle = color;
+  c.fill();
+}
+
+/* ═══════════════════════════════════════════════════
    TRAVELING DOTS + FALLING PETALS — from v43
    ═══════════════════════════════════════════════════ */
 let dots=[],lastT=-1,fallingPetals=[];
@@ -984,6 +1036,74 @@ function animate(){
 
   // Ghunnah glows disabled — structure first
   // glows rendering removed
+
+  // === WATERCOLOR PASS — Tyler Hobbs deformation ===
+  // Deformed polygon halos in saturated color BEHIND crisp garden elements.
+  let wcCount = 0;
+  for (let gi = 0; gi < garden.length && wcCount < 35; gi++) {
+    const g = garden[gi];
+    const elapsed = progress - g.born;
+    if (elapsed < 0) continue;
+
+    const wci = Math.min(g.ci, CL-1), wcn = getNormal(wci), wcd = disp[wci]||0;
+    const wcwt = wci/(CL-1), wcwp = g.side>0?0:Math.PI;
+    const wcwv = Math.sin(wcwt*Math.PI*2*WEAVE_FREQ+wcwp);
+    const wbx = curvePoints[wci].x + wcn.x*wcd*wcwv;
+    const wby = curvePoints[wci].y + wcn.y*wcd*wcwv;
+    let wbl = Math.min(1, elapsed / (g.growDur||0.06));
+    if (g.forceBloom !== undefined) wbl = Math.max(wbl, Math.min(1, (progress-g.forceBloom)/0.04));
+    if (wbl < 0.15) continue;
+
+    let wcx, wcy, wcr, wcCol;
+    switch(g.kind) {
+      case 'rose': {
+        const sB = Math.min(1, wbl*2);
+        const tx = wbx + wcn.x*g.stemLen*g.side, ty = wby + wcn.y*g.stemLen*g.side;
+        wcx = wbx + (tx-wbx)*sB; wcy = wby + (ty-wby)*sB;
+        wcr = g.maxR * wbl * 1.25; // 25% beyond flower — deformation bleeds further
+        wcCol = g.golden ? [240,175,30] : g.col;
+        break;
+      }
+      case 'bud': continue;
+      case 'leaf': {
+        wcx = wbx; wcy = wby;
+        wcr = g.leafSize * wbl * 0.45;
+        wcCol = [25, 140, 20];
+        break;
+      }
+      default: continue;
+    }
+
+    if (wcr < 12*dpr) continue;
+    wcCount++;
+
+    // Seed from element properties for stable deformation
+    const seed = Math.floor((g.born*100000 + g.baseRot*10000 + wci) % 233280);
+
+    // More deformation for older elements (paint has spread more)
+    const age = Math.min(1, elapsed / 0.15);
+    const deformVar = 0.12 + age * 0.10; // high variance for organic bleeding edges
+    const baseIter = 4;
+    const WC_LAYERS = g.kind === 'leaf' ? 10 : 16;
+    // Scale alpha inversely with radius — large flowers stay subtle
+    const sizeScale = Math.min(1, 25*dpr / wcr);
+    const wcAlpha = (g.kind === 'leaf' ? 0.008 : 0.012) * wbl * Math.max(0.3, sizeScale);
+
+    const basePoly = wcCirclePoly(wcx, wcy, wcr, 10);
+    // Base deformation (shared by all layers)
+    const baseRng = wcSrand(seed);
+    const base = wcDeform(basePoly, baseIter, deformVar, baseRng);
+    // Use original saturated color — source-over on dark bg preserves hue
+    const colStr = `rgb(${Math.round(wcCol[0])},${Math.round(wcCol[1])},${Math.round(wcCol[2])})`;
+
+    for (let l = 0; l < WC_LAYERS; l++) {
+      // Per-layer deformation with unique seed
+      const layerRng = wcSrand(seed + l * 7919 + 1);
+      const layer = wcDeform(base, 3, deformVar * 0.55, layerRng);
+      wcFillPoly(ctx, layer, colStr, wcAlpha);
+    }
+  }
+  ctx.globalAlpha = 1;
 
   // Garden elements
   for(const g of garden){
