@@ -481,24 +481,16 @@ for (let i = 0; i < numBuds; i++) {
   const budScale = 0.5 + (1 - t) * 0.6;
 
   if (i < 3) {
-    // Closed buds: teardrop shape
+    // Closed buds: teardrop shape — soft pink
     const budAngle = Math.atan2(-1, side * 0.5) + gauss(0, 0.3);
     const budPoly = makePetalPoly(budX, budY, budAngle, 22 * budScale, 12 * budScale, gauss(0, 0.3));
     budElements.push({
       poly: budPoly,
-      color: varyColor(PETAL_INNER_BASE),
+      color: varyColor(PETAL_OUTER_BASE),
       type: 'bud'
     });
-    // Sepal behind each bud
-    const sepalAngle = budAngle + Math.PI + gauss(0, 0.3);
-    const sepalPoly = makePetalPoly(budX, budY, sepalAngle, 14 * budScale, 7 * budScale, gauss(0, 0.2));
-    budElements.push({
-      poly: sepalPoly,
-      color: [45, 95, 42],
-      type: 'sepal'
-    });
   } else {
-    // Slightly open buds: 2-3 small petals fanning out
+    // Slightly open buds: 2-3 small petals fanning out — soft pink
     const numPetals = 2 + Math.floor(rand() * 2);
     const baseAngle = Math.atan2(-1, side * 0.3) + gauss(0, 0.2);
     for (let p = 0; p < numPetals; p++) {
@@ -512,14 +504,6 @@ for (let i = 0; i < numBuds; i++) {
         type: 'bud'
       });
     }
-    // Sepal
-    const sepalAngle = baseAngle + Math.PI + gauss(0, 0.3);
-    const sepalPoly = makePetalPoly(budX, budY, sepalAngle, 12 * budScale, 6 * budScale, gauss(0, 0.2));
-    budElements.push({
-      poly: sepalPoly,
-      color: [40, 90, 38],
-      type: 'sepal'
-    });
   }
 }
 
