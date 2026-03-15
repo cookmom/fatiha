@@ -51,6 +51,7 @@ out vec2 v_atlasUV;   // atlas UV for this tip
 out float v_atlasSize; // atlas cell size (normalized)
 out vec4 v_color;
 out float v_fade;
+flat out int v_instanceID;
 
 void main() {
     float age = a_life.x;
@@ -85,6 +86,7 @@ void main() {
     v_atlasUV = a_tex.xy;
     v_atlasSize = a_tex.z;
     v_color = a_color;
+    v_instanceID = gl_InstanceID;
 }
 `;
 
@@ -96,6 +98,7 @@ in vec2 v_atlasUV;
 in float v_atlasSize;
 in vec4 v_color;
 in float v_fade;
+flat in int v_instanceID;
 
 uniform sampler2D u_atlas;
 uniform sampler2D u_grain;
@@ -104,6 +107,15 @@ uniform vec2 u_grainOffset;
 
 out vec4 fragColor;
 
+// Integer hash for per-stamp color jitter
+float ihash(int n) {
+    int x = n;
+    x = ((x >> 16) ^ x) * 0x45d9f3b;
+    x = ((x >> 16) ^ x) * 0x45d9f3b;
+    x = (x >> 16) ^ x;
+    return float(x & 0xFFFF) / 65535.0;
+}
+
 void main() {
     if (v_fade <= 0.0) discard;
 
@@ -111,17 +123,22 @@ void main() {
     vec2 atlasCoord = v_atlasUV + v_uv * v_atlasSize;
     float tipAlpha = texture(u_atlas, atlasCoord).r;
 
-    // Sample grain texture (tiled)
+    // Sample grain texture (tiled) — stronger contrast
     vec2 grainCoord = gl_FragCoord.xy / 256.0 + u_grainOffset;
     float grain = texture(u_grain, grainCoord).r;
-    // Grain modulates opacity: darker grain = less ink
-    float grainMod = mix(1.0, grain, u_grainStrength);
+    float grainMod = mix(1.0, grain * 0.6 + 0.2, u_grainStrength);
 
     float alpha = tipAlpha * v_color.a * v_fade * grainMod;
 
     if (alpha < 0.003) discard;
 
-    fragColor = vec4(v_color.rgb * alpha, alpha);
+    // Color jitter: ±10/255 per RGB channel based on stamp ID
+    float jR = (ihash(v_instanceID * 3 + 0) - 0.5) * (20.0 / 255.0);
+    float jG = (ihash(v_instanceID * 3 + 1) - 0.5) * (20.0 / 255.0);
+    float jB = (ihash(v_instanceID * 3 + 2) - 0.5) * (20.0 / 255.0);
+    vec3 color = clamp(v_color.rgb + vec3(jR, jG, jB), 0.0, 1.0);
+
+    fragColor = vec4(color * alpha, alpha);
 }
 `;
 
@@ -193,18 +210,23 @@ function linkProgram(gl, vs, fs) {
 
 const BUILTIN_TIPS = {
 
-    /** Soft round — radial gradient, the workhorse watercolor stamp. */
+    /** Soft round — Gaussian falloff, the workhorse watercolor stamp. */
     soft_round(ctx, size) {
         const cx = size / 2, cy = size / 2, r = size / 2 - 2;
-        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-        g.addColorStop(0, 'rgba(255,255,255,1)');
-        g.addColorStop(0.3, 'rgba(255,255,255,0.8)');
-        g.addColorStop(0.6, 'rgba(255,255,255,0.4)');
-        g.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.fill();
+        const imgData = ctx.getImageData(0, 0, size, size);
+        const d = imgData.data;
+        for (let py = 0; py < size; py++) {
+            for (let px = 0; px < size; px++) {
+                const dx = (px - cx) / r, dy = (py - cy) / r;
+                const dist2 = dx * dx + dy * dy;
+                if (dist2 > 1) continue;
+                const alpha = Math.exp(-dist2 * 3) * 255;
+                const idx = (py * size + px) * 4;
+                d[idx] = 255; d[idx + 1] = 255; d[idx + 2] = 255;
+                d[idx + 3] = alpha;
+            }
+        }
+        ctx.putImageData(imgData, 0, 0);
     },
 
     /** Pointed leaf — elongated saz leaf silhouette with soft falloff. */
@@ -231,23 +253,25 @@ const BUILTIN_TIPS = {
         ctx.restore();
     },
 
-    /** Petal — ogee/almond shape, wider and rounder than leaf. */
+    /** Petal — rounder ogee shape with soft feathered edges. */
     petal(ctx, size) {
         const cx = size / 2, cy = size / 2;
-        const hw = size * 0.32, hh = size * 0.4;
+        const hw = size * 0.36, hh = size * 0.36;
         ctx.save();
         ctx.translate(cx, cy);
 
+        // Rounder tips — wider control points, less pointy ends
         ctx.beginPath();
         ctx.moveTo(0, -hh);
-        ctx.bezierCurveTo(hw * 2, -hh * 0.3, hw * 2, hh * 0.3, 0, hh);
-        ctx.bezierCurveTo(-hw * 2, hh * 0.3, -hw * 2, -hh * 0.3, 0, -hh);
+        ctx.bezierCurveTo(hw * 2.2, -hh * 0.1, hw * 2.2, hh * 0.1, 0, hh);
+        ctx.bezierCurveTo(-hw * 2.2, hh * 0.1, -hw * 2.2, -hh * 0.1, 0, -hh);
         ctx.closePath();
 
         const g = ctx.createRadialGradient(0, 0, 0, 0, 0, hh);
         g.addColorStop(0, 'rgba(255,255,255,1)');
-        g.addColorStop(0.4, 'rgba(255,255,255,0.85)');
-        g.addColorStop(0.8, 'rgba(255,255,255,0.3)');
+        g.addColorStop(0.3, 'rgba(255,255,255,0.9)');
+        g.addColorStop(0.6, 'rgba(255,255,255,0.5)');
+        g.addColorStop(0.85, 'rgba(255,255,255,0.15)');
         g.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.fillStyle = g;
         ctx.fill();
@@ -362,7 +386,7 @@ class FatihaBrush {
         this.maxStamps = opts.maxStamps || 4096;
         this.layerNames = opts.layers || ['default'];
         this.background = opts.background || '#000000';
-        this.grainStrength = opts.grainStrength !== undefined ? opts.grainStrength : 0.35;
+        this.grainStrength = opts.grainStrength !== undefined ? opts.grainStrength : 0.55;
 
         this.width = opts.width || canvas.width;
         this.height = opts.height || canvas.height;
@@ -463,6 +487,24 @@ class FatihaBrush {
             this._tipList[i].drawFn(ctx, ATLAS_CELL);
             ctx.restore();
         }
+
+        // Apply noise-based opacity variation to all stamps
+        const fullImg = ctx.getImageData(0, 0, atlasW, atlasH);
+        const px = fullImg.data;
+        for (let y = 0; y < atlasH; y++) {
+            for (let x = 0; x < atlasW; x++) {
+                const idx = (y * atlasW + x) * 4;
+                if (px[idx + 3] === 0) continue;
+                // Perlin-like smooth noise via sine superposition
+                const noise = 0.7 + 0.3 * (
+                    Math.sin(x * 0.15) * Math.cos(y * 0.12) * 0.5 +
+                    Math.sin(x * 0.08 + y * 0.1) * 0.3 +
+                    Math.sin(x * 0.25 - y * 0.18) * 0.2
+                );
+                px[idx + 3] = Math.min(255, px[idx + 3] * noise);
+            }
+        }
+        ctx.putImageData(fullImg, 0, 0);
 
         // Upload to WebGL
         this._atlasTex = gl.createTexture();

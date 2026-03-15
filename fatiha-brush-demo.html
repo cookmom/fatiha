@@ -547,49 +547,49 @@ function drawVineTendril(x, y, size, tangent) {
 // ══════════════════════════════════════════════════════════════
 
 function drawVineSegment(startIdx, endIdx, energy) {
-  // Multi-layer vine stamps along the spiral, mimicking p5.brush layering
-  for (let i = startIdx; i <= endIdx; i += 2) {
+  // Dense overlapping stamps for continuous Ottoman crimson vine
+  for (let i = startIdx; i <= endIdx; i += 1) {
     if (i >= spiralPts.length) break;
     const pt = spiralPts[i];
     const globalT = i / spiralPts.length;
-    const pressure = 1.0 - globalT * 0.65; // thick at start, thin at center
+    const pressure = 1.0 - globalT * 0.65;
     const baseSize = (3 + energy * 5) * pressure;
 
-    // Layer 1: Broad soft green wash (marker-like)
+    // Layer 1: Broad crimson wash — overlapping for continuous look
     fb.addStamp({
-      x: pt.x, y: pt.y, color: STEM_GREEN,
-      a: 0.12, scaleX: baseSize * 1.8, scaleY: baseSize * 1.8,
+      x: pt.x, y: pt.y, color: CRIMSON,
+      a: 0.14, scaleX: baseSize * 2.0, scaleY: baseSize * 2.0,
       texture: 'soft_round', layer: 'garden',
-      jitter: 1.5
+      jitter: 1.2
     });
 
-    // Layer 2: Darker core (charcoal-like texture)
+    // Layer 2: Deep crimson core
     fb.addStamp({
-      x: pt.x, y: pt.y, color: VINE_DARK,
-      a: 0.15, scaleX: baseSize * 1.0, scaleY: baseSize * 1.0,
+      x: pt.x, y: pt.y, color: DEEP_CRIMSON,
+      a: 0.18, scaleX: baseSize * 1.2, scaleY: baseSize * 1.2,
       texture: 'soft_round', layer: 'garden',
-      jitter: 0.8
+      jitter: 0.6
     });
 
-    // Layer 3: Fine green line
-    if (i % 4 === 0) {
+    // Layer 3: Fine dark line along tangent
+    if (i % 3 === 0) {
       const angle = getAngleAt(spiralPts, i);
       fb.addStamp({
-        x: pt.x, y: pt.y, color: DARK_GREEN,
+        x: pt.x, y: pt.y, color: '#660020',
         a: 0.3, rotation: angle,
-        scaleX: baseSize * 0.4, scaleY: baseSize * 0.8,
+        scaleX: baseSize * 0.4, scaleY: baseSize * 0.9,
         texture: 'hatch_line', layer: 'garden',
         jitter: 0.5
       });
     }
 
-    // Layer 4: Bright highlight (sparse)
-    if (i % 6 === 0) {
+    // Layer 4: Rose highlight (sparse)
+    if (i % 5 === 0) {
       fb.addStamp({
-        x: pt.x, y: pt.y, color: LIGHT_GREEN,
-        a: 0.18, scaleX: baseSize * 0.5, scaleY: baseSize * 0.5,
+        x: pt.x, y: pt.y, color: ROSE_PINK,
+        a: 0.15, scaleX: baseSize * 0.5, scaleY: baseSize * 0.5,
         texture: 'soft_round', layer: 'garden',
-        jitter: 1.0
+        jitter: 0.8
       });
     }
   }
@@ -664,7 +664,7 @@ fb = new FatihaBrush(canvas, {
   background: BG,
   width: CW,
   height: CH,
-  grainStrength: 0.35
+  grainStrength: 0.55
 });
 
 fb.setLayerBlend('glow', 'additive');
