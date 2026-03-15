@@ -225,7 +225,7 @@ function deformN(poly, n, variance) {
 }
 
 function makeBase(poly) {
-  return deformN(poly, 7, 0.15);
+  return deformN(poly, 6, 0.20);  // more organic deformation for painterly feel
 }
 
 // ============================================================
@@ -351,15 +351,15 @@ for (let i = 0; i < 5; i++) {
   });
 }
 
-// Outer ring: 8 large floppy petals — big romantic peony
+// Outer ring: 8 large floppy petals — big romantic peony, heavily overlapping
 for (let i = 0; i < 8; i++) {
-  const angle = (i / 8) * Math.PI * 2 + gauss(0, 0.1) + 0.4;
-  const dist = gauss(35, 6);
+  const angle = (i / 8) * Math.PI * 2 + gauss(0, 0.15) + 0.4;
+  const dist = gauss(30, 7);
   const bx = roseCx + Math.cos(angle) * dist;
   const by = roseCy + Math.sin(angle) * dist;
-  const sizeVar = 0.85 + rand() * 0.3;
+  const sizeVar = 0.9 + rand() * 0.35;
   rosePetals.push({
-    poly: makePetalPoly(bx, by, angle + gauss(0, 0.22), gauss(80, 7) * sizeVar, gauss(58, 5) * sizeVar, gauss(0, 1.0)),
+    poly: makePetalPoly(bx, by, angle + gauss(0, 0.3), gauss(85, 8) * sizeVar, gauss(62, 6) * sizeVar, gauss(0, 1.2)),
     color: PETAL_OUTER[i % PETAL_OUTER.length],
     ring: 'outer'
   });
@@ -453,6 +453,78 @@ for (let s = 0; s < 3; s++) {
 }
 
 // ============================================================
+// PHYLLOTAXIS: Small buds & petals along the stalk
+// Golden angle = 137.5° for natural botanical distribution
+// ============================================================
+
+const GOLDEN_ANGLE = 137.508 * Math.PI / 180;
+const budElements = [];
+const numBuds = 7;
+
+for (let i = 0; i < numBuds; i++) {
+  const t = 0.15 + (i / numBuds) * 0.65; // distribute along stalk (15%-80%)
+  const y = lerp(stalkStartY, stalkEndY, t);
+  const x = stalkCurveX(t);
+  const phiAngle = i * GOLDEN_ANGLE;
+  // Alternate sides, distance from stalk varies
+  const side = Math.cos(phiAngle) > 0 ? 1 : -1;
+  const dist = 14 + Math.abs(Math.sin(phiAngle)) * 22;
+  const budX = x + side * dist;
+  const budY = y + Math.sin(phiAngle) * 8;
+
+  // Small stem connecting bud to main stalk
+  const stemPoly = makeRect((x + budX) / 2, (y + budY) / 2,
+    Math.sqrt((budX-x)**2 + (budY-y)**2), 2,
+    Math.atan2(budY - y, budX - x));
+  budElements.push({ poly: stemPoly, color: STALK_COLORS[i % STALK_COLORS.length], type: 'sepal' });
+
+  // Size decreases further from main bloom (lower on stalk = smaller)
+  const budScale = 0.5 + (1 - t) * 0.6;
+
+  if (i < 3) {
+    // Closed buds: teardrop shape
+    const budAngle = Math.atan2(-1, side * 0.5) + gauss(0, 0.3);
+    const budPoly = makePetalPoly(budX, budY, budAngle, 22 * budScale, 12 * budScale, gauss(0, 0.3));
+    budElements.push({
+      poly: budPoly,
+      color: PETAL_INNER[i % PETAL_INNER.length],
+      type: 'bud'
+    });
+    // Sepal behind each bud
+    const sepalAngle = budAngle + Math.PI + gauss(0, 0.3);
+    const sepalPoly = makePetalPoly(budX, budY, sepalAngle, 14 * budScale, 7 * budScale, gauss(0, 0.2));
+    budElements.push({
+      poly: sepalPoly,
+      color: [45, 95, 42],
+      type: 'sepal'
+    });
+  } else {
+    // Slightly open buds: 2-3 small petals fanning out
+    const numPetals = 2 + Math.floor(rand() * 2);
+    const baseAngle = Math.atan2(-1, side * 0.3) + gauss(0, 0.2);
+    for (let p = 0; p < numPetals; p++) {
+      const pAngle = baseAngle + (p - numPetals/2) * 0.45 + gauss(0, 0.15);
+      const pLen = gauss(26, 4) * budScale;
+      const pWid = gauss(16, 3) * budScale;
+      const pPoly = makePetalPoly(budX, budY, pAngle, pLen, pWid, gauss(0, 0.5));
+      budElements.push({
+        poly: pPoly,
+        color: PETAL_OUTER[p % PETAL_OUTER.length],
+        type: 'bud'
+      });
+    }
+    // Sepal
+    const sepalAngle = baseAngle + Math.PI + gauss(0, 0.3);
+    const sepalPoly = makePetalPoly(budX, budY, sepalAngle, 12 * budScale, 6 * budScale, gauss(0, 0.2));
+    budElements.push({
+      poly: sepalPoly,
+      color: [40, 90, 38],
+      type: 'sepal'
+    });
+  }
+}
+
+// ============================================================
 // Build element list
 // ============================================================
 
@@ -491,35 +563,58 @@ calyxPolys.forEach((poly, i) => {
   });
 });
 
+// Phyllotaxis buds along stalk
+budElements.filter(b => b.type === 'sepal').forEach((b, i) => {
+  elements.push({
+    base: deformN(b.poly, 5, 0.12),
+    color: b.color,
+    layerVariance: 0.08,
+    hardEdge: false,
+    alphaScale: 1.0,
+    priority: 1, index: 200 + i
+  });
+});
+budElements.filter(b => b.type === 'bud').forEach((b, i) => {
+  elements.push({
+    base: deformN(b.poly, 5, 0.14),
+    color: b.color,
+    layerVariance: 0.10,
+    hardEdge: false,
+    alphaScale: 1.2,
+    priority: 1, index: 300 + i
+  });
+});
+
 // Rose petals — outer first, inner on top
-// Outer ring
+// Outer ring: HIGH opacity to cover inner structure
 rosePetals.filter(p => p.ring === 'outer').forEach((p, i) => {
   elements.push({
     base: makeBase(p.poly),
     color: p.color,
-    layerVariance: 0.09,
-    hardEdge: true,
-    alphaScale: 0.82, // outer petals: slightly lighter wash
+    layerVariance: 0.12,   // more organic deformation
+    hardEdge: false,
+    alphaScale: 1.8,       // much more opaque — covers inner petals
     priority: 2, index: i
   });
 });
-// Middle ring
+// Middle ring: moderate opacity
 rosePetals.filter(p => p.ring === 'mid').forEach((p, i) => {
   elements.push({
     base: makeBase(p.poly),
     color: p.color,
-    layerVariance: 0.08,
-    hardEdge: true,
+    layerVariance: 0.10,
+    hardEdge: false,
+    alphaScale: 1.3,
     priority: 3, index: i
   });
 });
-// Inner ring
+// Inner ring: standard
 rosePetals.filter(p => p.ring === 'inner').forEach((p, i) => {
   elements.push({
     base: makeBase(p.poly),
     color: p.color,
-    layerVariance: 0.07,
-    hardEdge: true,
+    layerVariance: 0.09,
+    hardEdge: false,
     priority: 4, index: i
   });
 });
@@ -575,10 +670,10 @@ function drawTexturedLayer(el, layerIdx) {
   // Texture mask: random circles for granulation
   maskCtx.clearRect(0, 0, W, H);
   maskCtx.fillStyle = 'white';
-  for (let j = 0; j < 850; j++) {
+  for (let j = 0; j < 700; j++) {
     const cx = rand() * W;
     const cy = rand() * H;
-    const radius = Math.abs(gauss(W * 0.016, W * 0.011));
+    const radius = Math.abs(gauss(W * 0.022, W * 0.016));
     maskCtx.beginPath();
     maskCtx.arc(cx, cy, radius, 0, Math.PI * 2);
     maskCtx.fill();
@@ -655,29 +750,20 @@ function renderFrame() {
   if (currentLayer < TOTAL_LAYERS) {
     requestAnimationFrame(renderFrame);
   } else {
-    // Draw drying halos — petals only (leaf halos would overlap flower)
+    // Subtle pigment pooling — very faint, no hard outlines
+    // Only on leaves (soft bloom, no petal outlines at all)
     for (const el of elements) {
-      if (el.hardEdge && el.priority >= 2) {
-        drawDryingHalo(el);
-      }
-    }
-    // Leaf halos: draw them but with much softer intensity
-    for (const el of elements) {
-      if (el.hardEdge && el.priority === 1) {
-        const saved = el.color;
-        // Just use the soft bloom, skip hard edge for leaves
+      if (el.priority === 1) {
         const [r, g, b] = el.color;
         const dr = Math.max(0, Math.round(r * 0.55));
         const dg = Math.max(0, Math.round(g * 0.50));
         const db = Math.max(0, Math.round(b * 0.55));
-        for (let pass = 0; pass < 2; pass++) {
-          const haloPoly = deformN(el.base, 5, 0.04 + pass * 0.01);
-          ctx.globalAlpha = 0.04;
-          ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
-          ctx.lineWidth = 0.8;
-          ctx.lineJoin = 'round';
-          strokePoly(ctx, haloPoly);
-        }
+        const bloomPoly = deformN(el.base, 6, 0.07);
+        ctx.globalAlpha = 0.02;
+        ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round';
+        strokePoly(ctx, bloomPoly);
         ctx.globalAlpha = 1.0;
       }
     }
@@ -691,9 +777,9 @@ function renderFrame() {
       ctx.strokeStyle = `rgb(${vr},${vg},${vb})`;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
-      // Main central vein
-      ctx.globalAlpha = 0.18;
-      ctx.lineWidth = 1.5;
+      // Main central vein — subtle
+      ctx.globalAlpha = 0.10;
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.moveTo(spinePoints[0][0], spinePoints[0][1]);
       for (let i = 1; i < spinePoints.length; i++) {
