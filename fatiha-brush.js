@@ -1,10 +1,11 @@
 /**
- * fatiha.brush — Custom Ottoman Brush Engine (v2: organic watercolor)
+ * fatiha.brush — Custom Ottoman Brush Engine (v3: procedural SDF stamps)
  *
  * WebGL2 instanced-quad renderer for real-time voice-reactive
- * Islamic calligraphic art. Organic natural-media aesthetic with
- * Gaussian-falloff brush tips, per-stamp noise grain, color jitter,
- * and multi-octave paper texture.
+ * Islamic calligraphic art. Resolution-independent brush tips via
+ * procedural signed distance fields in the fragment shader — no
+ * texture atlas. Per-pixel Gaussian falloff, fwidth() antialiasing,
+ * procedural grain noise, color jitter, and Mixbox pigment blending.
  *
  * Usage:
  *   const fb = new FatihaBrush(canvas, { maxStamps: 4096, layers: ['garden','glow'] });
@@ -306,266 +307,6 @@ function linkProgram(gl, vs, fs) {
     return p;
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  PROCEDURAL BRUSH TIPS — Gaussian falloff + organic edges
-// ═══════════════════════════════════════════════════════════════
-
-const BUILTIN_TIPS = {
-
-    /** Soft round — very soft Gaussian radial falloff, the workhorse watercolor stamp.
-     *  Uses a gentler falloff (sigma=2.0) so overlapping stamps blend smoothly
-     *  instead of showing hard edges. */
-    soft_round(ctx, size) {
-        const cx = size / 2, cy = size / 2, r = size / 2 - 1;
-        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-        // Gentler Gaussian: e^(-2.0 * t^2) — softer edges for better overlap blending
-        for (let i = 0; i <= 24; i++) {
-            const t = i / 24;
-            const a = Math.exp(-2.0 * t * t);
-            g.addColorStop(t, `rgba(255,255,255,${a.toFixed(4)})`);
-        }
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.fill();
-    },
-
-    /** Pointed leaf — organic wobbled edges with multi-pass softness. */
-    pointed_leaf(ctx, size) {
-        const cx = size / 2, cy = size / 2;
-        const hw = size * 0.24, hh = size * 0.45;
-        ctx.save();
-        ctx.translate(cx, cy);
-
-        // 3 passes: outer halo, mid body, inner core
-        const passes = [
-            { scale: 1.18, alpha: 0.12 },
-            { scale: 1.0,  alpha: 0.35 },
-            { scale: 0.78, alpha: 0.55 }
-        ];
-
-        for (const p of passes) {
-            const s = p.scale;
-            // Organic wobble on bezier control points
-            const w = () => (Math.random() - 0.5) * size * 0.03;
-
-            ctx.beginPath();
-            ctx.moveTo(w(), -hh * s + w());
-            ctx.bezierCurveTo(
-                hw * 1.5 * s + w(), -hh * 0.4 * s + w(),
-                hw * 1.5 * s + w(), hh * 0.4 * s + w(),
-                w(), hh * s + w()
-            );
-            ctx.bezierCurveTo(
-                -hw * 1.5 * s + w(), hh * 0.4 * s + w(),
-                -hw * 1.5 * s + w(), -hh * 0.4 * s + w(),
-                w(), -hh * s + w()
-            );
-            ctx.closePath();
-
-            const g = ctx.createRadialGradient(0, 0, 0, 0, 0, hh * s * 1.1);
-            for (let i = 0; i <= 12; i++) {
-                const t = i / 12;
-                const a = p.alpha * Math.exp(-2.8 * t * t);
-                g.addColorStop(t, `rgba(255,255,255,${a.toFixed(4)})`);
-            }
-            ctx.fillStyle = g;
-            ctx.fill();
-        }
-        ctx.restore();
-    },
-
-    /** Petal — wide ogee/almond with Gaussian falloff and multi-pass bleed. */
-    petal(ctx, size) {
-        const cx = size / 2, cy = size / 2;
-        const hw = size * 0.34, hh = size * 0.42;
-        ctx.save();
-        ctx.translate(cx, cy);
-
-        // 3 passes for watercolor edge bleed
-        const passes = [
-            { scale: 1.2,  alpha: 0.10 },
-            { scale: 1.0,  alpha: 0.40 },
-            { scale: 0.75, alpha: 0.65 }
-        ];
-
-        for (const p of passes) {
-            const s = p.scale;
-            ctx.beginPath();
-            ctx.moveTo(0, -hh * s);
-            ctx.bezierCurveTo(hw * 2.2 * s, -hh * 0.2 * s, hw * 2.2 * s, hh * 0.2 * s, 0, hh * s);
-            ctx.bezierCurveTo(-hw * 2.2 * s, hh * 0.2 * s, -hw * 2.2 * s, -hh * 0.2 * s, 0, -hh * s);
-            ctx.closePath();
-
-            const g = ctx.createRadialGradient(0, -hh * 0.1, 0, 0, 0, hh * s * 1.1);
-            for (let i = 0; i <= 12; i++) {
-                const t = i / 12;
-                const a = p.alpha * Math.exp(-2.5 * t * t);
-                g.addColorStop(t, `rgba(255,255,255,${a.toFixed(4)})`);
-            }
-            ctx.fillStyle = g;
-            ctx.fill();
-        }
-        ctx.restore();
-    },
-
-    /** Spray — scattered soft dots for pollen/atmosphere. */
-    spray(ctx, size) {
-        const cx = size / 2, cy = size / 2, r = size / 2 - 4;
-        for (let i = 0; i < 50; i++) {
-            const a = Math.random() * Math.PI * 2;
-            const d = Math.pow(Math.random(), 0.7) * r; // cluster toward center
-            const dr = 1.5 + Math.random() * 3.5;
-            const alpha = 0.15 + Math.random() * 0.5;
-
-            // Each dot gets a small Gaussian gradient
-            const dx = cx + Math.cos(a) * d;
-            const dy = cy + Math.sin(a) * d;
-            const g = ctx.createRadialGradient(dx, dy, 0, dx, dy, dr);
-            g.addColorStop(0, `rgba(255,255,255,${alpha})`);
-            g.addColorStop(0.5, `rgba(255,255,255,${(alpha * 0.4).toFixed(3)})`);
-            g.addColorStop(1, 'rgba(255,255,255,0)');
-            ctx.fillStyle = g;
-            ctx.beginPath();
-            ctx.arc(dx, dy, dr, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    },
-
-    /** Hatch line — thin tapered stroke with Gaussian along length. */
-    hatch_line(ctx, size) {
-        const cx = size / 2, cy = size / 2;
-        const hw = size * 0.04, hh = size * 0.45;
-        ctx.save();
-        ctx.translate(cx, cy);
-
-        ctx.beginPath();
-        ctx.moveTo(0, -hh);
-        ctx.bezierCurveTo(hw, -hh * 0.7, hw, hh * 0.7, 0, hh);
-        ctx.bezierCurveTo(-hw, hh * 0.7, -hw, -hh * 0.7, 0, -hh);
-        ctx.closePath();
-
-        const g = ctx.createLinearGradient(0, -hh, 0, hh);
-        // Gaussian taper at both ends
-        g.addColorStop(0, 'rgba(255,255,255,0)');
-        g.addColorStop(0.08, 'rgba(255,255,255,0.3)');
-        g.addColorStop(0.2, 'rgba(255,255,255,0.8)');
-        g.addColorStop(0.5, 'rgba(255,255,255,1)');
-        g.addColorStop(0.8, 'rgba(255,255,255,0.8)');
-        g.addColorStop(0.92, 'rgba(255,255,255,0.3)');
-        g.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = g;
-        ctx.fill();
-        ctx.restore();
-    },
-
-    /** Thorn — sharp triangle with soft gradient falloff. */
-    thorn(ctx, size) {
-        const cx = size / 2, cy = size / 2;
-        const hw = size * 0.15, hh = size * 0.45;
-        ctx.save();
-        ctx.translate(cx, cy);
-
-        // Two passes: outer glow + inner shape
-        for (let pass = 0; pass < 2; pass++) {
-            const s = pass === 0 ? 1.15 : 1.0;
-            const alpha = pass === 0 ? 0.2 : 0.7;
-
-            ctx.beginPath();
-            ctx.moveTo(0, -hh * s);
-            ctx.lineTo(hw * s, hh * 0.6 * s);
-            ctx.lineTo(-hw * s, hh * 0.6 * s);
-            ctx.closePath();
-
-            const g = ctx.createLinearGradient(0, -hh * s, 0, hh * 0.6 * s);
-            g.addColorStop(0, `rgba(255,255,255,${alpha})`);
-            g.addColorStop(0.5, `rgba(255,255,255,${(alpha * 0.7).toFixed(3)})`);
-            g.addColorStop(0.85, `rgba(255,255,255,${(alpha * 0.25).toFixed(3)})`);
-            g.addColorStop(1, 'rgba(255,255,255,0)');
-            ctx.fillStyle = g;
-            ctx.fill();
-        }
-        ctx.restore();
-    },
-
-    /** Bud — teardrop with Gaussian softness and multi-pass bleed. */
-    bud(ctx, size) {
-        const cx = size / 2, cy = size / 2;
-        const hw = size * 0.28, hh = size * 0.42;
-        ctx.save();
-        ctx.translate(cx, cy);
-
-        const passes = [
-            { scale: 1.15, alpha: 0.12 },
-            { scale: 1.0,  alpha: 0.4 },
-            { scale: 0.8,  alpha: 0.6 }
-        ];
-
-        for (const p of passes) {
-            const s = p.scale;
-            ctx.beginPath();
-            ctx.moveTo(0, -hh * s);
-            ctx.bezierCurveTo(hw * 1.8 * s, -hh * 0.2 * s, hw * 1.5 * s, hh * 0.8 * s, 0, hh * s);
-            ctx.bezierCurveTo(-hw * 1.5 * s, hh * 0.8 * s, -hw * 1.8 * s, -hh * 0.2 * s, 0, -hh * s);
-            ctx.closePath();
-
-            const g = ctx.createRadialGradient(0, -hh * 0.2, 0, 0, 0, hh * s * 1.1);
-            for (let i = 0; i <= 10; i++) {
-                const t = i / 10;
-                const a = p.alpha * Math.exp(-2.5 * t * t);
-                g.addColorStop(t, `rgba(255,255,255,${a.toFixed(4)})`);
-            }
-            ctx.fillStyle = g;
-            ctx.fill();
-        }
-        ctx.restore();
-    }
-};
-
-// ═══════════════════════════════════════════════════════════════
-//  STAMP GRAIN — noise-based opacity variation within each tip
-// ═══════════════════════════════════════════════════════════════
-
-/** Apply paper grain noise to a canvas cell, modulating alpha for absorption. */
-function applyGrainToCell(ctx, ox, oy, size, strength) {
-    const imgData = ctx.getImageData(ox, oy, size, size);
-    const d = imgData.data;
-
-    // Generate noise field
-    const noise = new Float32Array(size * size);
-    for (let i = 0; i < noise.length; i++) noise[i] = Math.random();
-
-    // Box blur for smooth grain (kernel radius 2)
-    const blurred = new Float32Array(size * size);
-    const k = 2;
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-            let sum = 0, cnt = 0;
-            for (let dy = -k; dy <= k; dy++) {
-                for (let dx = -k; dx <= k; dx++) {
-                    const ny = y + dy, nx = x + dx;
-                    if (ny >= 0 && ny < size && nx >= 0 && nx < size) {
-                        sum += noise[ny * size + nx]; cnt++;
-                    }
-                }
-            }
-            blurred[y * size + x] = sum / cnt;
-        }
-    }
-
-    // Modulate alpha — simulates uneven paper absorption
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-            const i = (y * size + x) * 4;
-            if (d[i + 3] === 0) continue;
-            const n = blurred[y * size + x];
-            const mod = 1.0 - strength + strength * n;
-            d[i + 3] = Math.min(255, Math.round(d[i + 3] * mod));
-        }
-    }
-
-    ctx.putImageData(imgData, ox, oy);
-}
 
 // ═══════════════════════════════════════════════════════════════
 //  FATIHA BRUSH — MAIN CLASS
@@ -597,12 +338,11 @@ class FatihaBrush {
         canvas.width = this.width;
         canvas.height = this.height;
 
+        // Brush type registry: name → type ID (for procedural SDF lookup)
+        this._tipNames = Object.keys(BRUSH_TYPES);
+
         // Audio reactive parameter bus
         this.audio = { amplitude: 0, energy: 0, smoothing: 0.12 };
-
-        // Tip registry: name → { index, drawFn }
-        this._tips = new Map();
-        this._tipList = []; // ordered list for atlas building
 
         // Stamp storage: per-layer arrays
         this._layers = {};
@@ -619,17 +359,10 @@ class FatihaBrush {
             };
         }
 
-        // Register built-in tips
-        for (const [name, fn] of Object.entries(BUILTIN_TIPS)) {
-            this.registerTip(name, fn);
-        }
-
         // Init WebGL
         this._initGL();
         this._initShaders();
         this._initGeometry();
-        this._buildAtlas();
-        this._buildGrain();
         this._initLayers();
         this._initMixbox();
 
@@ -637,132 +370,27 @@ class FatihaBrush {
         this._frame = 0;
     }
 
-    // ─── TEXTURE ATLAS ───────────────────────────────────────
+    // ─── BRUSH TYPE REGISTRY ─────────────────────────────────
 
     /**
-     * Register a custom brush tip.
+     * Register a custom brush tip name mapped to an existing SDF type.
      * @param {string} name — unique tip name
-     * @param {function} drawFn — function(ctx, cellSize) that draws white-on-transparent
+     * @param {string} [sdfType='soft_round'] — built-in SDF type to map to
      */
-    registerTip(name, drawFn) {
-        const index = this._tipList.length;
-        this._tips.set(name, { index, drawFn });
-        this._tipList.push({ name, drawFn });
+    registerTip(name, sdfType = 'soft_round') {
+        const id = BRUSH_TYPES[sdfType] !== undefined ? BRUSH_TYPES[sdfType] : 0;
+        BRUSH_TYPES[name] = id;
+        this._tipNames.push(name);
     }
 
-    /** Get atlas UV coordinates for a tip name. Returns { u, v, size }. */
+    /** Get brush type data for a tip name. Returns { u: typeId, v: 0, size: 0 }. */
     _getUV(name) {
-        const tip = this._tips.get(name);
-        if (!tip) {
+        const id = BRUSH_TYPES[name];
+        if (id === undefined) {
             console.warn(`FatihaBrush: unknown tip "${name}", falling back to soft_round`);
-            return this._getUV('soft_round');
+            return { u: 0, v: 0, size: 0 };
         }
-        const col = tip.index % ATLAS_COLS;
-        const row = Math.floor(tip.index / ATLAS_COLS);
-        const atlasW = ATLAS_COLS * ATLAS_CELL;
-        const atlasH = Math.ceil(this._tipList.length / ATLAS_COLS) * ATLAS_CELL;
-        return {
-            u: (col * ATLAS_CELL) / atlasW,
-            v: (row * ATLAS_CELL) / atlasH,
-            size: ATLAS_CELL / atlasW // assumes square cells in a wider atlas
-        };
-    }
-
-    /** Build the texture atlas from all registered tips, with per-cell grain noise. */
-    _buildAtlas() {
-        const gl = this.gl;
-        const cols = ATLAS_COLS;
-        const rows = Math.ceil(this._tipList.length / cols);
-        const atlasW = cols * ATLAS_CELL;
-        const atlasH = rows * ATLAS_CELL;
-
-        const c = document.createElement('canvas');
-        c.width = atlasW;
-        c.height = atlasH;
-        const ctx = c.getContext('2d');
-
-        for (let i = 0; i < this._tipList.length; i++) {
-            const col = i % cols;
-            const row = Math.floor(i / cols);
-            const ox = col * ATLAS_CELL;
-            const oy = row * ATLAS_CELL;
-
-            ctx.save();
-            ctx.translate(ox, oy);
-            ctx.clearRect(0, 0, ATLAS_CELL, ATLAS_CELL);
-            this._tipList[i].drawFn(ctx, ATLAS_CELL);
-            ctx.restore();
-
-            // Apply paper grain noise to this cell — simulates uneven ink absorption
-            applyGrainToCell(ctx, ox, oy, ATLAS_CELL, 0.3);
-        }
-
-        // Upload to WebGL
-        this._atlasTex = gl.createTexture();
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, this._atlasTex);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
-
-        this._atlasWidth = atlasW;
-        this._atlasHeight = atlasH;
-    }
-
-    /** Build multi-octave grain noise texture for paper feel. */
-    _buildGrain() {
-        const gl = this.gl;
-        const size = GRAIN_SIZE;
-
-        // Helper: box blur with wrapping
-        const blur = (src, radius) => {
-            const dst = new Float32Array(size * size);
-            for (let y = 0; y < size; y++) {
-                for (let x = 0; x < size; x++) {
-                    let sum = 0, cnt = 0;
-                    for (let dy = -radius; dy <= radius; dy++) {
-                        for (let dx = -radius; dx <= radius; dx++) {
-                            const ny = (y + dy + size) % size;
-                            const nx = (x + dx + size) % size;
-                            sum += src[ny * size + nx]; cnt++;
-                        }
-                    }
-                    dst[y * size + x] = sum / cnt;
-                }
-            }
-            return dst;
-        };
-
-        // Octave 1: coarse paper fiber
-        const raw1 = new Float32Array(size * size);
-        for (let i = 0; i < raw1.length; i++) raw1[i] = Math.random();
-        const coarse = blur(raw1, 4);
-
-        // Octave 2: fine grain detail
-        const raw2 = new Float32Array(size * size);
-        for (let i = 0; i < raw2.length; i++) raw2[i] = Math.random();
-        const fine = blur(raw2, 1);
-
-        // Combine: 65% coarse + 35% fine, with contrast boost
-        const result = new Uint8Array(size * size);
-        for (let i = 0; i < result.length; i++) {
-            const v = coarse[i] * 0.65 + fine[i] * 0.35;
-            // Slight contrast boost via power curve
-            const c = Math.pow(v, 0.85);
-            result[i] = Math.round(c * 255);
-        }
-
-        this._grainTex = gl.createTexture();
-        gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, this._grainTex);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, size, size, 0,
-                       gl.LUMINANCE, gl.UNSIGNED_BYTE, result);
+        return { u: id, v: 0, size: 0 };
     }
 
     // ─── WEBGL INIT ──────────────────────────────────────────
@@ -797,10 +425,7 @@ class FatihaBrush {
         gl.deleteShader(sfs);
 
         this._uResolution = gl.getUniformLocation(this._stampProg, 'u_resolution');
-        this._uAtlas = gl.getUniformLocation(this._stampProg, 'u_atlas');
-        this._uGrain = gl.getUniformLocation(this._stampProg, 'u_grain');
         this._uGrainStrength = gl.getUniformLocation(this._stampProg, 'u_grainStrength');
-        this._uGrainOffset = gl.getUniformLocation(this._stampProg, 'u_grainOffset');
         this._uColorJitter = gl.getUniformLocation(this._stampProg, 'u_colorJitter');
 
         // Composite shader program
@@ -1338,22 +963,9 @@ void main() {
         // Render each layer to its FBO
         gl.useProgram(this._stampProg);
 
-        // Bind textures
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, this._atlasTex);
-        gl.uniform1i(this._uAtlas, 0);
-
-        gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, this._grainTex);
-        gl.uniform1i(this._uGrain, 1);
-
+        // Set uniforms (no textures needed — all procedural)
         gl.uniform1f(this._uGrainStrength, this.grainStrength);
         gl.uniform1f(this._uColorJitter, this.colorJitter);
-        // Slowly drift grain for organic feel
-        gl.uniform2f(this._uGrainOffset,
-            Math.sin(this._frame * 0.01) * 0.5,
-            Math.cos(this._frame * 0.013) * 0.5
-        );
         gl.uniform2f(this._uResolution, this.width, this.height);
 
         for (const name of this.layerNames) {
@@ -1614,8 +1226,6 @@ void main() {
         }
         gl.deleteBuffer(this._quadVBO);
         gl.deleteVertexArray(this._fsQuadVAO);
-        gl.deleteTexture(this._atlasTex);
-        gl.deleteTexture(this._grainTex);
         gl.deleteProgram(this._stampProg);
         gl.deleteProgram(this._compositeProg);
 
