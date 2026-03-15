@@ -331,6 +331,14 @@ async function setup() {
 }
 
 function draw() {
+  // Debug fallback: red circle proves draw() is running
+  push();
+  translate(-CW / 2, -CH / 2);
+  noStroke();
+  fill(255, 0, 0);
+  circle(CW - 20, 20, 12);
+  pop();
+
   if (typeof window._synthTime === 'number' && !isPlaying) {
     isPlaying = true;
   }
@@ -349,7 +357,13 @@ function draw() {
     }
 
     // Update custom field with time
-    brush.refreshField(progress * 10);
+    try {
+      brush.field("gardenSpiral");
+      brush.refreshField(progress * 10);
+      brush.noField();
+    } catch (e) {
+      console.warn("Field refresh failed:", e.message);
+    }
 
     // Dispatch tajweed events
     while (tajweedIdx < TAJWEED.length && time >= TAJWEED[tajweedIdx].t) {
