@@ -2,9 +2,9 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Watercolor Variations — Lookdev</title>
+<title>Watercolor Variations — 10-Flower Palette</title>
 <style>
-  body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
+  body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
   canvas { display: block; }
 </style>
 </head>
@@ -13,8 +13,8 @@
 <script src="mixbox.js"></script>
 <script>
 // ============================================================
-// Watercolor Variations — 6 flowers, same Tyler Hobbs pipeline
-// 2 columns × 3 rows on 430×932
+// Watercolor Variations — 10 flowers, same Tyler Hobbs pipeline
+// 2 columns × 5 rows on 430×932
 // ============================================================
 
 const W = 430, H = 932;
@@ -315,17 +315,19 @@ function strokePoly(tCtx, poly) {
 }
 
 // ============================================================
-// Grid layout: 2 cols × 3 rows
+// Grid layout: 2 cols × 5 rows
 // ============================================================
 
-const COL_W = W / 2;       // 215px per cell
-const ROW_H = H / 3;       // ~310px per cell
-const CELL_CX = COL_W / 2; // center within cell
-const CELL_CY = ROW_H / 2;
+const COLS = 2, ROWS = 5;
+const COL_W = W / COLS;       // 215px per cell
+const ROW_H = H / ROWS;       // ~186px per cell
+const LABEL_SPACE = 16;       // reserved for label text at bottom of cell
 
 function cellCenter(col, row) {
-  return [col * COL_W + COL_W / 2, row * ROW_H + ROW_H / 2 - 15];
+  return [col * COL_W + COL_W / 2, row * ROW_H + (ROW_H - LABEL_SPACE) / 2 + 2];
 }
+// Available radius for flowers is smaller now
+const CELL_R = (ROW_H - LABEL_SPACE) / 2 - 8; // ~75px
 
 // ============================================================
 // Build all 6 flowers
@@ -346,267 +348,392 @@ function addElement(poly, color, opts) {
   return el;
 }
 
-// --- FLOWER 1: Small tight bud (top-left) ---
+// Scale factor for smaller cells (was ~310px tall, now ~186px)
+const S = 0.6;
+
+// Labels for each flower
+const flowerLabels = [
+  'Crimson Bud', 'Half-Open Rose', 'Full Bloom Rose', 'Golden Rose',
+  'Ottoman Tulip', 'Carnation', 'Blue Hyacinth', 'White Jasmine',
+  'Penç Filler', 'Berry Cluster'
+];
+
+// --- FLOWER 1: Small tight bud (row 0, col 0) ---
 {
   const [cx, cy] = cellCenter(0, 0);
-  const numPetals = 5;
-  const bloom = 0.3;
-  // Tight bud: petals barely open, pointing mostly upward
-  for (let i = 0; i < numPetals; i++) {
-    const angle = (i / numPetals) * Math.PI * 2 + gauss(0, 0.15);
-    const dist = bloom * 6;
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2 + gauss(0, 0.15);
+    const dist = 0.3 * 6 * S;
     const bx = cx + Math.cos(angle) * dist;
     const by = cy + Math.sin(angle) * dist;
-    const petalLen = 28 + gauss(0, 3);
-    const petalWid = 14 + gauss(0, 2);
     addElement(
-      makeBudPetalPoly(bx, by, angle + gauss(0, 0.2), petalLen, petalWid, gauss(0, 0.3)),
-      varyColor([140, 18, 30]), // deep crimson
+      makeBudPetalPoly(bx, by, angle + gauss(0, 0.2), (28 + gauss(0, 3)) * S, (14 + gauss(0, 2)) * S, gauss(0, 0.3)),
+      varyColor([140, 18, 30]),
       { layerVariance: 0.10, alphaScale: 1.5, priority: 2 }
     );
   }
-  // Dark center
   for (let i = 0; i < 3; i++) {
     const angle = (i / 3) * Math.PI * 2 + gauss(0, 0.4);
     addElement(
-      makeBudPetalPoly(cx + gauss(0,2), cy + gauss(0,2), angle, 12 + gauss(0,2), 8 + gauss(0,1), gauss(0,0.3)),
+      makeBudPetalPoly(cx + gauss(0,1), cy + gauss(0,1), angle, 8*S, 5*S, gauss(0,0.3)),
       varyColor([95, 10, 20]),
       { layerVariance: 0.08, alphaScale: 1.2, priority: 3 }
     );
   }
-  // Stalk
   addElement(
-    makeStalkPoly(cx, cy + 24, cx + gauss(0, 3), cy + ROW_H/2 + 20, 1.5, 2.5),
-    [42, 95, 38],
-    { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
+    makeStalkPoly(cx, cy + 16*S, cx + gauss(0, 2), cy + CELL_R + 8, 1.2, 2.0),
+    [42, 95, 38], { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
   );
 }
 
-// --- FLOWER 2: Half-open rose (top-right) ---
+// --- FLOWER 2: Half-open rose (row 0, col 1) ---
 {
   const [cx, cy] = cellCenter(1, 0);
-  const numPetals = 6;
-  const bloom = 0.6;
-  // Inner petals (tighter)
   for (let i = 0; i < 4; i++) {
     const angle = (i / 4) * Math.PI * 2 + gauss(0, 0.2);
-    const dist = bloom * 8;
+    const dist = 0.6 * 8 * S;
     const bx = cx + Math.cos(angle) * dist;
     const by = cy + Math.sin(angle) * dist;
     addElement(
-      makePetalPoly(bx, by, angle + gauss(0, 0.2), 32 + gauss(0, 4), 22 + gauss(0, 3), gauss(0, 0.5)),
-      varyColor([185, 45, 70]), // medium pink
+      makePetalPoly(bx, by, angle + gauss(0, 0.2), (32 + gauss(0, 4))*S, (22 + gauss(0, 3))*S, gauss(0, 0.5)),
+      varyColor([185, 45, 70]),
       { layerVariance: 0.10, alphaScale: 1.3, priority: 3 }
     );
   }
-  // Outer petals (opening up)
-  for (let i = 0; i < numPetals; i++) {
-    const angle = (i / numPetals) * Math.PI * 2 + gauss(0, 0.12) + 0.3;
-    const dist = bloom * 14;
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2 + gauss(0, 0.12) + 0.3;
+    const dist = 0.6 * 14 * S;
     const bx = cx + Math.cos(angle) * dist;
     const by = cy + Math.sin(angle) * dist;
     addElement(
-      makePetalPoly(bx, by, angle + gauss(0, 0.25), 42 + gauss(0, 5), 30 + gauss(0, 4), gauss(0, 0.7)),
-      varyColor([210, 70, 100]), // pink
+      makePetalPoly(bx, by, angle + gauss(0, 0.25), (42 + gauss(0, 5))*S, (30 + gauss(0, 4))*S, gauss(0, 0.7)),
+      varyColor([210, 70, 100]),
       { layerVariance: 0.12, alphaScale: 1.5, priority: 2 }
     );
   }
-  // Dark center blob
   for (let i = 0; i < 3; i++) {
     const angle = (i / 3) * Math.PI * 2 + gauss(0, 0.4);
     addElement(
-      makePetalPoly(cx + gauss(0,2), cy + gauss(0,2), angle, 14, 10, gauss(0,0.3)),
+      makePetalPoly(cx + gauss(0,1), cy + gauss(0,1), angle, 9*S, 6*S, gauss(0,0.3)),
       varyColor([130, 20, 40]),
       { layerVariance: 0.08, alphaScale: 1.0, priority: 4 }
     );
   }
-  // Stalk
   addElement(
-    makeStalkPoly(cx, cy + 30, cx + gauss(0, 3), cy + ROW_H/2 + 20, 1.8, 2.8),
-    [38, 90, 35],
-    { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
+    makeStalkPoly(cx, cy + 20*S, cx + gauss(0, 2), cy + CELL_R + 8, 1.4, 2.2),
+    [38, 90, 35], { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
   );
 }
 
-// --- FLOWER 3: Full bloom rose (middle-left) ---
+// --- FLOWER 3: Full bloom rose (row 1, col 0) ---
 {
   const [cx, cy] = cellCenter(0, 1);
-  // Outer ring: 7 large petals
   for (let i = 0; i < 7; i++) {
     const angle = (i / 7) * Math.PI * 2 + gauss(0, 0.15) + 0.4;
-    const dist = 25 + gauss(0, 5);
+    const dist = (25 + gauss(0, 5)) * S;
     const bx = cx + Math.cos(angle) * dist;
     const by = cy + Math.sin(angle) * dist;
     const sv = 0.9 + rand() * 0.3;
     addElement(
-      makePetalPoly(bx, by, angle + gauss(0, 0.25), (65 + gauss(0, 6)) * sv, (48 + gauss(0, 5)) * sv, gauss(0, 1.0)),
-      varyColor([225, 140, 155]), // light pink
+      makePetalPoly(bx, by, angle + gauss(0, 0.25), (55 + gauss(0, 5)) * sv * S, (40 + gauss(0, 4)) * sv * S, gauss(0, 1.0)),
+      varyColor([225, 140, 155]),
       { layerVariance: 0.12, alphaScale: 1.6, priority: 1 }
     );
   }
-  // Mid ring
-  for (let i = 0; i < 6; i++) {
-    const angle = (i / 6) * Math.PI * 2 + gauss(0, 0.15) + 0.2;
-    const dist = 14 + gauss(0, 3);
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2 + gauss(0, 0.15) + 0.2;
+    const dist = (14 + gauss(0, 3)) * S;
     const bx = cx + Math.cos(angle) * dist;
     const by = cy + Math.sin(angle) * dist;
     addElement(
-      makePetalPoly(bx, by, angle + gauss(0, 0.2), 45 + gauss(0, 5), 34 + gauss(0, 4), gauss(0, 0.7)),
+      makePetalPoly(bx, by, angle + gauss(0, 0.2), (38 + gauss(0, 4))*S, (28 + gauss(0, 3))*S, gauss(0, 0.7)),
       varyColor([200, 85, 115]),
       { layerVariance: 0.10, alphaScale: 1.3, priority: 2 }
     );
   }
-  // Inner petals
-  for (let i = 0; i < 5; i++) {
-    const angle = (i / 5) * Math.PI * 2 + gauss(0, 0.3);
-    const dist = gauss(4, 2);
+  for (let i = 0; i < 4; i++) {
+    const angle = (i / 4) * Math.PI * 2 + gauss(0, 0.3);
+    const dist = gauss(3, 1.5);
     addElement(
-      makePetalPoly(cx + Math.cos(angle)*dist, cy + Math.sin(angle)*dist, angle + gauss(0,0.3), 28 + gauss(0,3), 20 + gauss(0,2), gauss(0,0.5)),
+      makePetalPoly(cx + Math.cos(angle)*dist, cy + Math.sin(angle)*dist, angle + gauss(0,0.3), (22 + gauss(0,2))*S, (16 + gauss(0,2))*S, gauss(0,0.5)),
       varyColor([170, 50, 75]),
       { layerVariance: 0.09, alphaScale: 1.2, priority: 3 }
     );
   }
-  // Center
   for (let i = 0; i < 3; i++) {
     const angle = (i / 3) * Math.PI * 2 + gauss(0, 0.5);
     addElement(
-      makePetalPoly(cx + gauss(0,2), cy + gauss(0,2), angle, 12, 8, gauss(0,0.3)),
+      makePetalPoly(cx + gauss(0,1), cy + gauss(0,1), angle, 8*S, 5*S, gauss(0,0.3)),
       varyColor([120, 25, 45]),
       { layerVariance: 0.07, alphaScale: 1.0, priority: 4 }
     );
   }
-  // Stalk
   addElement(
-    makeStalkPoly(cx, cy + 50, cx + gauss(0, 3), cy + ROW_H/2 + 25, 2.0, 3.2),
-    [40, 92, 36],
-    { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
+    makeStalkPoly(cx, cy + 35*S, cx + gauss(0, 2), cy + CELL_R + 8, 1.6, 2.6),
+    [40, 92, 36], { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
   );
 }
 
-// --- FLOWER 4: Golden/amber rose (middle-right) ---
+// --- FLOWER 4: Golden/amber rose (row 1, col 1) ---
 {
   const [cx, cy] = cellCenter(1, 1);
-  const bloom = 0.8;
-  // Outer ring
   for (let i = 0; i < 6; i++) {
     const angle = (i / 6) * Math.PI * 2 + gauss(0, 0.15) + 0.3;
-    const dist = bloom * 28;
+    const dist = 0.8 * 28 * S;
     const bx = cx + Math.cos(angle) * dist;
     const by = cy + Math.sin(angle) * dist;
     const sv = 0.85 + rand() * 0.35;
     addElement(
-      makePetalPoly(bx, by, angle + gauss(0, 0.25), (58 + gauss(0, 5)) * sv, (42 + gauss(0, 4)) * sv, gauss(0, 0.9)),
-      varyColor([230, 175, 55], 12), // warm gold outer
+      makePetalPoly(bx, by, angle + gauss(0, 0.25), (48 + gauss(0, 4)) * sv * S, (36 + gauss(0, 3)) * sv * S, gauss(0, 0.9)),
+      varyColor([230, 175, 55], 12),
       { layerVariance: 0.12, alphaScale: 1.5, priority: 1 }
     );
   }
-  // Mid ring
   for (let i = 0; i < 5; i++) {
     const angle = (i / 5) * Math.PI * 2 + gauss(0, 0.15) + 0.15;
-    const dist = bloom * 14;
+    const dist = 0.8 * 14 * S;
     const bx = cx + Math.cos(angle) * dist;
     const by = cy + Math.sin(angle) * dist;
     addElement(
-      makePetalPoly(bx, by, angle + gauss(0, 0.2), 40 + gauss(0, 4), 30 + gauss(0, 3), gauss(0, 0.6)),
-      varyColor([210, 145, 40], 10), // amber mid
+      makePetalPoly(bx, by, angle + gauss(0, 0.2), (34 + gauss(0, 3))*S, (24 + gauss(0, 2))*S, gauss(0, 0.6)),
+      varyColor([210, 145, 40], 10),
       { layerVariance: 0.10, alphaScale: 1.3, priority: 2 }
     );
   }
-  // Inner
-  for (let i = 0; i < 4; i++) {
-    const angle = (i / 4) * Math.PI * 2 + gauss(0, 0.3);
+  for (let i = 0; i < 3; i++) {
+    const angle = (i / 3) * Math.PI * 2 + gauss(0, 0.3);
     addElement(
-      makePetalPoly(cx + gauss(0,3), cy + gauss(0,3), angle + gauss(0,0.2), 22 + gauss(0,3), 16 + gauss(0,2), gauss(0,0.4)),
-      varyColor([185, 110, 25], 8), // deeper gold
+      makePetalPoly(cx + gauss(0,2), cy + gauss(0,2), angle + gauss(0,0.2), (18 + gauss(0,2))*S, (13 + gauss(0,1))*S, gauss(0,0.4)),
+      varyColor([185, 110, 25], 8),
       { layerVariance: 0.08, alphaScale: 1.1, priority: 3 }
     );
   }
-  // Center
   for (let i = 0; i < 3; i++) {
     const angle = (i / 3) * Math.PI * 2 + gauss(0, 0.4);
     addElement(
-      makePetalPoly(cx + gauss(0,2), cy + gauss(0,2), angle, 10, 7, gauss(0,0.3)),
-      varyColor([155, 75, 15], 6), // dark amber center
+      makePetalPoly(cx + gauss(0,1), cy + gauss(0,1), angle, 7*S, 5*S, gauss(0,0.3)),
+      varyColor([155, 75, 15], 6),
       { layerVariance: 0.07, alphaScale: 1.0, priority: 4 }
     );
   }
-  // Stalk
   addElement(
-    makeStalkPoly(cx, cy + 42, cx + gauss(0, 3), cy + ROW_H/2 + 20, 1.8, 2.8),
-    [45, 100, 42],
-    { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
+    makeStalkPoly(cx, cy + 28*S, cx + gauss(0, 2), cy + CELL_R + 8, 1.4, 2.2),
+    [45, 100, 42], { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
   );
 }
 
-// --- FLOWER 5: Ottoman tulip (bottom-left) ---
+// --- FLOWER 5: Ottoman tulip (row 2, col 0) ---
 {
   const [cx, cy] = cellCenter(0, 2);
-  // 4 flame petals cupping upward
-  const petalAngles = [-0.35, -0.12, 0.12, 0.35]; // fan pointing upward
+  const petalAngles = [-0.35, -0.12, 0.12, 0.35];
   for (let i = 0; i < 4; i++) {
     const angle = -Math.PI / 2 + petalAngles[i] + gauss(0, 0.05);
     const dist = 4 + Math.abs(petalAngles[i]) * 10;
-    const bx = cx + Math.cos(angle + Math.PI/2) * dist * 0.5;
-    const by = cy + 15; // base of tulip
-    const petalLen = 65 + gauss(0, 5);
-    const petalWid = 22 + gauss(0, 3);
-    // Outer petals slightly wider
+    const bx = cx + Math.cos(angle + Math.PI/2) * dist * 0.5 * S;
+    const by = cy + 10 * S;
     const isOuter = (i === 0 || i === 3);
     addElement(
-      makeTulipPetalPoly(bx, by, angle, petalLen * (isOuter ? 0.9 : 1.0), petalWid * (isOuter ? 1.15 : 1.0), gauss(0.5, 0.3) * (i < 2 ? 1 : -1)),
-      varyColor(isOuter ? [210, 65, 20] : [230, 85, 25], 10), // red-orange
+      makeTulipPetalPoly(bx, by, angle, (55 + gauss(0, 4)) * S * (isOuter ? 0.9 : 1.0), (18 + gauss(0, 2)) * S * (isOuter ? 1.15 : 1.0), gauss(0.5, 0.3) * (i < 2 ? 1 : -1)),
+      varyColor(isOuter ? [210, 65, 20] : [230, 85, 25], 10),
       { layerVariance: 0.10, alphaScale: 1.5, priority: isOuter ? 1 : 2 }
     );
   }
-  // Yellow flame streaks inside petals (lighter inner glow)
   for (let i = 0; i < 2; i++) {
     const angle = -Math.PI / 2 + (i === 0 ? -0.06 : 0.06);
     addElement(
-      makeTulipPetalPoly(cx + gauss(0, 2), cy + 18, angle, 45 + gauss(0, 4), 10 + gauss(0, 2), gauss(0.3, 0.2)),
-      varyColor([240, 180, 40], 10), // yellow flame
+      makeTulipPetalPoly(cx + gauss(0, 1), cy + 12*S, angle, (38 + gauss(0, 3))*S, (8 + gauss(0, 1))*S, gauss(0.3, 0.2)),
+      varyColor([240, 180, 40], 10),
       { layerVariance: 0.08, alphaScale: 0.7, priority: 3 }
     );
   }
-  // Stalk
   addElement(
-    makeStalkPoly(cx, cy + 18, cx + gauss(0, 2), cy + ROW_H/2 + 25, 2.0, 3.0),
-    [35, 88, 32],
-    { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
+    makeStalkPoly(cx, cy + 12*S, cx + gauss(0, 2), cy + CELL_R + 8, 1.6, 2.4),
+    [35, 88, 32], { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
   );
 }
 
-// --- FLOWER 6: Carnation (bottom-right) ---
+// --- FLOWER 6: Carnation (row 2, col 1) ---
 {
   const [cx, cy] = cellCenter(1, 2);
-  // Outer ruffled layer
   addElement(
-    makeCarnationPoly(cx, cy, 45, 8, 14),
-    varyColor([195, 30, 50]), // crimson outer
+    makeCarnationPoly(cx, cy, 32*S, 6*S, 14),
+    varyColor([195, 30, 50]),
     { layerVariance: 0.14, alphaScale: 1.5, priority: 1 }
   );
-  // Mid ruffled layer (slightly smaller, different ruffle phase)
   addElement(
-    makeCarnationPoly(cx + gauss(0, 2), cy + gauss(0, 2), 36, 7, 12),
+    makeCarnationPoly(cx + gauss(0, 1), cy + gauss(0, 1), 26*S, 5*S, 12),
     varyColor([175, 25, 45]),
     { layerVariance: 0.12, alphaScale: 1.3, priority: 2 }
   );
-  // Inner ruffled layer
   addElement(
-    makeCarnationPoly(cx + gauss(0, 2), cy + gauss(0, 2), 26, 5, 10),
+    makeCarnationPoly(cx + gauss(0, 1), cy + gauss(0, 1), 18*S, 4*S, 10),
     varyColor([155, 20, 38]),
     { layerVariance: 0.10, alphaScale: 1.2, priority: 3 }
   );
-  // Core
   addElement(
-    makeCarnationPoly(cx + gauss(0, 1), cy + gauss(0, 1), 14, 3, 8),
+    makeCarnationPoly(cx + gauss(0, 1), cy + gauss(0, 1), 10*S, 2*S, 8),
     varyColor([120, 15, 30]),
     { layerVariance: 0.08, alphaScale: 1.0, priority: 4 }
   );
-  // Stalk
   addElement(
-    makeStalkPoly(cx, cy + 42, cx + gauss(0, 3), cy + ROW_H/2 + 20, 1.8, 2.8),
-    [40, 95, 38],
-    { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
+    makeStalkPoly(cx, cy + 28*S, cx + gauss(0, 2), cy + CELL_R + 8, 1.4, 2.2),
+    [40, 95, 38], { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
+  );
+}
+
+// --- FLOWER 7: Blue hyacinth (row 3, col 0) ---
+{
+  const [cx, cy] = cellCenter(0, 3);
+  // Vertical spike of 10 bell-shaped florets
+  const numFlorets = 10;
+  const spikeLen = CELL_R * 1.5;
+  const startY = cy + spikeLen * 0.35;
+  for (let i = 0; i < numFlorets; i++) {
+    const t = i / (numFlorets - 1);
+    const fy = startY - t * spikeLen;
+    // Alternate left/right slightly
+    const side = (i % 2 === 0) ? -1 : 1;
+    const fx = cx + side * (3 + gauss(0, 1.5));
+    // Bell size tapers toward top
+    const bellScale = 0.6 + 0.4 * (1 - t * 0.5);
+    const bellLen = (10 + gauss(0, 1.5)) * S * bellScale;
+    const bellWid = (7 + gauss(0, 1)) * S * bellScale;
+    // Each bell hangs downward with slight angle
+    const bellAngle = Math.PI / 2 + side * (0.3 + gauss(0, 0.15));
+    addElement(
+      makeBudPetalPoly(fx, fy, bellAngle, bellLen, bellWid, gauss(0, 0.2)),
+      varyColor([40, 60, 140], 10), // lacivert blue
+      { layerVariance: 0.10, alphaScale: 1.4, priority: 2 }
+    );
+  }
+  // Stalk through center
+  addElement(
+    makeStalkPoly(cx, startY - spikeLen + 5, cx, cy + CELL_R + 8, 1.0, 2.0),
+    [35, 85, 32], { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
+  );
+}
+
+// --- FLOWER 8: White jasmine (row 3, col 1) ---
+{
+  const [cx, cy] = cellCenter(1, 3);
+  const numPetals = 5;
+  // Star-shaped flower — 5 pointed petals
+  for (let i = 0; i < numPetals; i++) {
+    const angle = (i / numPetals) * Math.PI * 2 - Math.PI / 2 + gauss(0, 0.08);
+    const bx = cx + Math.cos(angle) * 3;
+    const by = cy + Math.sin(angle) * 3;
+    const petalLen = (26 + gauss(0, 2)) * S;
+    const petalWid = (12 + gauss(0, 1.5)) * S;
+    addElement(
+      makePetalPoly(bx, by, angle + gauss(0, 0.1), petalLen, petalWid, gauss(0, 0.2)),
+      varyColor([245, 240, 235], 4), // cream white
+      { layerVariance: 0.09, alphaScale: 1.8, priority: 2 }
+    );
+  }
+  // Second layer offset slightly
+  for (let i = 0; i < numPetals; i++) {
+    const angle = (i / numPetals) * Math.PI * 2 - Math.PI / 2 + Math.PI / numPetals + gauss(0, 0.08);
+    const bx = cx + Math.cos(angle) * 2;
+    const by = cy + Math.sin(angle) * 2;
+    addElement(
+      makePetalPoly(bx, by, angle + gauss(0, 0.1), (20 + gauss(0, 2)) * S, (9 + gauss(0, 1)) * S, gauss(0, 0.2)),
+      varyColor([240, 236, 228], 4),
+      { layerVariance: 0.08, alphaScale: 1.5, priority: 3 }
+    );
+  }
+  // Warm yellow center dot
+  for (let i = 0; i < 2; i++) {
+    const angle = (i / 2) * Math.PI * 2 + gauss(0, 0.5);
+    addElement(
+      makePetalPoly(cx + gauss(0,1), cy + gauss(0,1), angle, 5*S, 4*S, gauss(0,0.2)),
+      varyColor([220, 190, 80], 6),
+      { layerVariance: 0.06, alphaScale: 1.0, priority: 4 }
+    );
+  }
+  addElement(
+    makeStalkPoly(cx, cy + 18*S, cx + gauss(0, 2), cy + CELL_R + 8, 1.0, 1.6),
+    [38, 90, 35], { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
+  );
+}
+
+// --- FLOWER 9: Tiny penç filler rosette (row 4, col 0) ---
+{
+  const [cx, cy] = cellCenter(0, 4);
+  const numPetals = 5;
+  // Simple round 5-petal rosette
+  for (let i = 0; i < numPetals; i++) {
+    const angle = (i / numPetals) * Math.PI * 2 - Math.PI / 2 + gauss(0, 0.1);
+    const bx = cx + Math.cos(angle) * 2;
+    const by = cy + Math.sin(angle) * 2;
+    const petalLen = (18 + gauss(0, 2)) * S;
+    const petalWid = (14 + gauss(0, 1.5)) * S; // wide, round petals
+    addElement(
+      makePetalPoly(bx, by, angle + gauss(0, 0.1), petalLen, petalWid, gauss(0, 0.15)),
+      varyColor([200, 50, 75], 8),
+      { layerVariance: 0.09, alphaScale: 1.5, priority: 2 }
+    );
+  }
+  // Dense center dot
+  for (let i = 0; i < 3; i++) {
+    const angle = (i / 3) * Math.PI * 2 + gauss(0, 0.5);
+    addElement(
+      makePetalPoly(cx + gauss(0,1), cy + gauss(0,1), angle, 6*S, 5*S, gauss(0,0.2)),
+      varyColor([140, 25, 45], 5),
+      { layerVariance: 0.07, alphaScale: 1.2, priority: 4 }
+    );
+  }
+  addElement(
+    makeStalkPoly(cx, cy + 14*S, cx + gauss(0, 1), cy + CELL_R + 8, 0.8, 1.4),
+    [42, 92, 38], { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
+  );
+}
+
+// --- FLOWER 10: Burgundy berry cluster (row 4, col 1) ---
+{
+  const [cx, cy] = cellCenter(1, 4);
+  // 7 small round berry spheres clustered together
+  const numBerries = 7;
+  const clusterR = 14 * S;
+  for (let i = 0; i < numBerries; i++) {
+    // Pack berries in a rough circle
+    let bx, by;
+    if (i === 0) {
+      bx = cx; by = cy; // center berry
+    } else {
+      const angle = ((i - 1) / (numBerries - 1)) * Math.PI * 2 + gauss(0, 0.2);
+      bx = cx + Math.cos(angle) * clusterR + gauss(0, 2);
+      by = cy + Math.sin(angle) * clusterR + gauss(0, 2);
+    }
+    const berryR = (7 + gauss(0, 1)) * S;
+    // Circle polygon for berry
+    const berryPoly = [];
+    const np = 24;
+    for (let j = 0; j < np; j++) {
+      const a = (j / np) * Math.PI * 2;
+      berryPoly.push([bx + Math.cos(a) * berryR, by + Math.sin(a) * berryR]);
+    }
+    addElement(
+      berryPoly,
+      varyColor([100, 20, 35], 8),
+      { layerVariance: 0.10, alphaScale: 1.5, priority: 2 }
+    );
+    // Tiny highlight dot on each berry
+    const hlPoly = [];
+    const hlR = berryR * 0.3;
+    const hlX = bx - berryR * 0.25, hlY = by - berryR * 0.25;
+    for (let j = 0; j < 12; j++) {
+      const a = (j / 12) * Math.PI * 2;
+      hlPoly.push([hlX + Math.cos(a) * hlR, hlY + Math.sin(a) * hlR]);
+    }
+    addElement(
+      hlPoly,
+      varyColor([150, 45, 55], 6),
+      { layerVariance: 0.06, alphaScale: 0.6, priority: 3 }
+    );
+  }
+  addElement(
+    makeStalkPoly(cx, cy + 16*S, cx + gauss(0, 2), cy + CELL_R + 8, 1.2, 2.0),
+    [38, 85, 32], { layerVariance: 0.04, alphaScale: 1.0, priority: 0 }
   );
 }
 
@@ -707,6 +834,25 @@ function drawTexturedLayer(el, layerIdx) {
 // Post-processing: outlines + Mixbox
 // ============================================================
 
+function drawLabels() {
+  ctx.save();
+  ctx.font = '10px Georgia, serif';
+  ctx.fillStyle = '#8a7b6b';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      const idx = row * COLS + col;
+      if (idx < flowerLabels.length) {
+        const x = col * COL_W + COL_W / 2;
+        const y = (row + 1) * ROW_H - LABEL_SPACE + 2;
+        ctx.fillText(flowerLabels[idx], x, y);
+      }
+    }
+  }
+  ctx.restore();
+}
+
 function doPostProcessing() {
   // Petal outline halos
   for (const el of elements) {
@@ -746,6 +892,9 @@ function doPostProcessing() {
     }
     ctx.putImageData(imgData, 0, 0);
   }
+
+  // Draw labels last
+  drawLabels();
 }
 
 // ============================================================
