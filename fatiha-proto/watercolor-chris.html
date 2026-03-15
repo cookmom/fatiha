@@ -526,6 +526,9 @@ for (let i = 0; i < numBuds; i++) {
 
 const elements = [];
 
+// Rose exclusion zone — generous radius to fully clear leaves behind flower
+const ROSE_EXCLUSION_R = 120;
+
 // Stalk segments (back layer)
 stalkPolys.forEach((poly, i) => {
   elements.push({
@@ -533,17 +536,21 @@ stalkPolys.forEach((poly, i) => {
     color: STALK_COLORS[i % STALK_COLORS.length],
     layerVariance: 0.03,
     hardEdge: false,
+    isLeaf: false,
+    startFrame: 0,
     priority: 0, index: i
   });
 });
 
-// Leaves (mid layer)
+// Leaves (mid layer) — flagged for rose exclusion clipping
 leafPolys.forEach((poly, i) => {
   elements.push({
     base: makeBase(poly),
     color: LEAF_COLORS[i % LEAF_COLORS.length],
     layerVariance: 0.08,
     hardEdge: true,
+    isLeaf: true,
+    startFrame: 5,
     priority: 1, index: i
   });
 });
@@ -555,6 +562,8 @@ calyxPolys.forEach((poly, i) => {
     color: [45, 95, 42],
     layerVariance: 0.06,
     hardEdge: false,
+    isLeaf: false,
+    startFrame: 8,
     priority: 1, index: 100 + i
   });
 });
@@ -566,7 +575,9 @@ budElements.filter(b => b.type === 'sepal').forEach((b, i) => {
     color: b.color,
     layerVariance: 0.08,
     hardEdge: false,
+    isLeaf: false,
     alphaScale: 1.0,
+    startFrame: 3,
     priority: 1, index: 200 + i
   });
 });
@@ -576,41 +587,46 @@ budElements.filter(b => b.type === 'bud').forEach((b, i) => {
     color: b.color,
     layerVariance: 0.10,
     hardEdge: false,
+    isLeaf: false,
     alphaScale: 1.2,
+    startFrame: 6,
     priority: 1, index: 300 + i
   });
 });
 
 // Rose petals — outer first, inner on top
-// Outer ring: HIGH opacity to cover inner structure
 rosePetals.filter(p => p.ring === 'outer').forEach((p, i) => {
   elements.push({
     base: makeBase(p.poly),
     color: p.color,
-    layerVariance: 0.12,   // more organic deformation
+    layerVariance: 0.12,
     hardEdge: false,
-    alphaScale: 1.8,       // much more opaque — covers inner petals
+    isLeaf: false,
+    alphaScale: 1.8,
+    startFrame: 15,
     priority: 2, index: i
   });
 });
-// Middle ring: moderate opacity
 rosePetals.filter(p => p.ring === 'mid').forEach((p, i) => {
   elements.push({
     base: makeBase(p.poly),
     color: p.color,
     layerVariance: 0.10,
     hardEdge: false,
+    isLeaf: false,
     alphaScale: 1.3,
+    startFrame: 25,
     priority: 3, index: i
   });
 });
-// Inner ring: standard
 rosePetals.filter(p => p.ring === 'inner').forEach((p, i) => {
   elements.push({
     base: makeBase(p.poly),
     color: p.color,
     layerVariance: 0.09,
     hardEdge: false,
+    isLeaf: false,
+    startFrame: 35,
     priority: 4, index: i
   });
 });
@@ -618,30 +634,24 @@ rosePetals.filter(p => p.ring === 'inner').forEach((p, i) => {
 elements.sort((a, b) => a.priority - b.priority || a.index - b.index);
 
 // ============================================================
-// Rendering with Tyler Hobbs texture masking
-// IMPROVEMENT #2: Hard/soft edge contrast (drying halos)
+// Rendering — Performance-Aware Progressive System
+// "Watching paint dry": elements build up over ~60 frames
 // ============================================================
 
-const TOTAL_LAYERS = 40;
+const TARGET_LAYERS = 40;     // layers per element
+const LAYERS_PER_FRAME = 2;   // layers rendered per element per frame
 const LAYER_ALPHA = 0.07;
 
-// Pre-compute 4 sets of circle data (800 circles each) for texture masks
+// Pre-compute texture masks: large overlapping circles that SUBTRACT from solid fill
+// Tyler's method: fill solid, then modulate with large circles for subtle variation
 const NUM_MASKS = 4;
 const maskData = [];
 for (let m = 0; m < NUM_MASKS; m++) {
   const circles = [];
-  for (let j = 0; j < 800; j++) {
-    circles.push([rand() * W, rand() * H, Math.abs(gauss(W * 0.013, W * 0.009))]);
+  for (let j = 0; j < 300; j++) {
+    circles.push([rand() * W, rand() * H, Math.abs(gauss(W * 0.06, W * 0.025))]);
   }
   maskData.push(circles);
-}
-
-function fillPoly(tCtx, poly) {
-  tCtx.beginPath();
-  tCtx.moveTo(poly[0][0], poly[0][1]);
-  for (let i = 1; i < poly.length; i++) tCtx.lineTo(poly[i][0], poly[i][1]);
-  tCtx.closePath();
-  tCtx.fill();
 }
 
 function strokePoly(tCtx, poly) {
@@ -659,194 +669,226 @@ for (const el of elements) {
   for (let d = 0; d < PRE_DEFORM_COUNT; d++) {
     el._preDeformed.push(deformN(el.base, 1, el.layerVariance || 0.08));
   }
+  el._layersRendered = 0;
+  el._done = false;
 }
 
+// --- Rose exclusion clip helper ---
+function applyRoseExclusion() {
+  ctx.beginPath();
+  ctx.rect(0, 0, W, H);
+  ctx.arc(roseCx, roseCy, ROSE_EXCLUSION_R, 0, Math.PI * 2, true);
+  ctx.clip('evenodd');
+}
+
+// Offscreen canvas for texture masking (fill solid, then subtract)
+const offCanvas = document.createElement('canvas');
+offCanvas.width = W;
+offCanvas.height = H;
+const offCtx = offCanvas.getContext('2d');
+
 function drawTexturedLayer(el, layerIdx) {
-  // Pick a pre-computed variant and apply 1 fresh deformation
   const preIdx = layerIdx % PRE_DEFORM_COUNT;
   const layerPoly = deformOnce(el._preDeformed[preIdx], (el.layerVariance || 0.08) * 0.7);
   const [r, g, b] = el.color;
 
-  // Compute bounding box for early circle culling
+  // Bounding box for optimization
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   for (const [px, py] of layerPoly) {
-    if (px < minX) minX = px;
-    if (px > maxX) maxX = px;
-    if (py < minY) minY = py;
-    if (py > maxY) maxY = py;
+    if (px < minX) minX = px; if (px > maxX) maxX = px;
+    if (py < minY) minY = py; if (py > maxY) maxY = py;
   }
+  const bx = Math.max(0, Math.floor(minX) - 2);
+  const by = Math.max(0, Math.floor(minY) - 2);
+  const bw = Math.min(W, Math.ceil(maxX) + 2) - bx;
+  const bh = Math.min(H, Math.ceil(maxY) + 2) - by;
+  if (bw <= 0 || bh <= 0) return;
 
-  // Clip to deformed polygon, draw colored circles directly
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(layerPoly[0][0], layerPoly[0][1]);
-  for (let i = 1; i < layerPoly.length; i++) ctx.lineTo(layerPoly[i][0], layerPoly[i][1]);
-  ctx.closePath();
-  ctx.clip();
+  // Step 1: Fill deformed polygon SOLID on offscreen canvas
+  offCtx.clearRect(bx, by, bw, bh);
+  offCtx.globalCompositeOperation = 'source-over';
+  offCtx.globalAlpha = 1.0;
+  offCtx.fillStyle = `rgb(${r},${g},${b})`;
+  offCtx.beginPath();
+  offCtx.moveTo(layerPoly[0][0], layerPoly[0][1]);
+  for (let i = 1; i < layerPoly.length; i++) offCtx.lineTo(layerPoly[i][0], layerPoly[i][1]);
+  offCtx.closePath();
+  offCtx.fill();
 
-  ctx.globalAlpha = LAYER_ALPHA * (el.alphaScale || 1.0);
-  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  // Step 2: Texture mask — subtract circles to create subtle paper-showing-through
+  // Large overlapping circles at low alpha erode the solid fill slightly
+  offCtx.globalCompositeOperation = 'destination-out';
+  offCtx.globalAlpha = 0.08; // subtle subtraction
   const circles = maskData[layerIdx % NUM_MASKS];
   for (let j = 0; j < circles.length; j++) {
     const cx = circles[j][0], cy = circles[j][1], cr = circles[j][2];
     if (cx + cr < minX || cx - cr > maxX || cy + cr < minY || cy - cr > maxY) continue;
-    ctx.beginPath();
-    ctx.arc(cx, cy, cr, 0, Math.PI * 2);
-    ctx.fill();
+    offCtx.beginPath();
+    offCtx.arc(cx, cy, cr, 0, Math.PI * 2);
+    offCtx.fill();
   }
 
+  // Step 3: Composite the textured layer onto main canvas at layer alpha
+  ctx.save();
+
+  // Leaf exclusion: clip out the rose area so leaves don't poke through
+  if (el.isLeaf) applyRoseExclusion();
+
+  ctx.globalAlpha = LAYER_ALPHA * (el.alphaScale || 1.0);
+  ctx.drawImage(offCanvas, bx, by, bw, bh, bx, by, bw, bh);
   ctx.restore();
   ctx.globalAlpha = 1.0;
 }
 
-// Drying halo: dark edge line that simulates pigment pooling
-function drawDryingHalo(el) {
-  const [r, g, b] = el.color;
-  // Much darker version for edge pooling
-  const dr = Math.max(0, Math.round(r * 0.55));
-  const dg = Math.max(0, Math.round(g * 0.50));
-  const db = Math.max(0, Math.round(b * 0.55));
+// --- Post-processing: outlines, veins, mixbox ---
+function doPostProcessing() {
+  for (const el of elements) {
+    const [r, g, b] = el.color;
+    const dr = Math.max(0, Math.round(r * 0.55));
+    const dg = Math.max(0, Math.round(g * 0.50));
+    const db = Math.max(0, Math.round(b * 0.55));
 
-  // Hard edge: thin dark lines at the boundary
-  for (let pass = 0; pass < 3; pass++) {
-    const haloPoly = deformN(el.base, 5, 0.04 + pass * 0.008);
-    ctx.globalAlpha = 0.09 - pass * 0.02;
-    ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
-    ctx.lineWidth = 1.0;
-    ctx.lineJoin = 'round';
-    strokePoly(ctx, haloPoly);
+    if (el.priority === 1 && el.isLeaf) {
+      // Leaf bloom with rose exclusion
+      ctx.save();
+      applyRoseExclusion();
+      const bloomPoly = deformN(el.base, 6, 0.07);
+      ctx.globalAlpha = 0.02;
+      ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
+      ctx.lineWidth = 2.5;
+      ctx.lineJoin = 'round';
+      strokePoly(ctx, bloomPoly);
+      ctx.restore();
+      ctx.globalAlpha = 1.0;
+    }
+
+    if (el.priority >= 2 && el.priority <= 4) {
+      // Petal outlines at 20% strength
+      for (let pass = 0; pass < 3; pass++) {
+        const haloPoly = deformN(el.base, 5, 0.04 + pass * 0.008);
+        ctx.globalAlpha = (0.09 - pass * 0.02) * 0.2;
+        ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
+        ctx.lineWidth = 1.0;
+        ctx.lineJoin = 'round';
+        strokePoly(ctx, haloPoly);
+      }
+      for (let pass = 0; pass < 2; pass++) {
+        const bloomPoly = deformN(el.base, 6, 0.07 + pass * 0.02);
+        ctx.globalAlpha = 0.035 * 0.2;
+        ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
+        ctx.lineWidth = 2.5 + pass * 1.5;
+        ctx.lineJoin = 'round';
+        strokePoly(ctx, bloomPoly);
+      }
+      ctx.globalAlpha = 1.0;
+    }
   }
-  // Soft bloom: wider faint halo
-  for (let pass = 0; pass < 2; pass++) {
-    const bloomPoly = deformN(el.base, 6, 0.07 + pass * 0.02);
-    ctx.globalAlpha = 0.035;
-    ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
-    ctx.lineWidth = 2.5 + pass * 1.5;
+
+  // Leaf veins with rose exclusion
+  function drawLeafVein(spinePoints, color) {
+    const [r, g, b] = color;
+    const vr = Math.max(0, Math.round(r * 0.45));
+    const vg = Math.max(0, Math.round(g * 0.45));
+    const vb = Math.max(0, Math.round(b * 0.45));
+    ctx.save();
+    applyRoseExclusion();
+    ctx.strokeStyle = `rgb(${vr},${vg},${vb})`;
     ctx.lineJoin = 'round';
-    strokePoly(ctx, bloomPoly);
+    ctx.lineCap = 'round';
+    ctx.globalAlpha = 0.10;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(spinePoints[0][0], spinePoints[0][1]);
+    for (let i = 1; i < spinePoints.length; i++) ctx.lineTo(spinePoints[i][0], spinePoints[i][1]);
+    ctx.stroke();
+    ctx.globalAlpha = 0.06;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(spinePoints[0][0], spinePoints[0][1]);
+    for (let i = 1; i < spinePoints.length; i++) ctx.lineTo(spinePoints[i][0], spinePoints[i][1]);
+    ctx.stroke();
+    ctx.restore();
+    ctx.globalAlpha = 1.0;
   }
-  ctx.globalAlpha = 1.0;
+  drawLeafVein(leftLeafSpine, LEAF_COLORS[0]);
+  drawLeafVein(rightLeafSpine, LEAF_COLORS[1]);
+  drawLeafVein(smallLeafSpine, LEAF_COLORS[2]);
+
+  // Mixbox pigment blending
+  if (typeof mixbox !== 'undefined') {
+    const imgData = ctx.getImageData(0, 0, W, H);
+    const d = imgData.data;
+    const paperR = 244, paperG = 237, paperB = 227;
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], g = d[i+1], b = d[i+2];
+      const dr2 = paperR - r, dg2 = paperG - g, db2 = paperB - b;
+      const dev = Math.sqrt(dr2*dr2 + dg2*dg2 + db2*db2);
+      if (dev > 25) {
+        const mixed = mixbox.lerp(
+          [r, g, b, 255],
+          [Math.max(0, r - 12), Math.max(0, g - 8), Math.max(0, b - 12), 255],
+          0.12
+        );
+        d[i] = mixed[0]; d[i+1] = mixed[1]; d[i+2] = mixed[2];
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
 }
 
 // ============================================================
-// Progressive rendering
+// Progressive render loop — "watching paint dry"
+// Elements stagger in by startFrame, accumulate layers over time
 // ============================================================
 
 window._renderComplete = false;
+window._renderProgress = 0;
+window._fps = 0;
 
-function renderFrame() {
-  const t0 = performance.now();
-  for (let l = 0; l < TOTAL_LAYERS; l++) {
-    for (const el of elements) {
-      drawTexturedLayer(el, l);
+let frameCount = 0;
+let lastTimestamp = 0;
+const totalLayersAll = elements.length * TARGET_LAYERS;
+
+function progressiveRender(timestamp) {
+  if (!lastTimestamp) lastTimestamp = timestamp;
+  const dt = timestamp - lastTimestamp;
+  lastTimestamp = timestamp;
+  window._fps = dt > 0 ? Math.round(1000 / dt) : 60;
+
+  let layersDoneTotal = 0;
+
+  for (const el of elements) {
+    if (el._done) {
+      layersDoneTotal += TARGET_LAYERS;
+      continue;
     }
+    if (frameCount < el.startFrame) {
+      layersDoneTotal += el._layersRendered;
+      continue;
+    }
+
+    for (let l = 0; l < LAYERS_PER_FRAME && el._layersRendered < TARGET_LAYERS; l++) {
+      drawTexturedLayer(el, el._layersRendered);
+      el._layersRendered++;
+    }
+
+    layersDoneTotal += el._layersRendered;
+    if (el._layersRendered >= TARGET_LAYERS) el._done = true;
   }
 
-  {
-    // Subtle pigment pooling on leaves + very subtle petal outlines (20% strength)
-    for (const el of elements) {
-      const [r, g, b] = el.color;
-      const dr = Math.max(0, Math.round(r * 0.55));
-      const dg = Math.max(0, Math.round(g * 0.50));
-      const db = Math.max(0, Math.round(b * 0.55));
+  frameCount++;
+  window._renderProgress = layersDoneTotal / totalLayersAll;
 
-      if (el.priority === 1) {
-        // Leaves: soft bloom
-        const bloomPoly = deformN(el.base, 6, 0.07);
-        ctx.globalAlpha = 0.02;
-        ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
-        ctx.lineWidth = 2.5;
-        ctx.lineJoin = 'round';
-        strokePoly(ctx, bloomPoly);
-        ctx.globalAlpha = 1.0;
-      }
-
-      if (el.priority >= 2 && el.priority <= 4) {
-        // Petal outlines at 20% of original dryingHalo strength
-        // Original hard edge: alpha 0.09/0.07/0.05, lineWidth 1.0
-        // At 20%: alpha 0.018/0.014/0.010
-        for (let pass = 0; pass < 3; pass++) {
-          const haloPoly = deformN(el.base, 5, 0.04 + pass * 0.008);
-          ctx.globalAlpha = (0.09 - pass * 0.02) * 0.2;
-          ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
-          ctx.lineWidth = 1.0;
-          ctx.lineJoin = 'round';
-          strokePoly(ctx, haloPoly);
-        }
-        // Original soft bloom: alpha 0.035, lineWidth 2.5/4.0
-        // At 20%: alpha 0.007
-        for (let pass = 0; pass < 2; pass++) {
-          const bloomPoly = deformN(el.base, 6, 0.07 + pass * 0.02);
-          ctx.globalAlpha = 0.035 * 0.2;
-          ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
-          ctx.lineWidth = 2.5 + pass * 1.5;
-          ctx.lineJoin = 'round';
-          strokePoly(ctx, bloomPoly);
-        }
-        ctx.globalAlpha = 1.0;
-      }
-    }
-
-    // Draw leaf veins — darker line along each spine
-    function drawLeafVein(spinePoints, color) {
-      const [r, g, b] = color;
-      const vr = Math.max(0, Math.round(r * 0.45));
-      const vg = Math.max(0, Math.round(g * 0.45));
-      const vb = Math.max(0, Math.round(b * 0.45));
-      ctx.strokeStyle = `rgb(${vr},${vg},${vb})`;
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-      // Main central vein — subtle
-      ctx.globalAlpha = 0.10;
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(spinePoints[0][0], spinePoints[0][1]);
-      for (let i = 1; i < spinePoints.length; i++) {
-        ctx.lineTo(spinePoints[i][0], spinePoints[i][1]);
-      }
-      ctx.stroke();
-      // Fainter wider wash along vein
-      ctx.globalAlpha = 0.06;
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(spinePoints[0][0], spinePoints[0][1]);
-      for (let i = 1; i < spinePoints.length; i++) {
-        ctx.lineTo(spinePoints[i][0], spinePoints[i][1]);
-      }
-      ctx.stroke();
-      ctx.globalAlpha = 1.0;
-    }
-    drawLeafVein(leftLeafSpine, LEAF_COLORS[0]);
-    drawLeafVein(rightLeafSpine, LEAF_COLORS[1]);
-    drawLeafVein(smallLeafSpine, LEAF_COLORS[2]);
-
-    // Mixbox pigment blending post-process
-    if (typeof mixbox !== 'undefined') {
-      const imgData = ctx.getImageData(0, 0, W, H);
-      const d = imgData.data;
-      const paperR = 244, paperG = 237, paperB = 227;
-      for (let i = 0; i < d.length; i += 4) {
-        const r = d[i], g = d[i+1], b = d[i+2];
-        const dr = paperR - r, dg = paperG - g, db = paperB - b;
-        const dev = Math.sqrt(dr*dr + dg*dg + db*db);
-        if (dev > 25) {
-          const mixed = mixbox.lerp(
-            [r, g, b, 255],
-            [Math.max(0, r - 12), Math.max(0, g - 8), Math.max(0, b - 12), 255],
-            0.12
-          );
-          d[i] = mixed[0]; d[i+1] = mixed[1]; d[i+2] = mixed[2];
-        }
-      }
-      ctx.putImageData(imgData, 0, 0);
-    }
-    const elapsed = performance.now() - t0;
+  if (elements.every(el => el._done)) {
+    doPostProcessing();
     window._renderComplete = true;
-    console.log('Watercolor render complete in ' + Math.round(elapsed) + 'ms');
+    console.log('Watercolor render complete — ' + frameCount + ' frames');
+  } else {
+    requestAnimationFrame(progressiveRender);
   }
 }
 
-requestAnimationFrame(renderFrame);
+requestAnimationFrame(progressiveRender);
 </script>
 </body>
 </html>
