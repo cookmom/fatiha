@@ -377,25 +377,28 @@ for (let i = 0; i < 5; i++) {
 // ============================================================
 
 // Left saz leaf: emerges from mid-stalk, sweeps left and up
-// Asymmetric: starts lower than the right leaf
+// Reduced ~40% — spine endpoints pulled toward base, narrower width
+const leftLeafBase = [W * 0.46, H * 0.52];
 const leftLeafSpine = makeSpinePoints(
-  [W * 0.46, H * 0.52],   // base below flower region
-  [W * 0.18, H * 0.50],   // sweeps left
-  [W * 0.06, H * 0.38],   // gentle upward curve
-  [W * 0.04, H * 0.18],   // tip far upper-left
+  leftLeafBase,
+  [lerp(leftLeafBase[0], W * 0.18, 0.6), lerp(leftLeafBase[1], H * 0.50, 0.6)],
+  [lerp(leftLeafBase[0], W * 0.06, 0.6), lerp(leftLeafBase[1], H * 0.38, 0.6)],
+  [lerp(leftLeafBase[0], W * 0.04, 0.6), lerp(leftLeafBase[1], H * 0.18, 0.6)],
   120
 );
-const leftLeafPoly = makeSazLeaf(leftLeafSpine, 44, 18);
+const leftLeafPoly = makeSazLeaf(leftLeafSpine, 26, 18);
 
 // Right saz leaf: emerges well below flower, sweeps right and up
+// Reduced ~40% — spine endpoints pulled toward base, narrower width
+const rightLeafBase = [W * 0.54, H * 0.52];
 const rightLeafSpine = makeSpinePoints(
-  [W * 0.54, H * 0.52],   // base below flower region
-  [W * 0.76, H * 0.48],   // sweeps right
-  [W * 0.88, H * 0.36],   // upward
-  [W * 0.90, H * 0.20],   // tip upper-right
+  rightLeafBase,
+  [lerp(rightLeafBase[0], W * 0.76, 0.6), lerp(rightLeafBase[1], H * 0.48, 0.6)],
+  [lerp(rightLeafBase[0], W * 0.88, 0.6), lerp(rightLeafBase[1], H * 0.36, 0.6)],
+  [lerp(rightLeafBase[0], W * 0.90, 0.6), lerp(rightLeafBase[1], H * 0.20, 0.6)],
   100
 );
-const rightLeafPoly = makeSazLeaf(rightLeafSpine, 34, 15);
+const rightLeafPoly = makeSazLeaf(rightLeafSpine, 20, 15);
 
 // Small accent leaf: droops from lower stalk, down and left
 const smallLeafSpine = makeSpinePoints(
@@ -688,9 +691,30 @@ offCanvas.height = H;
 const offCtx = offCanvas.getContext('2d');
 
 function drawTexturedLayer(el, layerIdx) {
-  const preIdx = layerIdx % PRE_DEFORM_COUNT;
-  const layerPoly = deformOnce(el._preDeformed[preIdx], (el.layerVariance || 0.08) * 0.7);
+  const progress = layerIdx / TARGET_LAYERS; // 0→1 over element lifetime
+  const varianceScale = Math.pow(progress, 0.7); // ramps up: tight early, spread late
+  const baseVariance = el.layerVariance || 0.08;
   const [r, g, b] = el.color;
+
+  // Frame 0: crisp sharp outline only (pen stroke)
+  if (layerIdx === 0) {
+    ctx.save();
+    if (el.isLeaf) applyRoseExclusion();
+    ctx.globalAlpha = 0.25 * (el.alphaScale || 1.0);
+    ctx.strokeStyle = `rgb(${r},${g},${b})`;
+    ctx.lineWidth = 1.0;
+    ctx.lineJoin = 'round';
+    strokePoly(ctx, el.base);
+    ctx.restore();
+    ctx.globalAlpha = 1.0;
+    return;
+  }
+
+  // Progressive deformation: early layers tight to base, later layers spread
+  const sourcePoly = varianceScale < 0.3
+    ? el.base  // very early: use undeformed base
+    : el._preDeformed[layerIdx % PRE_DEFORM_COUNT]; // later: use pre-deformed
+  const layerPoly = deformOnce(sourcePoly, baseVariance * 0.7 * varianceScale);
 
   // Bounding box for optimization
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -851,15 +875,12 @@ let lastTimestamp = 0;
 let postDone = false;
 const totalLayersAll = elements.length * TARGET_LAYERS;
 
-// Synth mode: when window._synthFrame is set, render advances one
-// step per rAF (for headless frame-by-frame capture).
-// Detected on first frame — set _synthFrame = true before page load.
-let synthMode = false;
+// Synth mode: when window._synthFrame is set before page load,
+// render only advances one step per _synthFrame trigger.
+let synthMode = !!window._synthFrame;
+if (synthMode) window._synthFrame = false; // consume initial trigger
 
 function renderStep(timestamp) {
-  // Detect synth mode on first frame
-  if (frameCount === 0 && window._synthFrame) synthMode = true;
-
   // In synth mode, only advance if _synthFrame is set
   if (synthMode && !window._synthFrame) {
     requestAnimationFrame(renderStep);
