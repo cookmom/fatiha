@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=430, initial-scale=1">
+<title>On the Geometry of Tawaf</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,500&family=Cormorant+SC:wght@400;600;700&family=JetBrains+Mono:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  width: 430px;
+  height: 932px;
+  background: #F5F2EB;
+  font-family: 'Cormorant Garamond', 'Georgia', serif;
+  color: #2A2218;
+  overflow: hidden;
+  position: relative;
+}
+
+.page {
+  width: 430px;
+  height: 932px;
+  padding: 36px 44px 36px 48px;
+  position: relative;
+}
+
+/* ── Title ── */
+.title {
+  font-family: 'Cormorant SC', 'Georgia', serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.35em;
+  text-align: center;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  color: #1A1610;
+}
+
+.subtitle {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 13px;
+  text-align: center;
+  color: #5A4E3C;
+  margin-bottom: 18px;
+  letter-spacing: 0.02em;
+}
+
+/* ── Arabesque Header Band ── */
+.header-band {
+  width: 100%;
+  height: 42px;
+  margin-bottom: 20px;
+  background: #1A1610;
+  position: relative;
+  overflow: hidden;
+}
+
+.header-band svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Drop Cap ── */
+.body-text {
+  font-size: 15.5px;
+  line-height: 1.55;
+  text-align: justify;
+  margin-bottom: 18px;
+  position: relative;
+}
+
+.drop-cap-wrap {
+  float: left;
+  margin: 0 10px 4px 0;
+}
+
+.drop-cap-box {
+  width: 56px;
+  height: 56px;
+  border: 2px solid #2A2218;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: #F5F2EB;
+}
+
+.drop-cap-box::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid #8A7D6B;
+}
+
+.drop-cap-letter {
+  font-family: 'Cormorant SC', serif;
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+  color: #1A1610;
+}
+
+.body-text em {
+  font-style: italic;
+}
+
+/* ── Code Block ── */
+.code-block {
+  margin: 16px 0;
+  padding: 0;
+  position: relative;
+}
+
+.code-block pre {
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 10px;
+  line-height: 1.65;
+  color: #2A2218;
+  background: transparent;
+  border-top: 1px solid #C5BEAD;
+  border-bottom: 1px solid #C5BEAD;
+  padding: 12px 0 12px 30px;
+  overflow: hidden;
+}
+
+.line-num {
+  display: inline-block;
+  width: 20px;
+  margin-left: -30px;
+  text-align: right;
+  margin-right: 10px;
+  color: #A09880;
+  user-select: none;
+}
+
+.code-comment {
+  font-style: italic;
+  color: #7A6E5C;
+}
+
+/* ── Marginal Notes ── */
+.margin-note {
+  position: absolute;
+  right: 8px;
+  width: 52px;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 9.5px;
+  line-height: 1.35;
+  color: #8A7D6B;
+  text-align: right;
+}
+
+/* ── Footer ── */
+.footer-rule {
+  position: absolute;
+  bottom: 60px;
+  left: 48px;
+  right: 44px;
+  border: none;
+  border-top: 1px solid #C5BEAD;
+}
+
+.footer-text {
+  position: absolute;
+  bottom: 30px;
+  left: 48px;
+  right: 44px;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 10px;
+  color: #A09880;
+  text-align: center;
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="title">On the Geometry of Tawaf</div>
+  <div class="subtitle">being a treatise on the sacred orbit of devotion</div>
+
+  <!-- Arabesque Header Band -->
+  <div class="header-band">
+    <svg viewBox="0 0 340 42" preserveAspectRatio="none">
+      <defs>
+        <pattern id="arabesque" x="0" y="0" width="42" height="42" patternUnits="userSpaceOnUse">
+          <!-- 8-pointed star -->
+          <rect width="42" height="42" fill="#1A1610"/>
+          <polygon points="21,2 25,14 37,14 27,22 31,34 21,27 11,34 15,22 5,14 17,14" fill="none" stroke="#C5BEAD" stroke-width="0.8"/>
+          <polygon points="21,6 24,15 33,15 26,21 29,30 21,25 13,30 16,21 9,15 18,15" fill="none" stroke="#8A7D6B" stroke-width="0.5"/>
+          <circle cx="21" cy="21" r="3" fill="none" stroke="#C5BEAD" stroke-width="0.5"/>
+          <line x1="0" y1="0" x2="42" y2="42" stroke="#8A7D6B" stroke-width="0.3"/>
+          <line x1="42" y1="0" x2="0" y2="42" stroke="#8A7D6B" stroke-width="0.3"/>
+          <line x1="21" y1="0" x2="21" y2="42" stroke="#8A7D6B" stroke-width="0.2"/>
+          <line x1="0" y1="21" x2="42" y2="21" stroke="#8A7D6B" stroke-width="0.2"/>
+          <rect x="6" y="6" width="30" height="30" fill="none" stroke="#5A4E3C" stroke-width="0.3" transform="rotate(45 21 21)"/>
+        </pattern>
+      </defs>
+      <rect width="340" height="42" fill="url(#arabesque)"/>
+    </svg>
+  </div>
+
+  <!-- Marginal note: Quran reference -->
+  <div class="margin-note" style="top: 130px;">
+    cf. Al-Hajj<br>22 : 26<br><br>
+    <em>&lsquo;Purify My<br>House for<br>those who<br>circle it&rsquo;</em>
+  </div>
+
+  <!-- Body Text with Drop Cap -->
+  <div class="body-text">
+    <div class="drop-cap-wrap">
+      <div class="drop-cap-box">
+        <span class="drop-cap-letter">I</span>
+      </div>
+    </div>
+    n every orbit there is a confession of dependence. As the pilgrim
+    circles the House of God, so does the light circle the form it
+    reveals &mdash; neither departing, neither arriving, but always in
+    motion around a centre that remains still. Let the cube be fixed at the origin,
+    as the Ka&rsquo;bah is fixed upon the earth. Let the spotlight trace its
+    <em>tawaf</em>, a circumambulation measured in radians, and observe:
+    the object is known only by the light that circles it.
+  </div>
+
+  <!-- Code Block -->
+  <div class="code-block">
+    <pre>
+<span class="line-num">1</span><span class="code-comment">// the tawaf orbit, derived from time</span>
+<span class="line-num">2</span>const tawafSpot = new THREE.SpotLight(
+<span class="line-num">3</span>    0xffffff, 12
+<span class="line-num">4</span>);
+<span class="line-num">5</span>tawafSpot.position.set(0, 3.5, -3);
+<span class="line-num">6</span>tawafSpot.target.position.set(0, 0.5, 0);
+<span class="line-num">7</span>tawafSpot.angle    = 0.4;
+<span class="line-num">8</span>tawafSpot.penumbra = 0.9;
+<span class="line-num">9</span>
+<span class="line-num">10</span><span class="code-comment">// the pilgrim's path: radius and angle</span>
+<span class="line-num">11</span>const tawafAngle = seconds * TAU;
+<span class="line-num">12</span>const rimRadius  = 3.5;
+<span class="line-num">13</span>
+<span class="line-num">14</span><span class="code-comment">// the cube remains stationary;</span>
+<span class="line-num">15</span><span class="code-comment">// only the light revolves</span>
+<span class="line-num">16</span>tawafSpot.position.x =
+<span class="line-num">17</span>    Math.cos(tawafAngle) * rimRadius;
+<span class="line-num">18</span>tawafSpot.position.z =
+<span class="line-num">19</span>    Math.sin(tawafAngle) * rimRadius;</pre>
+  </div>
+
+  <!-- Marginal note: scholar reference -->
+  <div class="margin-note" style="top: 530px;">
+    Al-<br>Khwarizmi<br>c. 820<br><br>
+    <em>on the<br>algebra of<br>circular<br>motion</em>
+  </div>
+
+  <!-- Continuation text -->
+  <div class="body-text" style="font-size: 14.5px; margin-top: 10px;">
+    Observe that the cube &mdash; the <em>qiblah</em> of computation &mdash; never rotates.
+    It is the light which performs the devotion, sweeping its penumbra
+    across each face in turn, as each <em>shawt</em> reveals a new facet of
+    the form. The angle is measured from time itself: <em>seconds &times; 2&pi;</em>,
+    so that each full minute completes one circuit, and every hour
+    gathers sixty orbits of illumination around the still centre.
+  </div>
+
+  <div class="body-text" style="font-size: 14px; font-style: italic; color: #5A4E3C; margin-top: 8px;">
+    As Al-Khwarizmi reduced the unknown to the known through
+    <em>al-jabr</em>, so does the orbit reduce the invisible form
+    to visible light. The spotlight confesses: I am nothing without
+    that which I circle.
+  </div>
+
+  <hr class="footer-rule">
+  <div class="footer-text">A Gift of Time &nbsp;&middot;&nbsp; agiftoftime.app &nbsp;&middot;&nbsp; glass-cube-clock.js</div>
+
+</div>
+</body>
+</html>
