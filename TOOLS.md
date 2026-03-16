@@ -31,6 +31,16 @@ Things like:
 - Default speaker: Kitchen HomePod
 ```
 
+### Image Generation — Gemini
+- **Default model**: `gemini-3-pro-image-preview` (Nano Banana Pro 2) — ALWAYS use this, never Flash
+- **API key**: stored in `.env.gemini`
+- **Endpoint**: `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent`
+- **Config**: `"responseModalities": ["TEXT", "IMAGE"]`
+- **Available models** (for reference only, always use Pro):
+  - `gemini-3-pro-image-preview` — Nano Banana Pro 2 (best quality) ✅
+  - `gemini-3.1-flash-image-preview` — Nano Banana 2 (faster, lower quality)
+  - `imagen-4.0-generate-001` — Imagen 4 (uses `predict` method, different API)
+
 ### Web Scraping — Standard Method
 - **Always use `markitdown`** for converting web pages/docs to clean text for LLM ingestion
 - Already installed: v0.1.5 (`pip show markitdown`)
