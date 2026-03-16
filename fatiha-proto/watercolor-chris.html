@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Watercolor Chris — Tyler Hobbs Method</title>
+<title>Watercolor Chris — Brush Stroke Painting</title>
 <style>
   body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
   canvas { display: block; }
@@ -10,11 +10,12 @@
 </head>
 <body>
 <canvas id="c" width="430" height="932"></canvas>
-<script src="mixbox.js"></script>
 <script>
 // ============================================================
-// Tyler Hobbs Watercolor — v2 with proper petals, saz leaves,
-// drying halos, curved stalk, varied paper texture
+// BRUSH STROKE WATERCOLOR — Paint strokes, not stamps
+// Each petal is a bezier curve drawn by a brush over frames,
+// then wet pigment bleeds outward via polygon deformation.
+// PERSISTENT canvas — each frame accumulates, never clears.
 // ============================================================
 
 const W = 430, H = 932;
@@ -23,20 +24,16 @@ const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
 // --- Seeded RNG ---
 let seed = 777;
-function rand() {
-  seed = (seed * 16807 + 0) % 2147483647;
-  return (seed - 1) / 2147483646;
-}
+function rand() { seed = (seed * 16807 + 0) % 2147483647; return (seed - 1) / 2147483646; }
 function gauss(mean, std) {
   const u1 = rand(), u2 = rand();
   return mean + std * Math.sqrt(-2 * Math.log(u1 || 0.001)) * Math.cos(2 * Math.PI * u2);
 }
-function randInt(a, b) { return Math.floor(rand() * (b - a + 1)) + a; }
 function lerp(a, b, t) { return a + (b - a) * t; }
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
 // ============================================================
-// Simple value noise for paper texture variation
+// Value noise for paper texture
 // ============================================================
 const NOISE_SIZE = 128;
 const noiseGrid = [];
@@ -57,145 +54,53 @@ function fbmNoise(x, y, octaves) {
   let val = 0, amp = 1, freq = 1, total = 0;
   for (let i = 0; i < octaves; i++) {
     val += amp * smoothNoise(x * freq, y * freq);
-    total += amp;
-    amp *= 0.5;
-    freq *= 2;
+    total += amp; amp *= 0.5; freq *= 2;
   }
   return val / total;
 }
 
 // ============================================================
-// Shape generators
+// Paper background
 // ============================================================
-
-function makeRect(cx, cy, w, h, rotation) {
-  const corners = [[-w/2,-h/2],[w/2,-h/2],[w/2,h/2],[-w/2,h/2]];
-  return corners.map(([x,y]) => [
-    cx + x * Math.cos(rotation) - y * Math.sin(rotation),
-    cy + x * Math.sin(rotation) + y * Math.cos(rotation)
-  ]);
-}
-
-// Teardrop petal: narrow at base, wide rounded tip
-// baseX,baseY = attachment point (near flower center)
-// angle = direction petal points outward
-// length = petal length
-// width = max width at widest point
-function makePetalPoly(baseX, baseY, angle, length, width, curvature) {
-  const pts = [];
-  const n = 24;
-  // Right edge: from base to tip
-  for (let i = 0; i <= n; i++) {
-    const t = i / n;
-    // Width profile: narrow stem at base, swells quickly to full width, rounded tip
-    let w;
-    if (t < 0.08) {
-      w = t / 0.08 * 0.2; // very narrow base stem
-    } else if (t < 0.3) {
-      w = 0.2 + (t - 0.08) / 0.22 * 0.8; // rapidly widening
-    } else if (t < 0.75) {
-      w = 1.0; // full width plateau (fat petal body)
-    } else {
-      w = Math.cos((t - 0.75) / 0.25 * Math.PI * 0.5); // rounded tip
+function drawPaperBackground() {
+  ctx.fillStyle = '#f4ede3';
+  ctx.fillRect(0, 0, W, H);
+  const imgData = ctx.getImageData(0, 0, W, H);
+  const d = imgData.data;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const idx = (y * W + x) * 4;
+      const grain = gauss(0, 3.5);
+      const tooth = (fbmNoise(x * 0.15, y * 0.15, 3) - 0.5) * 6;
+      const localVar = (fbmNoise(x * 0.012, y * 0.012, 5) - 0.5) * 16;
+      const fiber = (fbmNoise(x * 0.06, y * 0.012, 4) - 0.5) * 7;
+      const total = grain + tooth + localVar + fiber;
+      d[idx]     = clamp(d[idx] + total, 0, 255);
+      d[idx + 1] = clamp(d[idx + 1] + total, 0, 255);
+      d[idx + 2] = clamp(d[idx + 2] + total - 1.5, 0, 255);
     }
-    const along = t * length;
-    const across = w * width * 0.5;
-    const curveOffset = curvature * Math.sin(t * Math.PI) * length * 0.08;
-    const x = baseX + along * Math.cos(angle) - (across + curveOffset) * Math.sin(angle);
-    const y = baseY + along * Math.sin(angle) + (across + curveOffset) * Math.cos(angle);
-    pts.push([x, y]);
   }
-  // Left edge: tip back to base
-  for (let i = n; i >= 0; i--) {
-    const t = i / n;
-    let w;
-    if (t < 0.08) {
-      w = t / 0.08 * 0.2;
-    } else if (t < 0.3) {
-      w = 0.2 + (t - 0.08) / 0.22 * 0.8;
-    } else if (t < 0.75) {
-      w = 1.0;
-    } else {
-      w = Math.cos((t - 0.75) / 0.25 * Math.PI * 0.5);
-    }
-    const along = t * length;
-    const across = -w * width * 0.5;
-    const curveOffset = curvature * Math.sin(t * Math.PI) * length * 0.08;
-    const x = baseX + along * Math.cos(angle) - (across + curveOffset) * Math.sin(angle);
-    const y = baseY + along * Math.sin(angle) + (across + curveOffset) * Math.cos(angle);
-    pts.push([x, y]);
-  }
-  return pts;
+  ctx.putImageData(imgData, 0, 0);
 }
+drawPaperBackground();
 
-// Proper saz leaf with serrated edges along an S-curve spine
-function makeSazLeaf(spinePoints, maxWidth, serrationsPerSide) {
-  // spinePoints: array of [x,y] along the S-curve
-  const n = spinePoints.length;
-  const rightEdge = [];
-  const leftEdge = [];
+// Save seed after paper generation
+const postPaperSeed = seed;
 
-  for (let i = 0; i < n; i++) {
-    const t = i / (n - 1);
-    // Width profile: pointed at both ends, widest at ~35%
-    let wProfile;
-    if (t < 0.05) wProfile = t / 0.05 * 0.15;
-    else if (t < 0.35) wProfile = 0.15 + (t - 0.05) / 0.3 * 0.85;
-    else if (t < 0.92) wProfile = 1.0 - (t - 0.35) / 0.57 * 0.85;
-    else wProfile = 0.15 * (1 - (t - 0.92) / 0.08);
-
-    // Get tangent direction
-    const prev = spinePoints[Math.max(0, i - 1)];
-    const next = spinePoints[Math.min(n - 1, i + 1)];
-    const dx = next[0] - prev[0], dy = next[1] - prev[1];
-    const len = Math.sqrt(dx * dx + dy * dy) || 1;
-    const nx = -dy / len, ny = dx / len; // normal
-
-    const w = maxWidth * wProfile;
-
-    // Serration: sharp barbs like saz feather teeth
-    const serrFreq = serrationsPerSide;
-    const serrPhase = t * serrFreq * Math.PI * 2;
-    const serrAmp = (t > 0.06 && t < 0.93) ? maxWidth * 0.18 * wProfile : 0;
-    // Sawtooth wave for sharper teeth (asymmetric — steep rise, gradual fall)
-    const saw = (phase) => {
-      const p = ((phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-      return p < Math.PI * 0.6 ? p / (Math.PI * 0.6) : 1 - (p - Math.PI * 0.6) / (Math.PI * 1.4);
-    };
-    const serrR = saw(serrPhase) * serrAmp;
-    const serrL = saw(serrPhase + Math.PI * 0.5) * serrAmp * 0.7;
-
-    rightEdge.push([
-      spinePoints[i][0] + nx * (w * 0.65 + serrR),
-      spinePoints[i][1] + ny * (w * 0.65 + serrR)
-    ]);
-    leftEdge.push([
-      spinePoints[i][0] - nx * (w * 0.35 + serrL),
-      spinePoints[i][1] - ny * (w * 0.35 + serrL)
-    ]);
-  }
-
-  return [...rightEdge, ...leftEdge.reverse()];
-}
-
-// Generate S-curve spine as array of points
-function makeSpinePoints(p0, p1, p2, p3, numPoints) {
-  const pts = [];
-  for (let i = 0; i < numPoints; i++) {
-    const t = i / (numPoints - 1);
-    const u = 1 - t;
-    pts.push([
-      u*u*u*p0[0] + 3*u*u*t*p1[0] + 3*u*t*t*p2[0] + t*t*t*p3[0],
-      u*u*u*p0[1] + 3*u*u*t*p1[1] + 3*u*t*t*p2[1] + t*t*t*p3[1]
-    ]);
-  }
-  return pts;
+// ============================================================
+// Bezier helpers
+// ============================================================
+function cubicBezier(p0, p1, p2, p3, t) {
+  const u = 1 - t;
+  return [
+    u*u*u*p0[0] + 3*u*u*t*p1[0] + 3*u*t*t*p2[0] + t*t*t*p3[0],
+    u*u*u*p0[1] + 3*u*u*t*p1[1] + 3*u*t*t*p2[1] + t*t*t*p3[1]
+  ];
 }
 
 // ============================================================
-// Tyler Hobbs Polygon Deformation
+// Tyler Hobbs Polygon Deformation (for bleed phase)
 // ============================================================
-
 function deformOnce(poly, variance) {
   const result = [];
   for (let i = 0; i < poly.length; i++) {
@@ -218,708 +123,355 @@ function deformOnce(poly, variance) {
 
 function deformN(poly, n, variance) {
   let p = poly.map(pt => [pt[0], pt[1]]);
-  for (let i = 0; i < n; i++) {
-    p = deformOnce(p, variance * Math.pow(0.7, i));
-  }
+  for (let i = 0; i < n; i++) p = deformOnce(p, variance * Math.pow(0.7, i));
   return p;
 }
 
-function makeBase(poly) {
-  return deformN(poly, 6, 0.18);  // 6-level deformation for performance
-}
-
 // ============================================================
-// Paper background with LOCAL texture variation (improvement #5)
+// Stroke shape: build polygon from points+widths
 // ============================================================
-
-function drawPaperBackground() {
-  ctx.fillStyle = '#f4ede3';
-  ctx.fillRect(0, 0, W, H);
-  const imgData = ctx.getImageData(0, 0, W, H);
-  const d = imgData.data;
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const idx = (y * W + x) * 4;
-      // Per-pixel random grain
-      const grain = gauss(0, 3.5);
-      // Fine-scale paper tooth
-      const tooth = (fbmNoise(x * 0.15, y * 0.15, 3) - 0.5) * 6;
-      // Local texture variation: large-scale brightness modulation
-      const localVar = (fbmNoise(x * 0.012, y * 0.012, 5) - 0.5) * 16;
-      // Fiber-like streaks (horizontal bias)
-      const fiber = (fbmNoise(x * 0.06, y * 0.012, 4) - 0.5) * 7;
-      const total = grain + tooth + localVar + fiber;
-      d[idx]     = clamp(d[idx] + total, 0, 255);
-      d[idx + 1] = clamp(d[idx + 1] + total, 0, 255);
-      d[idx + 2] = clamp(d[idx + 2] + total - 1.5, 0, 255); // slightly warm
-    }
+function strokeTrailToPolygon(points, widths) {
+  const right = [], left = [];
+  for (let i = 0; i < points.length; i++) {
+    const prev = points[Math.max(0, i - 1)];
+    const next = points[Math.min(points.length - 1, i + 1)];
+    const dx = next[0] - prev[0], dy = next[1] - prev[1];
+    const len = Math.sqrt(dx*dx + dy*dy) || 1;
+    const nx = -dy / len, ny = dx / len;
+    const w = widths[i];
+    right.push([points[i][0] + nx * w, points[i][1] + ny * w]);
+    left.push([points[i][0] - nx * w, points[i][1] - ny * w]);
   }
-  ctx.putImageData(imgData, 0, 0);
+  return [...right, ...left.reverse()];
 }
-drawPaperBackground();
 
 // ============================================================
-// Colors
+// Define petal strokes — bezier curves with width/color
 // ============================================================
+const roseCx = W * 0.50, roseCy = H * 0.38;
 
-// Ottoman three-shade: light→medium→dark from outside→inside
-// Each petal gets ±8 random hue shift so no two are identical
+// Reset to deterministic seed for geometry
+seed = postPaperSeed;
+
+function makePetalStroke(baseX, baseY, angle, length, maxWidth, curvature, color) {
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  const cn = -sa, sn = ca;
+  const p0 = [baseX, baseY];
+  const p1 = [baseX + ca * length * 0.33 + cn * curvature * length * 0.25,
+              baseY + sa * length * 0.33 + sn * curvature * length * 0.25];
+  const p2 = [baseX + ca * length * 0.66 + cn * curvature * length * 0.4,
+              baseY + sa * length * 0.66 + sn * curvature * length * 0.4];
+  const p3 = [baseX + ca * length + cn * curvature * length * 0.12,
+              baseY + sa * length + sn * curvature * length * 0.12];
+  return { p0, p1, p2, p3, maxWidth, color, length };
+}
+
+// Width profile: thin base → swell → taper at tip
+function petalWidth(t) {
+  if (t < 0.08) return t / 0.08 * 0.25;
+  if (t < 0.25) return 0.25 + (t - 0.08) / 0.17 * 0.75;
+  if (t < 0.65) return 1.0;
+  return 1.0 - ((t - 0.65) / 0.35) * 0.85;
+}
+
 function varyColor(base) {
-  const shift = gauss(0, 8);
-  return [
-    clamp(Math.round(base[0] + shift), 0, 255),
-    clamp(Math.round(base[1] + shift * 0.4), 0, 255),
-    clamp(Math.round(base[2] + shift * 0.6), 0, 255)
-  ];
+  const s = gauss(0, 8);
+  return [clamp(Math.round(base[0]+s),0,255), clamp(Math.round(base[1]+s*0.4),0,255), clamp(Math.round(base[2]+s*0.6),0,255)];
 }
-const PETAL_CENTER_BASE = [100, 15, 35];   // burgundy/maroon
-const PETAL_INNER_BASE = [140, 20, 50];    // deep dark crimson
-const PETAL_MID_BASE   = [180, 35, 65];    // medium crimson
-const PETAL_OUTER_BASE = [220, 60, 90];    // lightest pink
 
-const LEAF_COLORS = [
-  [38, 100, 45],   // deep green
-  [55, 120, 48],   // sap green
-  [30, 85, 38],    // forest green
-  [48, 110, 52],   // mid green
-  [60, 125, 55],   // bright green
-];
-const STALK_COLORS = [
-  [35, 88, 35],    // dark green
-  [45, 98, 40],    // mid green
-  [50, 80, 32],    // olive
-];
+const COL_OUTER = [215, 55, 85];
+const COL_MID   = [175, 30, 60];
+const COL_INNER = [135, 18, 45];
+const COL_CENTER= [95, 12, 32];
+const COL_LEAF  = [38, 100, 45];
+const COL_STALK = [35, 88, 35];
 
-// ============================================================
-// Define elements — IMPROVEMENT #1: Actual petal shapes
-// ============================================================
+const allStrokes = [];
 
-const roseCx = W * 0.50, roseCy = H * 0.36;
-const rosePetals = [];
+// --- Stalk ---
+allStrokes.push({
+  ...makePetalStroke(W*0.50, H*0.78, -Math.PI/2+0.04, H*0.38, 8, 0.06, COL_STALK),
+  _isStalk: true
+});
 
-// Center cluster: 8 tight petals (darkest) — dense peony core, varied angles
+// --- Leaves ---
+allStrokes.push(makePetalStroke(W*0.46, H*0.56, Math.PI+0.5, 110, 20, -0.45, varyColor(COL_LEAF)));
+allStrokes.push(makePetalStroke(W*0.54, H*0.56, -0.4, 95, 17, 0.4, varyColor(COL_LEAF)));
+
+// --- Outer petals: 8 long sweeping strokes ---
 for (let i = 0; i < 8; i++) {
-  const angle = (i / 8) * Math.PI * 2 + gauss(0, 0.3);
-  const dist = gauss(5, 2);
-  const bx = roseCx + Math.cos(angle) * dist;
-  const by = roseCy + Math.sin(angle) * dist;
-  // Vary sizes: some small, some medium, to break symmetry
-  const sizeVar = 0.7 + rand() * 0.6;
-  rosePetals.push({
-    poly: makePetalPoly(bx, by, angle + gauss(0, 0.35), gauss(36, 4) * sizeVar, gauss(28, 3) * sizeVar, gauss(0, 0.6)),
-    color: varyColor(PETAL_INNER_BASE),
-    ring: 'inner'
-  });
-}
-// Extra center fill: short fat petals + a center dot to close the gap
-for (let i = 0; i < 5; i++) {
-  const angle = (i / 5) * Math.PI * 2 + gauss(0, 0.5);
-  rosePetals.push({
-    poly: makePetalPoly(roseCx + gauss(0, 3), roseCy + gauss(0, 3), angle, gauss(16, 2), gauss(14, 2), gauss(0, 0.4)),
-    color: varyColor(PETAL_CENTER_BASE), // burgundy/maroon center
-    ring: 'inner'
-  });
+  const a = (i/8)*Math.PI*2 + gauss(0,0.12);
+  const d = gauss(18,4);
+  const curv = (i % 2 === 0 ? 1 : -1) * (0.35 + rand() * 0.45);
+  allStrokes.push(makePetalStroke(
+    roseCx+Math.cos(a)*d, roseCy+Math.sin(a)*d,
+    a+gauss(0,0.15), gauss(90,6), gauss(36,4), curv,
+    varyColor(COL_OUTER)
+  ));
 }
 
-// Middle ring: 9 medium petals — heavy overlap for fullness
-for (let i = 0; i < 9; i++) {
-  const angle = (i / 9) * Math.PI * 2 + gauss(0, 0.12) + 0.18;
-  const dist = gauss(20, 4);
-  const bx = roseCx + Math.cos(angle) * dist;
-  const by = roseCy + Math.sin(angle) * dist;
-  rosePetals.push({
-    poly: makePetalPoly(bx, by, angle + gauss(0, 0.18), gauss(58, 5), gauss(44, 4), gauss(0, 0.7)),
-    color: varyColor(PETAL_MID_BASE),
-    ring: 'mid'
-  });
-}
-
-// Fill ring: 5 petals between mid and outer for density
-for (let i = 0; i < 5; i++) {
-  const angle = (i / 5) * Math.PI * 2 + gauss(0, 0.15) + 1.1;
-  const dist = gauss(26, 4);
-  const bx = roseCx + Math.cos(angle) * dist;
-  const by = roseCy + Math.sin(angle) * dist;
-  rosePetals.push({
-    poly: makePetalPoly(bx, by, angle + gauss(0, 0.2), gauss(60, 5), gauss(42, 4), gauss(0, 0.8)),
-    color: varyColor(PETAL_MID_BASE),
-    ring: 'mid'
-  });
-}
-
-// Outer ring: 8 large floppy petals — big romantic peony, heavily overlapping
+// --- Mid petals: 8 overlapping ---
 for (let i = 0; i < 8; i++) {
-  const angle = (i / 8) * Math.PI * 2 + gauss(0, 0.15) + 0.4;
-  const dist = gauss(30, 7);
-  const bx = roseCx + Math.cos(angle) * dist;
-  const by = roseCy + Math.sin(angle) * dist;
-  const sizeVar = 0.9 + rand() * 0.35;
-  rosePetals.push({
-    poly: makePetalPoly(bx, by, angle + gauss(0, 0.3), gauss(85, 8) * sizeVar, gauss(62, 6) * sizeVar, gauss(0, 1.2)),
-    color: varyColor(PETAL_OUTER_BASE),
-    ring: 'outer'
-  });
+  const a = (i/8)*Math.PI*2 + gauss(0,0.15) + 0.22;
+  const d = gauss(12,3);
+  const curv = (i % 2 === 0 ? -1 : 1) * (0.3 + rand() * 0.5);
+  allStrokes.push(makePetalStroke(
+    roseCx+Math.cos(a)*d, roseCy+Math.sin(a)*d,
+    a+gauss(0,0.2), gauss(65,5), gauss(30,4), curv,
+    varyColor(COL_MID)
+  ));
 }
 
-// Calyx: 5 small green sepals radiating out from beneath the flower
-const calyxPolys = [];
+// --- Inner petals: 6 tight, curving to create spiral center ---
+for (let i = 0; i < 6; i++) {
+  const a = (i/6)*Math.PI*2 + gauss(0,0.2);
+  const d = gauss(5,2);
+  const curv = (i % 2 === 0 ? 1 : -1) * (0.5 + rand() * 0.5);
+  allStrokes.push(makePetalStroke(
+    roseCx+Math.cos(a)*d, roseCy+Math.sin(a)*d,
+    a+gauss(0,0.25), gauss(42,4), gauss(22,3), curv,
+    varyColor(COL_INNER)
+  ));
+}
+
+// --- Center fill: 5 short dabs ---
 for (let i = 0; i < 5; i++) {
-  const angle = (i / 5) * Math.PI * 2 + gauss(0, 0.15);
-  // Point outward and slightly downward from flower base
-  const outAngle = angle + gauss(0, 0.2);
-  const bx = roseCx + Math.cos(angle) * 12;
-  const by = roseCy + 40 + Math.sin(angle) * 6;
-  calyxPolys.push(makePetalPoly(bx, by, outAngle, gauss(26, 3), gauss(8, 1.5), gauss(0, 0.3)));
+  const a = (i/5)*Math.PI*2 + gauss(0,0.4);
+  const curv = gauss(0, 0.7);
+  allStrokes.push(makePetalStroke(
+    roseCx+gauss(0,4), roseCy+gauss(0,4),
+    a, gauss(24,3), gauss(16,3), curv,
+    varyColor(COL_CENTER)
+  ));
 }
 
-// ============================================================
-// IMPROVEMENT #3: Proper saz leaves with serrated edges
-// ============================================================
-
-// Left saz leaf: emerges from mid-stalk, sweeps left and up
-// Reduced ~40% — spine endpoints pulled toward base, narrower width
-const leftLeafBase = [W * 0.46, H * 0.52];
-const leftLeafSpine = makeSpinePoints(
-  leftLeafBase,
-  [lerp(leftLeafBase[0], W * 0.18, 0.6), lerp(leftLeafBase[1], H * 0.50, 0.6)],
-  [lerp(leftLeafBase[0], W * 0.06, 0.6), lerp(leftLeafBase[1], H * 0.38, 0.6)],
-  [lerp(leftLeafBase[0], W * 0.04, 0.6), lerp(leftLeafBase[1], H * 0.18, 0.6)],
-  120
-);
-const leftLeafPoly = makeSazLeaf(leftLeafSpine, 26, 18);
-
-// Right saz leaf: emerges well below flower, sweeps right and up
-// Reduced ~40% — spine endpoints pulled toward base, narrower width
-const rightLeafBase = [W * 0.54, H * 0.52];
-const rightLeafSpine = makeSpinePoints(
-  rightLeafBase,
-  [lerp(rightLeafBase[0], W * 0.76, 0.6), lerp(rightLeafBase[1], H * 0.48, 0.6)],
-  [lerp(rightLeafBase[0], W * 0.88, 0.6), lerp(rightLeafBase[1], H * 0.36, 0.6)],
-  [lerp(rightLeafBase[0], W * 0.90, 0.6), lerp(rightLeafBase[1], H * 0.20, 0.6)],
-  100
-);
-const rightLeafPoly = makeSazLeaf(rightLeafSpine, 20, 15);
-
-// Small accent leaf: droops from lower stalk, down and left
-const smallLeafSpine = makeSpinePoints(
-  [W * 0.46, H * 0.58],   // base on lower stalk
-  [W * 0.30, H * 0.62],   // droops down-left
-  [W * 0.20, H * 0.60],   // continues down
-  [W * 0.16, H * 0.54],   // tip hangs
-  60
-);
-const smallLeafPoly = makeSazLeaf(smallLeafSpine, 16, 10);
-
-const leafPolys = [leftLeafPoly, rightLeafPoly, smallLeafPoly];
+// Save geometry seed
+const postGeomSeed = seed;
 
 // ============================================================
-// IMPROVEMENT #4: Curved stalk — single continuous polygon
+// Pre-compute per-stroke sample points (deterministic)
 // ============================================================
+const SAMPLES_PER_STROKE = 80;
 
-const stalkStartY = H * 0.78, stalkEndY = roseCy + 20;
-const stalkN = 30;
-const stalkCurveX = (s) => W * 0.50 + Math.sin(s * Math.PI * 1.1) * 10 - s * 4;
-
-// Build stalk as a single ribbon polygon (right edge + left edge reversed)
-const stalkRight = [], stalkLeft = [];
-for (let i = 0; i <= stalkN; i++) {
-  const t = i / stalkN;
-  const y = lerp(stalkStartY, stalkEndY, t);
-  const x = stalkCurveX(t);
-  // Width tapers: wider at base (5px), thin at top (2px)
-  const w = lerp(5.0, 2.0, t);
-  // Tangent for perpendicular offset
-  const dt = 0.01;
-  const x0 = stalkCurveX(Math.max(0, t - dt)), y0 = lerp(stalkStartY, stalkEndY, Math.max(0, t - dt));
-  const x1 = stalkCurveX(Math.min(1, t + dt)), y1 = lerp(stalkStartY, stalkEndY, Math.min(1, t + dt));
-  const dx = x1 - x0, dy = y1 - y0;
-  const len = Math.sqrt(dx * dx + dy * dy) || 1;
-  const nx = -dy / len, ny = dx / len;
-  stalkRight.push([x + nx * w, y + ny * w]);
-  stalkLeft.push([x - nx * w, y - ny * w]);
-}
-const stalkPoly = [...stalkRight, ...stalkLeft.reverse()];
-
-// Split into 3 overlapping sections for color variation
-const stalkPolys = [];
-const third = Math.floor(stalkRight.length / 3);
-for (let s = 0; s < 3; s++) {
-  const start = Math.max(0, s * third - 3);
-  const end = Math.min(stalkRight.length, (s + 1) * third + 3);
-  const rSlice = stalkRight.slice(start, end);
-  const lSlice = stalkLeft.slice(start, end).slice().reverse();
-  stalkPolys.push([...rSlice, ...lSlice]);
-}
-
-// ============================================================
-// PHYLLOTAXIS: Small buds & petals along the stalk
-// Golden angle = 137.5° for natural botanical distribution
-// ============================================================
-
-const GOLDEN_ANGLE = 137.508 * Math.PI / 180;
-const budElements = [];
-const numBuds = 7;
-
-for (let i = 0; i < numBuds; i++) {
-  const t = 0.15 + (i / numBuds) * 0.65; // distribute along stalk (15%-80%)
-  const y = lerp(stalkStartY, stalkEndY, t);
-  const x = stalkCurveX(t);
-  const phiAngle = i * GOLDEN_ANGLE;
-  // Alternate sides, distance from stalk varies
-  const side = Math.cos(phiAngle) > 0 ? 1 : -1;
-  const dist = 14 + Math.abs(Math.sin(phiAngle)) * 22;
-  const budX = x + side * dist;
-  const budY = y + Math.sin(phiAngle) * 8;
-
-  // Small stem connecting bud to main stalk
-  const stemPoly = makeRect((x + budX) / 2, (y + budY) / 2,
-    Math.sqrt((budX-x)**2 + (budY-y)**2), 2,
-    Math.atan2(budY - y, budX - x));
-  budElements.push({ poly: stemPoly, color: STALK_COLORS[i % STALK_COLORS.length], type: 'sepal' });
-
-  // Size decreases further from main bloom (lower on stalk = smaller)
-  const budScale = 0.5 + (1 - t) * 0.6;
-
-  if (i < 3) {
-    // Closed buds: teardrop shape — soft pink
-    const budAngle = Math.atan2(-1, side * 0.5) + gauss(0, 0.3);
-    const budPoly = makePetalPoly(budX, budY, budAngle, 22 * budScale, 12 * budScale, gauss(0, 0.3));
-    budElements.push({
-      poly: budPoly,
-      color: varyColor(PETAL_OUTER_BASE),
-      type: 'bud'
-    });
-  } else {
-    // Slightly open buds: 2-3 small petals fanning out — soft pink
-    const numPetals = 2 + Math.floor(rand() * 2);
-    const baseAngle = Math.atan2(-1, side * 0.3) + gauss(0, 0.2);
-    for (let p = 0; p < numPetals; p++) {
-      const pAngle = baseAngle + (p - numPetals/2) * 0.45 + gauss(0, 0.15);
-      const pLen = gauss(26, 4) * budScale;
-      const pWid = gauss(16, 3) * budScale;
-      const pPoly = makePetalPoly(budX, budY, pAngle, pLen, pWid, gauss(0, 0.5));
-      budElements.push({
-        poly: pPoly,
-        color: varyColor(PETAL_OUTER_BASE),
-        type: 'bud'
-      });
-    }
+for (const s of allStrokes) {
+  s._samples = [];
+  for (let i = 0; i <= SAMPLES_PER_STROKE; i++) {
+    const t = i / SAMPLES_PER_STROKE;
+    const pt = cubicBezier(s.p0, s.p1, s.p2, s.p3, t);
+    const pressure = s._isStalk ? 0.55 : petalWidth(t);
+    const radius = s.maxWidth * pressure * 0.5;
+    // Pre-compute jitter
+    const jx = gauss(0, radius * 0.1);
+    const jy = gauss(0, radius * 0.1);
+    s._samples.push({ x: pt[0]+jx, y: pt[1]+jy, r: radius, pressure, t });
   }
+  // Pre-compute stroke polygon for bleed phase
+  const pts = s._samples.map(s => [s.x, s.y]);
+  const wds = s._samples.map(s => s.r);
+  s._polygon = strokeTrailToPolygon(pts, wds);
 }
 
 // ============================================================
-// Build element list
+// Animation schedule
+// Stalk: frames 0-7 draw, 8-19 bleed
+// Left leaf: frames 4-11 draw, 12-23 bleed
+// Right leaf: frames 8-15 draw, 16-27 bleed
+// Outer petals (7): each 3 frames apart starting frame 14
+//   petal 0: 14-21 draw, 22-33 bleed
+//   petal 1: 17-24 draw, 25-36 bleed...
+// Mid petals: continue after outer
+// Inner petals: continue after mid
+// Center: last
 // ============================================================
 
-const elements = [];
+const DRAW_FRAMES = 8;
+const BLEED_FRAMES = 14;
 
-// Rose exclusion zone — generous radius to fully clear leaves behind flower
-const ROSE_EXCLUSION_R = 120;
+let nextStart = 0;
+// Stalk
+allStrokes[0]._startFrame = 0;
+nextStart = 5;
+// Leaves
+allStrokes[1]._startFrame = nextStart; nextStart += 5;
+allStrokes[2]._startFrame = nextStart; nextStart += 5;
+// Petals: tight stagger — 2 frame gap
+for (let i = 3; i < allStrokes.length; i++) {
+  allStrokes[i]._startFrame = nextStart;
+  nextStart += 2;
+}
 
-// Stalk segments (back layer)
-stalkPolys.forEach((poly, i) => {
-  elements.push({
-    base: deformN(poly, 5, 0.04),
-    color: STALK_COLORS[i % STALK_COLORS.length],
-    layerVariance: 0.03,
-    hardEdge: false,
-    isLeaf: false,
-    startFrame: 0,
-    priority: 0, index: i
-  });
-});
-
-// Leaves (mid layer) — flagged for rose exclusion clipping
-leafPolys.forEach((poly, i) => {
-  elements.push({
-    base: makeBase(poly),
-    color: LEAF_COLORS[i % LEAF_COLORS.length],
-    layerVariance: 0.08,
-    hardEdge: true,
-    isLeaf: true,
-    startFrame: 12,
-    priority: 1, index: i
-  });
-});
-
-// Calyx (between stalk and flower)
-calyxPolys.forEach((poly, i) => {
-  elements.push({
-    base: deformN(poly, 6, 0.10),
-    color: [45, 95, 42],
-    layerVariance: 0.06,
-    hardEdge: false,
-    isLeaf: false,
-    startFrame: 18,
-    priority: 1, index: 100 + i
-  });
-});
-
-// Phyllotaxis buds along stalk
-budElements.filter(b => b.type === 'sepal').forEach((b, i) => {
-  elements.push({
-    base: deformN(b.poly, 5, 0.12),
-    color: b.color,
-    layerVariance: 0.08,
-    hardEdge: false,
-    isLeaf: false,
-    alphaScale: 1.0,
-    startFrame: 10,
-    priority: 1, index: 200 + i
-  });
-});
-budElements.filter(b => b.type === 'bud').forEach((b, i) => {
-  elements.push({
-    base: deformN(b.poly, 5, 0.14),
-    color: b.color,
-    layerVariance: 0.10,
-    hardEdge: false,
-    isLeaf: false,
-    alphaScale: 1.2,
-    startFrame: 18,
-    priority: 1, index: 300 + i
-  });
-});
-
-// Rose petals — outer first, inner on top
-rosePetals.filter(p => p.ring === 'outer').forEach((p, i) => {
-  elements.push({
-    base: makeBase(p.poly),
-    color: p.color,
-    layerVariance: 0.12,
-    hardEdge: false,
-    isLeaf: false,
-    alphaScale: 1.8,
-    startFrame: 35,
-    priority: 2, index: i
-  });
-});
-rosePetals.filter(p => p.ring === 'mid').forEach((p, i) => {
-  elements.push({
-    base: makeBase(p.poly),
-    color: p.color,
-    layerVariance: 0.10,
-    hardEdge: false,
-    isLeaf: false,
-    alphaScale: 1.3,
-    startFrame: 55,
-    priority: 3, index: i
-  });
-});
-rosePetals.filter(p => p.ring === 'inner').forEach((p, i) => {
-  elements.push({
-    base: makeBase(p.poly),
-    color: p.color,
-    layerVariance: 0.09,
-    hardEdge: false,
-    isLeaf: false,
-    startFrame: 70,
-    priority: 4, index: i
-  });
-});
-
-elements.sort((a, b) => a.priority - b.priority || a.index - b.index);
+// State per stroke
+const states = allStrokes.map(s => ({
+  stroke: s,
+  startFrame: s._startFrame,
+  phase: 'waiting',
+  drawProgress: 0,   // 0→1
+  bleedFrame: 0,
+  bleedPolys: [],
+  _bleedSeed: Math.floor(rand() * 100000),
+}));
 
 // ============================================================
-// Rendering — Progressive "Watching Paint Dry" System
-// Elements stagger in by priority, each builds up over many frames
+// Draw brush dabs onto canvas — ADDITIVE, no clearing
 // ============================================================
+function drawDabsRange(stroke, fromT, toT) {
+  const [r, g, b] = stroke.color;
+  const samples = stroke._samples;
 
-const TARGET_LAYERS = 40;          // layers per element
-const LAYERS_PER_EL_PER_FRAME = 2; // max layers an element gains per frame
-const LAYER_ALPHA = 0.07;
+  for (const s of samples) {
+    if (s.t < fromT || s.t > toT) continue;
+    if (s.r < 0.5) continue;
 
-// Pre-compute texture masks: large overlapping circles that SUBTRACT from solid fill
-// Tyler's method: fill solid, then modulate with large circles for subtle variation
-const NUM_MASKS = 4;
-const maskData = [];
-for (let m = 0; m < NUM_MASKS; m++) {
-  const circles = [];
-  for (let j = 0; j < 300; j++) {
-    circles.push([rand() * W, rand() * H, Math.abs(gauss(W * 0.06, W * 0.025))]);
+    // Multi-pass dab: concentric circles for soft brush feel
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+
+    // Core: solid, high alpha
+    ctx.globalAlpha = stroke._isStalk ? 0.22 : 0.18;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Mid ring
+    ctx.globalAlpha = stroke._isStalk ? 0.14 : 0.12;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Outer haze
+    ctx.globalAlpha = stroke._isStalk ? 0.06 : 0.05;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r * 1.0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Extra soft bloom
+    ctx.globalAlpha = 0.02;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r * 1.3, 0, Math.PI * 2);
+    ctx.fill();
   }
-  maskData.push(circles);
-}
-
-function strokePoly(tCtx, poly) {
-  tCtx.beginPath();
-  tCtx.moveTo(poly[0][0], poly[0][1]);
-  for (let i = 1; i < poly.length; i++) tCtx.lineTo(poly[i][0], poly[i][1]);
-  tCtx.closePath();
-  tCtx.stroke();
-}
-
-// Pre-compute 2 deformed variants per element for reuse
-const PRE_DEFORM_COUNT = 2;
-for (const el of elements) {
-  el._preDeformed = [];
-  for (let d = 0; d < PRE_DEFORM_COUNT; d++) {
-    el._preDeformed.push(deformN(el.base, 1, el.layerVariance || 0.08));
-  }
-  el._layersRendered = 0;
-  el._done = false;
-}
-
-// --- Rose exclusion clip helper ---
-function applyRoseExclusion() {
-  ctx.beginPath();
-  ctx.rect(0, 0, W, H);
-  ctx.arc(roseCx, roseCy, ROSE_EXCLUSION_R, 0, Math.PI * 2, true);
-  ctx.clip('evenodd');
-}
-
-// Offscreen canvas for texture masking (fill solid, then subtract)
-const offCanvas = document.createElement('canvas');
-offCanvas.width = W;
-offCanvas.height = H;
-const offCtx = offCanvas.getContext('2d');
-
-function drawTexturedLayer(el, layerIdx) {
-  const progress = layerIdx / TARGET_LAYERS; // 0→1 over element lifetime
-  const varianceScale = Math.pow(progress, 0.7); // ramps up: tight early, spread late
-  const baseVariance = el.layerVariance || 0.08;
-  const [r, g, b] = el.color;
-
-  // Frame 0: crisp sharp outline only (pen stroke)
-  if (layerIdx === 0) {
-    ctx.save();
-    if (el.isLeaf) applyRoseExclusion();
-    ctx.globalAlpha = 0.25 * (el.alphaScale || 1.0);
-    ctx.strokeStyle = `rgb(${r},${g},${b})`;
-    ctx.lineWidth = 1.0;
-    ctx.lineJoin = 'round';
-    strokePoly(ctx, el.base);
-    ctx.restore();
-    ctx.globalAlpha = 1.0;
-    return;
-  }
-
-  // Progressive deformation: early layers tight to base, later layers spread
-  const sourcePoly = varianceScale < 0.3
-    ? el.base  // very early: use undeformed base
-    : el._preDeformed[layerIdx % PRE_DEFORM_COUNT]; // later: use pre-deformed
-  const layerPoly = deformOnce(sourcePoly, baseVariance * 0.7 * varianceScale);
-
-  // Bounding box for optimization
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const [px, py] of layerPoly) {
-    if (px < minX) minX = px; if (px > maxX) maxX = px;
-    if (py < minY) minY = py; if (py > maxY) maxY = py;
-  }
-  const bx = Math.max(0, Math.floor(minX) - 2);
-  const by = Math.max(0, Math.floor(minY) - 2);
-  const bw = Math.min(W, Math.ceil(maxX) + 2) - bx;
-  const bh = Math.min(H, Math.ceil(maxY) + 2) - by;
-  if (bw <= 0 || bh <= 0) return;
-
-  // Step 1: Fill deformed polygon SOLID on offscreen canvas
-  offCtx.clearRect(bx, by, bw, bh);
-  offCtx.globalCompositeOperation = 'source-over';
-  offCtx.globalAlpha = 1.0;
-  offCtx.fillStyle = `rgb(${r},${g},${b})`;
-  offCtx.beginPath();
-  offCtx.moveTo(layerPoly[0][0], layerPoly[0][1]);
-  for (let i = 1; i < layerPoly.length; i++) offCtx.lineTo(layerPoly[i][0], layerPoly[i][1]);
-  offCtx.closePath();
-  offCtx.fill();
-
-  // Step 2: Texture mask — subtract circles to create subtle paper-showing-through
-  // Large overlapping circles at low alpha erode the solid fill slightly
-  offCtx.globalCompositeOperation = 'destination-out';
-  offCtx.globalAlpha = 0.08; // subtle subtraction
-  const circles = maskData[layerIdx % NUM_MASKS];
-  for (let j = 0; j < circles.length; j++) {
-    const cx = circles[j][0], cy = circles[j][1], cr = circles[j][2];
-    if (cx + cr < minX || cx - cr > maxX || cy + cr < minY || cy - cr > maxY) continue;
-    offCtx.beginPath();
-    offCtx.arc(cx, cy, cr, 0, Math.PI * 2);
-    offCtx.fill();
-  }
-
-  // Step 3: Composite the textured layer onto main canvas at layer alpha
-  ctx.save();
-
-  // Leaf exclusion: clip out the rose area so leaves don't poke through
-  if (el.isLeaf) applyRoseExclusion();
-
-  ctx.globalAlpha = LAYER_ALPHA * (el.alphaScale || 1.0);
-  ctx.drawImage(offCanvas, bx, by, bw, bh, bx, by, bw, bh);
-  ctx.restore();
   ctx.globalAlpha = 1.0;
 }
 
-// --- Post-processing: outlines, veins, mixbox ---
-function doPostProcessing() {
-  for (const el of elements) {
-    const [r, g, b] = el.color;
-    const dr = Math.max(0, Math.round(r * 0.55));
-    const dg = Math.max(0, Math.round(g * 0.50));
-    const db = Math.max(0, Math.round(b * 0.55));
+// Draw a visible brush head at the leading edge
+function drawBrushTip(stroke, t) {
+  if (t < 0.01 || t > 0.99) return;
+  const pt = cubicBezier(stroke.p0, stroke.p1, stroke.p2, stroke.p3, t);
+  const pressure = stroke._isStalk ? 0.55 : petalWidth(t);
+  const r = stroke.maxWidth * pressure * 0.55;
+  const [cr, cg, cb] = stroke.color;
+  const dr = Math.max(0, Math.round(cr * 0.65));
+  const dg = Math.max(0, Math.round(cg * 0.65));
+  const db = Math.max(0, Math.round(cb * 0.65));
 
-    if (el.priority === 1 && el.isLeaf) {
-      // Leaf bloom with rose exclusion
-      ctx.save();
-      applyRoseExclusion();
-      const bloomPoly = deformN(el.base, 6, 0.07);
-      ctx.globalAlpha = 0.02;
-      ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
-      ctx.lineWidth = 2.5;
-      ctx.lineJoin = 'round';
-      strokePoly(ctx, bloomPoly);
-      ctx.restore();
-      ctx.globalAlpha = 1.0;
-    }
+  // Dense wet pigment at brush head
+  ctx.globalAlpha = 0.38;
+  ctx.fillStyle = `rgb(${dr},${dg},${db})`;
+  ctx.beginPath();
+  ctx.arc(pt[0], pt[1], r * 0.35, 0, Math.PI * 2);
+  ctx.fill();
 
-    if (el.priority >= 2 && el.priority <= 4) {
-      // Petal outlines at 20% strength
-      for (let pass = 0; pass < 3; pass++) {
-        const haloPoly = deformN(el.base, 5, 0.04 + pass * 0.008);
-        ctx.globalAlpha = (0.09 - pass * 0.02) * 0.2;
-        ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
-        ctx.lineWidth = 1.0;
-        ctx.lineJoin = 'round';
-        strokePoly(ctx, haloPoly);
-      }
-      for (let pass = 0; pass < 2; pass++) {
-        const bloomPoly = deformN(el.base, 6, 0.07 + pass * 0.02);
-        ctx.globalAlpha = 0.035 * 0.2;
-        ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
-        ctx.lineWidth = 2.5 + pass * 1.5;
-        ctx.lineJoin = 'round';
-        strokePoly(ctx, bloomPoly);
-      }
-      ctx.globalAlpha = 1.0;
-    }
-  }
+  // Medium wet halo
+  ctx.globalAlpha = 0.18;
+  ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
+  ctx.beginPath();
+  ctx.arc(pt[0], pt[1], r * 0.7, 0, Math.PI * 2);
+  ctx.fill();
 
-  // Leaf veins with rose exclusion
-  function drawLeafVein(spinePoints, color) {
-    const [r, g, b] = color;
-    const vr = Math.max(0, Math.round(r * 0.45));
-    const vg = Math.max(0, Math.round(g * 0.45));
-    const vb = Math.max(0, Math.round(b * 0.45));
-    ctx.save();
-    applyRoseExclusion();
-    ctx.strokeStyle = `rgb(${vr},${vg},${vb})`;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.globalAlpha = 0.10;
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(spinePoints[0][0], spinePoints[0][1]);
-    for (let i = 1; i < spinePoints.length; i++) ctx.lineTo(spinePoints[i][0], spinePoints[i][1]);
-    ctx.stroke();
-    ctx.globalAlpha = 0.06;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(spinePoints[0][0], spinePoints[0][1]);
-    for (let i = 1; i < spinePoints.length; i++) ctx.lineTo(spinePoints[i][0], spinePoints[i][1]);
-    ctx.stroke();
-    ctx.restore();
-    ctx.globalAlpha = 1.0;
-  }
-  drawLeafVein(leftLeafSpine, LEAF_COLORS[0]);
-  drawLeafVein(rightLeafSpine, LEAF_COLORS[1]);
-  drawLeafVein(smallLeafSpine, LEAF_COLORS[2]);
+  // Outer wet spread
+  ctx.globalAlpha = 0.06;
+  ctx.beginPath();
+  ctx.arc(pt[0], pt[1], r * 1.4, 0, Math.PI * 2);
+  ctx.fill();
 
-  // Mixbox pigment blending
-  if (typeof mixbox !== 'undefined') {
-    const imgData = ctx.getImageData(0, 0, W, H);
-    const d = imgData.data;
-    const paperR = 244, paperG = 237, paperB = 227;
-    for (let i = 0; i < d.length; i += 4) {
-      const r = d[i], g = d[i+1], b = d[i+2];
-      const dr2 = paperR - r, dg2 = paperG - g, db2 = paperB - b;
-      const dev = Math.sqrt(dr2*dr2 + dg2*dg2 + db2*db2);
-      if (dev > 25) {
-        const mixed = mixbox.lerp(
-          [r, g, b, 255],
-          [Math.max(0, r - 12), Math.max(0, g - 8), Math.max(0, b - 12), 255],
-          0.12
-        );
-        d[i] = mixed[0]; d[i+1] = mixed[1]; d[i+2] = mixed[2];
-      }
-    }
-    ctx.putImageData(imgData, 0, 0);
-  }
+  ctx.globalAlpha = 1.0;
+}
+
+// Draw bleed polygon layer
+function drawBleedLayer(poly, color, alpha) {
+  const [r, g, b] = color;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  ctx.beginPath();
+  ctx.moveTo(poly[0][0], poly[0][1]);
+  for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i][0], poly[i][1]);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
 // ============================================================
-// Progressive render loop — "watching paint dry"
-// Elements stagger in by startFrame, each builds watercolor
-// layers gradually. Supports _synthFrame for headless capture.
+// FRAME-DRIVEN ANIMATION — called via window._step()
+// Persistent canvas: each frame only ADDS new paint
 // ============================================================
-
-window._renderComplete = false;
-window._renderProgress = 0;
-window._fps = 0;
 
 let frameCount = 0;
-let lastTimestamp = 0;
-let postDone = false;
-const totalLayersAll = elements.length * TARGET_LAYERS;
+window._renderComplete = false;
 
-// Synth mode: when window._synthFrame is set before page load,
-// render only advances one step per _synthFrame trigger.
-let synthMode = !!window._synthFrame;
-if (synthMode) window._synthFrame = false; // consume initial trigger
+window._step = function() {
+  for (const st of states) {
+    if (st.phase === 'done') continue;
 
-function renderStep(timestamp) {
-  // In synth mode, only advance if _synthFrame is set
-  if (synthMode && !window._synthFrame) {
-    requestAnimationFrame(renderStep);
-    return;
-  }
-  if (synthMode) window._synthFrame = false; // consume trigger
-
-  if (!lastTimestamp) lastTimestamp = timestamp;
-  const dt = timestamp - lastTimestamp;
-  lastTimestamp = timestamp;
-  window._fps = dt > 0 ? Math.round(1000 / dt) : 60;
-
-  let layersDoneTotal = 0;
-  const allDone = elements.every(el => el._done);
-
-  if (!allDone) {
-    // Each frame: give every active element up to LAYERS_PER_EL_PER_FRAME layers
-    for (const el of elements) {
-      if (el._done) {
-        layersDoneTotal += TARGET_LAYERS;
-        continue;
-      }
-      if (frameCount < el.startFrame) {
-        layersDoneTotal += el._layersRendered;
-        continue;
-      }
-
-      for (let l = 0; l < LAYERS_PER_EL_PER_FRAME && el._layersRendered < TARGET_LAYERS; l++) {
-        drawTexturedLayer(el, el._layersRendered);
-        el._layersRendered++;
-      }
-
-      layersDoneTotal += el._layersRendered;
-      if (el._layersRendered >= TARGET_LAYERS) el._done = true;
+    if (st.phase === 'waiting' && frameCount >= st.startFrame) {
+      st.phase = 'drawing';
+      st.drawProgress = 0;
     }
 
-    frameCount++;
-    window._renderProgress = layersDoneTotal / totalLayersAll;
+    if (st.phase === 'drawing') {
+      const prevProgress = st.drawProgress;
+      st.drawProgress += 1 / DRAW_FRAMES;
+      if (st.drawProgress > 1) st.drawProgress = 1;
+
+      // Draw new dabs for this frame's progress increment
+      drawDabsRange(st.stroke, prevProgress, st.drawProgress);
+
+      // Brush tip highlight
+      drawBrushTip(st.stroke, st.drawProgress);
+
+      if (st.drawProgress >= 1) {
+        st.phase = 'bleeding';
+        st.bleedFrame = 0;
+      }
+    }
+
+    if (st.phase === 'bleeding') {
+      st.bleedFrame++;
+      // Add deformed bleed layer every frame
+      seed = st._bleedSeed + st.bleedFrame * 31;
+      const variance = 0.08 + st.bleedFrame * 0.006;
+      const bleedPoly = deformN(st.stroke._polygon, 4, variance);
+      // Bleed alpha decreases over time (drying)
+      const alpha = 0.035 * (1 - st.bleedFrame / BLEED_FRAMES);
+      drawBleedLayer(bleedPoly, st.stroke.color, Math.max(0.008, alpha));
+
+      if (st.bleedFrame >= BLEED_FRAMES) {
+        st.phase = 'done';
+      }
+    }
   }
 
-  if (elements.every(el => el._done) && !postDone) {
-    doPostProcessing();
-    postDone = true;
-    window._renderProgress = 1;
+  frameCount++;
+
+  if (states.every(s => s.phase === 'done')) {
     window._renderComplete = true;
-    console.log('Watercolor render complete — ' + frameCount + ' frames');
-    return;
+    console.log('Brush stroke watercolor complete — ' + frameCount + ' frames');
   }
 
-  if (!window._renderComplete) {
-    requestAnimationFrame(renderStep);
-  }
+  return frameCount;
+};
+
+// Auto-play mode (for browser preview)
+// If ?noauto is in the URL, don't auto-play (for puppeteer)
+const autoPlay = !location.search.includes('noauto');
+function autoTick() {
+  if (!autoPlay) return;
+  if (window._renderComplete) return;
+  window._step();
+  requestAnimationFrame(autoTick);
 }
+if (autoPlay) requestAnimationFrame(autoTick);
 
-requestAnimationFrame(renderStep);
+console.log('Watercolor stroke engine ready — ' + allStrokes.length + ' strokes, call _step() to advance');
 </script>
 </body>
 </html>
