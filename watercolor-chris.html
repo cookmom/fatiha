@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Watercolor Chris — Brush Stroke Painting</title>
+<title>Watercolor Chris — v2 Brush Stroke Rose</title>
 <style>
   body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
   canvas { display: block; }
@@ -12,10 +12,9 @@
 <canvas id="c" width="430" height="932"></canvas>
 <script>
 // ============================================================
-// BRUSH STROKE WATERCOLOR — Paint strokes, not stamps
-// Each petal is a bezier curve drawn by a brush over frames,
-// then wet pigment bleeds outward via polygon deformation.
-// PERSISTENT canvas — each frame accumulates, never clears.
+// BRUSH STROKE WATERCOLOR v2
+// Fixes: ogee petals, varied strokes, smooth stem,
+// watercolor accidents, leaf veins, stronger bleed
 // ============================================================
 
 const W = 430, H = 932;
@@ -83,8 +82,6 @@ function drawPaperBackground() {
   ctx.putImageData(imgData, 0, 0);
 }
 drawPaperBackground();
-
-// Save seed after paper generation
 const postPaperSeed = seed;
 
 // ============================================================
@@ -98,32 +95,52 @@ function cubicBezier(p0, p1, p2, p3, t) {
   ];
 }
 
+function cubicBezierTangent(p0, p1, p2, p3, t) {
+  const u = 1 - t;
+  return [
+    3*u*u*(p1[0]-p0[0]) + 6*u*t*(p2[0]-p1[0]) + 3*t*t*(p3[0]-p2[0]),
+    3*u*u*(p1[1]-p0[1]) + 6*u*t*(p2[1]-p1[1]) + 3*t*t*(p3[1]-p2[1])
+  ];
+}
+
 // ============================================================
-// Tyler Hobbs Polygon Deformation (for bleed phase)
+// Tyler Hobbs Polygon Deformation with PER-EDGE VARIANCE
+// (Fix #4: watercolor accidents — different variance per segment)
 // ============================================================
-function deformOnce(poly, variance) {
+function deformOnce(poly, variances) {
   const result = [];
+  const newVariances = [];
   for (let i = 0; i < poly.length; i++) {
     const a = poly[i];
     const c = poly[(i + 1) % poly.length];
     result.push([a[0], a[1]]);
+    const v = variances ? variances[i] : 0.15;
     const bx = (a[0] + c[0]) / 2;
     const by = (a[1] + c[1]) / 2;
     const dx = c[0] - a[0];
     const dy = c[1] - a[1];
     const len = Math.sqrt(dx * dx + dy * dy);
-    if (len < 0.5) continue;
+    if (len < 0.5) { result.push([bx, by]); newVariances.push(v, v); continue; }
     const nx = -dy / len;
     const ny = dx / len;
-    const offset = gauss(0, variance * len);
+    const offset = gauss(0, v * len);
     result.push([bx + nx * offset, by + ny * offset]);
+    // Children inherit parent variance with slight randomization
+    const childVar1 = v * (0.7 + rand() * 0.5);
+    const childVar2 = v * (0.7 + rand() * 0.5);
+    newVariances.push(childVar1, childVar2);
   }
-  return result;
+  return { poly: result, variances: newVariances };
 }
 
-function deformN(poly, n, variance) {
+function deformN(poly, n, baseVariance, perEdgeVariances) {
   let p = poly.map(pt => [pt[0], pt[1]]);
-  for (let i = 0; i < n; i++) p = deformOnce(p, variance * Math.pow(0.7, i));
+  let vars = perEdgeVariances || poly.map(() => baseVariance);
+  for (let i = 0; i < n; i++) {
+    const res = deformOnce(p, vars);
+    p = res.poly;
+    vars = res.variances;
+  }
   return p;
 }
 
@@ -146,247 +163,539 @@ function strokeTrailToPolygon(points, widths) {
 }
 
 // ============================================================
-// Define petal strokes — bezier curves with width/color
+// OGEE / ALMOND petal shape (Fix #1)
+// Cupped, spiraling petals — not circles
 // ============================================================
-const roseCx = W * 0.50, roseCy = H * 0.38;
+const roseCx = W * 0.50, roseCy = H * 0.36;
 
-// Reset to deterministic seed for geometry
 seed = postPaperSeed;
 
-function makePetalStroke(baseX, baseY, angle, length, maxWidth, curvature, color) {
+// Ogee petal stroke: almond shape with cupped edges
+// angle = direction from center, curvature controls spiral curl
+function makeOgeePetal(cx, cy, angle, length, maxWidth, curvature, color, layer) {
   const ca = Math.cos(angle), sa = Math.sin(angle);
   const cn = -sa, sn = ca;
-  const p0 = [baseX, baseY];
-  const p1 = [baseX + ca * length * 0.33 + cn * curvature * length * 0.25,
-              baseY + sa * length * 0.33 + sn * curvature * length * 0.25];
-  const p2 = [baseX + ca * length * 0.66 + cn * curvature * length * 0.4,
-              baseY + sa * length * 0.66 + sn * curvature * length * 0.4];
-  const p3 = [baseX + ca * length + cn * curvature * length * 0.12,
-              baseY + sa * length + sn * curvature * length * 0.12];
-  return { p0, p1, p2, p3, maxWidth, color, length };
+  // Strong curve: petal wraps around rose center
+  const p0 = [cx, cy];
+  const p1 = [cx + ca * length * 0.3 + cn * curvature * length * 0.25,
+              cy + sa * length * 0.3 + sn * curvature * length * 0.25];
+  const p2 = [cx + ca * length * 0.55 + cn * curvature * length * 0.55,
+              cy + sa * length * 0.55 + sn * curvature * length * 0.55];
+  // Tip curves back strongly — wrapping around center
+  const p3 = [cx + ca * length * 0.75 + cn * curvature * length * 0.35,
+              cy + sa * length * 0.75 + sn * curvature * length * 0.35];
+  return { p0, p1, p2, p3, maxWidth, color, length, layer, angle };
 }
 
-// Width profile: thin base → swell → taper at tip
-function petalWidth(t) {
-  if (t < 0.08) return t / 0.08 * 0.25;
-  if (t < 0.25) return 0.25 + (t - 0.08) / 0.17 * 0.75;
-  if (t < 0.65) return 1.0;
-  return 1.0 - ((t - 0.65) / 0.35) * 0.85;
+// Rose petal width: wide cupped shape — fat in the middle, narrow at base and tip
+function ogeeWidth(t) {
+  if (t < 0.06) return t / 0.06 * 0.3;          // thin at base
+  if (t < 0.18) return 0.3 + (t - 0.06) / 0.12 * 0.7;  // fast swell to full width
+  if (t < 0.55) return 1.0;                      // WIDE plateau — cupped middle
+  if (t < 0.82) return 1.0 - (t - 0.55) / 0.27 * 0.45;  // gradual taper
+  return 0.55 * (1 - (t - 0.82) / 0.18);          // narrow tip (not too sharp)
 }
 
-function varyColor(base) {
-  const s = gauss(0, 8);
+// Ruffled edge displacement (Fix #1: ruffled edges)
+function ruffleDisp(t, seed_off) {
+  const s = Math.sin(t * Math.PI * 7 + seed_off) * 0.3;
+  const s2 = Math.sin(t * Math.PI * 13 + seed_off * 2.3) * 0.15;
+  return s + s2;
+}
+
+function varyColor(base, amount) {
+  const a = amount || 8;
+  const s = gauss(0, a);
   return [clamp(Math.round(base[0]+s),0,255), clamp(Math.round(base[1]+s*0.4),0,255), clamp(Math.round(base[2]+s*0.6),0,255)];
 }
 
-const COL_OUTER = [215, 55, 85];
-const COL_MID   = [175, 30, 60];
-const COL_INNER = [135, 18, 45];
-const COL_CENTER= [95, 12, 32];
+const COL_OUTER = [215, 60, 90];   // lighter/pinker outer
+const COL_MID   = [185, 30, 60];
+const COL_INNER = [145, 18, 42];
+const COL_CENTER= [105, 10, 30];   // darker center
 const COL_LEAF  = [38, 100, 45];
-const COL_STALK = [35, 88, 35];
+const COL_STEM  = [42, 95, 38];
 
 const allStrokes = [];
 
-// --- Stalk ---
-allStrokes.push({
-  ...makePetalStroke(W*0.50, H*0.78, -Math.PI/2+0.04, H*0.38, 8, 0.06, COL_STALK),
-  _isStalk: true
-});
-
-// --- Leaves ---
-allStrokes.push(makePetalStroke(W*0.46, H*0.56, Math.PI+0.5, 110, 20, -0.45, varyColor(COL_LEAF)));
-allStrokes.push(makePetalStroke(W*0.54, H*0.56, -0.4, 95, 17, 0.4, varyColor(COL_LEAF)));
-
-// --- Outer petals: 8 long sweeping strokes ---
-for (let i = 0; i < 8; i++) {
-  const a = (i/8)*Math.PI*2 + gauss(0,0.12);
-  const d = gauss(18,4);
-  const curv = (i % 2 === 0 ? 1 : -1) * (0.35 + rand() * 0.45);
-  allStrokes.push(makePetalStroke(
-    roseCx+Math.cos(a)*d, roseCy+Math.sin(a)*d,
-    a+gauss(0,0.15), gauss(90,6), gauss(36,4), curv,
-    varyColor(COL_OUTER)
-  ));
+// --- STEM (Fix #3): single smooth tapered brushstroke, THICK ---
+{
+  const stemTop = [W * 0.50, roseCy + 35];
+  const stemBot = [W * 0.50 + 2, H * 0.78];
+  const stemLen = Math.sqrt((stemBot[0]-stemTop[0])**2 + (stemBot[1]-stemTop[1])**2);
+  const stemAngle = Math.atan2(stemBot[1]-stemTop[1], stemBot[0]-stemTop[0]);
+  const s = {
+    p0: stemTop,
+    p1: [stemTop[0] - 6, stemTop[1] + stemLen * 0.3],
+    p2: [stemBot[0] + 8, stemBot[1] - stemLen * 0.35],
+    p3: stemBot,
+    maxWidth: 9,  // thicker stem
+    color: COL_STEM,
+    length: stemLen,
+    _isStem: true,
+    layer: -1,
+    angle: stemAngle
+  };
+  allStrokes.push(s);
 }
 
-// --- Mid petals: 8 overlapping ---
-for (let i = 0; i < 8; i++) {
-  const a = (i/8)*Math.PI*2 + gauss(0,0.15) + 0.22;
-  const d = gauss(12,3);
-  const curv = (i % 2 === 0 ? -1 : 1) * (0.3 + rand() * 0.5);
-  allStrokes.push(makePetalStroke(
-    roseCx+Math.cos(a)*d, roseCy+Math.sin(a)*d,
-    a+gauss(0,0.2), gauss(65,5), gauss(30,4), curv,
-    varyColor(COL_MID)
-  ));
+// --- LEAVES (Fix #5): with veins, value variation, wet-edge pooling ---
+function makeLeafStroke(baseX, baseY, angle, length, maxWidth, curvature, color) {
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  const cn = -sa, sn = ca;
+  const p0 = [baseX, baseY];
+  const p1 = [baseX + ca * length * 0.33 + cn * curvature * length * 0.2,
+              baseY + sa * length * 0.33 + sn * curvature * length * 0.2];
+  const p2 = [baseX + ca * length * 0.66 + cn * curvature * length * 0.35,
+              baseY + sa * length * 0.66 + sn * curvature * length * 0.35];
+  const p3 = [baseX + ca * length * 0.95 + cn * curvature * length * 0.08,
+              baseY + sa * length * 0.95 + sn * curvature * length * 0.08];
+  return { p0, p1, p2, p3, maxWidth, color, length, _isLeaf: true, layer: -1, angle };
 }
 
-// --- Inner petals: 6 tight, curving to create spiral center ---
+// Leaf width: pointed at both ends, widest at 35%
+function leafWidth(t) {
+  if (t < 0.1) return t / 0.1 * 0.4;
+  if (t < 0.35) return 0.4 + (t - 0.1) / 0.25 * 0.6;
+  if (t < 0.7) return 1.0 - (t - 0.35) / 0.35 * 0.25;
+  return 0.75 * (1 - (t - 0.7) / 0.3);
+}
+
+// Left leaf
+allStrokes.push(makeLeafStroke(W*0.47, H*0.54, Math.PI + 0.45, 100, 22, -0.5, varyColor(COL_LEAF)));
+// Right leaf
+allStrokes.push(makeLeafStroke(W*0.53, H*0.54, -0.35, 88, 19, 0.45, varyColor(COL_LEAF)));
+
+// --- PETALS: Spiral rose arrangement (Fix #1) ---
+// Key insight: rose petals don't radiate from center — they WRAP AROUND it.
+// Each petal starts at an offset position and curves ~90-120° around center.
+// Outer petals are bigger and more open, inner petals tighter curl.
+
+// Spiral direction (all petals curl the same way, like a real rose)
+const spiralSign = 1; // clockwise
+
+// OUTER RING: 6 large cupped petals wrapping around center
 for (let i = 0; i < 6; i++) {
-  const a = (i/6)*Math.PI*2 + gauss(0,0.2);
-  const d = gauss(5,2);
-  const curv = (i % 2 === 0 ? 1 : -1) * (0.5 + rand() * 0.5);
-  allStrokes.push(makePetalStroke(
-    roseCx+Math.cos(a)*d, roseCy+Math.sin(a)*d,
-    a+gauss(0,0.25), gauss(42,4), gauss(22,3), curv,
-    varyColor(COL_INNER)
+  const baseAngle = (i / 6) * Math.PI * 2 + 0.2;
+  const startDist = gauss(20, 3);
+  const startX = roseCx + Math.cos(baseAngle) * startDist;
+  const startY = roseCy + Math.sin(baseAngle) * startDist;
+  // Tangent direction — wraps around the center
+  const tangentAngle = baseAngle + spiralSign * Math.PI * 0.5 + gauss(0, 0.12);
+  // Strong curvature for dramatic wrap
+  const curv = spiralSign * (0.7 + rand() * 0.3);
+  allStrokes.push(makeOgeePetal(
+    startX, startY,
+    tangentAngle, gauss(85, 7), gauss(44, 5), curv,
+    varyColor(COL_OUTER, 12), 0
   ));
 }
 
-// --- Center fill: 5 short dabs ---
+// MID RING: 7 wider petals, tighter wrap
+for (let i = 0; i < 7; i++) {
+  const baseAngle = (i / 7) * Math.PI * 2 + 0.55;
+  const startDist = gauss(13, 2);
+  const startX = roseCx + Math.cos(baseAngle) * startDist;
+  const startY = roseCy + Math.sin(baseAngle) * startDist;
+  const tangentAngle = baseAngle + spiralSign * Math.PI * 0.5 + gauss(0, 0.15);
+  const curv = spiralSign * (0.8 + rand() * 0.3);
+  allStrokes.push(makeOgeePetal(
+    startX, startY,
+    tangentAngle, gauss(60, 5), gauss(36, 4), curv,
+    varyColor(COL_MID, 10), 1
+  ));
+}
+
+// INNER RING: 5 tightly curled petals
 for (let i = 0; i < 5; i++) {
-  const a = (i/5)*Math.PI*2 + gauss(0,0.4);
-  const curv = gauss(0, 0.7);
-  allStrokes.push(makePetalStroke(
-    roseCx+gauss(0,4), roseCy+gauss(0,4),
-    a, gauss(24,3), gauss(16,3), curv,
-    varyColor(COL_CENTER)
+  const baseAngle = (i / 5) * Math.PI * 2 + gauss(0.3, 0.15);
+  const startDist = gauss(6, 1.5);
+  const startX = roseCx + Math.cos(baseAngle) * startDist;
+  const startY = roseCy + Math.sin(baseAngle) * startDist;
+  const tangentAngle = baseAngle + spiralSign * Math.PI * 0.5 + gauss(0, 0.2);
+  const curv = spiralSign * (1.0 + rand() * 0.3);
+  allStrokes.push(makeOgeePetal(
+    startX, startY,
+    tangentAngle, gauss(38, 4), gauss(26, 3), curv,
+    varyColor(COL_INNER, 8), 2
   ));
 }
 
-// Save geometry seed
-const postGeomSeed = seed;
+// CENTER: 4 tight spiral curls forming the eye
+for (let i = 0; i < 4; i++) {
+  const a = (i / 4) * Math.PI * 2 + gauss(0, 0.3);
+  const curv = spiralSign * (1.2 + rand() * 0.4);
+  allStrokes.push(makeOgeePetal(
+    roseCx + gauss(0, 2), roseCy + gauss(0, 2),
+    a + spiralSign * Math.PI * 0.4, gauss(20, 3), gauss(16, 2), curv,
+    varyColor(COL_CENTER, 6), 3
+  ));
+}
 
 // ============================================================
-// Pre-compute per-stroke sample points (deterministic)
+// Pre-compute per-stroke sample points with VARIED pressure
+// (Fix #2: non-uniform strokes — drag marks, crisp/wet spots)
 // ============================================================
-const SAMPLES_PER_STROKE = 80;
+const SAMPLES_PER_STROKE = 90;
 
 for (const s of allStrokes) {
   s._samples = [];
+  // Per-stroke variation: pressure curve shift, pigment density
+  const pressureShift = gauss(0, 0.08);   // shifts width profile
+  const densityVar = 0.7 + rand() * 0.6;  // overall pigment density
+  const drySpot = rand();                  // where brush runs dry (0-1)
+  const dryWidth = 0.08 + rand() * 0.12;  // how wide the dry spot is
+  const ruffSeed = rand() * 100;
+
   for (let i = 0; i <= SAMPLES_PER_STROKE; i++) {
     const t = i / SAMPLES_PER_STROKE;
     const pt = cubicBezier(s.p0, s.p1, s.p2, s.p3, t);
-    const pressure = s._isStalk ? 0.55 : petalWidth(t);
+    const tang = cubicBezierTangent(s.p0, s.p1, s.p2, s.p3, t);
+    const tangLen = Math.sqrt(tang[0]*tang[0] + tang[1]*tang[1]) || 1;
+
+    let pressure;
+    if (s._isStem) {
+      // Fix #3: smooth taper — thick at base, thin at top
+      pressure = 1.0 - t * 0.7;
+    } else if (s._isLeaf) {
+      pressure = leafWidth(t);
+    } else {
+      // Ogee width with ruffle displacement
+      const tShifted = clamp(t + pressureShift, 0, 1);
+      pressure = ogeeWidth(tShifted);
+      // Add ruffled edge irregularity
+      pressure *= (1 + ruffleDisp(t, ruffSeed) * 0.25);
+    }
+
     const radius = s.maxWidth * pressure * 0.5;
-    // Pre-compute jitter
-    const jx = gauss(0, radius * 0.1);
-    const jy = gauss(0, radius * 0.1);
-    s._samples.push({ x: pt[0]+jx, y: pt[1]+jy, r: radius, pressure, t });
+
+    // Fix #2: Pigment density variation within stroke
+    // - thicker where brush presses (low t), thinner where it drags
+    // - dry spots where paint ran out
+    let pigmentDensity = densityVar;
+    // More pigment at start of stroke (fresh paint load)
+    pigmentDensity *= (0.7 + 0.3 * (1 - t));
+    // Dry spot simulation
+    const dryDist = Math.abs(t - drySpot);
+    if (dryDist < dryWidth) {
+      pigmentDensity *= 0.3 + 0.7 * (dryDist / dryWidth);
+    }
+    // Speed-dependent opacity: faster movement = less pigment
+    const speed = tangLen / (s.length || 100);
+    pigmentDensity *= clamp(1.2 - speed * 0.4, 0.4, 1.2);
+
+    // Per-sample color shift (pigment granulation)
+    const colorShift = gauss(0, 5);
+    const sampleColor = [
+      clamp(s.color[0] + colorShift, 0, 255),
+      clamp(s.color[1] + colorShift * 0.3, 0, 255),
+      clamp(s.color[2] + colorShift * 0.5, 0, 255)
+    ];
+
+    // Position jitter — more at edges, less at center
+    const edgeFactor = Math.abs(t - 0.4) * 1.5;
+    const jx = gauss(0, radius * 0.08 * (1 + edgeFactor));
+    const jy = gauss(0, radius * 0.08 * (1 + edgeFactor));
+
+    s._samples.push({
+      x: pt[0] + jx, y: pt[1] + jy, r: radius,
+      pressure, t, pigmentDensity,
+      color: sampleColor
+    });
   }
-  // Pre-compute stroke polygon for bleed phase
+
+  // Pre-compute stroke polygon for bleed
   const pts = s._samples.map(s => [s.x, s.y]);
   const wds = s._samples.map(s => s.r);
   s._polygon = strokeTrailToPolygon(pts, wds);
+
+  // Fix #4: Per-edge variance for watercolor accidents
+  // Assign different variance to each edge of the polygon
+  // Some edges are "hard" (paint dried) and some are "soft" (still wet)
+  s._edgeVariances = s._polygon.map((_, idx) => {
+    const edgeSeed = seed + idx * 17;
+    seed = (seed * 16807) % 2147483647;
+    const base = 0.06;
+    // Random: some edges get high variance (soft/wet), some low (hard/dry)
+    const accident = rand() < 0.2 ? 0.15 + rand() * 0.12 : base + rand() * 0.04;
+    return accident;
+  });
 }
+
+const postGeomSeed = seed;
 
 // ============================================================
 // Animation schedule
-// Stalk: frames 0-7 draw, 8-19 bleed
-// Left leaf: frames 4-11 draw, 12-23 bleed
-// Right leaf: frames 8-15 draw, 16-27 bleed
-// Outer petals (7): each 3 frames apart starting frame 14
-//   petal 0: 14-21 draw, 22-33 bleed
-//   petal 1: 17-24 draw, 25-36 bleed...
-// Mid petals: continue after outer
-// Inner petals: continue after mid
-// Center: last
 // ============================================================
-
-const DRAW_FRAMES = 8;
-const BLEED_FRAMES = 14;
+const DRAW_FRAMES = 10;
+const BLEED_FRAMES = 18;  // Fix #6: more bleed frames
 
 let nextStart = 0;
-// Stalk
+// Stem first
 allStrokes[0]._startFrame = 0;
-nextStart = 5;
+nextStart = 6;
 // Leaves
 allStrokes[1]._startFrame = nextStart; nextStart += 5;
 allStrokes[2]._startFrame = nextStart; nextStart += 5;
-// Petals: tight stagger — 2 frame gap
+// Petals: staggered by 2 frames
 for (let i = 3; i < allStrokes.length; i++) {
   allStrokes[i]._startFrame = nextStart;
   nextStart += 2;
 }
 
-// State per stroke
 const states = allStrokes.map(s => ({
   stroke: s,
   startFrame: s._startFrame,
   phase: 'waiting',
-  drawProgress: 0,   // 0→1
+  drawProgress: 0,
   bleedFrame: 0,
-  bleedPolys: [],
   _bleedSeed: Math.floor(rand() * 100000),
 }));
 
 // ============================================================
-// Draw brush dabs onto canvas — ADDITIVE, no clearing
+// Draw brush dabs — VARIED opacity/width within each stroke
+// (Fix #2: visible drag marks, uneven pigment)
 // ============================================================
 function drawDabsRange(stroke, fromT, toT) {
-  const [r, g, b] = stroke.color;
   const samples = stroke._samples;
 
   for (const s of samples) {
     if (s.t < fromT || s.t > toT) continue;
     if (s.r < 0.5) continue;
 
-    // Multi-pass dab: concentric circles for soft brush feel
+    const [r, g, b] = s.color;
+    const pd = s.pigmentDensity;
+
     ctx.fillStyle = `rgb(${r},${g},${b})`;
 
-    // Core: solid, high alpha
-    ctx.globalAlpha = stroke._isStalk ? 0.22 : 0.18;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.r * 0.45, 0, Math.PI * 2);
-    ctx.fill();
+    if (stroke._isStem) {
+      // Fix #3: Smooth stem — single clean stroke look
+      // Core
+      ctx.globalAlpha = 0.30 * pd;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      // Mid
+      ctx.globalAlpha = 0.18 * pd;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+      // Outer
+      ctx.globalAlpha = 0.06 * pd;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r * 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (stroke._isLeaf) {
+      // Fix #5: Leaf with value variation — darker at base, lighter at tip
+      const baseDarken = 1 - s.t * 0.35;
+      const lr = clamp(Math.round(r * baseDarken), 0, 255);
+      const lg = clamp(Math.round(g * baseDarken), 0, 255);
+      const lb = clamp(Math.round(b * baseDarken), 0, 255);
+      ctx.fillStyle = `rgb(${lr},${lg},${lb})`;
 
-    // Mid ring
-    ctx.globalAlpha = stroke._isStalk ? 0.14 : 0.12;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.r * 0.7, 0, Math.PI * 2);
-    ctx.fill();
+      // Core
+      ctx.globalAlpha = 0.22 * pd;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+      // Mid
+      ctx.globalAlpha = 0.14 * pd;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r * 0.75, 0, Math.PI * 2);
+      ctx.fill();
+      // Outer — wet edge pooling (extra paint at edges)
+      ctx.globalAlpha = 0.08 * pd;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r * 1.05, 0, Math.PI * 2);
+      ctx.fill();
+      // Edge pooling: darker ring at outer boundary
+      if (s.pressure > 0.6 && pd > 0.5) {
+        ctx.globalAlpha = 0.04;
+        ctx.strokeStyle = `rgb(${clamp(lr-20,0,255)},${clamp(lg-15,0,255)},${lb})`;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r * 1.0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    } else {
+      // PETAL dabs — multi-pass with pressure-dependent density
+      // Fix #2: Crisp spots (high alpha small area) vs wet areas (low alpha wide area)
 
-    // Outer haze
-    ctx.globalAlpha = stroke._isStalk ? 0.06 : 0.05;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.r * 1.0, 0, Math.PI * 2);
-    ctx.fill();
+      // Core — dense pigment for crisp petal definition
+      ctx.globalAlpha = clamp(0.40 * pd, 0.05, 0.55);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r * 0.45, 0, Math.PI * 2);
+      ctx.fill();
 
-    // Extra soft bloom
-    ctx.globalAlpha = 0.02;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.r * 1.3, 0, Math.PI * 2);
-    ctx.fill();
+      // Mid ring — main body, solid watercolor
+      ctx.globalAlpha = clamp(0.28 * pd, 0.04, 0.38);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r * 0.72, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Outer — watercolor wash (visible but lighter)
+      ctx.globalAlpha = clamp(0.12 * pd, 0.02, 0.18);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r * 1.0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Soft bloom halo — extends beyond petal edge
+      // Outer petals (layer 0) get a bigger, more visible halo
+      const haloMult = (stroke.layer === 0) ? 1.8 : 1.4;
+      const haloAlpha = (stroke.layer === 0) ? 0.055 : 0.04;
+      ctx.globalAlpha = clamp(haloAlpha * pd, 0.008, 0.07);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r * haloMult, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Drag mark: elongated dab in stroke direction (Fix #2)
+      if (pd > 0.5 && s.r > 2) {
+        const sidx = samples.indexOf(s);
+        const nextSamp = samples[Math.min(sidx + 1, samples.length - 1)];
+        if (nextSamp && sidx >= 0) {
+          const dragX = (s.x + nextSamp.x) / 2;
+          const dragY = (s.y + nextSamp.y) / 2;
+          ctx.globalAlpha = 0.04 * pd;
+          ctx.beginPath();
+          ctx.arc(dragX, dragY, s.r * 0.55, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
   }
   ctx.globalAlpha = 1.0;
 }
 
-// Draw a visible brush head at the leading edge
+// Brush tip at leading edge
 function drawBrushTip(stroke, t) {
   if (t < 0.01 || t > 0.99) return;
   const pt = cubicBezier(stroke.p0, stroke.p1, stroke.p2, stroke.p3, t);
-  const pressure = stroke._isStalk ? 0.55 : petalWidth(t);
+  let pressure;
+  if (stroke._isStem) pressure = 1.0 - t * 0.7;
+  else if (stroke._isLeaf) pressure = leafWidth(t);
+  else pressure = ogeeWidth(t);
+
   const r = stroke.maxWidth * pressure * 0.55;
   const [cr, cg, cb] = stroke.color;
-  const dr = Math.max(0, Math.round(cr * 0.65));
-  const dg = Math.max(0, Math.round(cg * 0.65));
-  const db = Math.max(0, Math.round(cb * 0.65));
+  const dr = Math.max(0, Math.round(cr * 0.6));
+  const dg = Math.max(0, Math.round(cg * 0.6));
+  const db = Math.max(0, Math.round(cb * 0.6));
 
-  // Dense wet pigment at brush head
-  ctx.globalAlpha = 0.38;
+  // Dense wet pigment
+  ctx.globalAlpha = 0.35;
   ctx.fillStyle = `rgb(${dr},${dg},${db})`;
   ctx.beginPath();
-  ctx.arc(pt[0], pt[1], r * 0.35, 0, Math.PI * 2);
+  ctx.arc(pt[0], pt[1], r * 0.3, 0, Math.PI * 2);
   ctx.fill();
 
-  // Medium wet halo
-  ctx.globalAlpha = 0.18;
+  ctx.globalAlpha = 0.15;
   ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
   ctx.beginPath();
   ctx.arc(pt[0], pt[1], r * 0.7, 0, Math.PI * 2);
   ctx.fill();
 
-  // Outer wet spread
-  ctx.globalAlpha = 0.06;
+  ctx.globalAlpha = 0.05;
   ctx.beginPath();
-  ctx.arc(pt[0], pt[1], r * 1.4, 0, Math.PI * 2);
+  ctx.arc(pt[0], pt[1], r * 1.3, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.globalAlpha = 1.0;
 }
 
-// Draw bleed polygon layer
+// ============================================================
+// PETAL EDGE DEFINITION — drawn after stroke completes
+// Darker pigment along the edge of each petal stroke
+// Creates visible separation between overlapping petals
+// ============================================================
+function drawPetalEdge(stroke) {
+  if (stroke._isStem || stroke._isLeaf) return;
+  const [cr, cg, cb] = stroke.color;
+  const dr = Math.max(0, cr - 40);
+  const dg = Math.max(0, cg - 25);
+  const db = Math.max(0, cb - 20);
+
+  // Draw the outer edge of the stroke polygon as a soft dark line
+  const poly = stroke._polygon;
+  if (!poly || poly.length < 4) return;
+
+  ctx.save();
+  ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
+  ctx.lineWidth = 1.0;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Draw edge in segments with varying alpha (some edges crisp, some soft)
+  const segLen = Math.max(4, Math.floor(poly.length / 10));
+  for (let start = 0; start < poly.length; start += segLen) {
+    const end = Math.min(start + segLen + 1, poly.length);
+    // Random edge alpha — some crisp (where paint dried), some soft (still wet)
+    const edgeAlpha = 0.06 + rand() * 0.16;
+    ctx.globalAlpha = edgeAlpha;
+    ctx.beginPath();
+    ctx.moveTo(poly[start][0], poly[start][1]);
+    for (let i = start + 1; i < end; i++) {
+      ctx.lineTo(poly[i][0], poly[i][1]);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ============================================================
+// LEAF VEIN STROKES (Fix #5)
+// Drawn after leaf body — central vein + side veins
+// ============================================================
+function drawLeafVeins(stroke) {
+  if (!stroke._isLeaf) return;
+  const [cr, cg, cb] = stroke.color;
+  // Central vein — darker, thinner line along the bezier
+  const veinColor = `rgba(${Math.max(0,cr-25)},${Math.max(0,cg-20)},${Math.max(0,cb-10)},`;
+  ctx.lineWidth = 1.2;
+  ctx.lineCap = 'round';
+
+  // Central vein
+  ctx.beginPath();
+  for (let i = 0; i <= 30; i++) {
+    const t = i / 30;
+    const pt = cubicBezier(stroke.p0, stroke.p1, stroke.p2, stroke.p3, t);
+    if (i === 0) ctx.moveTo(pt[0], pt[1]);
+    else ctx.lineTo(pt[0], pt[1]);
+  }
+  ctx.strokeStyle = veinColor + '0.25)';
+  ctx.stroke();
+
+  // Side veins branching off
+  const nVeins = 5;
+  ctx.lineWidth = 0.7;
+  for (let i = 1; i <= nVeins; i++) {
+    const t = 0.15 + (i / (nVeins + 1)) * 0.65;
+    const pt = cubicBezier(stroke.p0, stroke.p1, stroke.p2, stroke.p3, t);
+    const tang = cubicBezierTangent(stroke.p0, stroke.p1, stroke.p2, stroke.p3, t);
+    const tLen = Math.sqrt(tang[0]*tang[0] + tang[1]*tang[1]) || 1;
+    const nx = -tang[1] / tLen, ny = tang[0] / tLen;
+    const w = stroke.maxWidth * leafWidth(t) * 0.4;
+    // Vein angles slightly forward
+    const fwdX = tang[0] / tLen * w * 0.3;
+    const fwdY = tang[1] / tLen * w * 0.3;
+
+    ctx.beginPath();
+    ctx.moveTo(pt[0], pt[1]);
+    ctx.lineTo(pt[0] + nx * w + fwdX, pt[1] + ny * w + fwdY);
+    ctx.strokeStyle = veinColor + '0.18)';
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(pt[0], pt[1]);
+    ctx.lineTo(pt[0] - nx * w + fwdX, pt[1] - ny * w + fwdY);
+    ctx.strokeStyle = veinColor + '0.18)';
+    ctx.stroke();
+  }
+}
+
+// ============================================================
+// Bleed with WATERCOLOR ACCIDENTS (Fix #4 + Fix #6)
+// Cauliflower edges, backruns, pigment pooling
+// ============================================================
 function drawBleedLayer(poly, color, alpha) {
   const [r, g, b] = color;
   ctx.save();
@@ -400,11 +709,49 @@ function drawBleedLayer(poly, color, alpha) {
   ctx.restore();
 }
 
-// ============================================================
-// FRAME-DRIVEN ANIMATION — called via window._step()
-// Persistent canvas: each frame only ADDS new paint
-// ============================================================
+// Cauliflower / backrun blotch (Fix #4)
+function drawCauliflower(cx, cy, radius, color, alpha) {
+  const [r, g, b] = color;
+  // Several overlapping circles of varying size
+  const n = 3 + Math.floor(rand() * 4);
+  for (let i = 0; i < n; i++) {
+    const ox = gauss(0, radius * 0.4);
+    const oy = gauss(0, radius * 0.4);
+    const sr = radius * (0.3 + rand() * 0.5);
+    ctx.globalAlpha = alpha * (0.3 + rand() * 0.5);
+    ctx.fillStyle = `rgb(${clamp(r + gauss(0,8),0,255)|0},${clamp(g + gauss(0,5),0,255)|0},${clamp(b + gauss(0,5),0,255)|0})`;
+    ctx.beginPath();
+    ctx.arc(cx + ox, cy + oy, sr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
 
+// Pigment pooling at edge — dark ring (Fix #4)
+function drawPigmentPool(poly, color, alpha) {
+  const [r, g, b] = color;
+  const darkR = Math.max(0, r - 30);
+  const darkG = Math.max(0, g - 20);
+  const darkB = Math.max(0, b - 15);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = `rgb(${darkR},${darkG},${darkB})`;
+  ctx.lineWidth = 1.5 + rand() * 1.5;
+  ctx.beginPath();
+  ctx.moveTo(poly[0][0], poly[0][1]);
+  // Only draw partial outline (pigment pools unevenly)
+  const startEdge = Math.floor(rand() * poly.length * 0.3);
+  const endEdge = startEdge + Math.floor(poly.length * (0.15 + rand() * 0.25));
+  for (let i = startEdge; i < Math.min(endEdge, poly.length); i++) {
+    ctx.lineTo(poly[i][0], poly[i][1]);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ============================================================
+// FRAME-DRIVEN ANIMATION
+// ============================================================
 let frameCount = 0;
 window._renderComplete = false;
 
@@ -422,27 +769,59 @@ window._step = function() {
       st.drawProgress += 1 / DRAW_FRAMES;
       if (st.drawProgress > 1) st.drawProgress = 1;
 
-      // Draw new dabs for this frame's progress increment
       drawDabsRange(st.stroke, prevProgress, st.drawProgress);
-
-      // Brush tip highlight
       drawBrushTip(st.stroke, st.drawProgress);
 
       if (st.drawProgress >= 1) {
         st.phase = 'bleeding';
         st.bleedFrame = 0;
+        // Draw leaf veins after stroke is complete
+        if (st.stroke._isLeaf) drawLeafVeins(st.stroke);
+        // Draw petal edge definition
+        drawPetalEdge(st.stroke);
       }
     }
 
     if (st.phase === 'bleeding') {
       st.bleedFrame++;
-      // Add deformed bleed layer every frame
       seed = st._bleedSeed + st.bleedFrame * 31;
-      const variance = 0.08 + st.bleedFrame * 0.006;
-      const bleedPoly = deformN(st.stroke._polygon, 4, variance);
-      // Bleed alpha decreases over time (drying)
-      const alpha = 0.035 * (1 - st.bleedFrame / BLEED_FRAMES);
-      drawBleedLayer(bleedPoly, st.stroke.color, Math.max(0.008, alpha));
+
+      // Fix #6: Visible bleed — clearly visible watercolor spread
+      const baseVariance = 0.10 + st.bleedFrame * 0.008;
+
+      // Fix #4: Per-edge variances for watercolor accidents
+      const scaledVariances = st.stroke._edgeVariances.map(v =>
+        v * (1 + st.bleedFrame * 0.06)
+      );
+      // 3 subdivision iterations — visible irregular edges
+      const bleedPoly = deformN(st.stroke._polygon, 3, baseVariance, scaledVariances);
+
+      // Bleed alpha — visible early, fades as it dries
+      const dryFactor = Math.pow(1 - st.bleedFrame / BLEED_FRAMES, 1.3);
+      const alpha = 0.03 * dryFactor;
+      // Lighten the bleed color slightly (watercolor bleeds are paler)
+      const bleedCol = [
+        Math.min(255, st.stroke.color[0] + 25),
+        Math.min(255, st.stroke.color[1] + 15),
+        Math.min(255, st.stroke.color[2] + 15)
+      ];
+      drawBleedLayer(bleedPoly, bleedCol, Math.max(0.005, alpha));
+
+      // Fix #4: Pigment pooling at edges (intermittent)
+      if (st.bleedFrame === 3 || st.bleedFrame === 8) {
+        drawPigmentPool(bleedPoly, st.stroke.color, 0.04 * dryFactor);
+      }
+
+      // Fix #4: Cauliflower / backrun accidents — visible watercolor randomness
+      if ((st.bleedFrame === 4 || st.bleedFrame === 9) && rand() < 0.45) {
+        const si = Math.floor(rand() * st.stroke._samples.length);
+        const sp = st.stroke._samples[si];
+        const offset = sp.r * 0.8;
+        drawCauliflower(
+          sp.x + gauss(0, offset), sp.y + gauss(0, offset),
+          sp.r * 1.1, st.stroke.color, 0.04
+        );
+      }
 
       if (st.bleedFrame >= BLEED_FRAMES) {
         st.phase = 'done';
@@ -454,14 +833,13 @@ window._step = function() {
 
   if (states.every(s => s.phase === 'done')) {
     window._renderComplete = true;
-    console.log('Brush stroke watercolor complete — ' + frameCount + ' frames');
+    console.log('v2 watercolor complete — ' + frameCount + ' frames');
   }
 
   return frameCount;
 };
 
-// Auto-play mode (for browser preview)
-// If ?noauto is in the URL, don't auto-play (for puppeteer)
+// Auto-play
 const autoPlay = !location.search.includes('noauto');
 function autoTick() {
   if (!autoPlay) return;
@@ -471,7 +849,7 @@ function autoTick() {
 }
 if (autoPlay) requestAnimationFrame(autoTick);
 
-console.log('Watercolor stroke engine ready — ' + allStrokes.length + ' strokes, call _step() to advance');
+console.log('v2 watercolor ready — ' + allStrokes.length + ' strokes');
 </script>
 </body>
 </html>
