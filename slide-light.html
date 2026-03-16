@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=430, initial-scale=1">
+<title>On the Nature of Divine Light</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,500&family=Cormorant+SC:wght@400;600;700&family=JetBrains+Mono:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  width: 430px;
+  height: 932px;
+  background: #F5F2EB;
+  font-family: 'Cormorant Garamond', 'Georgia', serif;
+  color: #2A2218;
+  overflow: hidden;
+  position: relative;
+}
+
+.page {
+  width: 430px;
+  height: 932px;
+  padding: 36px 44px 36px 48px;
+  position: relative;
+}
+
+.title {
+  font-family: 'Cormorant SC', 'Georgia', serif;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  text-align: center;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  color: #1A1610;
+}
+
+.subtitle {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 13px;
+  text-align: center;
+  color: #5A4E3C;
+  margin-bottom: 18px;
+  letter-spacing: 0.02em;
+}
+
+.header-band {
+  width: 100%;
+  height: 42px;
+  margin-bottom: 20px;
+  background: #1A1610;
+  position: relative;
+  overflow: hidden;
+}
+
+.header-band svg { width: 100%; height: 100%; }
+
+.body-text {
+  font-size: 15.5px;
+  line-height: 1.55;
+  text-align: justify;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.drop-cap-wrap { float: left; margin: 0 10px 4px 0; }
+
+.drop-cap-box {
+  width: 56px;
+  height: 56px;
+  border: 2px solid #2A2218;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: #F5F2EB;
+}
+
+.drop-cap-box::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid #8A7D6B;
+}
+
+.drop-cap-letter {
+  font-family: 'Cormorant SC', serif;
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+  color: #1A1610;
+}
+
+.code-block { margin: 14px 0; }
+
+.code-block pre {
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 10px;
+  line-height: 1.65;
+  color: #2A2218;
+  background: transparent;
+  border-top: 1px solid #C5BEAD;
+  border-bottom: 1px solid #C5BEAD;
+  padding: 12px 0 12px 30px;
+  overflow: hidden;
+}
+
+.line-num {
+  display: inline-block;
+  width: 20px;
+  margin-left: -30px;
+  text-align: right;
+  margin-right: 10px;
+  color: #A09880;
+  user-select: none;
+}
+
+.code-comment { font-style: italic; color: #7A6E5C; }
+
+.margin-note {
+  position: absolute;
+  right: 8px;
+  width: 52px;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 9.5px;
+  line-height: 1.35;
+  color: #8A7D6B;
+  text-align: right;
+}
+
+.footer-rule {
+  position: absolute;
+  bottom: 60px;
+  left: 48px;
+  right: 44px;
+  border: none;
+  border-top: 1px solid #C5BEAD;
+}
+
+.footer-text {
+  position: absolute;
+  bottom: 30px;
+  left: 48px;
+  right: 44px;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 10px;
+  color: #A09880;
+  text-align: center;
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="title">On the Nature of Divine Light</div>
+  <div class="subtitle">being a treatise on the one light and its many colours</div>
+
+  <!-- Arabesque Header Band -->
+  <div class="header-band">
+    <svg viewBox="0 0 340 42" preserveAspectRatio="none">
+      <defs>
+        <pattern id="arabesque" x="0" y="0" width="42" height="42" patternUnits="userSpaceOnUse">
+          <rect width="42" height="42" fill="#1A1610"/>
+          <polygon points="21,2 25,14 37,14 27,22 31,34 21,27 11,34 15,22 5,14 17,14" fill="none" stroke="#C5BEAD" stroke-width="0.8"/>
+          <polygon points="21,6 24,15 33,15 26,21 29,30 21,25 13,30 16,21 9,15 18,15" fill="none" stroke="#8A7D6B" stroke-width="0.5"/>
+          <circle cx="21" cy="21" r="3" fill="none" stroke="#C5BEAD" stroke-width="0.5"/>
+          <line x1="0" y1="0" x2="42" y2="42" stroke="#8A7D6B" stroke-width="0.3"/>
+          <line x1="42" y1="0" x2="0" y2="42" stroke="#8A7D6B" stroke-width="0.3"/>
+          <line x1="21" y1="0" x2="21" y2="42" stroke="#8A7D6B" stroke-width="0.2"/>
+          <line x1="0" y1="21" x2="42" y2="21" stroke="#8A7D6B" stroke-width="0.2"/>
+          <rect x="6" y="6" width="30" height="30" fill="none" stroke="#5A4E3C" stroke-width="0.3" transform="rotate(45 21 21)"/>
+        </pattern>
+      </defs>
+      <rect width="340" height="42" fill="url(#arabesque)"/>
+    </svg>
+  </div>
+
+  <!-- Marginal note: Ayat an-Nur -->
+  <div class="margin-note" style="top: 130px;">
+    An-Nur<br>24 : 35<br><br>
+    <em>&lsquo;Allah is<br>the Light<br>of the<br>heavens<br>and the<br>earth&rsquo;</em>
+  </div>
+
+  <!-- Body Text -->
+  <div class="body-text">
+    <div class="drop-cap-wrap">
+      <div class="drop-cap-box">
+        <span class="drop-cap-letter">C</span>
+      </div>
+    </div>
+    onsider the prism: white light enters as one and departs as
+    many. This is no mere curiosity of glass but a parable written
+    in the physics of creation. As Ibn al-Haytham demonstrated that
+    light carries within itself all colours, so does the divine
+    <em>nur</em> contain within its unity the full spectrum of
+    manifest beauty. Each colour bends at its own angle &mdash;
+    each <em>tajalli</em>, each self-disclosure, refracts
+    according to its own nature.
+  </div>
+
+  <!-- Code Block -->
+  <div class="code-block">
+    <pre>
+<span class="line-num">1</span><span class="code-comment">// the one light, separated into many</span>
+<span class="line-num">2</span>uniform float uIorR;
+<span class="line-num">3</span>uniform float uIorG;
+<span class="line-num">4</span>uniform float uIorB;
+<span class="line-num">5</span>
+<span class="line-num">6</span><span class="code-comment">// each colour bends by its own nature</span>
+<span class="line-num">7</span>float iorR = 1.0 / uIorR;
+<span class="line-num">8</span>float iorG = 1.0 / uIorG;
+<span class="line-num">9</span>float iorB = 1.0 / uIorB;
+<span class="line-num">10</span>
+<span class="line-num">11</span><span class="code-comment">// the manifold refractions of one ray</span>
+<span class="line-num">12</span>vec3 refractR = refract(eye, n, iorR);
+<span class="line-num">13</span>vec3 refractG = refract(eye, n, iorG);
+<span class="line-num">14</span>vec3 refractB = refract(eye, n, iorB);
+<span class="line-num">15</span>
+<span class="line-num">16</span><span class="code-comment">// from unity, the spectrum emerges</span>
+<span class="line-num">17</span>float R = texture2D(scene, uv + refractR.xy).r;
+<span class="line-num">18</span>float G = texture2D(scene, uv + refractG.xy).g;
+<span class="line-num">19</span>float B = texture2D(scene, uv + refractB.xy).b;</pre>
+  </div>
+
+  <!-- Marginal note: Ibn al-Haytham -->
+  <div class="margin-note" style="top: 510px;">
+    Ibn al-<br>Haytham<br>c. 1021<br><br>
+    <em>Kit&#257;b<br>al-Man&#257;&#7827;ir</em>
+  </div>
+
+  <!-- Continuation -->
+  <div class="body-text" style="font-size: 14.5px; margin-top: 8px;">
+    The values are given thus: for red, <em>1.14</em>; for green,
+    <em>1.18</em>; for blue, <em>1.23</em>. Mark how the difference is
+    slight &mdash; mere hundredths &mdash; yet from this small divergence
+    the entire rainbow unfolds. So it is with the divine attributes:
+    each <em>sifah</em> is but a fraction apart from the others, yet
+    together they compose the inexhaustible beauty of creation.
+  </div>
+
+  <div class="body-text" style="font-size: 14px; font-style: italic; color: #5A4E3C; margin-top: 6px;">
+    As Ibn al-Haytham proved in the <em>Kit&#257;b al-Man&#257;&#7827;ir</em>,
+    light does not mix; it only appears to. Each ray preserves its
+    identity even as it passes through the same glass. The shader
+    merely rediscovers what the <em>&#7716;ak&#299;m</em> already knew:
+    unity and multiplicity are not opposites but facets of one truth.
+  </div>
+
+  <!-- IOR values as decorative element -->
+  <div style="text-align: center; margin-top: 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8A7D6B; letter-spacing: 0.15em;">
+    R = 1.14 &nbsp;&nbsp; G = 1.18 &nbsp;&nbsp; B = 1.23
+  </div>
+
+  <hr class="footer-rule">
+  <div class="footer-text">A Gift of Time &nbsp;&middot;&nbsp; agiftoftime.app &nbsp;&middot;&nbsp; dichroic FBO shader</div>
+
+</div>
+</body>
+</html>
