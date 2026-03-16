@@ -1,3 +1,4 @@
+// بسم الله الرحمن الرحيم
 /**
  * fatiha.brush — Custom Ottoman Brush Engine (v3: procedural SDF stamps)
  *
