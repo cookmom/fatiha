@@ -1028,21 +1028,23 @@ function wcMixboxComposite(accCtx, elemCanvas, bounds) {
   accCtx.putImageData(accData, sx, sy);
 }
 
-// Watercolor accumulation canvas — all watercolor drawn here with Mixbox, then composited to main
+// Watercolor accumulation canvas — all elements Mixbox-blended here, then drawn to main
 const wcAccCanvas = document.createElement('canvas');
 wcAccCanvas.width = WD; wcAccCanvas.height = HD;
 const wcAccCtx = wcAccCanvas.getContext('2d');
-// Per-element temp canvas (reused)
+wcAccCtx.translate(0, HD); wcAccCtx.scale(1, -1); // same transform as main
+// Per-element temp canvas (reused per element for Mixbox compositing)
 const wcElemCanvas = document.createElement('canvas');
 wcElemCanvas.width = WD; wcElemCanvas.height = HD;
 const wcElemCtx = wcElemCanvas.getContext('2d');
+wcElemCtx.translate(0, HD); wcElemCtx.scale(1, -1); // same transform
 
 // Pre-cache deformed polygon layers per element
 const wcCache = new Map();
 const WC_LAYERS = 45;         // 45 overlapping deformed polygons per element
 const WC_DEFORM_ITER = 3;     // midpoint subdivision iterations per layer
 const WC_VARIANCE = 0.18;     // ~4.5% of radius — visible irregular edges
-const WC_LAYER_ALPHA = 0.018; // 1.8% per layer — 45 layers ≈ 50% center, fades to ~5% at edges
+const WC_LAYER_ALPHA = 0.01;  // 1% per layer — 45 layers ≈ 30% at center = subtle watercolor wash
 const WC_POLY_PTS = 30;       // base circle resolution
 
 // Build all 40 deformed layers from a single base polygon
@@ -1140,9 +1142,15 @@ function animate(){
   // glows rendering removed
 
   // === WATERCOLOR PASS — Tyler Hobbs method ===
-  // Draw 40 slightly-deformed polygons per element DIRECTLY on canvas at 2% opacity.
-  // Accumulation creates watercolor: dense opaque center, soft transparent edges.
-  // Drawn BEFORE garden elements so watercolor halos sit behind crisp flowers.
+  // For each element: render 45 deformed polygons to element canvas at 2% opacity.
+  // Mixbox-composite each element onto accumulation canvas for pigment-realistic color mixing.
+  // Then draw accumulation canvas onto main canvas BEFORE garden elements.
+  wcAccCtx.save(); wcAccCtx.setTransform(1,0,0,1,0,0);
+  wcAccCtx.clearRect(0, 0, WD, HD);
+  wcAccCtx.restore();
+
+  // Collect watercolor elements with their data
+  const wcElems = [];
   for (let gi = 0; gi < garden.length; gi++) {
     const g = garden[gi];
     const elapsed = progress - g.born;
@@ -1175,7 +1183,7 @@ function animate(){
       case 'bud': {
         const tx = wbx + wcn.x*g.stemLen*g.side, ty = wby + wcn.y*g.stemLen*g.side;
         wcx = wbx + (tx-wbx)*wbl; wcy = wby + (ty-wby)*wbl;
-        const wcr = g.maxR * wbl * 1.1;
+        const wcr = g.maxR * wbl * 1.6; // larger halo around small buds
         if (wcr < 6*dpr) continue;
         cacheR = wcr;
         basePoly = wcCirclePoly(wcx, wcy, wcr, WC_POLY_PTS);
@@ -1205,24 +1213,64 @@ function animate(){
       layers = built;
     }
 
-    // Draw all 40 deformed polygons directly on main canvas
-    // Each at 2% opacity — accumulation IS the watercolor effect
-    // Mixbox: vary color per layer for pigment granulation
-    const layerAlpha = WC_LAYER_ALPHA * wbl;
+    wcElems.push({gi, g, wcx, wcy, cacheR, wcCol, wbl, seed, layers});
+  }
+
+  // Render each element to elem canvas, then Mixbox-composite onto accumulation canvas
+  for (const elem of wcElems) {
+    const {g, wcx, wcy, cacheR, wcCol, wbl, seed, layers} = elem;
+
+    // Clear element canvas for this element
+    wcElemCtx.save(); wcElemCtx.setTransform(1,0,0,1,0,0);
+    wcElemCtx.clearRect(0, 0, WD, HD);
+    wcElemCtx.restore();
+    // Compute screen-space bounding box for Mixbox compositing
+    const margin = cacheR * 0.35;
+    const bx0 = wcx - cacheR - margin, by0 = wcy - cacheR - margin;
+    const bw = (cacheR + margin) * 2, bh = (cacheR + margin) * 2;
+    // Convert Y-flipped coords to screen coords
+    const screenY = HD - (by0 + bh);
+
+    // Draw 45 deformed polygons at low opacity onto element canvas
+    // Kind-specific alpha: buds/leaves are subtle, roses are more prominent
+    const kindAlpha = g.kind === 'bud' ? 0.45 : g.kind === 'leaf' ? 0.55 : 1.0;
+    const layerAlpha = WC_LAYER_ALPHA * wbl * kindAlpha;
+    // Lighten watercolor color — watercolor washes are more pastel/translucent than the source
+    const tintAmt = g.kind === 'bud' ? 0.5 : g.kind === 'leaf' ? 0.3 : 0.35; // blend toward white — watercolor washes are pastel
+    const wcR = Math.round(wcCol[0] + (255 - wcCol[0]) * tintAmt);
+    const wcG = Math.round(wcCol[1] + (255 - wcCol[1]) * tintAmt);
+    const wcB = Math.round(wcCol[2] + (255 - wcCol[2]) * tintAmt);
     for (let l = 0; l < layers.length; l++) {
-      let r = wcCol[0], g2 = wcCol[1], b2 = wcCol[2];
+      let r = wcR, g2 = wcG, b2 = wcB;
       if (_hasMixbox) {
-        // Slight pigment variation per layer — simulates granulation
+        // Pigment granulation — slight color variation per layer
         const varRng = wcSrand(seed + l * 131 + 7);
-        const shift = varRng() * 0.15; // 0-15% blend toward a warm complement
-        const warm = g.kind === 'leaf' ? [107, 148, 4] : [255, 105, 0]; // sap green / cadmium orange
-        const mixed = mixbox.lerp(wcCol, warm, shift);
+        const shift = varRng() * 0.12;
+        const warm = g.kind === 'leaf' ? [107, 148, 4] : [255, 105, 0];
+        const mixed = mixbox.lerp([r, g2, b2], warm, shift);
         r = mixed[0]; g2 = mixed[1]; b2 = mixed[2];
       }
       const colStr = `rgb(${Math.round(r)},${Math.round(g2)},${Math.round(b2)})`;
-      wcFillPoly(ctx, layers[l], colStr, layerAlpha);
+      wcFillPoly(wcElemCtx, layers[l], colStr, layerAlpha);
+    }
+
+    // Mixbox-composite element onto accumulation canvas
+    // Bounding box in screen coordinates for pixel operations
+    const sx = Math.max(0, Math.floor(bx0));
+    const sy = Math.max(0, Math.floor(screenY));
+    const sw = Math.min(WD - sx, Math.ceil(bw));
+    const sh = Math.min(HD - sy, Math.ceil(bh));
+    if (sw > 0 && sh > 0) {
+      wcMixboxComposite(wcAccCtx, wcElemCanvas, {x: sx, y: sy, w: sw, h: sh});
     }
   }
+
+  // Draw accumulated watercolor onto main canvas
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.drawImage(wcAccCanvas, 0, 0);
+  ctx.restore();
   ctx.globalAlpha = 1;
 
   // Garden elements

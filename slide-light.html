@@ -1,3 +1,4 @@
+<!-- بسم الله الرحمن الرحيم -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,209 +12,243 @@
 body {
   width: 430px;
   height: 932px;
-  background: #F5F2EB;
+  background: #1A0A1E;
   font-family: 'Cormorant Garamond', 'Georgia', serif;
-  color: #2A2218;
+  color: #E8DCC8;
   overflow: hidden;
   position: relative;
 }
 
+.border-outer { position: absolute; inset: 0; border: 3px solid #C8A44E; }
+.border-inner { position: absolute; inset: 6px; border: 1.5px solid #C8A44E; }
+.border-pattern { position: absolute; inset: 10px; border: 1px solid rgba(200,164,78,0.3); }
+
+.corner-rosette { position: absolute; width: 24px; height: 24px; }
+.corner-rosette.tl { top: 11px; left: 11px; }
+.corner-rosette.tr { top: 11px; right: 11px; }
+.corner-rosette.bl { bottom: 11px; left: 11px; }
+.corner-rosette.br { bottom: 11px; right: 11px; }
+
 .page {
-  width: 430px;
-  height: 932px;
-  padding: 36px 44px 36px 48px;
-  position: relative;
+  position: absolute;
+  inset: 14px;
+  padding: 6px 20px 30px 24px;
+  overflow: hidden;
 }
+
+.unwan { width: 100%; height: 88px; margin-bottom: 10px; }
 
 .title {
   font-family: 'Cormorant SC', 'Georgia', serif;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 0.32em;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   text-align: center;
-  text-transform: uppercase;
-  margin-bottom: 6px;
-  color: #1A1610;
+  color: #D4AF37;
+  margin-bottom: 3px;
+  text-shadow: 0 0 12px rgba(212,175,55,0.3);
 }
 
 .subtitle {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: 13px;
+  font-size: 12px;
   text-align: center;
-  color: #5A4E3C;
-  margin-bottom: 18px;
-  letter-spacing: 0.02em;
+  color: #A89060;
+  margin-bottom: 12px;
+  letter-spacing: 0.06em;
 }
 
-.header-band {
-  width: 100%;
-  height: 42px;
-  margin-bottom: 20px;
-  background: #1A1610;
-  position: relative;
-  overflow: hidden;
-}
-
-.header-band svg { width: 100%; height: 100%; }
+.divider { text-align: center; margin: 6px 0; line-height: 1; }
 
 .body-text {
-  font-size: 15.5px;
-  line-height: 1.55;
+  font-size: 14.5px;
+  line-height: 1.5;
   text-align: justify;
-  margin-bottom: 16px;
-  position: relative;
+  margin-bottom: 10px;
+  margin-right: 28px;
+  color: #DDD0B8;
 }
+.body-text em { color: #D4AF37; font-style: italic; }
 
-.drop-cap-wrap { float: left; margin: 0 10px 4px 0; }
+.drop-cap-wrap { float: left; margin: 2px 10px 2px 0; }
 
-.drop-cap-box {
-  width: 56px;
-  height: 56px;
-  border: 2px solid #2A2218;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.code-frame {
+  margin: 8px 28px 8px 0;
+  border: 1.5px solid #C8A44E;
+  padding: 1px;
   position: relative;
-  background: #F5F2EB;
+  background: rgba(200,164,78,0.04);
 }
-
-.drop-cap-box::before {
+.code-frame::before {
   content: '';
   position: absolute;
   inset: 3px;
-  border: 1px solid #8A7D6B;
+  border: 0.5px solid rgba(200,164,78,0.25);
+  pointer-events: none;
 }
-
-.drop-cap-letter {
-  font-family: 'Cormorant SC', serif;
-  font-size: 36px;
-  font-weight: 700;
-  line-height: 1;
-  color: #1A1610;
-}
-
-.code-block { margin: 14px 0; }
-
-.code-block pre {
+.code-frame pre {
   font-family: 'JetBrains Mono', 'Courier New', monospace;
-  font-size: 10px;
-  line-height: 1.65;
-  color: #2A2218;
-  background: transparent;
-  border-top: 1px solid #C5BEAD;
-  border-bottom: 1px solid #C5BEAD;
-  padding: 12px 0 12px 30px;
+  font-size: 9.5px;
+  line-height: 1.6;
+  color: #C8B898;
+  background: rgba(26,10,30,0.6);
+  padding: 10px 8px 10px 32px;
   overflow: hidden;
+  margin: 3px;
 }
-
 .line-num {
   display: inline-block;
-  width: 20px;
-  margin-left: -30px;
+  width: 18px;
+  margin-left: -24px;
   text-align: right;
-  margin-right: 10px;
-  color: #A09880;
+  margin-right: 8px;
+  color: #5A4E6A;
   user-select: none;
 }
+.code-comment { font-style: italic; color: #7A6E8C; }
+.code-keyword { color: #D4AF37; }
 
-.code-comment { font-style: italic; color: #7A6E5C; }
-
-.margin-note {
-  position: absolute;
-  right: 8px;
-  width: 52px;
+.gul-note { position: absolute; right: 18px; text-align: center; }
+.gul-note .gul-text {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: 9.5px;
-  line-height: 1.35;
-  color: #8A7D6B;
-  text-align: right;
+  font-size: 8.5px;
+  line-height: 1.3;
+  color: #A89060;
+  display: block;
 }
 
-.footer-rule {
-  position: absolute;
-  bottom: 60px;
-  left: 48px;
-  right: 44px;
-  border: none;
-  border-top: 1px solid #C5BEAD;
-}
-
+.footer { position: absolute; bottom: 8px; left: 24px; right: 20px; text-align: center; }
 .footer-text {
-  position: absolute;
-  bottom: 30px;
-  left: 48px;
-  right: 44px;
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: 10px;
-  color: #A09880;
-  text-align: center;
+  font-size: 9px;
+  color: #6A5E48;
+  letter-spacing: 0.05em;
 }
 </style>
 </head>
 <body>
+
+<div class="border-outer"></div>
+<div class="border-inner"></div>
+<div class="border-pattern"></div>
+
+<svg class="corner-rosette tl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="#C8A44E" stroke-width="0.8"/><path d="M12,2 L14,10 L12,8 L10,10 Z M22,12 L14,14 L16,12 L14,10 Z M12,22 L10,14 L12,16 L14,14 Z M2,12 L10,10 L8,12 L10,14 Z" fill="#C8A44E" opacity="0.7"/><circle cx="12" cy="12" r="3" fill="#C8A44E" opacity="0.5"/></svg>
+<svg class="corner-rosette tr" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="#C8A44E" stroke-width="0.8"/><path d="M12,2 L14,10 L12,8 L10,10 Z M22,12 L14,14 L16,12 L14,10 Z M12,22 L10,14 L12,16 L14,14 Z M2,12 L10,10 L8,12 L10,14 Z" fill="#C8A44E" opacity="0.7"/><circle cx="12" cy="12" r="3" fill="#C8A44E" opacity="0.5"/></svg>
+<svg class="corner-rosette bl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="#C8A44E" stroke-width="0.8"/><path d="M12,2 L14,10 L12,8 L10,10 Z M22,12 L14,14 L16,12 L14,10 Z M12,22 L10,14 L12,16 L14,14 Z M2,12 L10,10 L8,12 L10,14 Z" fill="#C8A44E" opacity="0.7"/><circle cx="12" cy="12" r="3" fill="#C8A44E" opacity="0.5"/></svg>
+<svg class="corner-rosette br" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="#C8A44E" stroke-width="0.8"/><path d="M12,2 L14,10 L12,8 L10,10 Z M22,12 L14,14 L16,12 L14,10 Z M12,22 L10,14 L12,16 L14,14 Z M2,12 L10,10 L8,12 L10,14 Z" fill="#C8A44E" opacity="0.7"/><circle cx="12" cy="12" r="3" fill="#C8A44E" opacity="0.5"/></svg>
+
 <div class="page">
+
+  <!-- Unwan Headpiece — deep purple/burgundy theme -->
+  <div class="unwan">
+    <svg viewBox="0 0 370 88" width="100%" height="100%">
+      <defs>
+        <linearGradient id="goldG" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#D4AF37"/>
+          <stop offset="50%" stop-color="#F0D060"/>
+          <stop offset="100%" stop-color="#C8A44E"/>
+        </linearGradient>
+        <pattern id="unwanPat" x="0" y="0" width="16" height="16" patternUnits="userSpaceOnUse">
+          <rect width="16" height="16" fill="#2A1230"/>
+          <rect x="2" y="2" width="12" height="12" fill="none" stroke="#C8A44E" stroke-width="0.4" transform="rotate(45 8 8)"/>
+          <circle cx="8" cy="8" r="2" fill="#C8A44E" opacity="0.3"/>
+          <circle cx="0" cy="0" r="1.5" fill="#8B1A1A" opacity="0.4"/>
+          <circle cx="16" cy="0" r="1.5" fill="#8B1A1A" opacity="0.4"/>
+          <circle cx="0" cy="16" r="1.5" fill="#8B1A1A" opacity="0.4"/>
+          <circle cx="16" cy="16" r="1.5" fill="#8B1A1A" opacity="0.4"/>
+        </pattern>
+        <clipPath id="unwanClip">
+          <path d="M0,88 L0,30 Q0,12 20,8 L165,0 Q185,-2 185,0 L185,0 Q185,-2 205,0 L350,8 Q370,12 370,30 L370,88 Z"/>
+        </clipPath>
+      </defs>
+      <g clip-path="url(#unwanClip)">
+        <rect width="370" height="88" fill="url(#unwanPat)"/>
+      </g>
+      <path d="M0,88 L0,30 Q0,12 20,8 L165,0 Q185,-2 185,0 Q185,-2 205,0 L350,8 Q370,12 370,30 L370,88" fill="none" stroke="url(#goldG)" stroke-width="2"/>
+      <path d="M4,86 L4,32 Q4,16 22,12 L164,4 Q184,2 185,4 Q186,2 206,4 L348,12 Q366,16 366,32 L366,86" fill="none" stroke="#C8A44E" stroke-width="0.6" opacity="0.5"/>
+      <!-- Central medallion -->
+      <circle cx="185" cy="44" r="22" fill="#2A1230" stroke="url(#goldG)" stroke-width="1.5"/>
+      <circle cx="185" cy="44" r="18" fill="none" stroke="#C8A44E" stroke-width="0.5"/>
+      <polygon points="185,26 193,40 185,36 177,40" fill="#D4AF37" opacity="0.4"/>
+      <polygon points="185,62 177,48 185,52 193,48" fill="#D4AF37" opacity="0.4"/>
+      <polygon points="169,35 183,37 179,44 183,51 169,53" fill="#D4AF37" opacity="0.3"/>
+      <polygon points="201,35 187,37 191,44 187,51 201,53" fill="#D4AF37" opacity="0.3"/>
+      <circle cx="185" cy="44" r="6" fill="#8B1A1A" opacity="0.6"/>
+      <circle cx="185" cy="44" r="3" fill="#D4AF37" opacity="0.7"/>
+      <g opacity="0.5">
+        <circle cx="60" cy="44" r="3" fill="#8B1A1A"/><circle cx="60" cy="44" r="1.5" fill="#C8A44E"/>
+        <circle cx="100" cy="38" r="3" fill="#8B1A1A"/><circle cx="100" cy="38" r="1.5" fill="#C8A44E"/>
+        <circle cx="140" cy="34" r="3" fill="#8B1A1A"/><circle cx="140" cy="34" r="1.5" fill="#C8A44E"/>
+        <circle cx="230" cy="34" r="3" fill="#8B1A1A"/><circle cx="230" cy="34" r="1.5" fill="#C8A44E"/>
+        <circle cx="270" cy="38" r="3" fill="#8B1A1A"/><circle cx="270" cy="38" r="1.5" fill="#C8A44E"/>
+        <circle cx="310" cy="44" r="3" fill="#8B1A1A"/><circle cx="310" cy="44" r="1.5" fill="#C8A44E"/>
+      </g>
+      <rect x="0" y="78" width="370" height="3" fill="url(#goldG)" opacity="0.4"/>
+      <rect x="0" y="83" width="370" height="1" fill="#C8A44E" opacity="0.3"/>
+    </svg>
+  </div>
 
   <div class="title">On the Nature of Divine Light</div>
   <div class="subtitle">being a treatise on the one light and its many colours</div>
 
-  <!-- Arabesque Header Band -->
-  <div class="header-band">
-    <svg viewBox="0 0 340 42" preserveAspectRatio="none">
-      <defs>
-        <pattern id="arabesque" x="0" y="0" width="42" height="42" patternUnits="userSpaceOnUse">
-          <rect width="42" height="42" fill="#1A1610"/>
-          <polygon points="21,2 25,14 37,14 27,22 31,34 21,27 11,34 15,22 5,14 17,14" fill="none" stroke="#C5BEAD" stroke-width="0.8"/>
-          <polygon points="21,6 24,15 33,15 26,21 29,30 21,25 13,30 16,21 9,15 18,15" fill="none" stroke="#8A7D6B" stroke-width="0.5"/>
-          <circle cx="21" cy="21" r="3" fill="none" stroke="#C5BEAD" stroke-width="0.5"/>
-          <line x1="0" y1="0" x2="42" y2="42" stroke="#8A7D6B" stroke-width="0.3"/>
-          <line x1="42" y1="0" x2="0" y2="42" stroke="#8A7D6B" stroke-width="0.3"/>
-          <line x1="21" y1="0" x2="21" y2="42" stroke="#8A7D6B" stroke-width="0.2"/>
-          <line x1="0" y1="21" x2="42" y2="21" stroke="#8A7D6B" stroke-width="0.2"/>
-          <rect x="6" y="6" width="30" height="30" fill="none" stroke="#5A4E3C" stroke-width="0.3" transform="rotate(45 21 21)"/>
-        </pattern>
-      </defs>
-      <rect width="340" height="42" fill="url(#arabesque)"/>
+  <div class="divider">
+    <svg width="160" height="10" viewBox="0 0 160 10">
+      <line x1="0" y1="5" x2="60" y2="5" stroke="#C8A44E" stroke-width="0.5"/>
+      <polygon points="80,1 84,5 80,9 76,5" fill="#C8A44E" opacity="0.6"/>
+      <circle cx="80" cy="5" r="2" fill="#8B1A1A" opacity="0.5"/>
+      <line x1="100" y1="5" x2="160" y2="5" stroke="#C8A44E" stroke-width="0.5"/>
     </svg>
   </div>
 
-  <!-- Marginal note: Ayat an-Nur -->
-  <div class="margin-note" style="top: 130px;">
-    An-Nur<br>24 : 35<br><br>
-    <em>&lsquo;Allah is<br>the Light<br>of the<br>heavens<br>and the<br>earth&rsquo;</em>
+  <!-- Gül: Ayat an-Nur -->
+  <div class="gul-note" style="top: 215px;">
+    <svg class="gul-flower" width="20" height="20" viewBox="0 0 20 20">
+      <circle cx="10" cy="10" r="8" fill="none" stroke="#C8A44E" stroke-width="0.5"/>
+      <circle cx="10" cy="3" r="2.5" fill="#8B1A1A" opacity="0.6"/><circle cx="10" cy="3" r="1" fill="#C8A44E" opacity="0.5"/>
+      <circle cx="16.6" cy="7" r="2.5" fill="#8B1A1A" opacity="0.6"/><circle cx="16.6" cy="7" r="1" fill="#C8A44E" opacity="0.5"/>
+      <circle cx="14" cy="14.5" r="2.5" fill="#8B1A1A" opacity="0.6"/><circle cx="14" cy="14.5" r="1" fill="#C8A44E" opacity="0.5"/>
+      <circle cx="6" cy="14.5" r="2.5" fill="#8B1A1A" opacity="0.6"/><circle cx="6" cy="14.5" r="1" fill="#C8A44E" opacity="0.5"/>
+      <circle cx="3.4" cy="7" r="2.5" fill="#8B1A1A" opacity="0.6"/><circle cx="3.4" cy="7" r="1" fill="#C8A44E" opacity="0.5"/>
+      <circle cx="10" cy="10" r="3" fill="#C8A44E" opacity="0.4"/>
+    </svg>
+    <span class="gul-text">An-Nur<br>24 : 35</span>
+    <span class="gul-text" style="margin-top:2px;display:block;color:#C8A44E;opacity:0.7;">&lsquo;Allah is<br>the Light<br>of the<br>heavens&rsquo;</span>
   </div>
 
   <!-- Body Text -->
   <div class="body-text">
     <div class="drop-cap-wrap">
-      <div class="drop-cap-box">
-        <span class="drop-cap-letter">C</span>
-      </div>
+      <svg width="52" height="52" viewBox="0 0 52 52">
+        <polygon points="26,2 44,10 50,26 44,42 26,50 8,42 2,26 8,10" fill="#2A1230" stroke="#C8A44E" stroke-width="1.5"/>
+        <polygon points="26,6 40,13 46,26 40,39 26,46 12,39 6,26 12,13" fill="none" stroke="#C8A44E" stroke-width="0.5" opacity="0.5"/>
+        <polygon points="26,10 30,22 42,18 32,26 42,34 30,30 26,42 22,30 10,34 20,26 10,18 22,22" fill="#8B1A1A" opacity="0.3"/>
+        <circle cx="26" cy="26" r="10" fill="#1A0A1E" stroke="#C8A44E" stroke-width="0.8"/>
+        <text x="26" y="31" text-anchor="middle" font-family="'Cormorant SC', serif" font-size="20" font-weight="700" fill="#D4AF37">C</text>
+      </svg>
     </div>
     onsider the prism: white light enters as one and departs as
     many. This is no mere curiosity of glass but a parable written
     in the physics of creation. As Ibn al-Haytham demonstrated that
     light carries within itself all colours, so does the divine
     <em>nur</em> contain within its unity the full spectrum of
-    manifest beauty. Each colour bends at its own angle &mdash;
-    each <em>tajalli</em>, each self-disclosure, refracts
-    according to its own nature.
+    manifest beauty.
   </div>
 
   <!-- Code Block -->
-  <div class="code-block">
+  <div class="code-frame">
     <pre>
 <span class="line-num">1</span><span class="code-comment">// the one light, separated into many</span>
-<span class="line-num">2</span>uniform float uIorR;
-<span class="line-num">3</span>uniform float uIorG;
-<span class="line-num">4</span>uniform float uIorB;
+<span class="line-num">2</span><span class="code-keyword">uniform</span> <span class="code-keyword">float</span> uIorR;
+<span class="line-num">3</span><span class="code-keyword">uniform</span> <span class="code-keyword">float</span> uIorG;
+<span class="line-num">4</span><span class="code-keyword">uniform</span> <span class="code-keyword">float</span> uIorB;
 <span class="line-num">5</span>
 <span class="line-num">6</span><span class="code-comment">// each colour bends by its own nature</span>
-<span class="line-num">7</span>float iorR = 1.0 / uIorR;
-<span class="line-num">8</span>float iorG = 1.0 / uIorG;
-<span class="line-num">9</span>float iorB = 1.0 / uIorB;
+<span class="line-num">7</span><span class="code-keyword">float</span> iorR = 1.0 / uIorR;
+<span class="line-num">8</span><span class="code-keyword">float</span> iorG = 1.0 / uIorG;
+<span class="line-num">9</span><span class="code-keyword">float</span> iorB = 1.0 / uIorB;
 <span class="line-num">10</span>
 <span class="line-num">11</span><span class="code-comment">// the manifold refractions of one ray</span>
 <span class="line-num">12</span>vec3 refractR = refract(eye, n, iorR);
@@ -221,42 +256,62 @@ body {
 <span class="line-num">14</span>vec3 refractB = refract(eye, n, iorB);
 <span class="line-num">15</span>
 <span class="line-num">16</span><span class="code-comment">// from unity, the spectrum emerges</span>
-<span class="line-num">17</span>float R = texture2D(scene, uv + refractR.xy).r;
-<span class="line-num">18</span>float G = texture2D(scene, uv + refractG.xy).g;
-<span class="line-num">19</span>float B = texture2D(scene, uv + refractB.xy).b;</pre>
+<span class="line-num">17</span><span class="code-keyword">float</span> R = texture2D(scene, uv+refractR.xy).r;
+<span class="line-num">18</span><span class="code-keyword">float</span> G = texture2D(scene, uv+refractG.xy).g;
+<span class="line-num">19</span><span class="code-keyword">float</span> B = texture2D(scene, uv+refractB.xy).b;</pre>
   </div>
 
-  <!-- Marginal note: Ibn al-Haytham -->
-  <div class="margin-note" style="top: 510px;">
-    Ibn al-<br>Haytham<br>c. 1021<br><br>
-    <em>Kit&#257;b<br>al-Man&#257;&#7827;ir</em>
+  <!-- Gül: Ibn al-Haytham -->
+  <div class="gul-note" style="top: 560px;">
+    <svg class="gul-flower" width="16" height="16" viewBox="0 0 20 20">
+      <circle cx="10" cy="10" r="8" fill="none" stroke="#C8A44E" stroke-width="0.6"/>
+      <circle cx="10" cy="3" r="2.5" fill="#4A1A5A" opacity="0.5"/><circle cx="10" cy="3" r="1" fill="#C8A44E" opacity="0.5"/>
+      <circle cx="16.6" cy="7" r="2.5" fill="#4A1A5A" opacity="0.5"/><circle cx="16.6" cy="7" r="1" fill="#C8A44E" opacity="0.5"/>
+      <circle cx="14" cy="14.5" r="2.5" fill="#4A1A5A" opacity="0.5"/><circle cx="14" cy="14.5" r="1" fill="#C8A44E" opacity="0.5"/>
+      <circle cx="6" cy="14.5" r="2.5" fill="#4A1A5A" opacity="0.5"/><circle cx="6" cy="14.5" r="1" fill="#C8A44E" opacity="0.5"/>
+      <circle cx="3.4" cy="7" r="2.5" fill="#4A1A5A" opacity="0.5"/><circle cx="3.4" cy="7" r="1" fill="#C8A44E" opacity="0.5"/>
+      <circle cx="10" cy="10" r="3" fill="#C8A44E" opacity="0.3"/>
+    </svg>
+    <span class="gul-text">Ibn al-<br>Haytham<br>c. 1021</span>
   </div>
 
   <!-- Continuation -->
-  <div class="body-text" style="font-size: 14.5px; margin-top: 8px;">
+  <div class="body-text" style="font-size: 13px; margin-top: 2px; line-height: 1.45;">
     The values are given thus: for red, <em>1.14</em>; for green,
     <em>1.18</em>; for blue, <em>1.23</em>. Mark how the difference is
     slight &mdash; mere hundredths &mdash; yet from this small divergence
-    the entire rainbow unfolds. So it is with the divine attributes:
-    each <em>sifah</em> is but a fraction apart from the others, yet
-    together they compose the inexhaustible beauty of creation.
+    the entire rainbow unfolds. Each <em>sifah</em> is but a fraction
+    apart, yet together they compose the inexhaustible beauty of creation.
   </div>
 
-  <div class="body-text" style="font-size: 14px; font-style: italic; color: #5A4E3C; margin-top: 6px;">
+  <div class="body-text" style="font-size: 12.5px; color: #A89060; margin-top: 2px; margin-bottom: 0; line-height: 1.4;">
     As Ibn al-Haytham proved in the <em>Kit&#257;b al-Man&#257;&#7827;ir</em>,
     light does not mix; it only appears to. Each ray preserves its
-    identity even as it passes through the same glass. The shader
-    merely rediscovers what the <em>&#7716;ak&#299;m</em> already knew:
-    unity and multiplicity are not opposites but facets of one truth.
+    identity. The shader rediscovers what the <em>&#7716;ak&#299;m</em> knew:
+    unity and multiplicity are facets of one truth.
   </div>
 
-  <!-- IOR values as decorative element -->
-  <div style="text-align: center; margin-top: 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8A7D6B; letter-spacing: 0.15em;">
-    R = 1.14 &nbsp;&nbsp; G = 1.18 &nbsp;&nbsp; B = 1.23
+  <!-- IOR values ornamental -->
+  <div style="text-align: center; margin-top: 4px;">
+    <svg width="240" height="20" viewBox="0 0 240 20">
+      <line x1="0" y1="10" x2="30" y2="10" stroke="#C8A44E" stroke-width="0.4" opacity="0.4"/>
+      <text x="60" y="13" font-family="'JetBrains Mono', monospace" font-size="9" fill="#C8A44E" opacity="0.7" text-anchor="middle">R = 1.14</text>
+      <circle cx="95" cy="10" r="1.5" fill="#8B1A1A" opacity="0.5"/>
+      <text x="120" y="13" font-family="'JetBrains Mono', monospace" font-size="9" fill="#C8A44E" opacity="0.7" text-anchor="middle">G = 1.18</text>
+      <circle cx="145" cy="10" r="1.5" fill="#8B1A1A" opacity="0.5"/>
+      <text x="180" y="13" font-family="'JetBrains Mono', monospace" font-size="9" fill="#C8A44E" opacity="0.7" text-anchor="middle">B = 1.23</text>
+      <line x1="210" y1="10" x2="240" y2="10" stroke="#C8A44E" stroke-width="0.4" opacity="0.4"/>
+    </svg>
   </div>
 
-  <hr class="footer-rule">
-  <div class="footer-text">A Gift of Time &nbsp;&middot;&nbsp; agiftoftime.app &nbsp;&middot;&nbsp; dichroic FBO shader</div>
+  <div class="footer">
+    <svg width="100%" height="16" viewBox="0 0 340 16">
+      <line x1="0" y1="2" x2="340" y2="2" stroke="#C8A44E" stroke-width="0.3" opacity="0.3"/>
+      <circle cx="170" cy="9" r="3" fill="none" stroke="#C8A44E" stroke-width="0.4" opacity="0.4"/>
+      <circle cx="170" cy="9" r="1" fill="#C8A44E" opacity="0.3"/>
+    </svg>
+    <div class="footer-text">A Gift of Time &nbsp;&middot;&nbsp; agiftoftime.app &nbsp;&middot;&nbsp; dichroic FBO shader</div>
+  </div>
 
 </div>
 </body>

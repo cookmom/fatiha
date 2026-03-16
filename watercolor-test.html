@@ -1,0 +1,127 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c" width="430" height="932"></canvas>
+<script>
+const W = 430, H = 932;
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+ctx.fillStyle = '#000';
+ctx.fillRect(0, 0, W, H);
+
+function gaussRandom(mean, stddev) {
+  let u, v, s;
+  do {
+    u = Math.random() * 2 - 1;
+    v = Math.random() * 2 - 1;
+    s = u * u + v * v;
+  } while (s >= 1 || s === 0);
+  return mean + stddev * u * Math.sqrt(-2 * Math.log(s) / s);
+}
+
+// Tyler Hobbs recursive midpoint displacement
+// Each level inserts displaced midpoints, doubling vertex count
+// Displacement proportional to edge length, halving each level
+function deformPolygon(polygon, baseVariance, levels) {
+  let pts = polygon.map(p => ({ ...p }));
+
+  for (let level = 0; level < levels; level++) {
+    const newPts = [];
+    const v = baseVariance * Math.pow(0.5, level);
+
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      newPts.push(a);
+
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const edgeLen = Math.sqrt(dx * dx + dy * dy);
+      if (edgeLen < 0.5) { newPts.push({ x: (a.x+b.x)/2, y: (a.y+b.y)/2 }); continue; }
+
+      const nx = -dy / edgeLen, ny = dx / edgeLen;
+      const d = gaussRandom(0, edgeLen * v);
+      newPts.push({ x: (a.x+b.x)/2 + nx*d, y: (a.y+b.y)/2 + ny*d });
+    }
+    pts = newPts;
+  }
+  return pts;
+}
+
+function fillPoly(pts, color) {
+  if (pts.length < 3) return;
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+// Scale a polygon toward/away from center
+function scalePoly(pts, cx, cy, scale) {
+  return pts.map(p => ({
+    x: cx + (p.x - cx) * scale,
+    y: cy + (p.y - cy) * scale
+  }));
+}
+
+// --- MAIN ---
+const cx = W / 2, cy = H / 2;
+const radius = 110;
+
+// Step 1: Create base circle with 14 vertices
+const circle = [];
+for (let i = 0; i < 14; i++) {
+  const a = (2 * Math.PI * i) / 14;
+  circle.push({ x: cx + radius * Math.cos(a), y: cy + radius * Math.sin(a) });
+}
+
+// Step 2: Create ONE fixed irregular base shape
+const baseShape = deformPolygon(circle, 0.6, 2);
+
+// Inner core = same baseShape scaled to 50% — inherits the same organic shape
+const innerBase = scalePoly(baseShape, cx, cy, 0.5);
+
+const fineVariance = 0.4;
+const fineLevels = 4;
+
+// Dark center core — small dense blob
+for (let i = 0; i < 45; i++) {
+  const deformed = deformPolygon(innerBase, fineVariance * 0.8, fineLevels);
+  fillPoly(deformed, 'rgba(140, 20, 50, 0.022)');
+}
+
+// Core: deep rose-pink
+for (let i = 0; i < 85; i++) {
+  const deformed = deformPolygon(baseShape, fineVariance, fineLevels);
+  fillPoly(deformed, 'rgba(195, 50, 85, 0.015)');
+}
+
+// Mid: warmer pink
+for (let i = 0; i < 60; i++) {
+  const deformed = deformPolygon(baseShape, fineVariance * 1.3, fineLevels);
+  fillPoly(deformed, 'rgba(215, 85, 115, 0.011)');
+}
+
+// Outer: light pink wash
+for (let i = 0; i < 45; i++) {
+  const deformed = deformPolygon(baseShape, fineVariance * 1.7, fineLevels);
+  fillPoly(deformed, 'rgba(225, 120, 145, 0.007)');
+}
+
+// Outermost tendrils
+for (let i = 0; i < 35; i++) {
+  const deformed = deformPolygon(baseShape, fineVariance * 2.2, fineLevels);
+  fillPoly(deformed, 'rgba(235, 155, 170, 0.004)');
+}
+</script>
+</body>
+</html>
