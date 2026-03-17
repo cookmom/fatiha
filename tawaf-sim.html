@@ -46,6 +46,9 @@ const MAX_AGENTS = 2200;
 // --- CANVAS ---
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
+const trailCanvas = document.createElement('canvas');
+trailCanvas.width = W; trailCanvas.height = H;
+const tctx = trailCanvas.getContext('2d');
 canvas.width = W; canvas.height = H;
 canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
 
