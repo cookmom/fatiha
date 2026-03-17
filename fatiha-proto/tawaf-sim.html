@@ -365,26 +365,23 @@ const aprayerTX = new Float32Array(MAX_AGENTS);
 const aprayerTY = new Float32Array(MAX_AGENTS);
 const aprayerAssigned = new Uint8Array(MAX_AGENTS);
 
-// --- RECTANGULAR ROW COMPUTATION ---
+// --- CIRCULAR ROW COMPUTATION ---
 function computePrayerRows() {
   const ROW_SPACING = 6.5;
-  const AGENT_SPACING = 3.8;
+  const ARC_SPACING = 3.8;
   const startDist = KAABAH_SIZE / 2 + 14;
-  const maxDist = MATAF_OUTER + 30; // extend slightly beyond mataf for overflow
+  const maxDist = MATAF_OUTER + 30;
   const rows = [];
 
-  for (let d = startDist; d < maxDist; d += ROW_SPACING) {
-    const hw = d, hh = d; // half-width/height (square around Ka'bah)
+  for (let r = startDist; r < maxDist; r += ROW_SPACING) {
+    const circumference = 2 * Math.PI * r;
+    const count = Math.floor(circumference / ARC_SPACING);
     const positions = [];
-    // Top edge (left to right)
-    for (let x = -hw; x <= hw; x += AGENT_SPACING) positions.push({x: CX+x, y: CY-hh});
-    // Right edge (top to bottom, skip corner)
-    for (let y = -hh+AGENT_SPACING; y <= hh; y += AGENT_SPACING) positions.push({x: CX+hw, y: CY+y});
-    // Bottom edge (right to left, skip corner)
-    for (let x = hw-AGENT_SPACING; x >= -hw; x -= AGENT_SPACING) positions.push({x: CX+x, y: CY+hh});
-    // Left edge (bottom to top, skip corners)
-    for (let y = hh-AGENT_SPACING; y > -hh; y -= AGENT_SPACING) positions.push({x: CX-hw, y: CY+y});
-    rows.push({dist: d, positions, capacity: positions.length, filled: 0});
+    for (let j = 0; j < count; j++) {
+      const a = (j / count) * Math.PI * 2;
+      positions.push({x: CX + Math.cos(a) * r, y: CY + Math.sin(a) * r});
+    }
+    rows.push({dist: r, positions, capacity: positions.length, filled: 0});
   }
   return rows;
 }
@@ -731,7 +728,7 @@ function spawnAgent(distributed, forceType, groupId, leaderIdx, offX, offY) {
   asize[i] = cfg.sizeMin + Math.random() * (cfg.sizeMax - cfg.sizeMin);
   acolor[i] = typeColor(type);
   acircuits[i] = 0;
-  aangleAccum[i] = 0;
+  aangleAccum[i] = Math.random() * Math.PI * 2;
   alastAngle[i] = angle;
   aprayerAssigned[i] = 0;
 
@@ -1305,7 +1302,7 @@ function drawPrayerRowGuides() {
 
   for (let d = startDist; d < maxDist; d += ROW_SPACING) {
     ctx.beginPath();
-    ctx.rect(CX - d, CY - d, d * 2, d * 2);
+    ctx.arc(CX, CY, d, 0, Math.PI * 2);
     ctx.stroke();
   }
   ctx.restore();
@@ -1610,30 +1607,141 @@ function loop(timestamp) {
   requestAnimationFrame(loop);
 }
 
-// --- INIT ---
-addEvent('system', 'tawaf engine initializing');
-addEvent('system', 'connecting to aladhan api');
-
+// --- INIT (STEADY STATE — looks like tuning into a live feed) ---
 fetchPrayerTimes().then(() => {
-  addEvent('system', 'prayer times loaded');
   targetAgentCount = getTargetAgentCountForTime();
-  updateUI();
 
-  for (let i = 0; i < targetAgentCount; i++) {
+  // Spawn all agents in steady-state positions
+  for (let i = 0; i < targetAgentCount; ) {
     const type = pickType();
+    const before = agentCount;
     if (type === TYPE_FAMILY) {
       spawnFamilyCluster();
-      i += 3;
     } else if (type === TYPE_TOUR) {
       spawnTourGroup();
-      i += 14;
     } else {
       spawnAgent(true, type);
     }
+    i += Math.max(1, agentCount - before);
   }
 
-  addEvent('system', `${agentCount} agents spawned`);
+  // Give each agent a random circuit count (as if mid-tawaf)
+  for (let i = 0; i < agentCount; i++) {
+    acircuits[i] = Math.floor(Math.random() * 7);
+  }
+
+  // Pre-seed totalTawaf as if simulation has been running for hours
+  const makkah = getMakkahTime();
+  const hourOfDay = makkah.getHours() + makkah.getMinutes() / 60;
+  totalTawaf = Math.round(hourOfDay * 180 + Math.random() * 200);
+
+  // Pre-seed circuits/hr
+  circuitsPerHour = Math.round(agentCount * 0.35 + Math.random() * 80);
+  circuitsThisMinute = Math.round(circuitsPerHour / 60);
+
+  // Pre-fill density history so chart isn't empty
+  const baseDensity = agentCount / MAX_AGENTS;
+  for (let i = 0; i < densityHistory.length; i++) {
+    densityHistory[i] = baseDensity * (0.85 + Math.random() * 0.3);
+  }
+  densityFull = true;
+  densityIdx = 0;
+
+  // Check if we're currently in a prayer window and init prayer state
+  const nowSec = makkah.getHours() * 3600 + makkah.getMinutes() * 60 + makkah.getSeconds();
+  for (const p of prayerSchedule) {
+    const pSec = p.totalMin * 60;
+    const diff = nowSec - pSec;
+    // Within 2min before prayer → adhan phase
+    if (diff >= -120 && diff < 0) {
+      prayerMode.phase = 'adhan';
+      prayerMode.prayerName = p.name;
+      prayerMode.rakatTotal = PRAYER_RAKAT[p.name];
+      prayerMode.rakatCurrent = 1;
+      prayerMode.poseIndex = 0;
+      prayerMode.phaseStart = Date.now() - (120 + diff) * 1000;
+      prayerMode.adhanTriggeredFor = p.name;
+      break;
+    }
+    // 0-45s after prayer time → iqamah
+    if (diff >= 0 && diff < 45) {
+      prayerMode.phase = 'iqamah';
+      prayerMode.prayerName = p.name;
+      prayerMode.rakatTotal = PRAYER_RAKAT[p.name];
+      prayerMode.rakatCurrent = 1;
+      prayerMode.poseIndex = 0;
+      prayerMode.phaseStart = Date.now() - diff * 1000;
+      prayerMode.adhanTriggeredFor = p.name;
+      prayerMode.rowsComputed = false;
+      assignAgentsToRows();
+      break;
+    }
+    // 45s to (45 + rakatTotal*92)s → praying
+    const prayerDuration = PRAYER_RAKAT[p.name] * 92;
+    if (diff >= 45 && diff < 45 + prayerDuration) {
+      prayerMode.phase = 'praying';
+      prayerMode.prayerName = p.name;
+      prayerMode.rakatTotal = PRAYER_RAKAT[p.name];
+      prayerMode.adhanTriggeredFor = p.name;
+      // Figure out which rakat/pose we're in
+      const prayingElapsed = diff - 45;
+      const rakatDuration = 92; // sum of all pose durations
+      prayerMode.rakatCurrent = Math.min(prayerMode.rakatTotal, Math.floor(prayingElapsed / rakatDuration) + 1);
+      const inRakat = prayingElapsed % rakatDuration;
+      let cumulative = 0;
+      prayerMode.poseIndex = 0;
+      for (let pi = 0; pi < POSE_ORDER.length; pi++) {
+        cumulative += POSE_DURATION[POSE_ORDER[pi]];
+        if (inRakat < cumulative) { prayerMode.poseIndex = pi; break; }
+      }
+      prayerMode.phaseStart = Date.now() - (diff - 45) * 1000;
+      prayerMode.poseStart = Date.now() - (inRakat - (cumulative - POSE_DURATION[POSE_ORDER[prayerMode.poseIndex]])) * 1000;
+      prayerMode.rowsComputed = false;
+      assignAgentsToRows();
+      break;
+    }
+    // Post-prayer salam (20s)
+    if (diff >= 45 + prayerDuration && diff < 65 + prayerDuration) {
+      prayerMode.phase = 'salam';
+      prayerMode.prayerName = p.name;
+      prayerMode.rakatTotal = PRAYER_RAKAT[p.name];
+      prayerMode.phaseStart = Date.now() - (diff - 45 - prayerDuration) * 1000;
+      prayerMode.adhanTriggeredFor = p.name;
+      prayerMode.rowsComputed = false;
+      assignAgentsToRows();
+      break;
+    }
+    // Resuming (60s after salam)
+    if (diff >= 65 + prayerDuration && diff < 125 + prayerDuration) {
+      prayerMode.phase = 'resuming';
+      prayerMode.prayerName = p.name;
+      prayerMode.phaseStart = Date.now() - (diff - 65 - prayerDuration) * 1000;
+      prayerMode.adhanTriggeredFor = p.name;
+      break;
+    }
+  }
+
+  // Populate event log as if it's been running
+  const fakeEvents = [
+    {type:'system', msg:'telemetry stream active'},
+    {type:'circuit', msg:'solo m completed 7 circuits'},
+    {type:'circuit', msg:'family completed 7 circuits'},
+    {type:'arrival', msg:`tour grp ${nextGroupId-1} (${10+Math.floor(Math.random()*8)})`},
+    {type:'circuit', msg:'elderly completed 7 circuits'},
+    {type:'system', msg:`crowd density ${(baseDensity*100).toFixed(0)}% — ${agentCount} agents`},
+    {type:'arrival', msg:'solo f entered mataf'},
+    {type:'circuit', msg:'tour completed 7 circuits'},
+    {type:'arrival', msg:`family grp ${Math.max(0,nextGroupId-3)} (${3+Math.floor(Math.random()*3)})`},
+    {type:'circuit', msg:'solo m completed 7 circuits'},
+  ];
+  const ts = makkah.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+  for (const e of fakeEvents) {
+    eventLog.push({ts, type: e.type, msg: e.msg});
+  }
+
   tctx.clearRect(0, 0, W, H);
+  updateUI();
+  drawDensityChart();
   requestAnimationFrame(loop);
 });
 </script>
