@@ -281,13 +281,39 @@ const TYPE_COLORS_CSS = ['#E0E0E0','#c8a8d8','#00FF88','#d4af37','#00BBFF','#FF8
 // Inner ring: ~0.3 m/s, outer ring: ~1.1 m/s [ResearchGate crowd density studies]
 // 7-circuit tawaf time: 25-45 min (inner=shorter path but slower; outer=longer but faster)
 const TYPE_CONFIG = {
-  [TYPE_SOLO_M]:  { speedMul: 1.3, sizeMin: 0.8, sizeMax: 1.2, ringMin: 0.25, ringMax: 0.95 },
-  [TYPE_SOLO_F]:  { speedMul: 1.0, sizeMin: 0.7, sizeMax: 1.1, ringMin: 0.1,  ringMax: 0.7 },
-  [TYPE_FAMILY]:  { speedMul: 0.55, sizeMin: 0.7, sizeMax: 1.1, ringMin: 0.05, ringMax: 0.5 },
-  [TYPE_ELDERLY]: { speedMul: 0.25, sizeMin: 1.0, sizeMax: 1.4, ringMin: 0.0,  ringMax: 0.18 },
-  [TYPE_TOUR]:    { speedMul: 0.7, sizeMin: 0.7, sizeMax: 1.0, ringMin: 0.2,  ringMax: 0.75 },
-  [TYPE_CHILD]:   { speedMul: 0.8, sizeMin: 0.4, sizeMax: 0.6, ringMin: 0.05, ringMax: 0.5 },
+  [TYPE_SOLO_M]:  { speedMul: 1.3, sizeMin: 0.8, sizeMax: 1.2, ringMin: 0.0,  ringMax: 0.7 },
+  [TYPE_SOLO_F]:  { speedMul: 1.0, sizeMin: 0.7, sizeMax: 1.1, ringMin: 0.0,  ringMax: 0.8 },
+  [TYPE_FAMILY]:  { speedMul: 0.55, sizeMin: 0.7, sizeMax: 1.1, ringMin: 0.05, ringMax: 0.9 },
+  [TYPE_ELDERLY]: { speedMul: 0.25, sizeMin: 1.0, sizeMax: 1.4, ringMin: 0.1,  ringMax: 0.6 },
+  [TYPE_TOUR]:    { speedMul: 0.7, sizeMin: 0.7, sizeMax: 1.0, ringMin: 0.1,  ringMax: 0.8 },
+  [TYPE_CHILD]:   { speedMul: 0.8, sizeMin: 0.4, sizeMax: 0.6, ringMin: 0.05, ringMax: 0.9 },
 };
+
+// === SOCIAL FORCE MODEL (Helbing & Molnar 1995) ===
+// Standard pedestrian dynamics model used in Hajj crowd safety research
+// Parameters tuned for pixel-space sim (~2.57 px/m)
+const SFM_AGENT_R = 0.65;         // agent radius px (~0.25m shoulder half-width)
+const SFM_TAU = 8;                // velocity relaxation time (frames, ~0.5s at 60fps)
+const SFM_A = 0.3;                // social repulsion strength
+const SFM_B = 1.5;                // social repulsion range (px)
+const SFM_K = 3.0;                // body compression stiffness (contact only)
+const SFM_KAPPA = 1.5;            // sliding friction coefficient (contact only)
+const SFM_WALL_A = 1.0;           // wall repulsion strength
+const SFM_WALL_B = 2.5;           // wall repulsion range (px)
+const SFM_WALL_RANGE = 10;        // max distance for wall force calc
+const SFM_INTERACT_R2 = 64;       // agent interaction range² (8px ≈ 3m)
+
+// Gravitational pull toward Ka'bah — direct radial force per agent (px/frame²)
+// Everyone wants to be as close as possible; inner rings packed, outer exist because inner is full.
+// When an inner agent completes 7 circuits and exits, agents behind shift inward.
+const SFM_RADIAL_PULL = [
+  0.030,  // SOLO_M  — aggressive, push through crowd
+  0.022,  // SOLO_F  — moderate inward desire
+  0.015,  // FAMILY  — careful, don't crush kids
+  0.012,  // ELDERLY — wants proximity but gentle
+  0.020,  // TOUR    — guided, moderate push
+  0.010,  // CHILD   — follows family, weakest pull
+];
 
 function typeColor(type) {
   let r, g, b, a;
@@ -799,11 +825,11 @@ function spawnAgent(distributed, forceType, groupId, leaderIdx, offX, offY) {
   if (distributed) {
     const bandMin = MATAF_INNER + cfg.ringMin * range;
     const bandMax = MATAF_INNER + cfg.ringMax * range;
-    const t = Math.pow(Math.random(), 1.8);
+    const t = Math.pow(Math.random(), 2.5); // strong inner bias (gravitational packing)
     ring = bandMin + t * (bandMax - bandMin);
   } else {
-    const t = Math.pow(Math.random(), 1.8);
-    ring = MATAF_INNER + 8 + t * (MATAF_OUTER - MATAF_INNER - 12);
+    // New arrivals enter from the outer edge — gravity pulls them inward over time
+    ring = MATAF_OUTER - 3 - Math.random() * 15;
   }
   const angle = Math.random() * Math.PI * 2;
   ax[i] = CX + Math.cos(angle) * ring;
@@ -1176,34 +1202,25 @@ function updateAgents(dt) {
       }
     }
 
-    // --- TOUCHING RING: innermost ~2m from Ka'bah, all agents extremely slow ---
-    const touchRingSlowdown = dist < TOUCH_RING_DIST ? 0.15 : (dist < TOUCH_RING_DIST + 5 ? 0.4 : 1.0);
+    // === SOCIAL FORCE MODEL (Helbing & Molnar 1995) ===
+    // Desired velocity: tangential (CCW orbit) + radial (toward Ka'bah)
+    // Repulsive force: exponential decay between nearby agents
+    // Body compression + friction: when agents closer than shoulder width
+    // Wall force: Ka'bah inner boundary and Mataf outer boundary
 
     const ringFrac = Math.max(0, Math.min(1, (dist - MATAF_INNER) / (MATAF_OUTER - MATAF_INNER)));
-    const ringSpeed = (0.15 + ringFrac * ringFrac * 0.85) * touchRingSlowdown;
-    const speed = aspeed[i] * ringSpeed;
 
-    let fx = tx * speed * 2.0;
-    let fy = ty * speed * 2.0;
+    // Touch ring slowdown (innermost ~2m from Ka'bah — extremely slow, packed)
+    const touchSlow = dist < TOUCH_RING_DIST ? 0.15 : (dist < TOUCH_RING_DIST + 5 ? 0.4 : 1.0);
+    // Inner rings slower due to density (real: 0.3 m/s inner, 1.1 m/s outer)
+    const ringSpeed = (0.15 + ringFrac * ringFrac * 0.85) * touchSlow;
+    const desiredSpeed = aspeed[i] * ringSpeed;
 
-    const cfg = TYPE_CONFIG[type];
-    const prefRingFrac = cfg.ringMin + Math.random() * 0.01 + (cfg.ringMax - cfg.ringMin) * 0.5;
-    const prefDist = MATAF_INNER + prefRingFrac * (MATAF_OUTER - MATAF_INNER);
-    const ringErr = dist - prefDist;
-    fx -= (dx / dist) * ringErr * 0.004;
-    fy -= (dy / dist) * ringErr * 0.004;
+    // 1. DESIRED VELOCITY — tangential CCW orbit
+    let desVx = tx * desiredSpeed;
+    let desVy = ty * desiredSpeed;
 
-    if (dist < MATAF_INNER + 6) {
-      const push = (MATAF_INNER + 6 - dist) * 0.25;
-      fx += (dx / dist) * push;
-      fy += (dy / dist) * push;
-    }
-    if (dist > MATAF_OUTER - 4) {
-      const push = (dist - MATAF_OUTER + 4) * 0.2;
-      fx -= (dx / dist) * push;
-      fy -= (dy / dist) * push;
-    }
-
+    // Group cohesion: followers track their leader
     const leader = agroupLeader[i];
     if (leader >= 0 && leader < agentCount) {
       const ldx = ax[leader] + agroupOffX[i] - ax[i];
@@ -1211,26 +1228,34 @@ function updateAgents(dt) {
       const ldist = Math.sqrt(ldx * ldx + ldy * ldy);
       if (ldist > 2) {
         const pull = Math.min(ldist * 0.06, 0.8);
-        fx += (ldx / ldist) * pull;
-        fy += (ldy / ldist) * pull;
+        desVx += (ldx / ldist) * pull;
+        desVy += (ldy / ldist) * pull;
       }
-      fx += (avx[leader] - avx[i]) * 0.15;
-      fy += (avy[leader] - avy[i]) * 0.15;
+      desVx += (avx[leader] - avx[i]) * 0.15;
+      desVy += (avy[leader] - avy[i]) * 0.15;
     }
 
+    // Child random weaving
     if (type === TYPE_CHILD) {
-      fx += (Math.random() - 0.5) * 0.4;
-      fy += (Math.random() - 0.5) * 0.4;
+      desVx += (Math.random() - 0.5) * 0.4;
+      desVy += (Math.random() - 0.5) * 0.4;
     }
 
+    // 2. DRIVING FORCE: (v_desired - v_current) / tau
+    let fx = (desVx - avx[i]) / SFM_TAU;
+    let fy = (desVy - avy[i]) / SFM_TAU;
+
+    // 3. GRAVITATIONAL PULL TOWARD KA'BAH — everyone wants to be closer
+    // Radial inward force — resisted only by crowd pressure from agents already closer
+    const radX = -dx / dist;  // unit vector toward Ka'bah center
+    const radY = -dy / dist;
+    const pullForce = SFM_RADIAL_PULL[type];
+    fx += radX * pullForce;
+    fy += radY * pullForce;
+
+    // 4. AGENT-AGENT SOCIAL FORCES (Helbing & Molnar)
     const gx0 = (ax[i] / CELL) | 0;
     const gy0 = (ay[i] / CELL) | 0;
-    let sepX = 0, sepY = 0, sepN = 0;
-    let alignVx = 0, alignVy = 0, alignN = 0;
-
-    const hardBody2 = ringFrac < 0.25 ? 1.5 : 2.5;
-    const softDist2 = ringFrac < 0.25 ? 3 : (ringFrac < 0.5 ? 6 : 12);
-    const sepStrength = ringFrac < 0.25 ? 0.3 : 0.6;
 
     for (let dgy = -1; dgy <= 1; dgy++) {
       for (let dgx = -1; dgx <= 1; dgx++) {
@@ -1240,23 +1265,32 @@ function updateAgents(dt) {
         while (j >= 0) {
           if (j !== i) {
             const ndx = ax[i] - ax[j], ndy = ay[i] - ay[j];
-            const nd2 = ndx*ndx + ndy*ndy;
-            if (nd2 < hardBody2 && nd2 > 0.001) {
+            const nd2 = ndx * ndx + ndy * ndy;
+            if (nd2 < SFM_INTERACT_R2 && nd2 > 0.001) {
               const nd = Math.sqrt(nd2);
-              sepX += (ndx / nd) * 1.5;
-              sepY += (ndy / nd) * 1.5;
-              sepN++;
-            } else if (nd2 < softDist2 && nd2 > 0.001) {
-              const nd = Math.sqrt(nd2);
-              const f = (1.0 - nd / Math.sqrt(softDist2)) * sepStrength;
-              sepX += (ndx / nd) * f;
-              sepY += (ndy / nd) * f;
-              sepN++;
-            }
-            if (nd2 < 64) {
-              alignVx += avx[j];
-              alignVy += avy[j];
-              alignN++;
+              // Normal direction from j to i
+              const nix = ndx / nd, niy = ndy / nd;
+              // Gap between agent surfaces (negative = overlapping)
+              const rij = SFM_AGENT_R * 2;  // sum of radii
+              const gap = nd - rij;
+
+              // Social repulsion — exponential decay (always active)
+              const socialF = SFM_A * Math.exp(-gap / SFM_B);
+              fx += nix * socialF;
+              fy += niy * socialF;
+
+              // Body contact forces (only when overlapping)
+              if (gap < 0) {
+                const overlap = -gap;
+                // Compression force (normal — prevents overlap)
+                fx += nix * SFM_K * overlap;
+                fy += niy * SFM_K * overlap;
+                // Friction force (tangential — resists sliding)
+                const tix = -niy, tiy = nix;
+                const dvt = (avx[j] - avx[i]) * tix + (avy[j] - avy[i]) * tiy;
+                fx += tix * SFM_KAPPA * overlap * dvt;
+                fy += tiy * SFM_KAPPA * overlap * dvt;
+              }
             }
           }
           j = gridNext[j];
@@ -1264,23 +1298,45 @@ function updateAgents(dt) {
       }
     }
 
-    fx += sepX * 0.5;
-    fy += sepY * 0.5;
-    if (alignN > 0) {
-      fx += (alignVx / alignN - avx[i]) * 0.1;
-      fy += (alignVy / alignN - avy[i]) * 0.1;
+    // 5. WALL FORCES — Ka'bah inner boundary
+    const innerWallDist = dist - MATAF_INNER;
+    if (innerWallDist < SFM_WALL_RANGE) {
+      const wallGap = innerWallDist - SFM_AGENT_R;
+      const wallF = SFM_WALL_A * Math.exp(-wallGap / SFM_WALL_B);
+      fx += (dx / dist) * wallF;   // push outward
+      fy += (dy / dist) * wallF;
+      if (wallGap < 0) {
+        fx += (dx / dist) * SFM_K * (-wallGap);
+        fy += (dy / dist) * SFM_K * (-wallGap);
+      }
     }
 
-    const noiseMul = type === TYPE_ELDERLY ? 0.03 : (type === TYPE_FAMILY ? 0.05 : 0.08);
+    // Mataf outer boundary
+    const outerWallDist = MATAF_OUTER - dist;
+    if (outerWallDist < SFM_WALL_RANGE) {
+      const wallGap = outerWallDist - SFM_AGENT_R;
+      const wallF = SFM_WALL_A * Math.exp(-wallGap / SFM_WALL_B);
+      fx -= (dx / dist) * wallF;   // push inward
+      fy -= (dy / dist) * wallF;
+      if (wallGap < 0) {
+        fx -= (dx / dist) * SFM_K * (-wallGap);
+        fy -= (dy / dist) * SFM_K * (-wallGap);
+      }
+    }
+
+    // Small noise for natural movement variation
+    const noiseMul = type === TYPE_ELDERLY ? 0.02 : (type === TYPE_FAMILY ? 0.03 : 0.05);
     fx += (Math.random() - 0.5) * noiseMul;
     fy += (Math.random() - 0.5) * noiseMul;
 
-    avx[i] += (fx - avx[i]) * 0.1;
-    avy[i] += (fy - avy[i]) * 0.1;
+    // 6. INTEGRATION
+    avx[i] += fx * dt;
+    avy[i] += fy * dt;
 
-    const v = Math.sqrt(avx[i]*avx[i] + avy[i]*avy[i]);
-    const maxV = speed * 1.3;
-    if (v > maxV) {
+    // Clamp velocity
+    const v = Math.sqrt(avx[i] * avx[i] + avy[i] * avy[i]);
+    const maxV = desiredSpeed * 1.5;
+    if (v > maxV && maxV > 0) {
       avx[i] = (avx[i] / v) * maxV;
       avy[i] = (avy[i] / v) * maxV;
     }
@@ -1288,7 +1344,7 @@ function updateAgents(dt) {
     ax[i] += avx[i] * dt;
     ay[i] += avy[i] * dt;
 
-    // Circuit tracking
+    // Circuit tracking (counterclockwise angle accumulation)
     const newAngle = Math.atan2(ay[i] - CY, ax[i] - CX);
     let dAngle = newAngle - alastAngle[i];
     if (dAngle > Math.PI) dAngle -= 2 * Math.PI;
@@ -1309,6 +1365,7 @@ function updateAgents(dt) {
       }
     }
 
+    // Hard boundary enforcement (safety net)
     const newDist = Math.sqrt((ax[i]-CX)*(ax[i]-CX) + (ay[i]-CY)*(ay[i]-CY));
     if (newDist < MATAF_INNER) {
       ax[i] = CX + (ax[i]-CX) / newDist * (MATAF_INNER + 1);
