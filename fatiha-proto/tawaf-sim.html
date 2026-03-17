@@ -7,7 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a0a;overflow-x:hidden;overflow-y:auto;font-family:'JetBrains Mono',monospace;color:#E0E0E0;width:100%;max-width:430px;min-height:100vh;margin:0 auto;position:relative}
+body{background:#2a2a2e;overflow-x:hidden;overflow-y:auto;font-family:'JetBrains Mono',monospace;color:#E0E0E0;width:100%;max-width:430px;min-height:100vh;margin:0 auto;position:relative}
 
 /* TOP BAR */
 #top-bar{position:absolute;top:0;left:0;right:0;height:28px;display:flex;align-items:center;justify-content:space-between;padding:0 10px;z-index:10}
@@ -373,14 +373,23 @@ const SFM_RADIAL_PULL = [
 
 function typeColor(type) {
   let r, g, b, a;
-  const v = () => (Math.random() - 0.5) * 12;
+  const v = () => (Math.random() - 0.5) * 18;
   switch (type) {
-    case TYPE_SOLO_M: r = 230+v(); g = 240+v(); b = 255+v(); a = 220+Math.random()*35; break; // bright ice white
-    case TYPE_SOLO_F: r = 220+v(); g = 130+v(); b = 255+v(); a = 210+Math.random()*45; break; // vivid purple
-    case TYPE_FAMILY: r = 40+v();  g = 255+v(); b = 120+v(); a = 215+Math.random()*40; break; // VIVID green
-    case TYPE_ELDERLY: r = 255+v(); g = 195+v(); b = 30+v();  a = 220+Math.random()*35; break; // BRIGHT amber
-    case TYPE_TOUR:   r = 30+v();  g = 220+v(); b = 255+v(); a = 215+Math.random()*40; break; // VIVID cyan
-    case TYPE_CHILD:  r = 255+v(); g = 150+v(); b = 100+v(); a = 210+Math.random()*45; break; // warm orange-peach
+    case TYPE_SOLO_M: r = 220+v(); g = 230+v(); b = 245+v(); a = 200+Math.random()*55; break; // ice white
+    case TYPE_SOLO_F: r = 200+v(); g = 100+v(); b = 240+v(); a = 190+Math.random()*55; break; // purple/magenta
+    case TYPE_FAMILY: r = 40+v();  g = 220+v(); b = 100+v(); a = 195+Math.random()*50; break; // green
+    case TYPE_ELDERLY: r = 240+v(); g = 180+v(); b = 40+v();  a = 200+Math.random()*45; break; // amber/gold
+    case TYPE_TOUR: { // Compound palette: cyan, teal, blue, with some red/pink outliers
+      const sub = Math.random();
+      if (sub < 0.55) { r = 30+v(); g = 200+v(); b = 240+v(); } // cyan
+      else if (sub < 0.75) { r = 50+v(); g = 180+v(); b = 200+v(); } // teal
+      else if (sub < 0.88) { r = 60+v(); g = 100+v(); b = 240+v(); } // blue
+      else if (sub < 0.95) { r = 220+v(); g = 70+v(); b = 90+v(); } // red/coral
+      else { r = 200+v(); g = 200+v(); b = 210+v(); } // gray-white
+      a = 195+Math.random()*50;
+      break;
+    }
+    case TYPE_CHILD:  r = 245+v(); g = 130+v(); b = 80+v(); a = 190+Math.random()*50; break; // warm orange
   }
   r = Math.max(0, Math.min(255, r)) | 0;
   g = Math.max(0, Math.min(255, g)) | 0;
@@ -912,16 +921,18 @@ function spawnAgent(distributed, forceType, groupId, leaderIdx, offX, offY) {
   avx[i] = -Math.sin(angle) * spd;
   avy[i] = Math.cos(angle) * spd;
   aspeed[i] = spd;
-  // Power-law dot sizes: most tiny, some medium, few large focal pilgrims
+  // Compound particle sizes: mostly sub-pixel to 1px, rare hubs
   const sizeRoll = Math.random();
-  if (sizeRoll < 0.65) {
-    asize[i] = 0.5 + Math.random() * 1.0; // tiny 0.5-1.5px (65%)
-  } else if (sizeRoll < 0.88) {
-    asize[i] = 1.5 + Math.random() * 1.5; // medium 1.5-3px (23%)
-  } else if (sizeRoll < 0.97) {
-    asize[i] = 3.0 + Math.random() * 2.0; // large 3-5px (9%)
+  if (sizeRoll < 0.60) {
+    asize[i] = 0.3 + Math.random() * 0.3; // sub-pixel 0.3-0.6px (60%)
+  } else if (sizeRoll < 0.82) {
+    asize[i] = 0.6 + Math.random() * 0.4; // tiny 0.6-1.0px (22%)
+  } else if (sizeRoll < 0.93) {
+    asize[i] = 1.0 + Math.random() * 0.8; // small 1.0-1.8px (11%)
+  } else if (sizeRoll < 0.98) {
+    asize[i] = 1.8 + Math.random() * 1.2; // medium hub 1.8-3.0px (5%)
   } else {
-    asize[i] = 5.0 + Math.random() * 3.0; // focal 5-8px (3%)
+    asize[i] = 3.0 + Math.random() * 2.0; // focal hub 3-5px (2%)
   }
   acolor[i] = typeColor(type);
   acircuits[i] = 0;
@@ -970,7 +981,7 @@ function spawnFamilyCluster() {
   const count = 3 + Math.floor(Math.random() * 3);
   const leaderIdx = spawnAgent(true, TYPE_FAMILY, gid, -1, 0, 0);
   if (leaderIdx < 0) return;
-  asize[leaderIdx] = 5.0 + Math.random() * 3.0; // family leader always large
+  asize[leaderIdx] = 2.5 + Math.random() * 1.5; // family leader hub dot
   if (Math.random() < 0.15) addEvent('arrival', `family grp ${gid} (${count})`);
   for (let m = 1; m < count; m++) {
     const offAngle = (m / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
@@ -992,7 +1003,7 @@ function spawnTourGroup() {
   const leaderIdx = spawnAgent(true, TYPE_TOUR, gid, -1, 0, 0);
   if (leaderIdx < 0) return;
   if (Math.random() < 0.3) addEvent('arrival', `tour grp ${gid} (${count})`);
-  asize[leaderIdx] = 5.0 + Math.random() * 3.0; // tour leader always large focal dot
+  asize[leaderIdx] = 2.5 + Math.random() * 1.5; // tour leader hub dot
   const lr = (acolor[leaderIdx] & 0xFF);
   const lg = ((acolor[leaderIdx] >> 8) & 0xFF);
   const lb = ((acolor[leaderIdx] >> 16) & 0xFF);
@@ -1074,10 +1085,10 @@ function spawnTouchingAgent() {
   aspeed[i] = 0.06 * cfg.speedMul;
   // Touching agents are LARGER and more visible than tawaf agents
   const touchSizeRoll = Math.random();
-  if (touchSizeRoll < 0.35) asize[i] = 1.5 + Math.random() * 1.0;
-  else if (touchSizeRoll < 0.65) asize[i] = 2.5 + Math.random() * 2.0;
-  else if (touchSizeRoll < 0.88) asize[i] = 4.0 + Math.random() * 2.5;
-  else asize[i] = 6.0 + Math.random() * 3.0;
+  if (touchSizeRoll < 0.40) asize[i] = 0.8 + Math.random() * 0.7;
+  else if (touchSizeRoll < 0.75) asize[i] = 1.5 + Math.random() * 1.0;
+  else if (touchSizeRoll < 0.92) asize[i] = 2.5 + Math.random() * 1.5;
+  else asize[i] = 4.0 + Math.random() * 2.0;
 
   // Warm gold color for touching agents — visually distinct from tawaf flow
   acolor[i] = (240 << 24) | (55 << 16) | (195 << 8) | 235;  // warm gold rgba(235,195,55,0.94)
@@ -1152,7 +1163,7 @@ function manageTouchingLayer(dt) {
         // Warm gold for touching agents
         acolor[i] = (240 << 24) | (55 << 16) | (195 << 8) | 235;
         // Touching agents get larger sizes
-        asize[i] = Math.max(asize[i] * 1.5, 2.0);
+        asize[i] = Math.max(asize[i] * 1.2, 1.0);
         pulled++;
       }
     }
@@ -1939,70 +1950,8 @@ const bgCanvas = document.createElement('canvas');
 bgCanvas.width = W; bgCanvas.height = H;
 const bgCtx = bgCanvas.getContext('2d');
 function renderBackground() {
-  bgCtx.fillStyle = '#0a0a0a';
+  bgCtx.fillStyle = '#2a2a2e';
   bgCtx.fillRect(0, 0, W, H);
-
-  const bg = bgCtx.createRadialGradient(CX, CY, 20, CX, CY, MATAF_OUTER + 60);
-  bg.addColorStop(0, 'rgba(0,255,255,0.02)');
-  bg.addColorStop(0.4, 'rgba(0,255,255,0.008)');
-  bg.addColorStop(1, 'rgba(0,0,0,0)');
-  bgCtx.fillStyle = bg;
-  bgCtx.fillRect(0, 0, W, H);
-
-  bgCtx.save();
-  bgCtx.globalAlpha = 0.02;
-  bgCtx.beginPath();
-  bgCtx.arc(CX, CY, MATAF_OUTER + 5, 0, Math.PI * 2);
-  bgCtx.arc(CX, CY, KAABAH_WALL_R, 0, Math.PI * 2, true);
-  bgCtx.fillStyle = '#00FFFF';
-  bgCtx.fill();
-  bgCtx.restore();
-
-  // Touching layer zone indicator (faint gold ring)
-  bgCtx.save();
-  bgCtx.globalAlpha = 0.04;
-  bgCtx.strokeStyle = '#d4af37';
-  bgCtx.lineWidth = 0.5;
-  bgCtx.beginPath();
-  bgCtx.arc(CX, CY, TOUCHING_OUTER_R, 0, Math.PI * 2);
-  bgCtx.stroke();
-  bgCtx.globalAlpha = 0.025;
-  bgCtx.beginPath();
-  bgCtx.arc(CX, CY, SQUEEZE_OUTER_R, 0, Math.PI * 2);
-  bgCtx.stroke();
-  bgCtx.restore();
-
-  bgCtx.save();
-  bgCtx.globalAlpha = 0.04;
-  bgCtx.strokeStyle = '#00FFFF';
-  bgCtx.lineWidth = 0.3;
-  for (let r = MATAF_INNER; r <= MATAF_OUTER; r += 15) {
-    bgCtx.beginPath();
-    bgCtx.arc(CX, CY, r, 0, Math.PI * 2);
-    bgCtx.stroke();
-  }
-  bgCtx.restore();
-
-  bgCtx.save();
-  bgCtx.globalAlpha = 0.02;
-  bgCtx.strokeStyle = '#00FFFF';
-  bgCtx.lineWidth = 0.3;
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * Math.PI * 2;
-    bgCtx.beginPath();
-    bgCtx.moveTo(CX + Math.cos(a) * MATAF_INNER, CY + Math.sin(a) * MATAF_INNER);
-    bgCtx.lineTo(CX + Math.cos(a) * (MATAF_OUTER + 5), CY + Math.sin(a) * (MATAF_OUTER + 5));
-    bgCtx.stroke();
-  }
-  bgCtx.restore();
-
-  bgCtx.save();
-  bgCtx.globalAlpha = 0.06;
-  bgCtx.beginPath();
-  bgCtx.arc(CX, CY, MATAF_OUTER + 2, 0, Math.PI * 2);
-  bgCtx.strokeStyle = '#00FFFF';
-  bgCtx.lineWidth = 0.5;
-  bgCtx.stroke();
   bgCtx.restore();
 }
 renderBackground();
@@ -2055,93 +2004,55 @@ function drawAgentsCanvas() {
   // Draw row guides during prayer
   drawPrayerRowGuides();
 
-  // Crowd glow — subtle, not overpowering
-  if (agentCount > 30) {
-    const intensity = Math.min(agentCount / 2000, 1) * 0.06;
-    const glowColor = isPrayerActive ? 'rgba(212,175,55,' : 'rgba(0,255,255,';
-    const glow = ctx.createRadialGradient(CX, CY, MATAF_INNER - 5, CX, CY, MATAF_OUTER + 20);
-    glow.addColorStop(0, glowColor + (intensity * 0.2) + ')');
-    glow.addColorStop(0.3, glowColor + (intensity * 0.4) + ')');
-    glow.addColorStop(0.6, glowColor + intensity + ')');
-    glow.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(CX, CY, MATAF_OUTER + 20, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Touching layer glow ring — bright solid ring of devotion
-  if (!isPrayerActive) {
-    const touchGlow = ctx.createRadialGradient(CX, CY, KAABAH_WALL_R, CX, CY, TOUCHING_OUTER_R + 8);
-    touchGlow.addColorStop(0, 'rgba(212, 175, 55, 0.12)');
-    touchGlow.addColorStop(0.5, 'rgba(255, 240, 200, 0.08)');
-    touchGlow.addColorStop(1, 'rgba(255, 240, 200, 0)');
-    ctx.fillStyle = touchGlow;
-    ctx.beginPath();
-    ctx.arc(CX, CY, TOUCHING_OUTER_R + 8, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Motion trail — luminous trails behind orbiting agents create the vortex pattern naturally
-  tctx.globalCompositeOperation = 'destination-out';
-  tctx.globalAlpha = isPrayerActive ? 0.25 : 0.06; // slower fade = longer trails
-  tctx.fillStyle = '#000';
-  tctx.fillRect(0, 0, W, H);
-  tctx.globalCompositeOperation = 'source-over';
-  tctx.globalAlpha = 1;
-
-  if (!isPrayerActive) {
-    for (let i = 0; i < agentCount; i++) {
-      if (atouchState[i] === 1) continue; // skip stationary touching agents
-      const col = acolor[i];
-      const r = col & 0xFF;
-      const g = (col >> 8) & 0xFF;
-      const b = (col >> 16) & 0xFF;
-      const spd = Math.sqrt(avx[i]*avx[i] + avy[i]*avy[i]);
-      const trailAlpha = Math.min(0.12, 0.03 + spd * 0.8);
-      const sz = asize[i] * 0.5;
-      // Cyan-tinted luminous trail
-      const tr = Math.round(r * 0.5 + 80);
-      const tg = Math.round(g * 0.5 + 128);
-      const tb = Math.round(Math.min(255, b * 0.5 + 160));
-      tctx.fillStyle = `rgba(${tr},${tg},${tb},${trailAlpha.toFixed(3)})`;
-      tctx.fillRect(ax[i] - sz, ay[i] - sz, sz * 2, sz * 2);
-    }
-  }
-
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter'; // additive for luminous swirl
-  ctx.globalAlpha = 0.35;
-  ctx.drawImage(trailCanvas, 0, 0);
-  ctx.restore();
-
-  // Draw energy vortex above Ka'bah (below agents, above trails)
-  drawVortex();
-
-  // --- SCATTERED OUTER PARTICLES (ambient depth dots) ---
-  if (!isPrayerActive && typeof _outerParticles !== 'undefined') {
-    ctx.save();
-    for (let p = 0; p < _outerParticles.length; p++) {
-      const op = _outerParticles[p];
-      op.angle += op.speed;
-      const px = CX + Math.cos(op.angle) * op.dist;
-      const py = CY + Math.sin(op.angle) * op.dist;
-      ctx.globalAlpha = op.alpha * (0.7 + 0.3 * Math.sin(Date.now() * 0.001 + p));
-      ctx.fillStyle = op.color;
-      ctx.beginPath();
-      ctx.arc(px, py, op.size, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-
   // Pose size multiplier for prayer
   const poseSizeMul = isPrayerActive ? getPoseSizeMul() : 1.0;
-  // Subtle row pulse during prayer
   const pulseFactor = isPrayerActive ? 0.95 + 0.05 * Math.sin(Date.now() / 800) : 1.0;
 
-  // --- CONNECTION LINES between group members (drawn below dots) ---
+  // --- COMPOUND PARTICLE CONNECTION LINES (proximity web mesh with distance falloff) ---
   if (!isPrayerActive) {
+    const LINE_RANGE = 28;
+    const LINE_CELLS = Math.ceil(LINE_RANGE / CELL);
+    // Draw in 3 distance bands for natural falloff
+    const bands = [
+      { max: 10, style: 'rgba(170,180,195,0.22)', width: 0.4 },
+      { max: 18, style: 'rgba(150,160,175,0.12)', width: 0.3 },
+      { max: 28, style: 'rgba(140,150,165,0.06)', width: 0.2 },
+    ];
+    for (let b = 0; b < bands.length; b++) {
+      const band = bands[b];
+      const minD = b === 0 ? 2 : bands[b-1].max;
+      ctx.save();
+      ctx.lineWidth = band.width;
+      ctx.strokeStyle = band.style;
+      ctx.beginPath();
+      for (let i = 0; i < agentCount; i++) {
+        const xi = ax[i], yi = ay[i];
+        const gx = (xi / CELL) | 0;
+        const gy = (yi / CELL) | 0;
+        for (let dy = -LINE_CELLS; dy <= LINE_CELLS; dy++) {
+          for (let dx = -LINE_CELLS; dx <= LINE_CELLS; dx++) {
+            const nx = gx + dx, ny = gy + dy;
+            if (nx < 0 || nx >= GW || ny < 0 || ny >= GH) continue;
+            let j = gridHead[ny * GW + nx];
+            while (j >= 0) {
+              if (j > i) {
+                const ddx = xi - ax[j], ddy = yi - ay[j];
+                const dist = Math.sqrt(ddx*ddx + ddy*ddy);
+                if (dist >= minD && dist < band.max) {
+                  ctx.moveTo(xi, yi);
+                  ctx.lineTo(ax[j], ay[j]);
+                }
+              }
+              j = gridNext[j];
+            }
+          }
+        }
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Colored lines for group members
     ctx.save();
     ctx.lineWidth = 0.4;
     for (let i = 0; i < agentCount; i++) {
@@ -2149,13 +2060,12 @@ function drawAgentsCanvas() {
       if (leader < 0 || leader >= agentCount) continue;
       const type = atype[i];
       if (type !== TYPE_FAMILY && type !== TYPE_TOUR && type !== TYPE_CHILD) continue;
-      const dx = ax[i] - ax[leader], dy = ay[i] - ay[leader];
-      const dist = Math.sqrt(dx*dx + dy*dy);
-      if (dist > 40) continue;
+      const ddx = ax[i] - ax[leader], ddy = ay[i] - ay[leader];
+      const dist = Math.sqrt(ddx*ddx + ddy*ddy);
+      if (dist > 35) continue;
       const col = acolor[leader];
       const cr = col & 0xFF, cg = (col >> 8) & 0xFF, cb = (col >> 16) & 0xFF;
-      // Visible web texture: 10-25% opacity (was 4-15%)
-      const lineAlpha = Math.max(0.10, 0.25 * (1 - dist / 40));
+      const lineAlpha = Math.max(0.05, 0.15 * (1 - dist / 35));
       ctx.strokeStyle = `rgba(${cr},${cg},${cb},${lineAlpha.toFixed(3)})`;
       ctx.beginPath();
       ctx.moveTo(ax[i], ay[i]);
@@ -2165,7 +2075,7 @@ function drawAgentsCanvas() {
     ctx.restore();
   }
 
-  // Draw agents
+  // --- Draw agents as crisp compound particles ---
   for (let i = 0; i < agentCount; i++) {
     const col = acolor[i];
     const r = col & 0xFF;
@@ -2175,86 +2085,32 @@ function drawAgentsCanvas() {
     let sz = asize[i] * poseSizeMul * pulseFactor;
     const px = ax[i], py = ay[i];
 
-    // Touching agents: bright warm GOLD, large, solid, stationary dots — visually distinct ring
+    // Touching agents: gold dots, no glow
     if (atouchState[i] === 1 && !isPrayerActive) {
-      const ddx = px - CX, ddy = py - CY;
-      const d = Math.sqrt(ddx*ddx + ddy*ddy) || 1;
-      // Warm gold palette
-      const tr = 245, tg = 200, tb = 65;
-      // Warm glow halo for larger touching dots
-      if (sz > 3) {
-        ctx.beginPath();
-        ctx.arc(px, py, sz * 3.5, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${tr},${tg},${tb},0.10)`;
-        ctx.fill();
-      }
-      // Solid bright core
       ctx.beginPath();
-      ctx.arc(px, py, Math.max(sz * 1.3, 1.0), 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${tr},${tg},${tb},0.95)`;
+      ctx.arc(px, py, Math.max(sz * 0.8, 0.8), 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(245,200,65,0.9)';
       ctx.fill();
-      // Hot white center on big dots
-      if (sz > 4) {
-        ctx.beginPath();
-        ctx.arc(px, py, sz * 0.35, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,220,0.5)';
-        ctx.fill();
-      }
       continue;
     }
 
     if (isPrayerActive || phase === 'iqamah') {
-      const ddx = px - CX, ddy = py - CY;
-      const d = Math.sqrt(ddx*ddx + ddy*ddy) || 1;
       const amberBlend = isPrayerActive ? 0.3 : (phase === 'iqamah' ? 0.15 : 0);
       const fr = r * (1 - amberBlend) + 212 * amberBlend;
       const fg = g * (1 - amberBlend) + 175 * amberBlend;
       const fb = b * (1 - amberBlend) + 55 * amberBlend;
-      // Glow halo during prayer
-      if (sz > 1.5) {
-        ctx.beginPath();
-        ctx.arc(px, py, sz * 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${fr|0},${fg|0},${fb|0},0.05)`;
-        ctx.fill();
-      }
       ctx.beginPath();
-      ctx.arc(px, py, Math.max(sz * 0.8, 0.3), 0, Math.PI * 2);
+      ctx.arc(px, py, Math.max(sz * 0.7, 0.4), 0, Math.PI * 2);
       ctx.fillStyle = `rgba(${fr|0},${fg|0},${fb|0},${a})`;
       ctx.fill();
-      if (isPrayerActive && sz > 0.4) {
-        const faceDist = sz * 1.2;
-        ctx.beginPath();
-        ctx.moveTo(px, py);
-        ctx.lineTo(px - (ddx/d) * faceDist, py - (ddy/d) * faceDist);
-        ctx.strokeStyle = `rgba(${fr|0},${fg|0},${fb|0},${a*0.3})`;
-        ctx.lineWidth = 0.3;
-        ctx.stroke();
-      }
       continue;
     }
 
-    // Normal tawaf rendering — glowing dots
-    // Soft glow halo ONLY for medium/large dots (>3px) — tiny dots stay clean
-    if (sz > 3) {
-      const glowR = sz * 3.0;
-      const glowAlpha = Math.min(0.10, 0.02 + sz * 0.015);
-      ctx.beginPath();
-      ctx.arc(px, py, glowR, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${r},${g},${b},${glowAlpha.toFixed(3)})`;
-      ctx.fill();
-    }
-    // Core dot
+    // Normal tawaf: crisp dot, no glow halo
     ctx.beginPath();
     ctx.arc(px, py, Math.max(sz, 0.4), 0, Math.PI * 2);
     ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
     ctx.fill();
-    // Bright center for focal dots
-    if (sz > 4) {
-      ctx.beginPath();
-      ctx.arc(px, py, sz * 0.4, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255,255,255,0.3)`;
-      ctx.fill();
-    }
   }
 
   // Hijr Ismail — subtle semi-circular wall outline
@@ -2275,57 +2131,14 @@ function drawAgentsCanvas() {
     ctx.drawImage(kaabahImg, CX - KAABAH_SIZE/2 - 10, CY - KAABAH_SIZE/2 - 10);
   }
 
-  // --- BLACK STONE MARKER (bright dot on NE corner) ---
+  // --- BLACK STONE MARKER (small crisp dot) ---
   ctx.save();
   const bsPulse = 0.6 + 0.4 * Math.sin(Date.now() / 500);
   ctx.beginPath();
-  ctx.arc(BLACK_STONE_X, BLACK_STONE_Y, 3, 0, Math.PI * 2);
+  ctx.arc(BLACK_STONE_X, BLACK_STONE_Y, 2, 0, Math.PI * 2);
   ctx.fillStyle = `rgba(255, 255, 255, ${bsPulse})`;
-  ctx.shadowColor = '#FFFFFF';
-  ctx.shadowBlur = 8;
   ctx.fill();
-  ctx.shadowBlur = 0;
-  // Outer glow ring
-  ctx.beginPath();
-  ctx.arc(BLACK_STONE_X, BLACK_STONE_Y, 5, 0, Math.PI * 2);
-  ctx.strokeStyle = `rgba(255, 200, 100, ${bsPulse * 0.4})`;
-  ctx.lineWidth = 0.5;
-  ctx.stroke();
   ctx.restore();
-
-  // --- ZONE CLUSTER GLOW (bright cluster at Black Stone when agents present) ---
-  if (!isPrayerActive) {
-    let bsCount = 0, mzCount = 0;
-    for (let i = 0; i < agentCount; i++) {
-      if (azoneState[i] === 2) {
-        if (azoneIntent[i] === 1) bsCount++;
-        else if (azoneIntent[i] === 2) mzCount++;
-      }
-    }
-    if (bsCount > 0) {
-      const intensity = Math.min(bsCount / 15, 1) * 0.25;
-      const bsGlow = ctx.createRadialGradient(BLACK_STONE_X, BLACK_STONE_Y, 2, BLACK_STONE_X, BLACK_STONE_Y, 20);
-      bsGlow.addColorStop(0, `rgba(255, 255, 200, ${intensity})`);
-      bsGlow.addColorStop(1, 'rgba(255, 255, 200, 0)');
-      ctx.fillStyle = bsGlow;
-      ctx.beginPath();
-      ctx.arc(BLACK_STONE_X, BLACK_STONE_Y, 20, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    if (mzCount > 0) {
-      const mzCenterAngle = (MULTAZAM_ANGLE_START + MULTAZAM_ANGLE_END) / 2;
-      const mzX = CX + Math.cos(mzCenterAngle) * (KAABAH_SIZE / 2 + 4);
-      const mzY = CY + Math.sin(mzCenterAngle) * (KAABAH_SIZE / 2 + 4);
-      const intensity = Math.min(mzCount / 10, 1) * 0.15;
-      const mzGlow = ctx.createRadialGradient(mzX, mzY, 2, mzX, mzY, 15);
-      mzGlow.addColorStop(0, `rgba(212, 175, 55, ${intensity})`);
-      mzGlow.addColorStop(1, 'rgba(212, 175, 55, 0)');
-      ctx.fillStyle = mzGlow;
-      ctx.beginPath();
-      ctx.arc(mzX, mzY, 15, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
 
   // Ka'bah glow pulse during prayer
   if (isPrayerActive) {
