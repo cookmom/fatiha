@@ -17,6 +17,11 @@ canvas{display:block;margin:0 auto}
 .stat{text-align:center;flex:1}
 .stat-val{font-size:20px;font-weight:300;color:#d4af37;font-variant-numeric:tabular-nums}
 .stat-label{font-size:8px;color:#554d3e;text-transform:uppercase;letter-spacing:2.5px;margin-top:3px}
+#bayes-panel{position:absolute;top:105px;right:12px;text-align:right;font-size:9px;color:#554d3e;letter-spacing:0.5px;line-height:1.5}
+#bayes-conf{color:#d4af37;font-size:11px}
+#legend{position:absolute;bottom:70px;left:20px;right:20px;display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+.leg{display:flex;align-items:center;gap:3px;font-size:7px;color:#665d4a;letter-spacing:0.5px;text-transform:uppercase}
+.leg-dot{width:6px;height:6px;border-radius:50%}
 </style>
 </head>
 <body>
@@ -27,6 +32,18 @@ canvas{display:block;margin:0 auto}
     <div id="makkah-time"></div>
   </div>
   <div id="next-prayer"></div>
+  <div id="bayes-panel">
+    <div id="bayes-conf">●●●○○</div>
+    <div id="bayes-text">Model warming up…</div>
+  </div>
+  <div id="legend">
+    <div class="leg"><div class="leg-dot" style="background:#e8dcc8"></div>Solo M</div>
+    <div class="leg"><div class="leg-dot" style="background:#c8a8d8"></div>Solo F</div>
+    <div class="leg"><div class="leg-dot" style="background:#a8d4a8"></div>Family</div>
+    <div class="leg"><div class="leg-dot" style="background:#d4c8a0"></div>Elderly</div>
+    <div class="leg"><div class="leg-dot" style="background:#a8c8e8"></div>Tour</div>
+    <div class="leg"><div class="leg-dot" style="background:#e8c8a8"></div>Child</div>
+  </div>
   <div id="stats">
     <div class="stat"><div class="stat-val" id="s-pilgrims">0</div><div class="stat-label">Pilgrims</div></div>
     <div class="stat"><div class="stat-val" id="s-tawaf">0</div><div class="stat-label">Circuits</div></div>
@@ -41,7 +58,58 @@ const CX = W / 2, CY = H / 2 - 20;
 const KAABAH_SIZE = 36;
 const MATAF_INNER = 42;
 const MATAF_OUTER = 190;
-const MAX_AGENTS = 2200;
+const MAX_AGENTS = 3500;
+
+// --- DEMOGRAPHICS ---
+// Types: 0=solo male, 1=solo female, 2=family, 3=elderly, 4=tour, 5=child
+const TYPE_SOLO_M = 0, TYPE_SOLO_F = 1, TYPE_FAMILY = 2, TYPE_ELDERLY = 3, TYPE_TOUR = 4, TYPE_CHILD = 5;
+const TYPE_WEIGHTS = [0.30, 0.15, 0.25, 0.10, 0.15, 0.05];
+const TYPE_CUMULATIVE = [];
+{ let s = 0; for (const w of TYPE_WEIGHTS) { s += w; TYPE_CUMULATIVE.push(s); } }
+
+// Type configs — ringMin/ringMax as fraction of mataf range
+// Tighter ranges = more packed. Most types crowd the inner-mid zone.
+const TYPE_CONFIG = {
+  [TYPE_SOLO_M]:  { speedMul: 1.3, sizeMin: 0.8, sizeMax: 1.2, ringMin: 0.25, ringMax: 0.95 },
+  [TYPE_SOLO_F]:  { speedMul: 1.0, sizeMin: 0.7, sizeMax: 1.1, ringMin: 0.1,  ringMax: 0.7 },
+  [TYPE_FAMILY]:  { speedMul: 0.55, sizeMin: 0.7, sizeMax: 1.1, ringMin: 0.05, ringMax: 0.5 },
+  [TYPE_ELDERLY]: { speedMul: 0.25, sizeMin: 1.0, sizeMax: 1.4, ringMin: 0.0,  ringMax: 0.18 },
+  [TYPE_TOUR]:    { speedMul: 0.7, sizeMin: 0.7, sizeMax: 1.0, ringMin: 0.2,  ringMax: 0.75 },
+  [TYPE_CHILD]:   { speedMul: 0.8, sizeMin: 0.4, sizeMax: 0.6, ringMin: 0.05, ringMax: 0.5 },
+};
+
+// Color palettes per type (r,g,b base + variation)
+function typeColor(type) {
+  let r, g, b, a;
+  const v = () => (Math.random() - 0.5) * 30;
+  switch (type) {
+    case TYPE_SOLO_M: // warm white/ihram
+      r = 220 + v(); g = 210 + v(); b = 195 + v(); a = 160 + Math.random() * 90; break;
+    case TYPE_SOLO_F: // soft lavender/purple tint
+      r = 190 + v(); g = 160 + v(); b = 210 + v(); a = 150 + Math.random() * 90; break;
+    case TYPE_FAMILY: // soft green tint
+      r = 165 + v(); g = 205 + v(); b = 165 + v(); a = 155 + Math.random() * 90; break;
+    case TYPE_ELDERLY: // warm gold/amber
+      r = 210 + v(); g = 195 + v(); b = 155 + v(); a = 170 + Math.random() * 80; break;
+    case TYPE_TOUR: // cool blue tint
+      r = 165 + v(); g = 195 + v(); b = 225 + v(); a = 145 + Math.random() * 90; break;
+    case TYPE_CHILD: // warm peach
+      r = 225 + v(); g = 195 + v(); b = 165 + v(); a = 140 + Math.random() * 80; break;
+  }
+  r = Math.max(0, Math.min(255, r)) | 0;
+  g = Math.max(0, Math.min(255, g)) | 0;
+  b = Math.max(0, Math.min(255, b)) | 0;
+  a = Math.max(80, Math.min(255, a)) | 0;
+  return (a << 24) | (b << 16) | (g << 8) | r;
+}
+
+function pickType() {
+  const r = Math.random();
+  for (let i = 0; i < TYPE_CUMULATIVE.length; i++) {
+    if (r < TYPE_CUMULATIVE[i]) return i;
+  }
+  return TYPE_SOLO_M;
+}
 
 // --- CANVAS ---
 const canvas = document.getElementById('c');
@@ -52,13 +120,10 @@ const tctx = trailCanvas.getContext('2d');
 canvas.width = W; canvas.height = H;
 canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
 
-// Previous frame for motion blur
-let useTrail = true;
-
 // --- PRAYER TIMES ---
 let prayerTimes = null;
 let prayerSchedule = [];
-let targetAgentCount = 500;
+let targetAgentCount = 1500;
 
 async function fetchPrayerTimes() {
   try {
@@ -90,7 +155,7 @@ function getMakkahTime() {
 }
 
 function getCurrentPrayerInfo() {
-  if (!prayerSchedule.length) return {current:'—',next:'—',nextIn:'',phase:'tawaf',target:500};
+  if (!prayerSchedule.length) return {current:'—',next:'—',nextIn:'',phase:'tawaf',target:1500};
   const makkah = getMakkahTime();
   const nowSec = (makkah.getHours() * 60 + makkah.getMinutes()) * 60 + makkah.getSeconds();
 
@@ -103,15 +168,14 @@ function getCurrentPrayerInfo() {
     const rem = nSec > nowSec ? nSec - nowSec : (86400 - nowSec + nSec);
 
     if (diff >= 0 && diff < 600) {
-      return {current: p.name, next: prayerSchedule[ni].name, nextIn: formatTime(rem), phase:'prayer', target: 0};
+      return {current: p.name, next: prayerSchedule[ni].name, nextIn: formatTime(rem), phase:'prayer', target: 200};
     }
     if (diff >= 600 && diff < 1800) {
-      const t = p.name === 'Fajr' ? 800 : 2000;
+      const t = p.name === 'Fajr' ? 2000 : 3200;
       return {current: p.name, next: prayerSchedule[ni].name, nextIn: formatTime(rem), phase:'surge', target: t};
     }
   }
 
-  // Between prayers — find next
   let next = '—', nextIn = '';
   for (let i = 0; i < prayerSchedule.length; i++) {
     if (prayerSchedule[i].totalMin * 60 > nowSec) {
@@ -126,10 +190,12 @@ function getCurrentPrayerInfo() {
   }
 
   const h = makkah.getHours();
-  let target = 500;
-  if (h >= 1 && h < 5) target = 300;
-  else if (h >= 22 || h < 1) target = 800;
-  else if (h >= 9 && h < 12) target = 700;
+  let target = 1800;
+  if (h >= 2 && h < 4) target = 1200;
+  else if (h >= 4 && h < 6) target = 1500;
+  else if (h >= 22 || h < 2) target = 2200;
+  else if (h >= 9 && h < 15) target = 2000;
+  else if (h >= 6 && h < 9) target = 1600;
 
   return {current: '—', next, nextIn, phase:'tawaf', target};
 }
@@ -142,54 +208,124 @@ function formatTime(sec) {
   return `${m}m ${String(s).padStart(2,'0')}s`;
 }
 
-// --- AGENTS ---
-// SoA (Structure of Arrays) for performance
+// --- AGENTS (SoA) ---
 const ax = new Float32Array(MAX_AGENTS);
 const ay = new Float32Array(MAX_AGENTS);
 const avx = new Float32Array(MAX_AGENTS);
 const avy = new Float32Array(MAX_AGENTS);
 const aspeed = new Float32Array(MAX_AGENTS);
 const asize = new Float32Array(MAX_AGENTS);
-const acolor = new Uint32Array(MAX_AGENTS); // packed RGBA
+const acolor = new Uint32Array(MAX_AGENTS);
 const acircuits = new Uint8Array(MAX_AGENTS);
 const aangleAccum = new Float32Array(MAX_AGENTS);
 const alastAngle = new Float32Array(MAX_AGENTS);
-const aalive = new Uint8Array(MAX_AGENTS);
+const atype = new Uint8Array(MAX_AGENTS);
+// Group linkage: groupId (-1=none), groupLeader index, groupOffset angle
+const agroupId = new Int16Array(MAX_AGENTS);
+const agroupLeader = new Int16Array(MAX_AGENTS); // index of leader (-1 if IS leader or no group)
+const agroupOffX = new Float32Array(MAX_AGENTS); // offset from leader
+const agroupOffY = new Float32Array(MAX_AGENTS);
 let agentCount = 0;
 let totalTawaf = 0;
+let nextGroupId = 0;
 
-function spawnAgent(distributed) {
-  if (agentCount >= MAX_AGENTS) return;
+function spawnAgent(distributed, forceType, groupId, leaderIdx, offX, offY) {
+  if (agentCount >= MAX_AGENTS) return -1;
   const i = agentCount++;
+  const type = forceType !== undefined ? forceType : pickType();
+  atype[i] = type;
+  const cfg = TYPE_CONFIG[type];
+
+  // Ring placement — DENSE inner bias
+  const range = MATAF_OUTER - MATAF_INNER;
   let ring;
   if (distributed) {
-    // Inner-biased distribution: denser near Ka'bah
-    const t = Math.pow(Math.random(), 0.7); // bias toward 0 (inner)
-    ring = MATAF_INNER + 8 + t * (MATAF_OUTER - MATAF_INNER - 12);
+    const bandMin = MATAF_INNER + cfg.ringMin * range;
+    const bandMax = MATAF_INNER + cfg.ringMax * range;
+    // Inner-heavy bias but still fill mid/outer rings
+    const t = Math.pow(Math.random(), 1.8);
+    ring = bandMin + t * (bandMax - bandMin);
   } else {
-    ring = MATAF_OUTER - Math.random() * 25;
+    // New arrivals also biased inward
+    const t = Math.pow(Math.random(), 1.8);
+    ring = MATAF_INNER + 8 + t * (MATAF_OUTER - MATAF_INNER - 12);
   }
   const angle = Math.random() * Math.PI * 2;
   ax[i] = CX + Math.cos(angle) * ring;
   ay[i] = CY + Math.sin(angle) * ring;
-  // Initial velocity: tangential CCW (strong initial flow)
-  const spd = 0.06 + Math.random() * 0.06; // slow contemplative pace
+
+  const baseSpeed = 0.06 + Math.random() * 0.05;
+  const spd = baseSpeed * cfg.speedMul;
   avx[i] = -Math.sin(angle) * spd;
   avy[i] = Math.cos(angle) * spd;
   aspeed[i] = spd;
-  asize[i] = 1.0 + Math.random() * 1.3;
-  // Color: warm white/cream/amber variations
-  const brightness = 170 + Math.random() * 80;
-  const warmth = Math.random() * 40;
-  const r = Math.min(255, brightness + warmth) | 0;
-  const g = Math.min(255, brightness + warmth * 0.4) | 0;
-  const b = Math.min(255, brightness - warmth * 0.5) | 0;
-  const a = (120 + Math.random() * 120) | 0;
-  acolor[i] = (a << 24) | (b << 16) | (g << 8) | r;
+  asize[i] = cfg.sizeMin + Math.random() * (cfg.sizeMax - cfg.sizeMin);
+  acolor[i] = typeColor(type);
   acircuits[i] = 0;
   aangleAccum[i] = 0;
   alastAngle[i] = angle;
-  aalive[i] = 1;
+
+  agroupId[i] = groupId !== undefined ? groupId : -1;
+  agroupLeader[i] = leaderIdx !== undefined ? leaderIdx : -1;
+  agroupOffX[i] = offX || 0;
+  agroupOffY[i] = offY || 0;
+
+  return i;
+}
+
+function spawnFamilyCluster() {
+  const gid = nextGroupId++;
+  const count = 3 + Math.floor(Math.random() * 3); // 3-5 members
+  const leaderIdx = spawnAgent(true, TYPE_FAMILY, gid, -1, 0, 0);
+  if (leaderIdx < 0) return;
+  for (let m = 1; m < count; m++) {
+    const offAngle = (m / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+    const offDist = 3 + Math.random() * 4;
+    const ox = Math.cos(offAngle) * offDist;
+    const oy = Math.sin(offAngle) * offDist;
+    // 30% chance a family member is a child
+    const memberType = Math.random() < 0.3 ? TYPE_CHILD : TYPE_FAMILY;
+    const mi = spawnAgent(true, memberType, gid, leaderIdx, ox, oy);
+    if (mi >= 0) {
+      // Place near leader
+      ax[mi] = ax[leaderIdx] + ox;
+      ay[mi] = ay[leaderIdx] + oy;
+    }
+  }
+}
+
+function spawnTourGroup() {
+  const gid = nextGroupId++;
+  const count = 10 + Math.floor(Math.random() * 11); // 10-20
+  const leaderIdx = spawnAgent(true, TYPE_TOUR, gid, -1, 0, 0);
+  if (leaderIdx < 0) return;
+  asize[leaderIdx] = 2.0;
+  const lr = (acolor[leaderIdx] & 0xFF);
+  const lg = ((acolor[leaderIdx] >> 8) & 0xFF);
+  const lb = ((acolor[leaderIdx] >> 16) & 0xFF);
+  acolor[leaderIdx] = (220 << 24) | (Math.min(255, lb + 30) << 16) | (Math.min(255, lg + 30) << 8) | Math.min(255, lr + 30);
+
+  // Chain along the circular arc behind leader
+  const ldx = ax[leaderIdx] - CX, ldy = ay[leaderIdx] - CY;
+  const leaderDist = Math.sqrt(ldx * ldx + ldy * ldy);
+  const leaderAngle = Math.atan2(ldy, ldx);
+
+  for (let m = 1; m < count; m++) {
+    // Each member is ~3px behind along the arc (CW = behind in CCW tawaf)
+    const arcOffset = m * 3.5 / leaderDist; // angular offset
+    const memberAngle = leaderAngle + arcOffset; // CW behind
+    const radialJitter = (Math.random() - 0.5) * 4;
+    const mx = CX + Math.cos(memberAngle) * (leaderDist + radialJitter);
+    const my = CY + Math.sin(memberAngle) * (leaderDist + radialJitter);
+
+    const offX = Math.cos(arcOffset) * 3 * m * 0.15;
+    const offY = Math.sin(arcOffset) * 3 * m * 0.15;
+    const mi = spawnAgent(true, TYPE_TOUR, gid, leaderIdx, offX, offY);
+    if (mi >= 0) {
+      ax[mi] = mx;
+      ay[mi] = my;
+    }
+  }
 }
 
 function removeAgent(i) {
@@ -200,12 +336,31 @@ function removeAgent(i) {
     aspeed[i] = aspeed[agentCount]; asize[i] = asize[agentCount];
     acolor[i] = acolor[agentCount]; acircuits[i] = acircuits[agentCount];
     aangleAccum[i] = aangleAccum[agentCount]; alastAngle[i] = alastAngle[agentCount];
-    aalive[i] = aalive[agentCount];
+    atype[i] = atype[agentCount];
+    agroupId[i] = agroupId[agentCount]; agroupLeader[i] = agroupLeader[agentCount];
+    agroupOffX[i] = agroupOffX[agentCount]; agroupOffY[i] = agroupOffY[agentCount];
+    // Update any followers pointing to moved agent
+    for (let j = 0; j < agentCount; j++) {
+      if (agroupLeader[j] === agentCount) agroupLeader[j] = i;
+      if (agroupLeader[j] === i && j !== i) {} // stays
+    }
+  }
+}
+
+// Smart spawn: picks appropriate type and spawns groups
+function smartSpawn() {
+  const type = pickType();
+  if (type === TYPE_FAMILY) {
+    spawnFamilyCluster();
+  } else if (type === TYPE_TOUR) {
+    spawnTourGroup();
+  } else {
+    spawnAgent(false, type);
   }
 }
 
 // --- SPATIAL HASH ---
-const CELL = 18;
+const CELL = 10; // smaller cells for denser packing
 const GW = Math.ceil(W / CELL);
 const GH = Math.ceil(H / CELL);
 const gridHead = new Int32Array(GW * GH);
@@ -240,42 +395,74 @@ function updateAgents(dt, isPraying) {
       continue;
     }
 
+    const type = atype[i];
+
     // CCW tangent
     const tx = -dy / dist;
     const ty = dx / dist;
 
-    // Speed: inner slower, outer faster
+    // Speed varies by ring position — inner is MUCH slower (packed)
     const ringFrac = Math.max(0, Math.min(1, (dist - MATAF_INNER) / (MATAF_OUTER - MATAF_INNER)));
-    const ringSpeed = 0.3 + ringFrac * 0.7;
+    // Inner rings crawl, outer rings flow — exponential curve
+    const ringSpeed = 0.15 + ringFrac * ringFrac * 0.85;
     const speed = aspeed[i] * ringSpeed;
 
     // Strong circular flow
     let fx = tx * speed * 2.0;
     let fy = ty * speed * 2.0;
 
-    // Centripetal: gently pull toward preferred ring
-    const prefDist = MATAF_INNER + 15 + ringFrac * (MATAF_OUTER - MATAF_INNER - 20);
+    // Centripetal: pull toward preferred ring (type-dependent)
+    const cfg = TYPE_CONFIG[type];
+    const prefRingFrac = cfg.ringMin + Math.random() * 0.01 + (cfg.ringMax - cfg.ringMin) * 0.5;
+    const prefDist = MATAF_INNER + prefRingFrac * (MATAF_OUTER - MATAF_INNER);
     const ringErr = dist - prefDist;
-    fx -= (dx / dist) * ringErr * 0.003;
-    fy -= (dy / dist) * ringErr * 0.003;
+    fx -= (dx / dist) * ringErr * 0.004;
+    fy -= (dy / dist) * ringErr * 0.004;
 
-    // Hard boundary forces
-    if (dist < MATAF_INNER + 12) {
-      const push = (MATAF_INNER + 12 - dist) * 0.12;
+    // Hard boundary forces — very stiff
+    if (dist < MATAF_INNER + 6) {
+      const push = (MATAF_INNER + 6 - dist) * 0.25;
       fx += (dx / dist) * push;
       fy += (dy / dist) * push;
     }
-    if (dist > MATAF_OUTER - 8) {
-      const push = (dist - MATAF_OUTER + 8) * 0.08;
+    if (dist > MATAF_OUTER - 4) {
+      const push = (dist - MATAF_OUTER + 4) * 0.2;
       fx -= (dx / dist) * push;
       fy -= (dy / dist) * push;
     }
 
-    // Flocking (only check 3x3 neighborhood)
+    // Group cohesion: followers stay near leader
+    const leader = agroupLeader[i];
+    if (leader >= 0 && leader < agentCount) {
+      const ldx = ax[leader] + agroupOffX[i] - ax[i];
+      const ldy = ay[leader] + agroupOffY[i] - ay[i];
+      const ldist = Math.sqrt(ldx * ldx + ldy * ldy);
+      if (ldist > 2) {
+        const pull = Math.min(ldist * 0.06, 0.8);
+        fx += (ldx / ldist) * pull;
+        fy += (ldy / ldist) * pull;
+      }
+      // Match leader velocity
+      fx += (avx[leader] - avx[i]) * 0.15;
+      fy += (avy[leader] - avy[i]) * 0.15;
+    }
+
+    // Child wobble
+    if (type === TYPE_CHILD) {
+      fx += (Math.random() - 0.5) * 0.4;
+      fy += (Math.random() - 0.5) * 0.4;
+    }
+
+    // Flocking — tight separation for density
     const gx0 = (ax[i] / CELL) | 0;
     const gy0 = (ay[i] / CELL) | 0;
-    let sepX = 0, sepY = 0;
+    let sepX = 0, sepY = 0, sepN = 0;
     let alignVx = 0, alignVy = 0, alignN = 0;
+
+    // Inner rings: nearly zero separation, just hard body. Outer: more space.
+    const hardBody2 = ringFrac < 0.25 ? 1.5 : 2.5; // pixels squared
+    const softDist2 = ringFrac < 0.25 ? 3 : (ringFrac < 0.5 ? 6 : 12);
+    const sepStrength = ringFrac < 0.25 ? 0.3 : 0.6;
 
     for (let dgy = -1; dgy <= 1; dgy++) {
       for (let dgx = -1; dgx <= 1; dgx++) {
@@ -286,15 +473,19 @@ function updateAgents(dt, isPraying) {
           if (j !== i) {
             const ndx = ax[i] - ax[j], ndy = ay[i] - ay[j];
             const nd2 = ndx*ndx + ndy*ndy;
-            // Separation
-            if (nd2 < 36 && nd2 > 0.01) { // 6px
+            if (nd2 < hardBody2 && nd2 > 0.001) {
               const nd = Math.sqrt(nd2);
-              const f = 1.0 / nd;
+              sepX += (ndx / nd) * 1.5;
+              sepY += (ndy / nd) * 1.5;
+              sepN++;
+            } else if (nd2 < softDist2 && nd2 > 0.001) {
+              const nd = Math.sqrt(nd2);
+              const f = (1.0 - nd / Math.sqrt(softDist2)) * sepStrength;
               sepX += (ndx / nd) * f;
               sepY += (ndy / nd) * f;
+              sepN++;
             }
-            // Alignment
-            if (nd2 < 196) { // 14px
+            if (nd2 < 64) {
               alignVx += avx[j];
               alignVy += avy[j];
               alignN++;
@@ -305,24 +496,25 @@ function updateAgents(dt, isPraying) {
       }
     }
 
-    fx += sepX * 1.2;
-    fy += sepY * 1.2;
+    fx += sepX * 0.5;
+    fy += sepY * 0.5;
     if (alignN > 0) {
-      fx += (alignVx / alignN - avx[i]) * 0.08;
-      fy += (alignVy / alignN - avy[i]) * 0.08;
+      fx += (alignVx / alignN - avx[i]) * 0.1;
+      fy += (alignVy / alignN - avy[i]) * 0.1;
     }
 
-    // Noise
-    fx += (Math.random() - 0.5) * 0.12;
-    fy += (Math.random() - 0.5) * 0.12;
+    // Noise (less for elderly/families to keep them steady)
+    const noiseMul = type === TYPE_ELDERLY ? 0.03 : (type === TYPE_FAMILY ? 0.05 : 0.08);
+    fx += (Math.random() - 0.5) * noiseMul;
+    fy += (Math.random() - 0.5) * noiseMul;
 
-    // Steer toward desired
-    avx[i] += (fx - avx[i]) * 0.12;
-    avy[i] += (fy - avy[i]) * 0.12;
+    // Steer
+    avx[i] += (fx - avx[i]) * 0.1;
+    avy[i] += (fy - avy[i]) * 0.1;
 
     // Clamp
     const v = Math.sqrt(avx[i]*avx[i] + avy[i]*avy[i]);
-    const maxV = speed * 1.4;
+    const maxV = speed * 1.3;
     if (v > maxV) {
       avx[i] = (avx[i] / v) * maxV;
       avy[i] = (avy[i] / v) * maxV;
@@ -345,7 +537,7 @@ function updateAgents(dt, isPraying) {
       if (acircuits[i] >= 7) {
         totalTawaf++;
         removeAgent(i);
-        i--; // re-check swapped agent
+        i--;
         continue;
       }
     }
@@ -363,6 +555,67 @@ function updateAgents(dt, isPraying) {
   }
 }
 
+// --- BAYESIAN CROWD MODEL ---
+const bayesModel = {
+  // Predicted crowd multiplier per hour bucket (0-23)
+  priors: new Float32Array(24),
+  observations: new Float32Array(24),
+  counts: new Uint16Array(24),
+  confidence: 0,
+  lastUpdate: 0,
+  predictionError: 0,
+};
+// Initialize with reasonable priors
+(function initBayes() {
+  const hourProfile = [0.6,0.4,0.35,0.3,0.35,0.7,0.9,0.8,0.75,0.85,0.9,0.95,1.0,0.85,0.8,0.85,0.9,0.95,1.0,0.95,0.9,0.85,0.8,0.7];
+  for (let h = 0; h < 24; h++) bayesModel.priors[h] = hourProfile[h];
+})();
+
+function updateBayesModel() {
+  const makkah = getMakkahTime();
+  const hour = makkah.getHours();
+  const now = Date.now();
+
+  // Only update every 30 seconds
+  if (now - bayesModel.lastUpdate < 30000) return;
+  bayesModel.lastUpdate = now;
+
+  // Observe: normalized agent count vs max expected
+  const observed = agentCount / 3200; // normalize to 0-1
+  const predicted = bayesModel.priors[hour];
+
+  // Bayesian update: weighted average of prior and observation
+  const alpha = 0.05; // learning rate — slow adaptation
+  bayesModel.observations[hour] = observed;
+  bayesModel.counts[hour]++;
+  const n = Math.min(bayesModel.counts[hour], 20);
+  const weight = alpha * n; // more observations = more trust in data
+  bayesModel.priors[hour] = predicted * (1 - weight) + observed * weight;
+  bayesModel.priors[hour] = Math.max(0.1, Math.min(1.0, bayesModel.priors[hour]));
+
+  // Compute prediction error (recent)
+  bayesModel.predictionError = Math.abs(predicted - observed);
+
+  // Confidence: based on total observations and error
+  const totalObs = bayesModel.counts.reduce((s, c) => s + c, 0);
+  const errorFactor = Math.max(0, 1 - bayesModel.predictionError * 3);
+  bayesModel.confidence = Math.min(1, (totalObs / 50) * errorFactor);
+}
+
+function renderBayesUI() {
+  const conf = bayesModel.confidence;
+  const filled = Math.round(conf * 5);
+  const dots = '●'.repeat(filled) + '○'.repeat(5 - filled);
+  document.getElementById('bayes-conf').textContent = dots;
+
+  const err = (bayesModel.predictionError * 100).toFixed(0);
+  const makkah = getMakkahTime();
+  const hour = makkah.getHours();
+  const pred = (bayesModel.priors[hour] * 3200).toFixed(0);
+  document.getElementById('bayes-text').textContent =
+    `Pred: ${pred} · Err: ${err}% · h${hour}`;
+}
+
 // --- RENDERING ---
 // Pre-rendered Ka'bah
 const kaabahImg = document.createElement('canvas');
@@ -370,27 +623,22 @@ kaabahImg.width = KAABAH_SIZE + 20;
 kaabahImg.height = KAABAH_SIZE + 20;
 const kctx = kaabahImg.getContext('2d');
 const kOff = 10;
-// Outer glow
 kctx.shadowColor = '#d4af37';
 kctx.shadowBlur = 8;
 kctx.fillStyle = '#0a0a0a';
 kctx.fillRect(kOff, kOff, KAABAH_SIZE, KAABAH_SIZE);
 kctx.shadowBlur = 0;
-// Ka'bah body
 kctx.fillStyle = '#0e0e0e';
 kctx.fillRect(kOff, kOff, KAABAH_SIZE, KAABAH_SIZE);
-// Gold band (Hizam)
 const bandY = kOff + KAABAH_SIZE * 0.58;
 kctx.fillStyle = '#d4af3755';
 kctx.fillRect(kOff, bandY, KAABAH_SIZE, 3);
 kctx.fillStyle = '#d4af3730';
 kctx.fillRect(kOff, bandY - 2, KAABAH_SIZE, 1);
 kctx.fillRect(kOff, bandY + 4, KAABAH_SIZE, 1);
-// Border
 kctx.strokeStyle = '#d4af37aa';
 kctx.lineWidth = 1;
 kctx.strokeRect(kOff + 0.5, kOff + 0.5, KAABAH_SIZE - 1, KAABAH_SIZE - 1);
-// Door hint (east face, right side)
 kctx.fillStyle = '#d4af3722';
 kctx.fillRect(kOff + KAABAH_SIZE - 8, kOff + KAABAH_SIZE * 0.3, 5, 10);
 
@@ -406,7 +654,6 @@ function renderBackground() {
   bgCtx.fillStyle = bg;
   bgCtx.fillRect(0, 0, W, H);
 
-  // Mataf floor fill
   bgCtx.save();
   bgCtx.globalAlpha = 0.035;
   bgCtx.beginPath();
@@ -416,7 +663,6 @@ function renderBackground() {
   bgCtx.fill();
   bgCtx.restore();
 
-  // Concentric marble rings
   bgCtx.save();
   bgCtx.globalAlpha = 0.06;
   bgCtx.strokeStyle = '#d4af37';
@@ -428,7 +674,6 @@ function renderBackground() {
   }
   bgCtx.restore();
 
-  // Radial seams
   bgCtx.save();
   bgCtx.globalAlpha = 0.025;
   bgCtx.strokeStyle = '#d4af37';
@@ -442,7 +687,6 @@ function renderBackground() {
   }
   bgCtx.restore();
 
-  // Outer ring boundary
   bgCtx.save();
   bgCtx.globalAlpha = 0.08;
   bgCtx.beginPath();
@@ -454,91 +698,16 @@ function renderBackground() {
 }
 renderBackground();
 
-// ImageData for fast agent drawing
-const imgData = ctx.createImageData(W, H);
-const pixels = new Uint8ClampedArray(imgData.data.buffer);
-const pixels32 = new Uint32Array(imgData.data.buffer);
-
-function drawAgentsFast() {
-  // Copy background pixels
-  const bgData = bgCtx.getImageData(0, 0, W, H);
-  const bg32 = new Uint32Array(bgData.data.buffer);
-
-  // Apply trail fade: blend trail canvas with background
-  const trailData = tctx.getImageData(0, 0, W, H);
-  const tr32 = new Uint32Array(trailData.data.buffer);
-
-  for (let p = 0; p < bg32.length; p++) {
-    // Blend trail over background
-    const bgPx = bg32[p];
-    const trPx = tr32[p];
-    const trA = (trPx >>> 24) & 0xFF;
-    if (trA === 0) {
-      pixels32[p] = bgPx;
-    } else {
-      const a = trA / 255;
-      const ia = 1 - a;
-      const r = ((trPx & 0xFF) * a + (bgPx & 0xFF) * ia) | 0;
-      const g = (((trPx >> 8) & 0xFF) * a + ((bgPx >> 8) & 0xFF) * ia) | 0;
-      const b = (((trPx >> 16) & 0xFF) * a + ((bgPx >> 16) & 0xFF) * ia) | 0;
-      pixels32[p] = (255 << 24) | (b << 16) | (g << 8) | r;
-    }
-  }
-
-  // Draw agents as anti-aliased dots onto pixel buffer
-  for (let i = 0; i < agentCount; i++) {
-    const px = ax[i], py = ay[i];
-    const sz = asize[i];
-    const col = acolor[i];
-    const cr = col & 0xFF;
-    const cg = (col >> 8) & 0xFF;
-    const cb = (col >> 16) & 0xFF;
-    const ca = ((col >> 24) & 0xFF) / 255;
-
-    const x0 = (px - sz - 1) | 0;
-    const x1 = (px + sz + 1) | 0;
-    const y0 = (py - sz - 1) | 0;
-    const y1 = (py + sz + 1) | 0;
-
-    for (let yy = Math.max(0, y0); yy <= Math.min(H-1, y1); yy++) {
-      for (let xx = Math.max(0, x0); xx <= Math.min(W-1, x1); xx++) {
-        const ddx = xx - px, ddy = yy - py;
-        const d2 = ddx*ddx + ddy*ddy;
-        const r2 = sz * sz;
-        if (d2 > (sz+1)*(sz+1)) continue;
-        let alpha = ca;
-        if (d2 > r2) {
-          alpha *= Math.max(0, 1 - (Math.sqrt(d2) - sz));
-        }
-        if (alpha <= 0) continue;
-        const idx = yy * W + xx;
-        const dst = pixels32[idx];
-        const dr = dst & 0xFF;
-        const dg = (dst >> 8) & 0xFF;
-        const db = (dst >> 16) & 0xFF;
-        const ia = 1 - alpha;
-        const nr = (cr * alpha + dr * ia) | 0;
-        const ng = (cg * alpha + dg * ia) | 0;
-        const nb = (cb * alpha + db * ia) | 0;
-        pixels32[idx] = (255 << 24) | (nb << 16) | (ng << 8) | nr;
-      }
-    }
-  }
-
-  ctx.putImageData(imgData, 0, 0);
-}
-
 function drawAgentsCanvas() {
-  // Simpler canvas-based rendering (fallback / for glow)
   ctx.drawImage(bgCanvas, 0, 0);
 
-  // Crowd glow
+  // Crowd glow — stronger for more agents
   if (agentCount > 30) {
-    const intensity = Math.min(agentCount / 1200, 1) * 0.15;
+    const intensity = Math.min(agentCount / 1500, 1) * 0.2;
     const glow = ctx.createRadialGradient(CX, CY, MATAF_INNER - 5, CX, CY, MATAF_OUTER + 30);
-    glow.addColorStop(0, `rgba(212,175,55,${intensity * 0.3})`);
-    glow.addColorStop(0.3, `rgba(220,195,130,${intensity * 0.7})`);
-    glow.addColorStop(0.7, `rgba(200,180,140,${intensity})`);
+    glow.addColorStop(0, `rgba(212,175,55,${intensity * 0.4})`);
+    glow.addColorStop(0.2, `rgba(220,195,130,${intensity * 0.8})`);
+    glow.addColorStop(0.5, `rgba(200,180,140,${intensity})`);
     glow.addColorStop(1, 'rgba(200,180,140,0)');
     ctx.fillStyle = glow;
     ctx.beginPath();
@@ -546,33 +715,32 @@ function drawAgentsCanvas() {
     ctx.fill();
   }
 
-  // Motion trail: fade previous frame heavily
+  // Motion trail
   tctx.globalCompositeOperation = 'destination-out';
-  tctx.globalAlpha = 0.15;
+  tctx.globalAlpha = 0.12;
   tctx.fillStyle = '#000';
   tctx.fillRect(0, 0, W, H);
   tctx.globalCompositeOperation = 'source-over';
   tctx.globalAlpha = 1;
 
-  // Stamp agents into trail
+  // Stamp agents into trail (batch by filling rects for speed)
   for (let i = 0; i < agentCount; i++) {
     const col = acolor[i];
     const r = col & 0xFF;
     const g = (col >> 8) & 0xFF;
     const b = (col >> 16) & 0xFF;
-    tctx.beginPath();
-    tctx.arc(ax[i], ay[i], asize[i] * 0.5, 0, Math.PI * 2);
-    tctx.fillStyle = `rgba(${r},${g},${b},0.12)`;
-    tctx.fill();
+    const sz = asize[i] * 0.4;
+    tctx.fillStyle = `rgba(${r},${g},${b},0.08)`;
+    tctx.fillRect(ax[i] - sz, ay[i] - sz, sz * 2, sz * 2);
   }
 
-  // Composite trail softly
+  // Composite trail
   ctx.save();
-  ctx.globalAlpha = 0.3;
+  ctx.globalAlpha = 0.25;
   ctx.drawImage(trailCanvas, 0, 0);
   ctx.restore();
 
-  // Draw current agents with velocity streaks
+  // Draw agents — use fillRect for inner packed agents (speed), arc for outer
   for (let i = 0; i < agentCount; i++) {
     const col = acolor[i];
     const r = col & 0xFF;
@@ -580,26 +748,35 @@ function drawAgentsCanvas() {
     const b = (col >> 16) & 0xFF;
     const a = ((col >> 24) & 0xFF) / 255;
     const sz = asize[i];
-    const vl = Math.sqrt(avx[i]*avx[i] + avy[i]*avy[i]);
+    const px = ax[i], py = ay[i];
 
-    // Streak behind the agent (motion trail)
-    if (vl > 0.05) {
-      const streakLen = Math.min(vl * 8, 12);
-      const nx = avx[i] / vl, ny = avy[i] / vl;
+    const ddx = px - CX, ddy = py - CY;
+    const d = Math.sqrt(ddx*ddx + ddy*ddy);
+    const ringF = (d - MATAF_INNER) / (MATAF_OUTER - MATAF_INNER);
+
+    // Inner agents: small filled rects (faster, denser look)
+    if (ringF < 0.4) {
+      ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+      ctx.fillRect(px - sz, py - sz, sz * 2, sz * 2);
+    } else {
+      // Streak for faster outer agents
+      const vl = Math.sqrt(avx[i]*avx[i] + avy[i]*avy[i]);
+      if (vl > 0.04) {
+        const streakLen = Math.min(vl * 6, 8);
+        const nx = avx[i] / vl, ny = avy[i] / vl;
+        ctx.beginPath();
+        ctx.moveTo(px + ny * sz * 0.4, py - nx * sz * 0.4);
+        ctx.lineTo(px - nx * streakLen, py - ny * streakLen);
+        ctx.lineTo(px - ny * sz * 0.4, py + nx * sz * 0.4);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(${r},${g},${b},${a * 0.2})`;
+        ctx.fill();
+      }
       ctx.beginPath();
-      ctx.moveTo(ax[i] + ny * sz * 0.5, ay[i] - nx * sz * 0.5);
-      ctx.lineTo(ax[i] - nx * streakLen, ay[i] - ny * streakLen);
-      ctx.lineTo(ax[i] - ny * sz * 0.5, ay[i] + nx * sz * 0.5);
-      ctx.closePath();
-      ctx.fillStyle = `rgba(${r},${g},${b},${a * 0.25})`;
+      ctx.arc(px, py, sz, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
       ctx.fill();
     }
-
-    // Agent dot
-    ctx.beginPath();
-    ctx.arc(ax[i], ay[i], sz, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
-    ctx.fill();
   }
 
   // Ka'bah on top
@@ -632,12 +809,14 @@ function updateUI(info) {
   document.getElementById('s-tawaf').textContent = totalTawaf.toLocaleString();
   document.getElementById('s-phase').textContent =
     info.phase === 'prayer' ? 'Salah' : info.phase === 'surge' ? 'Surge' : 'Tawaf';
+
+  renderBayesUI();
 }
 
 // --- MAIN LOOP ---
 let lastTime = 0;
 let uiTimer = 0;
-let prayerInfo = {current:'—',next:'—',nextIn:'',phase:'tawaf',target:500};
+let prayerInfo = {current:'—',next:'—',nextIn:'',phase:'tawaf',target:800};
 
 function loop(timestamp) {
   if (!lastTime) lastTime = timestamp;
@@ -650,15 +829,16 @@ function loop(timestamp) {
     prayerInfo = getCurrentPrayerInfo();
     targetAgentCount = prayerInfo.target;
     updateUI(prayerInfo);
+    updateBayesModel();
   }
 
-  // Adjust count
+  // Adjust count — spawn faster for density
   const diff = targetAgentCount - agentCount;
   if (diff > 0) {
-    const n = Math.min(diff, Math.max(3, (diff * 0.04) | 0));
-    for (let i = 0; i < n; i++) spawnAgent(false);
+    const n = Math.min(diff, Math.max(15, (diff * 0.12) | 0));
+    for (let i = 0; i < n; i++) smartSpawn();
   } else if (diff < -10 && prayerInfo.phase !== 'prayer') {
-    const n = Math.min(-diff, 4);
+    const n = Math.min(-diff, 6);
     for (let i = 0; i < n; i++) {
       if (agentCount > 0) removeAgent(agentCount - 1);
     }
@@ -676,12 +856,21 @@ fetchPrayerTimes().then(() => {
   targetAgentCount = prayerInfo.target;
   updateUI(prayerInfo);
 
-  // Spawn all agents immediately, distributed across rings
-  for (let i = 0; i < targetAgentCount; i++) spawnAgent(true);
+  // Spawn initial agents distributed across rings with proper types
+  for (let i = 0; i < targetAgentCount; i++) {
+    const type = pickType();
+    if (type === TYPE_FAMILY) {
+      spawnFamilyCluster();
+      i += 3; // account for extra members
+    } else if (type === TYPE_TOUR) {
+      spawnTourGroup();
+      i += 14;
+    } else {
+      spawnAgent(true, type);
+    }
+  }
 
-  // Clear trail
   tctx.clearRect(0, 0, W, H);
-
   requestAnimationFrame(loop);
 });
 </script>
