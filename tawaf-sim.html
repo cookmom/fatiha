@@ -252,6 +252,61 @@ const KAABAH_SIZE = Math.round(((REAL_KAABAH_W + REAL_KAABAH_L) / 2) * PX_PER_ME
 const MATAF_INNER = Math.round(REAL_MATAF_INNER_R * PX_PER_METER);  // ~39px
 const MATAF_OUTER = Math.min(175, W * 0.41);                        // ~175px
 
+// === HIJR ISMAIL (semi-circular wall NW of Ka'bah) ===
+// Real dimensions: ~12m radius semi-circle on the NW side
+// Angle: roughly centered at ~2.36 rad (135° from east, i.e. NW)
+const HIJR_RADIUS = Math.round(12 * PX_PER_METER);  // ~31px
+const HIJR_CENTER_ANGLE = Math.PI * 0.75;            // NW direction (135°)
+const HIJR_CX = CX + Math.cos(HIJR_CENTER_ANGLE) * (KAABAH_SIZE / 2 + HIJR_RADIUS * 0.45);
+const HIJR_CY = CY + Math.sin(HIJR_CENTER_ANGLE) * (KAABAH_SIZE / 2 + HIJR_RADIUS * 0.45);
+const HIJR_ARC_HALF = Math.PI * 0.55; // semi-circle angular span
+
+function isInHijrIsmail(x, y) {
+  const dx = x - HIJR_CX, dy = y - HIJR_CY;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist > HIJR_RADIUS) return false;
+  // Check angular span — only the semi-circle facing Ka'bah
+  const ang = Math.atan2(dy, dx);
+  let dAng = ang - (HIJR_CENTER_ANGLE + Math.PI); // facing inward
+  while (dAng > Math.PI) dAng -= 2 * Math.PI;
+  while (dAng < -Math.PI) dAng += 2 * Math.PI;
+  return Math.abs(dAng) < HIJR_ARC_HALF;
+}
+
+// === CLUSTER BEHAVIOR — 7 organic clumps with dark gaps ===
+const NUM_CLUSTERS = 7;
+const clusterAngle = new Float32Array(NUM_CLUSTERS);
+const clusterDist = new Float32Array(NUM_CLUSTERS);  // distance from center
+const clusterSize = new Float32Array(NUM_CLUSTERS);   // radius of influence
+const clusterDrift = new Float32Array(NUM_CLUSTERS);  // slow angular drift speed
+(function initClusters() {
+  for (let c = 0; c < NUM_CLUSTERS; c++) {
+    // Uneven angular spacing creates natural asymmetry
+    clusterAngle[c] = (c / NUM_CLUSTERS) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+    // Vary radial distance — some inner, some outer
+    clusterDist[c] = MATAF_INNER + Math.random() * (MATAF_OUTER - MATAF_INNER - 15);
+    clusterSize[c] = 20 + Math.random() * 25; // tighter clusters = more visible gaps
+    clusterDrift[c] = (0.00005 + Math.random() * 0.00015) * (Math.random() < 0.5 ? 1 : -1);
+  }
+})();
+
+// Per-agent cluster assignment (-1 = no cluster) — initialized after MAX_AGENTS
+let acluster; // set in initClusterArrays()
+
+function assignCluster(i) {
+  // 80% chance of being drawn to a cluster (stronger clumping)
+  if (Math.random() > 0.80) { acluster[i] = -1; return; }
+  // Pick closest cluster to current position
+  let bestC = 0, bestD = Infinity;
+  for (let c = 0; c < NUM_CLUSTERS; c++) {
+    const cx = CX + Math.cos(clusterAngle[c]) * clusterDist[c];
+    const cy = CY + Math.sin(clusterAngle[c]) * clusterDist[c];
+    const d = Math.sqrt((ax[i]-cx)*(ax[i]-cx) + (ay[i]-cy)*(ay[i]-cy));
+    if (d < bestD) { bestD = d; bestC = c; }
+  }
+  acluster[i] = bestC;
+}
+
 // === CAPACITY MODEL ===
 // Total Mataf throughput: 107,000 pilgrims/hr across all levels
 //   [General Authority for Affairs of Two Holy Mosques, SPA.gov.sa, 2025]
@@ -263,6 +318,7 @@ const MATAF_HOURLY_CAPACITY = 107000;       // all levels combined [SPA.gov.sa]
 const MATAF_GROUND_MAX = 28000;             // instantaneous ground floor max
 const PEOPLE_PER_AGENT = 8;                 // each dot ≈ 8 real people
 const MAX_AGENTS = 3500;                    // performance cap → 3500 × 8 = 28,000 people
+acluster = new Int8Array(MAX_AGENTS).fill(-1); // cluster assignment array
 
 // --- DEMOGRAPHICS ---
 // Sources: Saudi GASTAT Hajj data 2024; Frontiers in Public Health (Iranian Hajj cohort)
@@ -317,14 +373,14 @@ const SFM_RADIAL_PULL = [
 
 function typeColor(type) {
   let r, g, b, a;
-  const v = () => (Math.random() - 0.5) * 15;
+  const v = () => (Math.random() - 0.5) * 12;
   switch (type) {
-    case TYPE_SOLO_M: r = 220+v(); g = 228+v(); b = 236+v(); a = 200+Math.random()*55; break; // cool white
-    case TYPE_SOLO_F: r = 200+v(); g = 160+v(); b = 224+v(); a = 190+Math.random()*60; break; // soft lavender
-    case TYPE_FAMILY: r = 60+v();  g = 220+v(); b = 130+v(); a = 190+Math.random()*60; break; // warm green
-    case TYPE_ELDERLY: r = 212+v(); g = 175+v(); b = 55+v();  a = 200+Math.random()*55; break; // amber/gold
-    case TYPE_TOUR:   r = 64+v();  g = 200+v(); b = 255+v(); a = 190+Math.random()*60; break; // cyan/blue
-    case TYPE_CHILD:  r = 255+v(); g = 176+v(); b = 136+v(); a = 180+Math.random()*60; break; // soft peach
+    case TYPE_SOLO_M: r = 230+v(); g = 240+v(); b = 255+v(); a = 220+Math.random()*35; break; // bright ice white
+    case TYPE_SOLO_F: r = 220+v(); g = 130+v(); b = 255+v(); a = 210+Math.random()*45; break; // vivid purple
+    case TYPE_FAMILY: r = 40+v();  g = 255+v(); b = 120+v(); a = 215+Math.random()*40; break; // VIVID green
+    case TYPE_ELDERLY: r = 255+v(); g = 195+v(); b = 30+v();  a = 220+Math.random()*35; break; // BRIGHT amber
+    case TYPE_TOUR:   r = 30+v();  g = 220+v(); b = 255+v(); a = 215+Math.random()*40; break; // VIVID cyan
+    case TYPE_CHILD:  r = 255+v(); g = 150+v(); b = 100+v(); a = 210+Math.random()*45; break; // warm orange-peach
   }
   r = Math.max(0, Math.min(255, r)) | 0;
   g = Math.max(0, Math.min(255, g)) | 0;
@@ -896,6 +952,16 @@ function spawnAgent(distributed, forceType, groupId, leaderIdx, offX, offY) {
   agroupOffX[i] = offX || 0;
   agroupOffY[i] = offY || 0;
 
+  // Cluster assignment
+  assignCluster(i);
+
+  // Hijr Ismail avoidance on spawn
+  if (isInHijrIsmail(ax[i], ay[i])) {
+    const ang = Math.atan2(ay[i] - HIJR_CY, ax[i] - HIJR_CX);
+    ax[i] = HIJR_CX + Math.cos(ang) * (HIJR_RADIUS + 3);
+    ay[i] = HIJR_CY + Math.sin(ang) * (HIJR_RADIUS + 3);
+  }
+
   return i;
 }
 
@@ -970,6 +1036,7 @@ function removeAgent(i) {
     azoneTimer[i] = azoneTimer[agentCount]; azoneDuration[i] = azoneDuration[agentCount];
     atouchState[i] = atouchState[agentCount]; atouchTimer[i] = atouchTimer[agentCount];
     atouchDuration[i] = atouchDuration[agentCount];
+    acluster[i] = acluster[agentCount];
     for (let j = 0; j < agentCount; j++) {
       if (agroupLeader[j] === agentCount) agroupLeader[j] = i;
     }
@@ -1005,19 +1072,15 @@ function spawnTouchingAgent() {
   // Stationary
   avx[i] = 0; avy[i] = 0;
   aspeed[i] = 0.06 * cfg.speedMul;
-  // Power-law size for touching agents too
+  // Touching agents are LARGER and more visible than tawaf agents
   const touchSizeRoll = Math.random();
-  if (touchSizeRoll < 0.6) asize[i] = 0.5 + Math.random() * 1.0;
-  else if (touchSizeRoll < 0.85) asize[i] = 1.5 + Math.random() * 1.5;
-  else if (touchSizeRoll < 0.95) asize[i] = 3.0 + Math.random() * 2.0;
-  else asize[i] = 5.0 + Math.random() * 3.0;
+  if (touchSizeRoll < 0.35) asize[i] = 1.5 + Math.random() * 1.0;
+  else if (touchSizeRoll < 0.65) asize[i] = 2.5 + Math.random() * 2.0;
+  else if (touchSizeRoll < 0.88) asize[i] = 4.0 + Math.random() * 2.5;
+  else asize[i] = 6.0 + Math.random() * 3.0;
 
-  // Brighter color for touching agents
-  let col = typeColor(type);
-  const cr = Math.min(255, (col & 0xFF) + 40);
-  const cg = Math.min(255, ((col >> 8) & 0xFF) + 30);
-  const cb = Math.min(255, ((col >> 16) & 0xFF) + 20);
-  acolor[i] = (230 << 24) | (cb << 16) | (cg << 8) | cr;
+  // Warm gold color for touching agents — visually distinct from tawaf flow
+  acolor[i] = (240 << 24) | (55 << 16) | (195 << 8) | 235;  // warm gold rgba(235,195,55,0.94)
 
   acircuits[i] = Math.floor(Math.random() * 7);
   aangleAccum[i] = Math.random() * Math.PI * 2;
@@ -1086,12 +1149,10 @@ function manageTouchingLayer(dt) {
         atouchState[i] = 1;
         atouchTimer[i] = 0;
         atouchDuration[i] = TOUCHING_MIN_SEC + Math.random() * (TOUCHING_MAX_SEC - TOUCHING_MIN_SEC);
-        // Brighten
-        const col = acolor[i];
-        const cr = Math.min(255, (col & 0xFF) + 40);
-        const cg = Math.min(255, ((col >> 8) & 0xFF) + 30);
-        const cb = Math.min(255, ((col >> 16) & 0xFF) + 20);
-        acolor[i] = (230 << 24) | (cb << 16) | (cg << 8) | cr;
+        // Warm gold for touching agents
+        acolor[i] = (240 << 24) | (55 << 16) | (195 << 8) | 235;
+        // Touching agents get larger sizes
+        asize[i] = Math.max(asize[i] * 1.5, 2.0);
         pulled++;
       }
     }
@@ -1634,9 +1695,9 @@ function updateAgents(dt) {
         fy += (dy / dist) * SFM_K * (-wallGap);
       }
     }
-    // Gentle repulsion from touching layer (don't overlap stationary du'a ring)
-    if (atouchState[i] === 0 && dist < TOUCHING_OUTER_R + 3) {
-      const touchRepulse = (TOUCHING_OUTER_R + 3 - dist) * 0.05;
+    // Strong repulsion from touching layer — creates visible DARK GAP between touching ring and tawaf
+    if (atouchState[i] === 0 && dist < TOUCHING_OUTER_R + 8) {
+      const touchRepulse = (TOUCHING_OUTER_R + 8 - dist) * 0.12;
       fx += (dx / dist) * touchRepulse;
       fy += (dy / dist) * touchRepulse;
     }
@@ -1651,6 +1712,41 @@ function updateAgents(dt) {
       if (wallGap < 0) {
         fx -= (dx / dist) * SFM_K * (-wallGap);
         fy -= (dy / dist) * SFM_K * (-wallGap);
+      }
+    }
+
+    // 6b. HIJR ISMAIL AVOIDANCE — strong repulsion from the semi-circular wall
+    {
+      const hdx = ax[i] - HIJR_CX, hdy = ay[i] - HIJR_CY;
+      const hDist = Math.sqrt(hdx * hdx + hdy * hdy);
+      if (hDist < HIJR_RADIUS + 5) {
+        const hAng = Math.atan2(hdy, hdx);
+        let hAngDiff = hAng - (HIJR_CENTER_ANGLE + Math.PI);
+        while (hAngDiff > Math.PI) hAngDiff -= 2 * Math.PI;
+        while (hAngDiff < -Math.PI) hAngDiff += 2 * Math.PI;
+        if (Math.abs(hAngDiff) < HIJR_ARC_HALF) {
+          const gap = HIJR_RADIUS - hDist;
+          if (gap > -5) {
+            const repulse = Math.max(0.5, (gap + 5) * 0.15);
+            fx += (hdx / hDist) * repulse;
+            fy += (hdy / hDist) * repulse;
+          }
+        }
+      }
+    }
+
+    // 6c. CLUSTER PULL — attraction toward assigned cluster center (creates visible clumps)
+    if (acluster[i] >= 0) {
+      const ci = acluster[i];
+      const ccx = CX + Math.cos(clusterAngle[ci]) * clusterDist[ci];
+      const ccy = CY + Math.sin(clusterAngle[ci]) * clusterDist[ci];
+      const cdx = ccx - ax[i], cdy = ccy - ay[i];
+      const cdist = Math.sqrt(cdx * cdx + cdy * cdy);
+      if (cdist > 3) {
+        // Stronger pull when far from cluster, weaker when close
+        const pull = Math.min(0.04, 0.008 * (cdist / clusterSize[ci]));
+        fx += (cdx / cdist) * pull;
+        fy += (cdy / cdist) * pull;
       }
     }
 
@@ -1704,6 +1800,12 @@ function updateAgents(dt) {
     if (newDist > MATAF_OUTER) {
       ax[i] = CX + (ax[i]-CX) / newDist * (MATAF_OUTER - 1);
       ay[i] = CY + (ay[i]-CY) / newDist * (MATAF_OUTER - 1);
+    }
+    // Hijr Ismail hard boundary
+    if (isInHijrIsmail(ax[i], ay[i])) {
+      const ha = Math.atan2(ay[i] - HIJR_CY, ax[i] - HIJR_CX);
+      ax[i] = HIJR_CX + Math.cos(ha) * (HIJR_RADIUS + 2);
+      ay[i] = HIJR_CY + Math.sin(ha) * (HIJR_RADIUS + 2);
     }
   }
 }
@@ -1953,13 +2055,13 @@ function drawAgentsCanvas() {
   // Draw row guides during prayer
   drawPrayerRowGuides();
 
-  // Crowd glow
+  // Crowd glow — subtle, not overpowering
   if (agentCount > 30) {
-    const intensity = Math.min(agentCount / 2000, 1) * 0.12;
+    const intensity = Math.min(agentCount / 2000, 1) * 0.06;
     const glowColor = isPrayerActive ? 'rgba(212,175,55,' : 'rgba(0,255,255,';
     const glow = ctx.createRadialGradient(CX, CY, MATAF_INNER - 5, CX, CY, MATAF_OUTER + 20);
-    glow.addColorStop(0, glowColor + (intensity * 0.3) + ')');
-    glow.addColorStop(0.3, glowColor + (intensity * 0.6) + ')');
+    glow.addColorStop(0, glowColor + (intensity * 0.2) + ')');
+    glow.addColorStop(0.3, glowColor + (intensity * 0.4) + ')');
     glow.addColorStop(0.6, glowColor + intensity + ')');
     glow.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = glow;
@@ -2041,7 +2143,7 @@ function drawAgentsCanvas() {
   // --- CONNECTION LINES between group members (drawn below dots) ---
   if (!isPrayerActive) {
     ctx.save();
-    ctx.lineWidth = 0.3;
+    ctx.lineWidth = 0.4;
     for (let i = 0; i < agentCount; i++) {
       const leader = agroupLeader[i];
       if (leader < 0 || leader >= agentCount) continue;
@@ -2049,10 +2151,11 @@ function drawAgentsCanvas() {
       if (type !== TYPE_FAMILY && type !== TYPE_TOUR && type !== TYPE_CHILD) continue;
       const dx = ax[i] - ax[leader], dy = ay[i] - ay[leader];
       const dist = Math.sqrt(dx*dx + dy*dy);
-      if (dist > 40) continue; // skip if too far apart
+      if (dist > 40) continue;
       const col = acolor[leader];
       const cr = col & 0xFF, cg = (col >> 8) & 0xFF, cb = (col >> 16) & 0xFF;
-      const lineAlpha = Math.max(0.04, 0.15 * (1 - dist / 40));
+      // Visible web texture: 10-25% opacity (was 4-15%)
+      const lineAlpha = Math.max(0.10, 0.25 * (1 - dist / 40));
       ctx.strokeStyle = `rgba(${cr},${cg},${cb},${lineAlpha.toFixed(3)})`;
       ctx.beginPath();
       ctx.moveTo(ax[i], ay[i]);
@@ -2072,31 +2175,30 @@ function drawAgentsCanvas() {
     let sz = asize[i] * poseSizeMul * pulseFactor;
     const px = ax[i], py = ay[i];
 
-    // Touching agents: bright, solid, stationary dots facing inward
+    // Touching agents: bright warm GOLD, large, solid, stationary dots — visually distinct ring
     if (atouchState[i] === 1 && !isPrayerActive) {
       const ddx = px - CX, ddy = py - CY;
       const d = Math.sqrt(ddx*ddx + ddy*ddy) || 1;
-      const tr = Math.min(255, r * 0.5 + 255 * 0.5);
-      const tg = Math.min(255, g * 0.4 + 220 * 0.6);
-      const tb = Math.min(255, b * 0.3 + 180 * 0.7);
-      // Glow halo
-      if (sz > 1.5) {
+      // Warm gold palette
+      const tr = 245, tg = 200, tb = 65;
+      // Warm glow halo for larger touching dots
+      if (sz > 3) {
         ctx.beginPath();
-        ctx.arc(px, py, sz * 3, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${tr|0},${tg|0},${tb|0},0.06)`;
+        ctx.arc(px, py, sz * 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${tr},${tg},${tb},0.10)`;
         ctx.fill();
       }
+      // Solid bright core
       ctx.beginPath();
-      ctx.arc(px, py, Math.max(sz * 1.1, 0.6), 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${tr|0},${tg|0},${tb|0},0.9)`;
+      ctx.arc(px, py, Math.max(sz * 1.3, 1.0), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${tr},${tg},${tb},0.95)`;
       ctx.fill();
-      if (sz > 0.3) {
+      // Hot white center on big dots
+      if (sz > 4) {
         ctx.beginPath();
-        ctx.moveTo(px, py);
-        ctx.lineTo(px - (ddx/d) * sz * 1.5, py - (ddy/d) * sz * 1.5);
-        ctx.strokeStyle = `rgba(${tr|0},${tg|0},${tb|0},0.3)`;
-        ctx.lineWidth = 0.3;
-        ctx.stroke();
+        ctx.arc(px, py, sz * 0.35, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,220,0.5)';
+        ctx.fill();
       }
       continue;
     }
@@ -2132,10 +2234,10 @@ function drawAgentsCanvas() {
     }
 
     // Normal tawaf rendering — glowing dots
-    // Soft glow halo for medium/large dots (nebula effect)
-    if (sz > 1.5) {
-      const glowR = sz * 3.5;
-      const glowAlpha = Math.min(0.12, 0.03 + sz * 0.012);
+    // Soft glow halo ONLY for medium/large dots (>3px) — tiny dots stay clean
+    if (sz > 3) {
+      const glowR = sz * 3.0;
+      const glowAlpha = Math.min(0.10, 0.02 + sz * 0.015);
       ctx.beginPath();
       ctx.arc(px, py, glowR, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(${r},${g},${b},${glowAlpha.toFixed(3)})`;
@@ -2154,6 +2256,15 @@ function drawAgentsCanvas() {
       ctx.fill();
     }
   }
+
+  // Hijr Ismail — subtle semi-circular wall outline
+  ctx.save();
+  ctx.strokeStyle = 'rgba(100,100,80,0.25)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(HIJR_CX, HIJR_CY, HIJR_RADIUS, HIJR_CENTER_ANGLE + Math.PI - HIJR_ARC_HALF, HIJR_CENTER_ANGLE + Math.PI + HIJR_ARC_HALF);
+  ctx.stroke();
+  ctx.restore();
 
   // Ka'bah: dichroic glass cube (Three.js composite) or fallback gold rect
   if (window._cubeCanvas && window._renderGlassCube) {
@@ -2388,6 +2499,11 @@ function loop(timestamp) {
         if (agentCount > 0) removeAgent(agentCount - 1);
       }
     }
+  }
+
+  // Drift cluster centers slowly (organic movement)
+  for (let c = 0; c < NUM_CLUSTERS; c++) {
+    clusterAngle[c] += clusterDrift[c] * dt;
   }
 
   manageTouchingLayer(dt);
