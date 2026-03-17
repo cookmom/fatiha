@@ -882,8 +882,8 @@ function updateAgents(dt) {
       }
 
       // Otherwise slow tawaf drift
-      const tx_p = -dy / dist;
-      const ty_p = dx / dist;
+      const tx_p = dy / dist;
+      const ty_p = -dx / dist;
       const prayerSpeed = aspeed[i] * slowFactor;
       const targetVx = tx_p * prayerSpeed;
       const targetVy = ty_p * prayerSpeed;
@@ -937,8 +937,8 @@ function updateAgents(dt) {
       const elapsed = (now - prayerMode.phaseStart) / 1000;
       const resumeFrac = Math.min(elapsed / 60, 1); // 0→1 over 60s
       // Blend between holding position and tawaf orbit
-      const tx = -dy / dist;
-      const ty = dx / dist;
+      const tx = dy / dist;
+      const ty = -dx / dist;
       const tawafVx = tx * aspeed[i];
       const tawafVy = ty * aspeed[i];
       // Early: mostly hold; late: mostly tawaf
@@ -964,8 +964,8 @@ function updateAgents(dt) {
 
     // === NORMAL TAWAF PHYSICS ===
     const type = atype[i];
-    const tx = -dy / dist;
-    const ty = dx / dist;
+    const tx = dy / dist;
+    const ty = -dx / dist;
 
     const ringFrac = Math.max(0, Math.min(1, (dist - MATAF_INNER) / (MATAF_OUTER - MATAF_INNER)));
     const ringSpeed = 0.15 + ringFrac * ringFrac * 0.85;
