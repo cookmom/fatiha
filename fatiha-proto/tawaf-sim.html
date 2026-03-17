@@ -80,6 +80,24 @@ body{background:#000;overflow-x:hidden;overflow-y:auto;font-family:'JetBrains Mo
 .bstat .val{font-size:10px;font-weight:300;color:#E0E0E0;font-variant-numeric:tabular-nums}
 .bstat .lbl{font-size:6px;color:#333;text-transform:uppercase;letter-spacing:1.5px;margin-top:1px}
 
+/* RESEARCH MODE PANEL */
+#research-toggle{position:absolute;top:2px;right:70px;z-index:20;font-size:7px;color:#333;letter-spacing:1px;cursor:pointer;padding:2px 6px;border:1px solid #222;text-transform:uppercase;font-family:'JetBrains Mono',monospace;background:transparent}
+#research-toggle.active{color:#FF4444;border-color:#FF4444;box-shadow:0 0 4px rgba(255,68,68,0.3)}
+#research-badge{display:none;position:absolute;top:14px;right:6px;z-index:20;font-size:6px;color:#FF4444;letter-spacing:2px;text-transform:uppercase;animation:researchPulse 2s infinite}
+#research-badge.visible{display:block}
+@keyframes researchPulse{0%,100%{opacity:1}50%{opacity:0.4}}
+#research-panel{display:none;position:absolute;top:50px;left:50%;transform:translateX(-50%);width:280px;z-index:20;background:rgba(0,0,0,0.92);border:1px solid #222;padding:8px;font-size:6.5px;color:#666;line-height:1.6;max-height:300px;overflow-y:auto}
+#research-panel.visible{display:block}
+#research-panel .rp-header{font-size:7px;font-weight:700;letter-spacing:2px;color:#FF4444;text-transform:uppercase;margin-bottom:4px}
+#research-panel .rp-section{margin-bottom:6px;border-bottom:1px solid #111;padding-bottom:4px}
+#research-panel .rp-label{color:#444;text-transform:uppercase;letter-spacing:1px}
+#research-panel .rp-val{color:#E0E0E0;font-variant-numeric:tabular-nums}
+#research-panel .rp-export{cursor:pointer;color:#00FFFF;border:1px solid #00FFFF33;padding:2px 8px;font-size:7px;letter-spacing:1px;background:transparent;font-family:'JetBrains Mono',monospace;text-transform:uppercase}
+#research-panel .rp-export:hover{background:#00FFFF11}
+
+/* BLACK STONE MARKER */
+.bs-marker{position:absolute;z-index:5;pointer-events:none}
+
 /* MAIN CANVAS */
 canvas#c{position:absolute;top:0;left:0;z-index:1}
 
@@ -197,6 +215,17 @@ canvas#c{position:absolute;top:0;left:0;z-index:1}
   <div class="bstat"><div class="val" id="s-avgtime">0s</div><div class="lbl">AVG CIRC</div></div>
   <div class="bstat"><div class="val" id="s-density">0.0</div><div class="lbl">PPL/M²</div></div>
   <div class="bstat"><div class="val" id="s-countdown">—</div><div class="lbl">NEXT SALAH</div></div>
+</div>
+
+<!-- RESEARCH MODE -->
+<button id="research-toggle" onclick="toggleResearch()">RESEARCH</button>
+<div id="research-badge">● RESEARCH MODE</div>
+<div id="research-panel">
+  <div class="rp-header">AUTORESEARCH // DATA LOG</div>
+  <div class="rp-section" id="rp-params"></div>
+  <div class="rp-section" id="rp-flow"></div>
+  <div class="rp-section" id="rp-accuracy"></div>
+  <div class="rp-section"><button class="rp-export" onclick="exportResearchData()">EXPORT JSON</button> <span id="rp-export-status" style="color:#00FF88"></span></div>
 </div>
 
 <canvas id="c"></canvas>
@@ -648,6 +677,25 @@ let agentCount = 0;
 let totalTawaf = 0;
 let nextGroupId = 0;
 
+// === INNER RING ZONES ===
+// Hajar al-Aswad (Black Stone) is at the eastern corner of Ka'bah
+// Multazam is the wall between the door and Black Stone (SE wall)
+const BLACK_STONE_ANGLE = -Math.PI / 4; // NE corner in screen coords
+const BLACK_STONE_X = CX + KAABAH_SIZE / 2;
+const BLACK_STONE_Y = CY - KAABAH_SIZE / 2;
+const MULTAZAM_ANGLE_START = BLACK_STONE_ANGLE;
+const MULTAZAM_ANGLE_END = BLACK_STONE_ANGLE + Math.PI / 4; // quarter wall toward door
+const TOUCH_RING_DIST = KAABAH_SIZE / 2 + 2 * PX_PER_METER; // ~2m from Ka'bah wall
+const ZONE_SEEKER_PCT = 0.15; // 15% of agents attempt to touch
+const ZONE_ARC_TRIGGER = Math.PI / 5; // how close in angle before zone behavior activates
+
+// Zone arrays — 0=normal orbit, 1=black stone seeker, 2=multazam seeker
+const azoneIntent = new Uint8Array(MAX_AGENTS);
+// Zone state — 0=orbiting, 1=approaching, 2=at zone (stopped), 3=departing
+const azoneState = new Uint8Array(MAX_AGENTS);
+const azoneTimer = new Float32Array(MAX_AGENTS);
+const azoneDuration = new Float32Array(MAX_AGENTS); // seconds to stay at zone
+
 // --- EVENT LOG ---
 const eventLog = [];
 const MAX_LOG = 18;
@@ -773,6 +821,20 @@ function spawnAgent(distributed, forceType, groupId, leaderIdx, offX, offY) {
   alastAngle[i] = angle;
   aprayerAssigned[i] = 0;
 
+  // Zone intent: ~15% seek Black Stone, ~5% seek Multazam (subset of seekers)
+  const zoneRoll = Math.random();
+  if (zoneRoll < ZONE_SEEKER_PCT * 0.7) {
+    azoneIntent[i] = 1; // black stone seeker
+    azoneDuration[i] = 10 + Math.random() * 20; // 10-30s at stone
+  } else if (zoneRoll < ZONE_SEEKER_PCT) {
+    azoneIntent[i] = 2; // multazam seeker
+    azoneDuration[i] = 15 + Math.random() * 25; // 15-40s at wall
+  } else {
+    azoneIntent[i] = 0;
+  }
+  azoneState[i] = 0;
+  azoneTimer[i] = 0;
+
   agroupId[i] = groupId !== undefined ? groupId : -1;
   agroupLeader[i] = leaderIdx !== undefined ? leaderIdx : -1;
   agroupOffX[i] = offX || 0;
@@ -847,6 +909,8 @@ function removeAgent(i) {
     agroupOffX[i] = agroupOffX[agentCount]; agroupOffY[i] = agroupOffY[agentCount];
     aprayerTX[i] = aprayerTX[agentCount]; aprayerTY[i] = aprayerTY[agentCount];
     aprayerAssigned[i] = aprayerAssigned[agentCount];
+    azoneIntent[i] = azoneIntent[agentCount]; azoneState[i] = azoneState[agentCount];
+    azoneTimer[i] = azoneTimer[agentCount]; azoneDuration[i] = azoneDuration[agentCount];
     for (let j = 0; j < agentCount; j++) {
       if (agroupLeader[j] === agentCount) agroupLeader[j] = i;
     }
@@ -1005,8 +1069,118 @@ function updateAgents(dt) {
     const tx = dy / dist;
     const ty = -dx / dist;
 
+    // --- INNER RING ZONE BEHAVIOR ---
+    const intent = azoneIntent[i];
+    if (intent > 0 && dist < MATAF_INNER + 30) {
+      // Normalize angle difference
+      let angleDiff;
+      if (intent === 1) {
+        angleDiff = angle - BLACK_STONE_ANGLE;
+      } else {
+        const multazamCenter = (MULTAZAM_ANGLE_START + MULTAZAM_ANGLE_END) / 2;
+        angleDiff = angle - multazamCenter;
+      }
+      while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+      while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+      const absAngleDiff = Math.abs(angleDiff);
+
+      if (azoneState[i] === 0 && absAngleDiff < ZONE_ARC_TRIGGER && dist < MATAF_INNER + 20) {
+        azoneState[i] = 1; // start approaching
+      }
+
+      if (azoneState[i] === 1) {
+        // Approaching zone: drift inward toward target
+        let targetX, targetY;
+        if (intent === 1) {
+          // Black Stone: crowd toward the corner with jitter
+          const jx = (Math.random() - 0.5) * 6;
+          const jy = (Math.random() - 0.5) * 6;
+          targetX = BLACK_STONE_X + jx;
+          targetY = BLACK_STONE_Y + jy;
+        } else {
+          // Multazam: press against the east wall of Ka'bah
+          const wallFrac = Math.random();
+          const wallAngle = MULTAZAM_ANGLE_START + wallFrac * (MULTAZAM_ANGLE_END - MULTAZAM_ANGLE_START);
+          const wallDist = KAABAH_SIZE / 2 + 3;
+          targetX = CX + Math.cos(wallAngle) * wallDist;
+          targetY = CY + Math.sin(wallAngle) * wallDist;
+        }
+
+        const tdx = targetX - ax[i], tdy = targetY - ay[i];
+        const tdist = Math.sqrt(tdx * tdx + tdy * tdy);
+        if (tdist > 3) {
+          const moveSpeed = Math.min(tdist * 0.04, 0.8);
+          avx[i] += (tdx / tdist * moveSpeed - avx[i]) * 0.08;
+          avy[i] += (tdy / tdist * moveSpeed - avy[i]) * 0.08;
+        } else {
+          azoneState[i] = 2; // arrived at zone
+          azoneTimer[i] = 0;
+        }
+        ax[i] += avx[i] * dt; ay[i] += avy[i] * dt;
+        // Update angle tracking
+        const newAngle2 = Math.atan2(ay[i] - CY, ax[i] - CX);
+        alastAngle[i] = newAngle2;
+        continue;
+      }
+
+      if (azoneState[i] === 2) {
+        // At zone: nearly stationary, subtle push toward Ka'bah
+        azoneTimer[i] += dt * 16.67 / 1000; // convert to seconds
+        const breathX = (Math.random() - 0.5) * 0.02;
+        const breathY = (Math.random() - 0.5) * 0.02;
+        // Gentle push toward Ka'bah
+        const pushStr = 0.01;
+        avx[i] = -dx / dist * pushStr + breathX;
+        avy[i] = -dy / dist * pushStr + breathY;
+        ax[i] += avx[i] * dt; ay[i] += avy[i] * dt;
+
+        // Keep outside Ka'bah
+        const newDist2 = Math.sqrt((ax[i]-CX)*(ax[i]-CX)+(ay[i]-CY)*(ay[i]-CY));
+        if (newDist2 < KAABAH_SIZE / 2 + 2) {
+          ax[i] = CX + (ax[i]-CX)/newDist2*(KAABAH_SIZE/2+2);
+          ay[i] = CY + (ay[i]-CY)/newDist2*(KAABAH_SIZE/2+2);
+        }
+
+        if (azoneTimer[i] >= azoneDuration[i]) {
+          azoneState[i] = 3; // departing
+        }
+        const newAngle2 = Math.atan2(ay[i] - CY, ax[i] - CX);
+        alastAngle[i] = newAngle2;
+        continue;
+      }
+
+      if (azoneState[i] === 3) {
+        // Departing: drift back outward to rejoin tawaf orbit
+        const prefDist2 = MATAF_INNER + 10;
+        if (dist < prefDist2 - 2) {
+          const pushOut = (prefDist2 - dist) * 0.03;
+          avx[i] += (dx / dist) * pushOut;
+          avy[i] += (dy / dist) * pushOut;
+        }
+        // Add tangential velocity to rejoin flow
+        avx[i] += (tx * aspeed[i] * 0.5 - avx[i]) * 0.05;
+        avy[i] += (ty * aspeed[i] * 0.5 - avy[i]) * 0.05;
+        ax[i] += avx[i] * dt; ay[i] += avy[i] * dt;
+
+        if (dist > MATAF_INNER + 5) {
+          azoneState[i] = 0;
+          azoneIntent[i] = 0; // done seeking — won't seek again this tawaf
+        }
+        const newAngle2 = Math.atan2(ay[i] - CY, ax[i] - CX);
+        let dAngle2 = newAngle2 - alastAngle[i];
+        if (dAngle2 > Math.PI) dAngle2 -= 2 * Math.PI;
+        if (dAngle2 < -Math.PI) dAngle2 += 2 * Math.PI;
+        if (dAngle2 < 0) aangleAccum[i] += -dAngle2;
+        alastAngle[i] = newAngle2;
+        continue;
+      }
+    }
+
+    // --- TOUCHING RING: innermost ~2m from Ka'bah, all agents extremely slow ---
+    const touchRingSlowdown = dist < TOUCH_RING_DIST ? 0.15 : (dist < TOUCH_RING_DIST + 5 ? 0.4 : 1.0);
+
     const ringFrac = Math.max(0, Math.min(1, (dist - MATAF_INNER) / (MATAF_OUTER - MATAF_INNER)));
-    const ringSpeed = 0.15 + ringFrac * ringFrac * 0.85;
+    const ringSpeed = (0.15 + ringFrac * ringFrac * 0.85) * touchRingSlowdown;
     const speed = aspeed[i] * ringSpeed;
 
     let fx = tx * speed * 2.0;
@@ -1475,6 +1649,58 @@ function drawAgentsCanvas() {
   // Ka'bah (always on top)
   ctx.drawImage(kaabahImg, CX - KAABAH_SIZE/2 - 10, CY - KAABAH_SIZE/2 - 10);
 
+  // --- BLACK STONE MARKER (bright dot on NE corner) ---
+  ctx.save();
+  const bsPulse = 0.6 + 0.4 * Math.sin(Date.now() / 500);
+  ctx.beginPath();
+  ctx.arc(BLACK_STONE_X, BLACK_STONE_Y, 3, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(255, 255, 255, ${bsPulse})`;
+  ctx.shadowColor = '#FFFFFF';
+  ctx.shadowBlur = 8;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  // Outer glow ring
+  ctx.beginPath();
+  ctx.arc(BLACK_STONE_X, BLACK_STONE_Y, 5, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(255, 200, 100, ${bsPulse * 0.4})`;
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+  ctx.restore();
+
+  // --- ZONE CLUSTER GLOW (bright cluster at Black Stone when agents present) ---
+  if (!isPrayerActive) {
+    let bsCount = 0, mzCount = 0;
+    for (let i = 0; i < agentCount; i++) {
+      if (azoneState[i] === 2) {
+        if (azoneIntent[i] === 1) bsCount++;
+        else if (azoneIntent[i] === 2) mzCount++;
+      }
+    }
+    if (bsCount > 0) {
+      const intensity = Math.min(bsCount / 15, 1) * 0.25;
+      const bsGlow = ctx.createRadialGradient(BLACK_STONE_X, BLACK_STONE_Y, 2, BLACK_STONE_X, BLACK_STONE_Y, 20);
+      bsGlow.addColorStop(0, `rgba(255, 255, 200, ${intensity})`);
+      bsGlow.addColorStop(1, 'rgba(255, 255, 200, 0)');
+      ctx.fillStyle = bsGlow;
+      ctx.beginPath();
+      ctx.arc(BLACK_STONE_X, BLACK_STONE_Y, 20, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (mzCount > 0) {
+      const mzCenterAngle = (MULTAZAM_ANGLE_START + MULTAZAM_ANGLE_END) / 2;
+      const mzX = CX + Math.cos(mzCenterAngle) * (KAABAH_SIZE / 2 + 4);
+      const mzY = CY + Math.sin(mzCenterAngle) * (KAABAH_SIZE / 2 + 4);
+      const intensity = Math.min(mzCount / 10, 1) * 0.15;
+      const mzGlow = ctx.createRadialGradient(mzX, mzY, 2, mzX, mzY, 15);
+      mzGlow.addColorStop(0, `rgba(212, 175, 55, ${intensity})`);
+      mzGlow.addColorStop(1, 'rgba(212, 175, 55, 0)');
+      ctx.fillStyle = mzGlow;
+      ctx.beginPath();
+      ctx.arc(mzX, mzY, 15, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   // Ka'bah glow pulse during prayer
   if (isPrayerActive) {
     const glowPulse = 0.04 + 0.03 * Math.sin(Date.now() / 1200);
@@ -1793,6 +2019,166 @@ fetchPrayerTimes().then(() => {
   drawDensityChart();
   requestAnimationFrame(loop);
 });
+
+// === AUTORESEARCH MODULE ===
+let researchMode = false;
+let researchLog = [];
+let researchLogInterval = null;
+let researchStartTime = null;
+let bayesErrorHistory = [];
+
+function toggleResearch() {
+  researchMode = !researchMode;
+  const btn = document.getElementById('research-toggle');
+  const badge = document.getElementById('research-badge');
+  const panel = document.getElementById('research-panel');
+  btn.classList.toggle('active', researchMode);
+  badge.classList.toggle('visible', researchMode);
+  panel.classList.toggle('visible', researchMode);
+
+  if (researchMode) {
+    researchStartTime = Date.now();
+    bayesErrorHistory = [];
+    addEvent('system', 'RESEARCH MODE activated — logging');
+    researchLogInterval = setInterval(logResearchSnapshot, 30000);
+    logResearchSnapshot(); // immediate first log
+  } else {
+    clearInterval(researchLogInterval);
+    researchLogInterval = null;
+    addEvent('system', 'RESEARCH MODE deactivated');
+  }
+}
+
+function getFlowRatesByRing() {
+  const rings = [
+    {name: 'TOUCH (0-2m)', min: 0, max: TOUCH_RING_DIST, count: 0, totalSpeed: 0},
+    {name: 'INNER (2-10m)', min: TOUCH_RING_DIST, max: MATAF_INNER + 25, count: 0, totalSpeed: 0},
+    {name: 'MID (10-30m)', min: MATAF_INNER + 25, max: MATAF_INNER + 80, count: 0, totalSpeed: 0},
+    {name: 'OUTER (30m+)', min: MATAF_INNER + 80, max: MATAF_OUTER + 50, count: 0, totalSpeed: 0},
+  ];
+  for (let i = 0; i < agentCount; i++) {
+    const dx = ax[i] - CX, dy = ay[i] - CY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const spd = Math.sqrt(avx[i] * avx[i] + avy[i] * avy[i]);
+    for (const r of rings) {
+      if (dist >= r.min && dist < r.max) {
+        r.count++;
+        r.totalSpeed += spd;
+        break;
+      }
+    }
+  }
+  return rings.map(r => ({
+    name: r.name,
+    agents: r.count,
+    people: r.count * PEOPLE_PER_AGENT,
+    avgSpeed: r.count > 0 ? (r.totalSpeed / r.count).toFixed(4) : '0',
+  }));
+}
+
+function getZoneStats() {
+  let bsSeekers = 0, bsStopped = 0, mzSeekers = 0, mzStopped = 0;
+  for (let i = 0; i < agentCount; i++) {
+    if (azoneIntent[i] === 1) { bsSeekers++; if (azoneState[i] === 2) bsStopped++; }
+    if (azoneIntent[i] === 2) { mzSeekers++; if (azoneState[i] === 2) mzStopped++; }
+  }
+  return {bsSeekers, bsStopped, mzSeekers, mzStopped};
+}
+
+function logResearchSnapshot() {
+  const makkah = getMakkahTime();
+  const ts = makkah.toISOString();
+  const elapsed = (Date.now() - researchStartTime) / 1000;
+  const flow = getFlowRatesByRing();
+  const zones = getZoneStats();
+
+  const snapshot = {
+    timestamp: ts,
+    elapsedSec: Math.round(elapsed),
+    phase: prayerMode.phase,
+    prayerName: prayerMode.prayerName || null,
+    agents: agentCount,
+    realPeople: agentCount * PEOPLE_PER_AGENT,
+    targetAgents: targetAgentCount,
+    totalTawaf: totalTawaf,
+    circuitsPerHour: circuitsPerHour,
+    densityPplSqM: parseFloat(((agentCount * PEOPLE_PER_AGENT) / REAL_MATAF_AREA).toFixed(2)),
+    bayesian: {
+      prior: parseFloat(bayesModel.lastPrior.toFixed(4)),
+      likelihood: parseFloat(bayesModel.lastLikelihood.toFixed(4)),
+      evidence: parseFloat(bayesModel.lastEvidence.toFixed(4)),
+      posterior: parseFloat(bayesModel.lastPosterior.toFixed(4)),
+      predictionError: parseFloat(bayesModel.predictionError.toFixed(4)),
+      confidence: parseFloat(bayesModel.confidence.toFixed(4)),
+    },
+    flowByRing: flow,
+    zones: zones,
+    config: {
+      pxPerMeter: PX_PER_METER,
+      matafInnerR: REAL_MATAF_INNER_R,
+      matafOuterR: REAL_MATAF_OUTER_R,
+      matafArea: REAL_MATAF_AREA,
+      peoplePerAgent: PEOPLE_PER_AGENT,
+      maxAgents: MAX_AGENTS,
+      zoneSeekerPct: ZONE_SEEKER_PCT,
+    }
+  };
+
+  researchLog.push(snapshot);
+  bayesErrorHistory.push({t: elapsed, error: bayesModel.predictionError});
+
+  // Update research panel UI
+  updateResearchPanel(snapshot);
+}
+
+function updateResearchPanel(snap) {
+  if (!snap) return;
+  const paramsEl = document.getElementById('rp-params');
+  paramsEl.innerHTML = `
+    <div><span class="rp-label">T </span><span class="rp-val">${snap.timestamp}</span></div>
+    <div><span class="rp-label">ELAPSED </span><span class="rp-val">${snap.elapsedSec}s</span></div>
+    <div><span class="rp-label">PHASE </span><span class="rp-val">${snap.phase}${snap.prayerName ? ' ('+snap.prayerName+')' : ''}</span></div>
+    <div><span class="rp-label">AGENTS </span><span class="rp-val">${snap.agents} (${snap.realPeople.toLocaleString()} ppl)</span></div>
+    <div><span class="rp-label">TARGET </span><span class="rp-val">${snap.targetAgents}</span></div>
+    <div><span class="rp-label">DENSITY </span><span class="rp-val">${snap.densityPplSqM} ppl/m²</span></div>
+    <div><span class="rp-label">CIRC/HR </span><span class="rp-val">${snap.circuitsPerHour}</span></div>
+  `;
+
+  const flowEl = document.getElementById('rp-flow');
+  let flowHtml = '<div style="color:#00FFFF;font-size:6px;letter-spacing:1.5px;margin-bottom:3px">FLOW BY RING</div>';
+  for (const r of snap.flowByRing) {
+    flowHtml += `<div><span class="rp-label">${r.name} </span><span class="rp-val">${r.people} ppl, v=${r.avgSpeed}</span></div>`;
+  }
+  flowHtml += `<div style="margin-top:3px"><span class="rp-label">BS ZONE </span><span class="rp-val">${snap.zones.bsStopped}/${snap.zones.bsSeekers} at stone</span></div>`;
+  flowHtml += `<div><span class="rp-label">MULTAZAM </span><span class="rp-val">${snap.zones.mzStopped}/${snap.zones.mzSeekers} at wall</span></div>`;
+  flowEl.innerHTML = flowHtml;
+
+  const accEl = document.getElementById('rp-accuracy');
+  const errTrend = bayesErrorHistory.length > 1 ?
+    (bayesErrorHistory[bayesErrorHistory.length-1].error < bayesErrorHistory[0].error ? '↓ CONVERGING' : '→ STABLE') : '...';
+  accEl.innerHTML = `
+    <div style="color:#00FFFF;font-size:6px;letter-spacing:1.5px;margin-bottom:3px">BAYESIAN ACCURACY</div>
+    <div><span class="rp-label">PRED ERR </span><span class="rp-val">${(snap.bayesian.predictionError * 100).toFixed(2)}%</span></div>
+    <div><span class="rp-label">CONF </span><span class="rp-val">${(snap.bayesian.confidence * 100).toFixed(1)}%</span></div>
+    <div><span class="rp-label">TREND </span><span class="rp-val" style="color:#00FF88">${errTrend}</span></div>
+    <div><span class="rp-label">SAMPLES </span><span class="rp-val">${researchLog.length}</span></div>
+  `;
+}
+
+function exportResearchData() {
+  const exportData = {
+    exportTime: new Date().toISOString(),
+    totalSnapshots: researchLog.length,
+    sessionDuration: researchStartTime ? Math.round((Date.now() - researchStartTime) / 1000) : 0,
+    bayesErrorConvergence: bayesErrorHistory,
+    snapshots: researchLog,
+  };
+  console.log('%c[TAWAF RESEARCH EXPORT]', 'color: #FF4444; font-weight: bold;', JSON.stringify(exportData, null, 2));
+  console.log('%cData object:', 'color: #00FFFF;', exportData);
+  const statusEl = document.getElementById('rp-export-status');
+  statusEl.textContent = `✓ ${researchLog.length} snapshots → console`;
+  setTimeout(() => statusEl.textContent = '', 3000);
+}
 </script>
 </body>
 </html>
