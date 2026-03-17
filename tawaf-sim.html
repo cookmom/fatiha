@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tawaf Simulation — Masjid al-Haram</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;color:#e8dcc8}
+canvas{display:block;margin:0 auto}
+#overlay{position:absolute;top:0;left:0;width:430px;height:932px;pointer-events:none;left:50%;transform:translateX(-50%)}
+#prayer-bar{position:absolute;top:20px;left:0;right:0;text-align:center}
+#prayer-name{font-size:22px;font-weight:300;letter-spacing:3px;color:#d4af37;text-transform:uppercase}
+#prayer-time{font-size:13px;color:#a89470;margin-top:3px;letter-spacing:1px}
+#makkah-time{font-size:11px;color:#665d4a;margin-top:6px;font-variant-numeric:tabular-nums}
+#stats{position:absolute;bottom:30px;left:20px;right:20px;display:flex;justify-content:space-between}
+.stat{text-align:center;flex:1}
+.stat-val{font-size:20px;font-weight:300;color:#d4af37;font-variant-numeric:tabular-nums}
+.stat-label{font-size:9px;color:#665d4a;text-transform:uppercase;letter-spacing:2px;margin-top:2px}
+#next-prayer{position:absolute;top:80px;left:0;right:0;text-align:center;font-size:11px;color:#665d4a}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="overlay">
+  <div id="prayer-bar">
+    <div id="prayer-name">Loading…</div>
+    <div id="prayer-time"></div>
+    <div id="makkah-time"></div>
+  </div>
+  <div id="next-prayer"></div>
+  <div id="stats">
+    <div class="stat"><div class="stat-val" id="s-pilgrims">0</div><div class="stat-label">Pilgrims</div></div>
+    <div class="stat"><div class="stat-val" id="s-tawaf">0</div><div class="stat-label">Tawaf Completed</div></div>
+    <div class="stat"><div class="stat-val" id="s-phase">—</div><div class="stat-label">Phase</div></div>
+  </div>
+</div>
+
+<script>
+// --- CONFIG ---
+const W = 430, H = 932;
+const CX = W / 2, CY = H / 2 - 30; // center of Ka'bah, slightly above center
+const KAABAH_SIZE = 38;
+const MATAF_INNER = 45;  // inner radius of walking area
+const MATAF_OUTER = 195; // outer radius
+const MAX_AGENTS = 2000;
+
+// --- CANVAS SETUP ---
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+canvas.width = W; canvas.height = H;
+canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+
+// --- PRAYER TIMES ---
+let prayerTimes = null;
+let prayerSchedule = []; // {name, hour, min, timestamp}
+let currentPhase = 'tawaf'; // 'tawaf', 'prayer', 'surge'
+let targetAgentCount = 500;
+let phaseLabel = 'Tawaf';
+
+async function fetchPrayerTimes() {
+  try {
+    const today = new Date();
+    const dd = String(today.getDate()).padStart(2,'0');
+    const mm = String(today.getMonth()+1).padStart(2,'0');
+    const yyyy = today.getFullYear();
+    const res = await fetch(`https://api.aladhan.com/v1/timingsByCity/${dd}-${mm}-${yyyy}?city=Makkah&country=Saudi+Arabia&method=4`);
+    const data = await res.json();
+    prayerTimes = data.data.timings;
+  } catch(e) {
+    // fallback times for Makkah
+    prayerTimes = {Fajr:'05:13',Sunrise:'06:29',Dhuhr:'12:29',Asr:'15:53',Maghrib:'18:30',Isha:'20:30'};
+  }
+  buildSchedule();
+}
+
+function buildSchedule() {
+  const names = ['Fajr','Dhuhr','Asr','Maghrib','Isha'];
+  prayerSchedule = names.map(n => {
+    const [h,m] = prayerTimes[n].split(':').map(Number);
+    return {name: n, hour: h, min: m, totalMin: h*60+m};
+  });
+}
+
+function getMakkahTime() {
+  // Makkah is UTC+3 (AST)
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+  return new Date(utc + 3 * 3600000);
+}
+
+function getCurrentPrayerInfo() {
+  if (!prayerSchedule.length) return {current:'—',next:'—',nextIn:'',phase:'tawaf',target:500};
+  const makkah = getMakkahTime();
+  const nowMin = makkah.getHours() * 60 + makkah.getMinutes();
+  const nowSec = nowMin * 60 + makkah.getSeconds();
+
+  let current = '—', next = '—', nextIn = '', phase = 'tawaf', target = 500;
+
+  for (let i = 0; i < prayerSchedule.length; i++) {
+    const p = prayerSchedule[i];
+    const pSec = p.totalMin * 60;
+    const diff = nowSec - pSec;
+
+    // During prayer (0 to +10 min after adhan)
+    if (diff >= 0 && diff < 600) {
+      current = p.name;
+      phase = 'prayer';
+      target = 0; // agents stop
+      const ni = (i + 1) % prayerSchedule.length;
+      next = prayerSchedule[ni].name;
+      const nSec = prayerSchedule[ni].totalMin * 60;
+      const rem = nSec > nowSec ? nSec - nowSec : (24*3600 - nowSec + nSec);
+      nextIn = formatTime(rem);
+      return {current, next, nextIn, phase, target};
+    }
+    // Post-prayer surge (10 to 30 min after)
+    if (diff >= 600 && diff < 1800) {
+      current = p.name;
+      phase = 'surge';
+      target = p.name === 'Fajr' ? 800 : 2000;
+      const ni = (i + 1) % prayerSchedule.length;
+      next = prayerSchedule[ni].name;
+      const nSec = prayerSchedule[ni].totalMin * 60;
+      const rem = nSec > nowSec ? nSec - nowSec : (24*3600 - nowSec + nSec);
+      nextIn = formatTime(rem);
+      return {current, next, nextIn, phase, target};
+    }
+  }
+
+  // Between prayers
+  // Find next prayer
+  for (let i = 0; i < prayerSchedule.length; i++) {
+    if (prayerSchedule[i].totalMin * 60 > nowSec) {
+      next = prayerSchedule[i].name;
+      const rem = prayerSchedule[i].totalMin * 60 - nowSec;
+      nextIn = formatTime(rem);
+      break;
+    }
+  }
+  if (next === '—') {
+    next = prayerSchedule[0].name;
+    const rem = (24*3600 - nowSec) + prayerSchedule[0].totalMin * 60;
+    nextIn = formatTime(rem);
+  }
+
+  // Time-based density
+  const h = makkah.getHours();
+  if (h >= 1 && h < 5) { target = 300; phaseLabel = 'Late Night'; }
+  else if (h >= 22 || h < 1) { target = 800; phaseLabel = 'After Isha'; }
+  else { target = 500; phaseLabel = 'Tawaf'; }
+
+  return {current: '—', next, nextIn, phase:'tawaf', target};
+}
+
+function formatTime(sec) {
+  const h = Math.floor(sec/3600);
+  const m = Math.floor((sec%3600)/60);
+  const s = Math.floor(sec%60);
+  if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m`;
+  return `${m}m ${String(s).padStart(2,'0')}s`;
+}
+
+// --- AGENT CLASS ---
+class Agent {
+  constructor(entering) {
+    // Place on a random ring
+    const ring = entering ? MATAF_OUTER : MATAF_INNER + Math.random() * (MATAF_OUTER - MATAF_INNER);
+    const angle = Math.random() * Math.PI * 2;
+    this.x = CX + Math.cos(angle) * ring;
+    this.y = CY + Math.sin(angle) * ring;
+    this.vx = 0;
+    this.vy = 0;
+    this.ring = ring;
+    this.circuits = 0;
+    this.lastAngle = angle;
+    this.totalAngle = 0;
+    this.patience = 0.5 + Math.random() * 0.5; // 0.5–1.0
+    this.desiredSpeed = (0.4 + Math.random() * 0.6) * this.patience;
+    // Color variation: warm whites/creams
+    const brightness = 180 + Math.random() * 75;
+    const warmth = Math.random() * 30;
+    this.r = Math.min(255, brightness + warmth);
+    this.g = Math.min(255, brightness + warmth * 0.5);
+    this.b = Math.min(255, brightness - warmth * 0.3);
+    this.alpha = 0.5 + Math.random() * 0.4;
+    this.size = 1.2 + Math.random() * 1.2;
+    this.alive = true;
+    this.praying = false;
+    this.prayAngle = 0; // facing qibla
+  }
+}
+
+// --- SIMULATION ---
+let agents = [];
+let totalTawaf = 0;
+let frame = 0;
+
+// Spatial hash for neighbor queries
+const CELL_SIZE = 20;
+const GRID_W = Math.ceil(W / CELL_SIZE);
+const GRID_H = Math.ceil(H / CELL_SIZE);
+let grid = new Array(GRID_W * GRID_H);
+
+function clearGrid() {
+  for (let i = 0; i < grid.length; i++) grid[i] = null;
+}
+
+function gridKey(x, y) {
+  const gx = Math.floor(x / CELL_SIZE);
+  const gy = Math.floor(y / CELL_SIZE);
+  if (gx < 0 || gx >= GRID_W || gy < 0 || gy >= GRID_H) return -1;
+  return gy * GRID_W + gx;
+}
+
+function insertGrid(agent) {
+  const k = gridKey(agent.x, agent.y);
+  if (k < 0) return;
+  agent._next = grid[k];
+  grid[k] = agent;
+}
+
+function getNeighbors(x, y, radius) {
+  const results = [];
+  const cr = Math.ceil(radius / CELL_SIZE);
+  const gx0 = Math.floor(x / CELL_SIZE);
+  const gy0 = Math.floor(y / CELL_SIZE);
+  for (let dy = -cr; dy <= cr; dy++) {
+    for (let dx = -cr; dx <= cr; dx++) {
+      const gx = gx0 + dx, gy = gy0 + dy;
+      if (gx < 0 || gx >= GRID_W || gy < 0 || gy >= GRID_H) continue;
+      let a = grid[gy * GRID_W + gx];
+      while (a) {
+        const ddx = a.x - x, ddy = a.y - y;
+        if (ddx*ddx + ddy*ddy < radius*radius) results.push(a);
+        a = a._next;
+      }
+    }
+  }
+  return results;
+}
+
+function spawnAgents(count) {
+  for (let i = 0; i < count; i++) {
+    if (agents.length >= MAX_AGENTS) break;
+    agents.push(new Agent(true));
+  }
+}
+
+function updateAgents(dt, isPraying) {
+  clearGrid();
+  for (const a of agents) insertGrid(a);
+
+  for (const a of agents) {
+    if (!a.alive) continue;
+
+    const dx = a.x - CX, dy = a.y - CY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const angle = Math.atan2(dy, dx);
+
+    if (isPraying) {
+      // During prayer: slow down and stop
+      a.vx *= 0.92;
+      a.vy *= 0.92;
+      a.x += a.vx * dt;
+      a.y += a.vy * dt;
+      continue;
+    }
+
+    // --- Circular flow field (counterclockwise) ---
+    // Tangent direction (counterclockwise = negative angular velocity)
+    const tx = -Math.sin(angle);  // CCW tangent
+    const ty = Math.cos(angle);
+
+    // Speed varies by ring: inner = slower, outer = faster
+    const ringFrac = (dist - MATAF_INNER) / (MATAF_OUTER - MATAF_INNER);
+    const ringSpeed = 0.3 + ringFrac * 0.7; // 0.3 inner, 1.0 outer
+    const speed = a.desiredSpeed * ringSpeed;
+
+    let fx = tx * speed;
+    let fy = ty * speed;
+
+    // --- Keep agents in the mataf ring ---
+    if (dist < MATAF_INNER + 5) {
+      fx += dx / dist * 0.3; // push outward
+      fy += dy / dist * 0.3;
+    }
+    if (dist > MATAF_OUTER - 5) {
+      fx -= dx / dist * 0.3; // push inward
+      fy -= dy / dist * 0.3;
+    }
+
+    // --- Flocking ---
+    const neighbors = getNeighbors(a.x, a.y, 15);
+    let sepX = 0, sepY = 0, sepCount = 0;
+    let alignX = 0, alignY = 0, alignCount = 0;
+    let cohX = 0, cohY = 0, cohCount = 0;
+
+    for (const n of neighbors) {
+      if (n === a) continue;
+      const ndx = a.x - n.x, ndy = a.y - n.y;
+      const nd = Math.sqrt(ndx*ndx + ndy*ndy);
+
+      // Separation (strong, close range)
+      if (nd < 6 && nd > 0.01) {
+        sepX += (ndx / nd) / nd;
+        sepY += (ndy / nd) / nd;
+        sepCount++;
+      }
+      // Alignment
+      if (nd < 15) {
+        alignX += n.vx;
+        alignY += n.vy;
+        alignCount++;
+      }
+      // Cohesion
+      if (nd < 15) {
+        cohX += n.x;
+        cohY += n.y;
+        cohCount++;
+      }
+    }
+
+    if (sepCount > 0) {
+      fx += sepX * 1.5;
+      fy += sepY * 1.5;
+    }
+    if (alignCount > 0) {
+      fx += (alignX / alignCount - a.vx) * 0.1;
+      fy += (alignY / alignCount - a.vy) * 0.1;
+    }
+    if (cohCount > 0) {
+      const cx2 = cohX / cohCount, cy2 = cohY / cohCount;
+      fx += (cx2 - a.x) * 0.005;
+      fy += (cy2 - a.y) * 0.005;
+    }
+
+    // --- Random perturbation for organic feel ---
+    fx += (Math.random() - 0.5) * 0.15;
+    fy += (Math.random() - 0.5) * 0.15;
+
+    // --- Apply forces ---
+    a.vx += (fx - a.vx) * 0.08;
+    a.vy += (fy - a.vy) * 0.08;
+
+    // Clamp speed
+    const v = Math.sqrt(a.vx*a.vx + a.vy*a.vy);
+    const maxV = speed * 1.5;
+    if (v > maxV) {
+      a.vx = (a.vx / v) * maxV;
+      a.vy = (a.vy / v) * maxV;
+    }
+
+    a.x += a.vx * dt;
+    a.y += a.vy * dt;
+
+    // --- Track circuits ---
+    const newAngle = Math.atan2(a.y - CY, a.x - CX);
+    let dAngle = newAngle - a.lastAngle;
+    // Normalize to [-PI, PI]
+    if (dAngle > Math.PI) dAngle -= 2 * Math.PI;
+    if (dAngle < -Math.PI) dAngle += 2 * Math.PI;
+    // Only count counterclockwise (negative angle change)
+    if (dAngle < 0) a.totalAngle += Math.abs(dAngle);
+    a.lastAngle = newAngle;
+
+    if (a.totalAngle >= Math.PI * 2) {
+      a.circuits++;
+      a.totalAngle -= Math.PI * 2;
+      if (a.circuits >= 7) {
+        a.alive = false;
+        totalTawaf++;
+      }
+    }
+
+    // Keep in bounds
+    if (dist < MATAF_INNER) {
+      a.x = CX + (dx / dist) * (MATAF_INNER + 2);
+      a.y = CY + (dy / dist) * (MATAF_INNER + 2);
+    }
+    if (dist > MATAF_OUTER) {
+      a.x = CX + (dx / dist) * (MATAF_OUTER - 2);
+      a.y = CY + (dy / dist) * (MATAF_OUTER - 2);
+    }
+  }
+
+  // Remove dead agents
+  agents = agents.filter(a => a.alive);
+}
+
+// --- RENDERING ---
+// Pre-render Ka'bah
+const kaabahCanvas = document.createElement('canvas');
+kaabahCanvas.width = KAABAH_SIZE + 8;
+kaabahCanvas.height = KAABAH_SIZE + 8;
+const kctx = kaabahCanvas.getContext('2d');
+// Gold border glow
+kctx.shadowColor = '#d4af37';
+kctx.shadowBlur = 6;
+kctx.strokeStyle = '#d4af37';
+kctx.lineWidth = 1.5;
+kctx.strokeRect(4, 4, KAABAH_SIZE, KAABAH_SIZE);
+kctx.shadowBlur = 0;
+// Black fill
+kctx.fillStyle = '#111';
+kctx.fillRect(4, 4, KAABAH_SIZE, KAABAH_SIZE);
+// Gold Kiswah stripe
+kctx.fillStyle = '#d4af3744';
+kctx.fillRect(4, 4 + KAABAH_SIZE * 0.6, KAABAH_SIZE, 3);
+// Inner gold border
+kctx.strokeStyle = '#d4af3788';
+kctx.lineWidth = 0.5;
+kctx.strokeRect(4, 4, KAABAH_SIZE, KAABAH_SIZE);
+
+function drawBackground() {
+  // Dark gradient background
+  const bg = ctx.createRadialGradient(CX, CY, 30, CX, CY, H * 0.6);
+  bg.addColorStop(0, '#1a1520');
+  bg.addColorStop(0.4, '#0f0e14');
+  bg.addColorStop(1, '#07060a');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Mataf floor — subtle concentric rings
+  ctx.save();
+  ctx.globalAlpha = 0.08;
+  for (let r = MATAF_INNER; r <= MATAF_OUTER; r += 15) {
+    ctx.beginPath();
+    ctx.arc(CX, CY, r, 0, Math.PI * 2);
+    ctx.strokeStyle = '#d4af37';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 0.04;
+  // Mataf area fill
+  ctx.beginPath();
+  ctx.arc(CX, CY, MATAF_OUTER, 0, Math.PI * 2);
+  ctx.arc(CX, CY, MATAF_INNER, 0, Math.PI * 2, true);
+  ctx.fillStyle = '#1a1822';
+  ctx.fill();
+  ctx.restore();
+
+  // Subtle radial lines (like marble seams)
+  ctx.save();
+  ctx.globalAlpha = 0.03;
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(CX + Math.cos(a) * MATAF_INNER, CY + Math.sin(a) * MATAF_INNER);
+    ctx.lineTo(CX + Math.cos(a) * MATAF_OUTER, CY + Math.sin(a) * MATAF_OUTER);
+    ctx.strokeStyle = '#d4af37';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawKaabah() {
+  ctx.drawImage(kaabahCanvas, CX - KAABAH_SIZE/2 - 4, CY - KAABAH_SIZE/2 - 4);
+}
+
+function drawAgents() {
+  // Draw agents as dots with slight glow
+  for (const a of agents) {
+    ctx.beginPath();
+    ctx.arc(a.x, a.y, a.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${a.r|0},${a.g|0},${a.b|0},${a.alpha})`;
+    ctx.fill();
+  }
+}
+
+function drawGlow() {
+  // Ambient glow around the mataf from the crowd
+  const agentCount = agents.length;
+  if (agentCount < 50) return;
+  ctx.save();
+  const intensity = Math.min(agentCount / 1500, 1) * 0.12;
+  const glow = ctx.createRadialGradient(CX, CY, MATAF_INNER, CX, CY, MATAF_OUTER + 20);
+  glow.addColorStop(0, `rgba(212,175,55,${intensity * 0.5})`);
+  glow.addColorStop(0.5, `rgba(200,180,140,${intensity})`);
+  glow.addColorStop(1, 'rgba(200,180,140,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(CX, CY, MATAF_OUTER + 20, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// --- UI UPDATE ---
+function updateUI(info) {
+  const makkah = getMakkahTime();
+  const timeStr = makkah.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true});
+
+  if (info.phase === 'prayer') {
+    document.getElementById('prayer-name').textContent = info.current + ' Prayer';
+    document.getElementById('prayer-name').style.color = '#e8c547';
+  } else if (info.phase === 'surge') {
+    document.getElementById('prayer-name').textContent = 'After ' + info.current;
+    document.getElementById('prayer-name').style.color = '#d4af37';
+  } else {
+    document.getElementById('prayer-name').textContent = 'Tawaf';
+    document.getElementById('prayer-name').style.color = '#d4af37';
+  }
+
+  document.getElementById('prayer-time').textContent = info.current !== '—' ? info.current : '';
+  document.getElementById('makkah-time').textContent = 'Makkah  ' + timeStr;
+
+  if (info.next !== '—') {
+    document.getElementById('next-prayer').textContent = 'Next: ' + info.next + ' in ' + info.nextIn;
+  } else {
+    document.getElementById('next-prayer').textContent = '';
+  }
+
+  document.getElementById('s-pilgrims').textContent = agents.length.toLocaleString();
+  document.getElementById('s-tawaf').textContent = totalTawaf.toLocaleString();
+
+  if (info.phase === 'prayer') {
+    document.getElementById('s-phase').textContent = 'Salah';
+  } else if (info.phase === 'surge') {
+    document.getElementById('s-phase').textContent = 'Surge';
+  } else {
+    document.getElementById('s-phase').textContent = 'Tawaf';
+  }
+}
+
+// --- MAIN LOOP ---
+let lastTime = 0;
+let uiTimer = 0;
+let prayerInfo = {current:'—',next:'—',nextIn:'',phase:'tawaf',target:500};
+
+function loop(timestamp) {
+  const dt = Math.min((timestamp - lastTime) / 16.67, 3); // normalize to ~60fps, cap
+  lastTime = timestamp;
+  frame++;
+
+  // Update prayer info every 60 frames (~1s)
+  uiTimer++;
+  if (uiTimer >= 60) {
+    uiTimer = 0;
+    prayerInfo = getCurrentPrayerInfo();
+    targetAgentCount = prayerInfo.target;
+    updateUI(prayerInfo);
+  }
+
+  // Adjust agent count toward target
+  const diff = targetAgentCount - agents.length;
+  if (diff > 0) {
+    // Spawn gradually
+    const spawn = Math.min(diff, Math.ceil(diff * 0.05) + 2);
+    spawnAgents(spawn);
+  } else if (diff < -10 && prayerInfo.phase !== 'prayer') {
+    // Remove some (they "leave")
+    const remove = Math.min(-diff, 5);
+    for (let i = 0; i < remove; i++) {
+      if (agents.length > 0) agents.pop();
+    }
+  }
+
+  // Physics
+  const isPraying = prayerInfo.phase === 'prayer';
+  updateAgents(dt, isPraying);
+
+  // Render
+  drawBackground();
+  drawGlow();
+  drawAgents();
+  drawKaabah();
+
+  requestAnimationFrame(loop);
+}
+
+// --- INIT ---
+fetchPrayerTimes().then(() => {
+  prayerInfo = getCurrentPrayerInfo();
+  targetAgentCount = prayerInfo.target;
+  updateUI(prayerInfo);
+
+  // Initial spawn
+  spawnAgents(Math.min(targetAgentCount, 200));
+
+  requestAnimationFrame(loop);
+});
+</script>
+</body>
+</html>
