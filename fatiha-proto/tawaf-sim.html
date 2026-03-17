@@ -7,7 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#000;overflow-x:hidden;overflow-y:auto;font-family:'JetBrains Mono',monospace;color:#E0E0E0;width:100%;max-width:430px;min-height:100vh;margin:0 auto;position:relative}
+body{background:#0a0a0a;overflow-x:hidden;overflow-y:auto;font-family:'JetBrains Mono',monospace;color:#E0E0E0;width:100%;max-width:430px;min-height:100vh;margin:0 auto;position:relative}
 
 /* TOP BAR */
 #top-bar{position:absolute;top:0;left:0;right:0;height:28px;display:flex;align-items:center;justify-content:space-between;padding:0 10px;z-index:10}
@@ -275,7 +275,7 @@ const TYPE_CUMULATIVE = [];
 { let s = 0; for (const w of TYPE_WEIGHTS) { s += w; TYPE_CUMULATIVE.push(s); } }
 
 const TYPE_NAMES = ['SOLO M','SOLO F','FAMILY','ELDERLY','TOUR','CHILD'];
-const TYPE_COLORS_CSS = ['#E0E0E0','#c8a8d8','#00FF88','#d4af37','#00BBFF','#FF8844'];
+const TYPE_COLORS_CSS = ['#dce4ec','#c8a0e0','#4ddb8a','#d4af37','#40c8ff','#ffb088'];
 
 // Speed multipliers calibrated to real tawaf speeds:
 // Inner ring: ~0.3 m/s, outer ring: ~1.1 m/s [ResearchGate crowd density studies]
@@ -317,14 +317,14 @@ const SFM_RADIAL_PULL = [
 
 function typeColor(type) {
   let r, g, b, a;
-  const v = () => (Math.random() - 0.5) * 20;
+  const v = () => (Math.random() - 0.5) * 15;
   switch (type) {
-    case TYPE_SOLO_M: r = 200+v(); g = 210+v(); b = 220+v(); a = 180+Math.random()*70; break;
-    case TYPE_SOLO_F: r = 180+v(); g = 150+v(); b = 210+v(); a = 170+Math.random()*80; break;
-    case TYPE_FAMILY: r = 0+v()*2;  g = 230+v(); b = 120+v(); a = 160+Math.random()*80; break;
-    case TYPE_ELDERLY: r = 210+v(); g = 175+v(); b = 55+v();  a = 180+Math.random()*70; break;
-    case TYPE_TOUR:   r = 0+v()*2;  g = 180+v(); b = 255+v(); a = 160+Math.random()*80; break;
-    case TYPE_CHILD:  r = 255+v(); g = 136+v(); b = 68+v();  a = 150+Math.random()*80; break;
+    case TYPE_SOLO_M: r = 220+v(); g = 228+v(); b = 236+v(); a = 200+Math.random()*55; break; // cool white
+    case TYPE_SOLO_F: r = 200+v(); g = 160+v(); b = 224+v(); a = 190+Math.random()*60; break; // soft lavender
+    case TYPE_FAMILY: r = 60+v();  g = 220+v(); b = 130+v(); a = 190+Math.random()*60; break; // warm green
+    case TYPE_ELDERLY: r = 212+v(); g = 175+v(); b = 55+v();  a = 200+Math.random()*55; break; // amber/gold
+    case TYPE_TOUR:   r = 64+v();  g = 200+v(); b = 255+v(); a = 190+Math.random()*60; break; // cyan/blue
+    case TYPE_CHILD:  r = 255+v(); g = 176+v(); b = 136+v(); a = 180+Math.random()*60; break; // soft peach
   }
   r = Math.max(0, Math.min(255, r)) | 0;
   g = Math.max(0, Math.min(255, g)) | 0;
@@ -729,7 +729,7 @@ const KAABAH_WALL_R = KAABAH_SIZE / 2 + 1;                   // hard wall (build
 const TOUCHING_INNER_R = KAABAH_SIZE / 2 + 1 * PX_PER_METER; // ~1m from wall
 const TOUCHING_OUTER_R = KAABAH_SIZE / 2 + 2 * PX_PER_METER; // ~2m from wall
 const SQUEEZE_OUTER_R = KAABAH_SIZE / 2 + 5 * PX_PER_METER;  // squeeze zone outer edge (~5m)
-const TOUCHING_AGENTS_TARGET = 100;  // target agents in touching ring (dense solid ring)
+const TOUCHING_AGENTS_TARGET = 150;  // target agents in touching ring (dense solid ring)
 const TOUCHING_MIN_SEC = 30;         // min seconds pressed against wall
 const TOUCHING_MAX_SEC = 120;        // max before crowd pushes them out
 
@@ -836,11 +836,11 @@ function spawnAgent(distributed, forceType, groupId, leaderIdx, offX, offY) {
   atype[i] = type;
   const cfg = TYPE_CONFIG[type];
 
-  const range = MATAF_OUTER - MATAF_INNER;
+  const range = MATAF_OUTER - SQUEEZE_OUTER_R;
   let ring;
   if (distributed) {
-    const bandMin = MATAF_INNER + cfg.ringMin * range;
-    const bandMax = MATAF_INNER + cfg.ringMax * range;
+    const bandMin = SQUEEZE_OUTER_R + cfg.ringMin * range;
+    const bandMax = SQUEEZE_OUTER_R + cfg.ringMax * range;
     const t = Math.pow(Math.random(), 2.5); // strong inner bias (gravitational packing)
     ring = bandMin + t * (bandMax - bandMin);
   } else {
@@ -856,7 +856,17 @@ function spawnAgent(distributed, forceType, groupId, leaderIdx, offX, offY) {
   avx[i] = -Math.sin(angle) * spd;
   avy[i] = Math.cos(angle) * spd;
   aspeed[i] = spd;
-  asize[i] = cfg.sizeMin + Math.random() * (cfg.sizeMax - cfg.sizeMin);
+  // Power-law dot sizes: most tiny, some medium, few large focal pilgrims
+  const sizeRoll = Math.random();
+  if (sizeRoll < 0.65) {
+    asize[i] = 0.5 + Math.random() * 1.0; // tiny 0.5-1.5px (65%)
+  } else if (sizeRoll < 0.88) {
+    asize[i] = 1.5 + Math.random() * 1.5; // medium 1.5-3px (23%)
+  } else if (sizeRoll < 0.97) {
+    asize[i] = 3.0 + Math.random() * 2.0; // large 3-5px (9%)
+  } else {
+    asize[i] = 5.0 + Math.random() * 3.0; // focal 5-8px (3%)
+  }
   acolor[i] = typeColor(type);
   acircuits[i] = 0;
   aangleAccum[i] = Math.random() * Math.PI * 2;
@@ -894,6 +904,7 @@ function spawnFamilyCluster() {
   const count = 3 + Math.floor(Math.random() * 3);
   const leaderIdx = spawnAgent(true, TYPE_FAMILY, gid, -1, 0, 0);
   if (leaderIdx < 0) return;
+  asize[leaderIdx] = 5.0 + Math.random() * 3.0; // family leader always large
   if (Math.random() < 0.15) addEvent('arrival', `family grp ${gid} (${count})`);
   for (let m = 1; m < count; m++) {
     const offAngle = (m / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
@@ -915,7 +926,7 @@ function spawnTourGroup() {
   const leaderIdx = spawnAgent(true, TYPE_TOUR, gid, -1, 0, 0);
   if (leaderIdx < 0) return;
   if (Math.random() < 0.3) addEvent('arrival', `tour grp ${gid} (${count})`);
-  asize[leaderIdx] = 2.0;
+  asize[leaderIdx] = 5.0 + Math.random() * 3.0; // tour leader always large focal dot
   const lr = (acolor[leaderIdx] & 0xFF);
   const lg = ((acolor[leaderIdx] >> 8) & 0xFF);
   const lb = ((acolor[leaderIdx] >> 16) & 0xFF);
@@ -994,7 +1005,12 @@ function spawnTouchingAgent() {
   // Stationary
   avx[i] = 0; avy[i] = 0;
   aspeed[i] = 0.06 * cfg.speedMul;
-  asize[i] = cfg.sizeMin + Math.random() * (cfg.sizeMax - cfg.sizeMin);
+  // Power-law size for touching agents too
+  const touchSizeRoll = Math.random();
+  if (touchSizeRoll < 0.6) asize[i] = 0.5 + Math.random() * 1.0;
+  else if (touchSizeRoll < 0.85) asize[i] = 1.5 + Math.random() * 1.5;
+  else if (touchSizeRoll < 0.95) asize[i] = 3.0 + Math.random() * 2.0;
+  else asize[i] = 5.0 + Math.random() * 3.0;
 
   // Brighter color for touching agents
   let col = typeColor(type);
@@ -1281,7 +1297,7 @@ function updateAgents(dt) {
 
       // Keep in bounds
       const pDist = Math.sqrt((ax[i]-CX)*(ax[i]-CX) + (ay[i]-CY)*(ay[i]-CY));
-      const adhanInner = atouchState[i] > 0 ? KAABAH_WALL_R : MATAF_INNER;
+      const adhanInner = KAABAH_WALL_R + 2;
       if (pDist < adhanInner) { ax[i] = CX + (ax[i]-CX)/pDist*(adhanInner+1); ay[i] = CY + (ay[i]-CY)/pDist*(adhanInner+1); }
       if (pDist > MATAF_OUTER) { ax[i] = CX + (ax[i]-CX)/pDist*(MATAF_OUTER-1); ay[i] = CY + (ay[i]-CY)/pDist*(MATAF_OUTER-1); }
       continue;
@@ -1346,7 +1362,7 @@ function updateAgents(dt) {
       ax[i] += avx[i] * dt; ay[i] += avy[i] * dt;
 
       const pDist = Math.sqrt((ax[i]-CX)*(ax[i]-CX) + (ay[i]-CY)*(ay[i]-CY));
-      const resInner = atouchState[i] > 0 ? KAABAH_WALL_R : MATAF_INNER;
+      const resInner = KAABAH_WALL_R + 2;
       if (pDist < resInner) { ax[i] = CX + (ax[i]-CX)/pDist*(resInner+1); ay[i] = CY + (ay[i]-CY)/pDist*(resInner+1); }
       if (pDist > MATAF_OUTER + 30) { ax[i] = CX + (ax[i]-CX)/pDist*(MATAF_OUTER-1); ay[i] = CY + (ay[i]-CY)/pDist*(MATAF_OUTER-1); }
       continue;
@@ -1506,11 +1522,19 @@ function updateAgents(dt) {
     // Body compression + friction: when agents closer than shoulder width
     // Wall force: Ka'bah inner boundary and Mataf outer boundary
 
-    const ringFrac = Math.max(0, Math.min(1, (dist - MATAF_INNER) / (MATAF_OUTER - MATAF_INNER)));
+    const ringFrac = Math.max(0, Math.min(1, (dist - SQUEEZE_OUTER_R) / (MATAF_OUTER - SQUEEZE_OUTER_R)));
 
-    // Squeeze zone: extremely slow, packed, trying to push closer
+    // Continuous density gradient — no gap between touching layer and tawaf
+    // Speed: near-zero at Ka'bah walls → 0.3 m/s at 15m → 1.1 m/s at outer edge
+    let squeezeSlow = 1.0;
+    if (dist < TOUCHING_OUTER_R + 3) {
+      squeezeSlow = 0.06;
+    } else if (dist < SQUEEZE_OUTER_R) {
+      squeezeSlow = 0.10 + 0.20 * ((dist - TOUCHING_OUTER_R - 3) / Math.max(1, SQUEEZE_OUTER_R - TOUCHING_OUTER_R - 3));
+    } else if (dist < MATAF_INNER) {
+      squeezeSlow = 0.30 + 0.40 * ((dist - SQUEEZE_OUTER_R) / Math.max(1, MATAF_INNER - SQUEEZE_OUTER_R));
+    }
     const inSqueezeZone = dist < SQUEEZE_OUTER_R;
-    const squeezeSlow = inSqueezeZone ? (dist < TOUCHING_OUTER_R + 3 ? 0.08 : 0.2) : 1.0;
     // Inner rings slower due to density (real: 0.3 m/s inner, 1.1 m/s outer)
     const ringSpeed = (0.15 + ringFrac * ringFrac * 0.85) * squeezeSlow;
     const desiredSpeed = aspeed[i] * ringSpeed;
@@ -1597,9 +1621,8 @@ function updateAgents(dt) {
       }
     }
 
-    // 5. WALL FORCES — Ka'bah boundary
-    // Normal agents: wall at MATAF_INNER. Squeeze zone agents: wall at Ka'bah building edge.
-    const wallBoundary = inSqueezeZone ? KAABAH_WALL_R : MATAF_INNER;
+    // 5. WALL FORCES — Ka'bah boundary (continuous crowd, wall at building edge)
+    const wallBoundary = KAABAH_WALL_R;
     const innerWallDist = dist - wallBoundary;
     if (innerWallDist < SFM_WALL_RANGE) {
       const wallGap = innerWallDist - SFM_AGENT_R;
@@ -1611,9 +1634,9 @@ function updateAgents(dt) {
         fy += (dy / dist) * SFM_K * (-wallGap);
       }
     }
-    // Soft repulsion at touching layer outer edge — normal agents shouldn't push into touching ring
-    if (!inSqueezeZone && dist < MATAF_INNER + 5) {
-      const touchRepulse = (MATAF_INNER + 5 - dist) * 0.02;
+    // Gentle repulsion from touching layer (don't overlap stationary du'a ring)
+    if (atouchState[i] === 0 && dist < TOUCHING_OUTER_R + 3) {
+      const touchRepulse = (TOUCHING_OUTER_R + 3 - dist) * 0.05;
       fx += (dx / dist) * touchRepulse;
       fy += (dy / dist) * touchRepulse;
     }
@@ -1814,7 +1837,7 @@ const bgCanvas = document.createElement('canvas');
 bgCanvas.width = W; bgCanvas.height = H;
 const bgCtx = bgCanvas.getContext('2d');
 function renderBackground() {
-  bgCtx.fillStyle = '#000';
+  bgCtx.fillStyle = '#0a0a0a';
   bgCtx.fillRect(0, 0, W, H);
 
   const bg = bgCtx.createRadialGradient(CX, CY, 20, CX, CY, MATAF_OUTER + 60);
@@ -1881,6 +1904,24 @@ function renderBackground() {
   bgCtx.restore();
 }
 renderBackground();
+
+// --- SCATTERED OUTER PARTICLES (ambient depth dots at Mataf edge) ---
+const _outerParticles = [];
+{
+  const outerColors = ['#dce4ec','#c8a0e0','#4ddb8a','#d4af37','#40c8ff','#ffb088'];
+  for (let p = 0; p < 120; p++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = MATAF_OUTER + 5 + Math.random() * 35;
+    _outerParticles.push({
+      angle: angle,
+      dist: dist,
+      speed: (0.0001 + Math.random() * 0.0003) * (Math.random() < 0.5 ? 1 : -1),
+      size: 0.3 + Math.random() * 0.7,
+      alpha: 0.08 + Math.random() * 0.15,
+      color: outerColors[Math.floor(Math.random() * outerColors.length)]
+    });
+  }
+}
 
 // Draw prayer row guides during prayer phases
 function drawPrayerRowGuides() {
@@ -1975,10 +2016,51 @@ function drawAgentsCanvas() {
   // Draw energy vortex above Ka'bah (below agents, above trails)
   drawVortex();
 
+  // --- SCATTERED OUTER PARTICLES (ambient depth dots) ---
+  if (!isPrayerActive && typeof _outerParticles !== 'undefined') {
+    ctx.save();
+    for (let p = 0; p < _outerParticles.length; p++) {
+      const op = _outerParticles[p];
+      op.angle += op.speed;
+      const px = CX + Math.cos(op.angle) * op.dist;
+      const py = CY + Math.sin(op.angle) * op.dist;
+      ctx.globalAlpha = op.alpha * (0.7 + 0.3 * Math.sin(Date.now() * 0.001 + p));
+      ctx.fillStyle = op.color;
+      ctx.beginPath();
+      ctx.arc(px, py, op.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   // Pose size multiplier for prayer
   const poseSizeMul = isPrayerActive ? getPoseSizeMul() : 1.0;
   // Subtle row pulse during prayer
   const pulseFactor = isPrayerActive ? 0.95 + 0.05 * Math.sin(Date.now() / 800) : 1.0;
+
+  // --- CONNECTION LINES between group members (drawn below dots) ---
+  if (!isPrayerActive) {
+    ctx.save();
+    ctx.lineWidth = 0.3;
+    for (let i = 0; i < agentCount; i++) {
+      const leader = agroupLeader[i];
+      if (leader < 0 || leader >= agentCount) continue;
+      const type = atype[i];
+      if (type !== TYPE_FAMILY && type !== TYPE_TOUR && type !== TYPE_CHILD) continue;
+      const dx = ax[i] - ax[leader], dy = ay[i] - ay[leader];
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist > 40) continue; // skip if too far apart
+      const col = acolor[leader];
+      const cr = col & 0xFF, cg = (col >> 8) & 0xFF, cb = (col >> 16) & 0xFF;
+      const lineAlpha = Math.max(0.04, 0.15 * (1 - dist / 40));
+      ctx.strokeStyle = `rgba(${cr},${cg},${cb},${lineAlpha.toFixed(3)})`;
+      ctx.beginPath();
+      ctx.moveTo(ax[i], ay[i]);
+      ctx.lineTo(ax[leader], ay[leader]);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 
   // Draw agents
   for (let i = 0; i < agentCount; i++) {
@@ -1994,15 +2076,20 @@ function drawAgentsCanvas() {
     if (atouchState[i] === 1 && !isPrayerActive) {
       const ddx = px - CX, ddy = py - CY;
       const d = Math.sqrt(ddx*ddx + ddy*ddy) || 1;
-      // Warm bright color
       const tr = Math.min(255, r * 0.5 + 255 * 0.5);
       const tg = Math.min(255, g * 0.4 + 220 * 0.6);
       const tb = Math.min(255, b * 0.3 + 180 * 0.7);
+      // Glow halo
+      if (sz > 1.5) {
+        ctx.beginPath();
+        ctx.arc(px, py, sz * 3, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${tr|0},${tg|0},${tb|0},0.06)`;
+        ctx.fill();
+      }
       ctx.beginPath();
       ctx.arc(px, py, Math.max(sz * 1.1, 0.6), 0, Math.PI * 2);
       ctx.fillStyle = `rgba(${tr|0},${tg|0},${tb|0},0.9)`;
       ctx.fill();
-      // Tiny line facing inward toward Ka'bah
       if (sz > 0.3) {
         ctx.beginPath();
         ctx.moveTo(px, py);
@@ -2015,22 +2102,23 @@ function drawAgentsCanvas() {
     }
 
     if (isPrayerActive || phase === 'iqamah') {
-      // During prayer/iqamah: draw as circles with amber tint, facing Ka'bah
       const ddx = px - CX, ddy = py - CY;
       const d = Math.sqrt(ddx*ddx + ddy*ddy) || 1;
-
-      // Amber tint during prayer
       const amberBlend = isPrayerActive ? 0.3 : (phase === 'iqamah' ? 0.15 : 0);
       const fr = r * (1 - amberBlend) + 212 * amberBlend;
       const fg = g * (1 - amberBlend) + 175 * amberBlend;
       const fb = b * (1 - amberBlend) + 55 * amberBlend;
-
+      // Glow halo during prayer
+      if (sz > 1.5) {
+        ctx.beginPath();
+        ctx.arc(px, py, sz * 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${fr|0},${fg|0},${fb|0},0.05)`;
+        ctx.fill();
+      }
       ctx.beginPath();
       ctx.arc(px, py, Math.max(sz * 0.8, 0.3), 0, Math.PI * 2);
       ctx.fillStyle = `rgba(${fr|0},${fg|0},${fb|0},${a})`;
       ctx.fill();
-
-      // Facing indicator: tiny line toward Ka'bah
       if (isPrayerActive && sz > 0.4) {
         const faceDist = sz * 1.2;
         ctx.beginPath();
@@ -2043,36 +2131,38 @@ function drawAgentsCanvas() {
       continue;
     }
 
-    // Normal tawaf rendering
-    const ddx = px - CX, ddy = py - CY;
-    const d = Math.sqrt(ddx*ddx + ddy*ddy);
-    const ringF = (d - MATAF_INNER) / (MATAF_OUTER - MATAF_INNER);
-
-    if (ringF < 0.4) {
-      ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
-      ctx.fillRect(px - sz, py - sz, sz * 2, sz * 2);
-    } else {
-      const vl = Math.sqrt(avx[i]*avx[i] + avy[i]*avy[i]);
-      if (vl > 0.04) {
-        const streakLen = Math.min(vl * 6, 8);
-        const nx = avx[i] / vl, ny = avy[i] / vl;
-        ctx.beginPath();
-        ctx.moveTo(px + ny * sz * 0.4, py - nx * sz * 0.4);
-        ctx.lineTo(px - nx * streakLen, py - ny * streakLen);
-        ctx.lineTo(px - ny * sz * 0.4, py + nx * sz * 0.4);
-        ctx.closePath();
-        ctx.fillStyle = `rgba(${r},${g},${b},${a * 0.15})`;
-        ctx.fill();
-      }
+    // Normal tawaf rendering — glowing dots
+    // Soft glow halo for medium/large dots (nebula effect)
+    if (sz > 1.5) {
+      const glowR = sz * 3.5;
+      const glowAlpha = Math.min(0.12, 0.03 + sz * 0.012);
       ctx.beginPath();
-      ctx.arc(px, py, sz, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+      ctx.arc(px, py, glowR, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${r},${g},${b},${glowAlpha.toFixed(3)})`;
+      ctx.fill();
+    }
+    // Core dot
+    ctx.beginPath();
+    ctx.arc(px, py, Math.max(sz, 0.4), 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+    ctx.fill();
+    // Bright center for focal dots
+    if (sz > 4) {
+      ctx.beginPath();
+      ctx.arc(px, py, sz * 0.4, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,0.3)`;
       ctx.fill();
     }
   }
 
-  // Ka'bah (always on top)
-  ctx.drawImage(kaabahImg, CX - KAABAH_SIZE/2 - 10, CY - KAABAH_SIZE/2 - 10);
+  // Ka'bah: dichroic glass cube (Three.js composite) or fallback gold rect
+  if (window._cubeCanvas && window._renderGlassCube) {
+    window._renderGlassCube(Date.now() / 1000);
+    const cubeDrawSize = KAABAH_SIZE + 12;
+    ctx.drawImage(window._cubeCanvas, CX - cubeDrawSize/2, CY - cubeDrawSize/2, cubeDrawSize, cubeDrawSize);
+  } else {
+    ctx.drawImage(kaabahImg, CX - KAABAH_SIZE/2 - 10, CY - KAABAH_SIZE/2 - 10);
+  }
 
   // --- BLACK STONE MARKER (bright dot on NE corner) ---
   ctx.save();
@@ -2334,6 +2424,19 @@ fetchPrayerTimes().then(() => {
   // Spawn touching layer — solid ring of agents pressed against Ka'bah
   for (let t = 0; t < TOUCHING_AGENTS_TARGET; t++) {
     spawnTouchingAgent();
+  }
+
+  // Spawn dense inner crowd (2-15m zone) — continuous press from Ka'bah outward
+  const innerCrowdTarget = 250;
+  for (let ic = 0; ic < innerCrowdTarget; ic++) {
+    const type = pickType();
+    const idx = spawnAgent(true, type);
+    if (idx < 0) break;
+    // Place specifically in the gap zone between squeeze and tawaf ring
+    const innerR = SQUEEZE_OUTER_R + Math.pow(Math.random(), 0.7) * (MATAF_INNER - SQUEEZE_OUTER_R);
+    const ang = Math.random() * Math.PI * 2;
+    ax[idx] = CX + Math.cos(ang) * innerR;
+    ay[idx] = CY + Math.sin(ang) * innerR;
   }
 
   // Pre-seed totalTawaf: ~107,000 tawaf/hr across all levels → ground floor ~25,000/hr
@@ -2611,6 +2714,140 @@ function exportResearchData() {
   statusEl.textContent = `✓ ${researchLog.length} snapshots → console`;
   setTimeout(() => statusEl.textContent = '', 3000);
 }
+</script>
+
+<!-- Three.js dichroic glass cube (Ka'bah) -->
+<script type="importmap">
+{"imports":{"three":"https://esm.sh/three@0.170.0"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const RES = 128;
+const cvs = document.createElement('canvas');
+cvs.width = RES; cvs.height = RES;
+
+const gl = new THREE.WebGLRenderer({
+  canvas: cvs, alpha: true, antialias: true, premultipliedAlpha: false
+});
+gl.setSize(RES, RES);
+gl.toneMapping = THREE.ACESFilmicToneMapping;
+gl.toneMappingExposure = 1.4;
+
+const scene = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(28, 1, 0.1, 50);
+cam.position.set(0, 4.5, 1.5);
+cam.lookAt(0, 0, 0);
+
+// Background texture — captures tawaf canvas area around Ka'bah for refraction
+const bgCvs = document.createElement('canvas');
+bgCvs.width = RES; bgCvs.height = RES;
+const bgCtx = bgCvs.getContext('2d');
+const bgTex = new THREE.CanvasTexture(bgCvs);
+bgTex.minFilter = THREE.LinearFilter;
+
+// Dichroic glass shader — per-channel IOR (R=1.14, G=1.18, B=1.23)
+const vert = `
+varying vec3 vN, vE, vWN;
+void main() {
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vN = normalize(normalMatrix * normal);
+  vE = normalize(-mv.xyz);
+  vWN = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+  gl_Position = projectionMatrix * mv;
+}`;
+
+const frag = `
+uniform float uTime, uIorR, uIorG, uIorB;
+uniform sampler2D uBg;
+uniform vec2 uRes;
+varying vec3 vN, vE, vWN;
+
+vec3 film(float c, float t) {
+  float p = 6.2832 * 5.0 * c + t * 0.25;
+  return vec3(.5+.5*cos(p), .5+.5*cos(p-2.094), .5+.5*cos(p+2.094));
+}
+
+void main() {
+  vec3 n = normalize(vN), e = normalize(vE);
+  float NdV = max(dot(n, e), .001);
+  float fres = pow(1.0 - NdV, 3.0);
+
+  // Per-channel refraction — dichroic IOR split
+  vec3 rR = refract(-e, n, 1.0/uIorR);
+  vec3 rG = refract(-e, n, 1.0/uIorG);
+  vec3 rB = refract(-e, n, 1.0/uIorB);
+
+  float ab = 0.14;
+  vec2 uv = gl_FragCoord.xy / uRes;
+  float R = texture2D(uBg, clamp(uv + rR.xy * ab, 0.0, 1.0)).r;
+  float G = texture2D(uBg, clamp(uv + rG.xy * ab, 0.0, 1.0)).g;
+  float B = texture2D(uBg, clamp(uv + rB.xy * ab, 0.0, 1.0)).b;
+  vec3 col = vec3(R, G, B) * vec3(.94, .97, 1.06) * 2.8;
+
+  // Thin-film iridescence (diagonal band)
+  vec3 ir = film(NdV, uTime);
+  float diag = abs(dot(vWN, normalize(vec3(1.0, 0.0, 1.0))));
+  col = mix(col, col * ir * 1.4, diag * .22);
+  col += ir * diag * fres * .12;
+
+  // Fresnel edge highlight
+  col += vec3(.80, .92, 1.0) * fres * .35;
+
+  // Side-face ambient fill
+  float side = 1.0 - abs(vWN.y);
+  col += vec3(.22, .28, .45) * side * .30;
+
+  // Top-face dichroic — thin-film interference
+  float top = smoothstep(.5, .92, vWN.y);
+  vec3 tir = film(NdV, uTime * .4);
+  col = mix(col, col * tir * 1.6 + tir * .18, top * .40);
+  col += vec3(.25, .15, .55) * pow(1.0 - NdV, 3.0) * top * .15;
+
+  // Sky reflection + edge catch rim
+  col += pow(max(vWN.y, 0.0), 1.8) * vec3(.90, .94, 1.0) * .38;
+  col += vec3(.70, .85, 1.0) * pow(1.0 - NdV, 5.0) * 1.8;
+
+  gl_FragColor = vec4(col, .88 + fres * .12);
+}`;
+
+const mat = new THREE.ShaderMaterial({
+  uniforms: {
+    uTime: { value: 0 },
+    uIorR: { value: 1.14 }, uIorG: { value: 1.18 }, uIorB: { value: 1.23 },
+    uBg:   { value: bgTex },
+    uRes:  { value: new THREE.Vector2(RES, RES) }
+  },
+  vertexShader: vert, fragmentShader: frag,
+  transparent: true, side: THREE.DoubleSide
+});
+
+const cube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
+scene.add(cube);
+
+// Lighting
+scene.add(new THREE.AmbientLight(0x334455, 0.5));
+const key = new THREE.DirectionalLight(0xffeedd, 3.5);
+key.position.set(2, 5, 1); scene.add(key);
+const rim = new THREE.DirectionalLight(0x8888ff, 1.2);
+rim.position.set(-2, 3, -2); scene.add(rim);
+const back = new THREE.DirectionalLight(0xaa88ff, 0.6);
+back.position.set(0, 2, -3); scene.add(back);
+
+// Expose to main script
+window._cubeCanvas = cvs;
+window._renderGlassCube = function(t) {
+  // Capture tawaf canvas area around Ka'bah for refraction background
+  const mc = document.getElementById('c');
+  if (mc) {
+    const cx = mc.width / 2, cy = mc.height / 2 + 10, half = 80;
+    bgCtx.drawImage(mc, cx - half, cy - half, half * 2, half * 2, 0, 0, RES, RES);
+    bgTex.needsUpdate = true;
+  }
+  cube.rotation.y = t * 0.12;
+  mat.uniforms.uTime.value = t;
+  gl.render(scene, cam);
+};
 </script>
 </body>
 </html>
