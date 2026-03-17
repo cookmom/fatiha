@@ -722,6 +722,22 @@ const azoneState = new Uint8Array(MAX_AGENTS);
 const azoneTimer = new Float32Array(MAX_AGENTS);
 const azoneDuration = new Float32Array(MAX_AGENTS); // seconds to stay at zone
 
+// === TOUCHING LAYER (agents pressed against Ka'bah walls, making du'a) ===
+// In reality the innermost ring is NOT tawaf. People are pressed against the Kiswah,
+// completely stationary, facing inward. The tawaf flow goes AROUND them.
+const KAABAH_WALL_R = KAABAH_SIZE / 2 + 1;                   // hard wall (building edge)
+const TOUCHING_INNER_R = KAABAH_SIZE / 2 + 1 * PX_PER_METER; // ~1m from wall
+const TOUCHING_OUTER_R = KAABAH_SIZE / 2 + 2 * PX_PER_METER; // ~2m from wall
+const SQUEEZE_OUTER_R = KAABAH_SIZE / 2 + 5 * PX_PER_METER;  // squeeze zone outer edge (~5m)
+const TOUCHING_AGENTS_TARGET = 100;  // target agents in touching ring (dense solid ring)
+const TOUCHING_MIN_SEC = 30;         // min seconds pressed against wall
+const TOUCHING_MAX_SEC = 120;        // max before crowd pushes them out
+
+// Per-agent touching state: 0=normal tawaf, 1=touching (stationary at wall), 2=releasing (pushed out)
+const atouchState = new Uint8Array(MAX_AGENTS);
+const atouchTimer = new Float32Array(MAX_AGENTS);
+const atouchDuration = new Float32Array(MAX_AGENTS);
+
 // --- EVENT LOG ---
 const eventLog = [];
 const MAX_LOG = 18;
@@ -861,6 +877,10 @@ function spawnAgent(distributed, forceType, groupId, leaderIdx, offX, offY) {
   azoneState[i] = 0;
   azoneTimer[i] = 0;
 
+  atouchState[i] = 0;
+  atouchTimer[i] = 0;
+  atouchDuration[i] = 0;
+
   agroupId[i] = groupId !== undefined ? groupId : -1;
   agroupLeader[i] = leaderIdx !== undefined ? leaderIdx : -1;
   agroupOffX[i] = offX || 0;
@@ -937,6 +957,8 @@ function removeAgent(i) {
     aprayerAssigned[i] = aprayerAssigned[agentCount];
     azoneIntent[i] = azoneIntent[agentCount]; azoneState[i] = azoneState[agentCount];
     azoneTimer[i] = azoneTimer[agentCount]; azoneDuration[i] = azoneDuration[agentCount];
+    atouchState[i] = atouchState[agentCount]; atouchTimer[i] = atouchTimer[agentCount];
+    atouchDuration[i] = atouchDuration[agentCount];
     for (let j = 0; j < agentCount; j++) {
       if (agroupLeader[j] === agentCount) agroupLeader[j] = i;
     }
@@ -952,6 +974,115 @@ function smartSpawn() {
   } else {
     spawnAgent(false, type);
     if (Math.random() < 0.03) addEvent('arrival', `${TYPE_NAMES[type].toLowerCase()} entered mataf`);
+  }
+}
+
+// --- TOUCHING LAYER MANAGEMENT ---
+function spawnTouchingAgent() {
+  if (agentCount >= MAX_AGENTS) return -1;
+  const i = agentCount++;
+  const type = pickType();
+  atype[i] = type;
+  const cfg = TYPE_CONFIG[type];
+
+  // Place in a tight ring around Ka'bah
+  const ring = TOUCHING_INNER_R + Math.random() * (TOUCHING_OUTER_R - TOUCHING_INNER_R);
+  const angle = Math.random() * Math.PI * 2;
+  ax[i] = CX + Math.cos(angle) * ring;
+  ay[i] = CY + Math.sin(angle) * ring;
+
+  // Stationary
+  avx[i] = 0; avy[i] = 0;
+  aspeed[i] = 0.06 * cfg.speedMul;
+  asize[i] = cfg.sizeMin + Math.random() * (cfg.sizeMax - cfg.sizeMin);
+
+  // Brighter color for touching agents
+  let col = typeColor(type);
+  const cr = Math.min(255, (col & 0xFF) + 40);
+  const cg = Math.min(255, ((col >> 8) & 0xFF) + 30);
+  const cb = Math.min(255, ((col >> 16) & 0xFF) + 20);
+  acolor[i] = (230 << 24) | (cb << 16) | (cg << 8) | cr;
+
+  acircuits[i] = Math.floor(Math.random() * 7);
+  aangleAccum[i] = Math.random() * Math.PI * 2;
+  alastAngle[i] = angle;
+  aprayerAssigned[i] = 0;
+  azoneIntent[i] = 0; azoneState[i] = 0; azoneTimer[i] = 0; azoneDuration[i] = 0;
+  agroupId[i] = -1; agroupLeader[i] = -1; agroupOffX[i] = 0; agroupOffY[i] = 0;
+
+  // Touching state
+  atouchState[i] = 1; // touching wall
+  atouchTimer[i] = 0;
+  atouchDuration[i] = TOUCHING_MIN_SEC + Math.random() * (TOUCHING_MAX_SEC - TOUCHING_MIN_SEC);
+
+  return i;
+}
+
+function countTouchingAgents() {
+  let count = 0;
+  for (let i = 0; i < agentCount; i++) {
+    if (atouchState[i] === 1) count++;
+  }
+  return count;
+}
+
+function manageTouchingLayer(dt) {
+  const phase = prayerMode.phase;
+  if (phase === 'iqamah' || phase === 'praying' || phase === 'salam') return;
+
+  let touchCount = 0;
+  for (let i = 0; i < agentCount; i++) {
+    if (atouchState[i] === 1) {
+      touchCount++;
+      // Update timer
+      atouchTimer[i] += dt * 16.67 / 1000;
+      if (atouchTimer[i] >= atouchDuration[i]) {
+        // Time's up — crowd pushes them out
+        atouchState[i] = 2; // releasing
+        touchCount--;
+      }
+    } else if (atouchState[i] === 2) {
+      // Releasing: check if they've moved far enough out
+      const dx = ax[i] - CX, dy = ay[i] - CY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > SQUEEZE_OUTER_R + 5) {
+        atouchState[i] = 0; // back to normal tawaf
+      }
+    }
+  }
+
+  // Replenish touching layer
+  if (touchCount < TOUCHING_AGENTS_TARGET) {
+    const deficit = TOUCHING_AGENTS_TARGET - touchCount;
+    // Try to pull in nearby squeeze-zone agents first
+    let pulled = 0;
+    for (let i = 0; i < agentCount && pulled < Math.min(deficit, 3); i++) {
+      if (atouchState[i] !== 0) continue;
+      const dx = ax[i] - CX, dy = ay[i] - CY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < SQUEEZE_OUTER_R && dist > TOUCHING_OUTER_R) {
+        // Pull this agent into touching layer
+        const angle = Math.atan2(dy, dx);
+        const newR = TOUCHING_INNER_R + Math.random() * (TOUCHING_OUTER_R - TOUCHING_INNER_R);
+        ax[i] = CX + Math.cos(angle) * newR;
+        ay[i] = CY + Math.sin(angle) * newR;
+        avx[i] = 0; avy[i] = 0;
+        atouchState[i] = 1;
+        atouchTimer[i] = 0;
+        atouchDuration[i] = TOUCHING_MIN_SEC + Math.random() * (TOUCHING_MAX_SEC - TOUCHING_MIN_SEC);
+        // Brighten
+        const col = acolor[i];
+        const cr = Math.min(255, (col & 0xFF) + 40);
+        const cg = Math.min(255, ((col >> 8) & 0xFF) + 30);
+        const cb = Math.min(255, ((col >> 16) & 0xFF) + 20);
+        acolor[i] = (230 << 24) | (cb << 16) | (cg << 8) | cr;
+        pulled++;
+      }
+    }
+    // Spawn fresh if not enough pulled in
+    for (let s = pulled; s < Math.min(deficit, 2); s++) {
+      spawnTouchingAgent();
+    }
   }
 }
 
@@ -1021,7 +1152,8 @@ function updateAgents(dt) {
 
       // Keep in bounds
       const pDist = Math.sqrt((ax[i]-CX)*(ax[i]-CX) + (ay[i]-CY)*(ay[i]-CY));
-      if (pDist < MATAF_INNER) { ax[i] = CX + (ax[i]-CX)/pDist*(MATAF_INNER+1); ay[i] = CY + (ay[i]-CY)/pDist*(MATAF_INNER+1); }
+      const adhanInner = atouchState[i] > 0 ? KAABAH_WALL_R : MATAF_INNER;
+      if (pDist < adhanInner) { ax[i] = CX + (ax[i]-CX)/pDist*(adhanInner+1); ay[i] = CY + (ay[i]-CY)/pDist*(adhanInner+1); }
       if (pDist > MATAF_OUTER) { ax[i] = CX + (ax[i]-CX)/pDist*(MATAF_OUTER-1); ay[i] = CY + (ay[i]-CY)/pDist*(MATAF_OUTER-1); }
       continue;
     }
@@ -1085,8 +1217,45 @@ function updateAgents(dt) {
       ax[i] += avx[i] * dt; ay[i] += avy[i] * dt;
 
       const pDist = Math.sqrt((ax[i]-CX)*(ax[i]-CX) + (ay[i]-CY)*(ay[i]-CY));
-      if (pDist < MATAF_INNER) { ax[i] = CX + (ax[i]-CX)/pDist*(MATAF_INNER+1); ay[i] = CY + (ay[i]-CY)/pDist*(MATAF_INNER+1); }
+      const resInner = atouchState[i] > 0 ? KAABAH_WALL_R : MATAF_INNER;
+      if (pDist < resInner) { ax[i] = CX + (ax[i]-CX)/pDist*(resInner+1); ay[i] = CY + (ay[i]-CY)/pDist*(resInner+1); }
       if (pDist > MATAF_OUTER + 30) { ax[i] = CX + (ax[i]-CX)/pDist*(MATAF_OUTER-1); ay[i] = CY + (ay[i]-CY)/pDist*(MATAF_OUTER-1); }
+      continue;
+    }
+
+    // === TOUCHING LAYER: stationary agents pressed against Ka'bah ===
+    if (atouchState[i] === 1) {
+      // Completely still with tiny breathing motion, face inward
+      const breathX = (Math.random() - 0.5) * 0.008;
+      const breathY = (Math.random() - 0.5) * 0.008;
+      // Very gentle push toward Ka'bah (pressed against wall)
+      const pushStr = 0.005;
+      avx[i] = -dx / dist * pushStr + breathX;
+      avy[i] = -dy / dist * pushStr + breathY;
+      ax[i] += avx[i] * dt;
+      ay[i] += avy[i] * dt;
+      // Hard clamp: can't overlap Ka'bah building
+      const newDist2 = Math.sqrt((ax[i]-CX)*(ax[i]-CX) + (ay[i]-CY)*(ay[i]-CY));
+      if (newDist2 < KAABAH_WALL_R) {
+        ax[i] = CX + (ax[i]-CX)/newDist2 * KAABAH_WALL_R;
+        ay[i] = CY + (ay[i]-CY)/newDist2 * KAABAH_WALL_R;
+      }
+      alastAngle[i] = Math.atan2(ay[i] - CY, ax[i] - CX);
+      continue;
+    }
+
+    // === RELEASING: being pushed out from touching layer ===
+    if (atouchState[i] === 2) {
+      // Push outward and add tangential velocity to rejoin tawaf
+      const pushOut = 0.08;
+      const tanStr = 0.03;
+      avx[i] += (dx / dist) * pushOut + (dy / dist) * tanStr;
+      avy[i] += (dy / dist) * pushOut + (-dx / dist) * tanStr;
+      avx[i] *= 0.95; avy[i] *= 0.95;
+      ax[i] += avx[i] * dt;
+      ay[i] += avy[i] * dt;
+      const newAngle2 = Math.atan2(ay[i] - CY, ax[i] - CX);
+      alastAngle[i] = newAngle2;
       continue;
     }
 
@@ -1210,10 +1379,11 @@ function updateAgents(dt) {
 
     const ringFrac = Math.max(0, Math.min(1, (dist - MATAF_INNER) / (MATAF_OUTER - MATAF_INNER)));
 
-    // Touch ring slowdown (innermost ~2m from Ka'bah — extremely slow, packed)
-    const touchSlow = dist < TOUCH_RING_DIST ? 0.15 : (dist < TOUCH_RING_DIST + 5 ? 0.4 : 1.0);
+    // Squeeze zone: extremely slow, packed, trying to push closer
+    const inSqueezeZone = dist < SQUEEZE_OUTER_R;
+    const squeezeSlow = inSqueezeZone ? (dist < TOUCHING_OUTER_R + 3 ? 0.08 : 0.2) : 1.0;
     // Inner rings slower due to density (real: 0.3 m/s inner, 1.1 m/s outer)
-    const ringSpeed = (0.15 + ringFrac * ringFrac * 0.85) * touchSlow;
+    const ringSpeed = (0.15 + ringFrac * ringFrac * 0.85) * squeezeSlow;
     const desiredSpeed = aspeed[i] * ringSpeed;
 
     // 1. DESIRED VELOCITY — tangential CCW orbit
@@ -1298,8 +1468,10 @@ function updateAgents(dt) {
       }
     }
 
-    // 5. WALL FORCES — Ka'bah inner boundary
-    const innerWallDist = dist - MATAF_INNER;
+    // 5. WALL FORCES — Ka'bah boundary
+    // Normal agents: wall at MATAF_INNER. Squeeze zone agents: wall at Ka'bah building edge.
+    const wallBoundary = inSqueezeZone ? KAABAH_WALL_R : MATAF_INNER;
+    const innerWallDist = dist - wallBoundary;
     if (innerWallDist < SFM_WALL_RANGE) {
       const wallGap = innerWallDist - SFM_AGENT_R;
       const wallF = SFM_WALL_A * Math.exp(-wallGap / SFM_WALL_B);
@@ -1309,6 +1481,12 @@ function updateAgents(dt) {
         fx += (dx / dist) * SFM_K * (-wallGap);
         fy += (dy / dist) * SFM_K * (-wallGap);
       }
+    }
+    // Soft repulsion at touching layer outer edge — normal agents shouldn't push into touching ring
+    if (!inSqueezeZone && dist < MATAF_INNER + 5) {
+      const touchRepulse = (MATAF_INNER + 5 - dist) * 0.02;
+      fx += (dx / dist) * touchRepulse;
+      fy += (dy / dist) * touchRepulse;
     }
 
     // Mataf outer boundary
@@ -1367,9 +1545,9 @@ function updateAgents(dt) {
 
     // Hard boundary enforcement (safety net)
     const newDist = Math.sqrt((ax[i]-CX)*(ax[i]-CX) + (ay[i]-CY)*(ay[i]-CY));
-    if (newDist < MATAF_INNER) {
-      ax[i] = CX + (ax[i]-CX) / newDist * (MATAF_INNER + 1);
-      ay[i] = CY + (ay[i]-CY) / newDist * (MATAF_INNER + 1);
+    if (newDist < KAABAH_WALL_R) {
+      ax[i] = CX + (ax[i]-CX) / newDist * (KAABAH_WALL_R + 1);
+      ay[i] = CY + (ay[i]-CY) / newDist * (KAABAH_WALL_R + 1);
     }
     if (newDist > MATAF_OUTER) {
       ax[i] = CX + (ax[i]-CX) / newDist * (MATAF_OUTER - 1);
@@ -1521,9 +1699,23 @@ function renderBackground() {
   bgCtx.globalAlpha = 0.02;
   bgCtx.beginPath();
   bgCtx.arc(CX, CY, MATAF_OUTER + 5, 0, Math.PI * 2);
-  bgCtx.arc(CX, CY, MATAF_INNER - 3, 0, Math.PI * 2, true);
+  bgCtx.arc(CX, CY, KAABAH_WALL_R, 0, Math.PI * 2, true);
   bgCtx.fillStyle = '#00FFFF';
   bgCtx.fill();
+  bgCtx.restore();
+
+  // Touching layer zone indicator (faint gold ring)
+  bgCtx.save();
+  bgCtx.globalAlpha = 0.04;
+  bgCtx.strokeStyle = '#d4af37';
+  bgCtx.lineWidth = 0.5;
+  bgCtx.beginPath();
+  bgCtx.arc(CX, CY, TOUCHING_OUTER_R, 0, Math.PI * 2);
+  bgCtx.stroke();
+  bgCtx.globalAlpha = 0.025;
+  bgCtx.beginPath();
+  bgCtx.arc(CX, CY, SQUEEZE_OUTER_R, 0, Math.PI * 2);
+  bgCtx.stroke();
   bgCtx.restore();
 
   bgCtx.save();
@@ -1606,6 +1798,18 @@ function drawAgentsCanvas() {
     ctx.fill();
   }
 
+  // Touching layer glow ring — bright solid ring of devotion
+  if (!isPrayerActive) {
+    const touchGlow = ctx.createRadialGradient(CX, CY, KAABAH_WALL_R, CX, CY, TOUCHING_OUTER_R + 8);
+    touchGlow.addColorStop(0, 'rgba(212, 175, 55, 0.12)');
+    touchGlow.addColorStop(0.5, 'rgba(255, 240, 200, 0.08)');
+    touchGlow.addColorStop(1, 'rgba(255, 240, 200, 0)');
+    ctx.fillStyle = touchGlow;
+    ctx.beginPath();
+    ctx.arc(CX, CY, TOUCHING_OUTER_R + 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   // Motion trail (reduced during prayer)
   tctx.globalCompositeOperation = 'destination-out';
   tctx.globalAlpha = isPrayerActive ? 0.3 : 0.1;
@@ -1645,6 +1849,30 @@ function drawAgentsCanvas() {
     const a = ((col >> 24) & 0xFF) / 255;
     let sz = asize[i] * poseSizeMul * pulseFactor;
     const px = ax[i], py = ay[i];
+
+    // Touching agents: bright, solid, stationary dots facing inward
+    if (atouchState[i] === 1 && !isPrayerActive) {
+      const ddx = px - CX, ddy = py - CY;
+      const d = Math.sqrt(ddx*ddx + ddy*ddy) || 1;
+      // Warm bright color
+      const tr = Math.min(255, r * 0.5 + 255 * 0.5);
+      const tg = Math.min(255, g * 0.4 + 220 * 0.6);
+      const tb = Math.min(255, b * 0.3 + 180 * 0.7);
+      ctx.beginPath();
+      ctx.arc(px, py, Math.max(sz * 1.1, 0.6), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${tr|0},${tg|0},${tb|0},0.9)`;
+      ctx.fill();
+      // Tiny line facing inward toward Ka'bah
+      if (sz > 0.3) {
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(px - (ddx/d) * sz * 1.5, py - (ddy/d) * sz * 1.5);
+        ctx.strokeStyle = `rgba(${tr|0},${tg|0},${tb|0},0.3)`;
+        ctx.lineWidth = 0.3;
+        ctx.stroke();
+      }
+      continue;
+    }
 
     if (isPrayerActive || phase === 'iqamah') {
       // During prayer/iqamah: draw as circles with amber tint, facing Ka'bah
@@ -1932,6 +2160,7 @@ function loop(timestamp) {
     }
   }
 
+  manageTouchingLayer(dt);
   updateAgents(dt);
   drawAgentsCanvas();
 
@@ -1959,6 +2188,11 @@ fetchPrayerTimes().then(() => {
   // Give each agent a random circuit count (as if mid-tawaf)
   for (let i = 0; i < agentCount; i++) {
     acircuits[i] = Math.floor(Math.random() * 7);
+  }
+
+  // Spawn touching layer — solid ring of agents pressed against Ka'bah
+  for (let t = 0; t < TOUCHING_AGENTS_TARGET; t++) {
+    spawnTouchingAgent();
   }
 
   // Pre-seed totalTawaf: ~107,000 tawaf/hr across all levels → ground floor ~25,000/hr
