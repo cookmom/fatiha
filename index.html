@@ -84,7 +84,7 @@ let brushGfx; // 2D line/stroke accumulation buffer
 let frame = 0;
 let vinePoints = [];
 let leafData = [];
-const roseCx = 430 * 0.48, roseCy = 932 * 0.36;
+let roseCx, roseCy;
 const rS = 90;
 
 // Pre-computed draw queues
@@ -181,6 +181,8 @@ function setup() {
   createCanvas(windowWidth, windowHeight, WEBGL);
   brush.load();
   frameRate(30);
+  roseCx = width * 0.48;
+  roseCy = height * 0.36;
 
   // Register custom brushes
   brush.add("ottoman_petal", {
@@ -209,16 +211,16 @@ function setup() {
     spacing: 0.6, pressure: [1, 0.5], rotate: "random"
   });
 
-  wcGfx = createGraphics(430, 932);
-  brushGfx = createGraphics(430, 932);
+  wcGfx = createGraphics(width, height);
+  brushGfx = createGraphics(width, height);
 
   // Pre-compute vine path
   const vineSegs = 40;
-  const vineEndY = 932 * 0.44;
+  const vineEndY = height * 0.44;
   for (let i = 0; i <= vineSegs; i++) {
     const t = i / vineSegs;
-    const x = 430*0.5 + Math.sin(t * Math.PI * 1.8) * 55 * (1-t*0.4);
-    const y = 932*0.92 - t * (932*0.92 - vineEndY);
+    const x = width*0.5 + Math.sin(t * Math.PI * 1.8) * 55 * (1-t*0.4);
+    const y = height*0.92 - t * (height*0.92 - vineEndY);
     vinePoints.push([x, y]);
   }
 
@@ -477,20 +479,20 @@ function drawBackground(subFrame) {
     wcGfx.background(13, 13, 13);
   } else if (subFrame <= 15) {
     // Gradual warm wash layers
-    const bgCx = 430 * 0.48, bgCy = 932 * 0.36;
+    const bgCx = width * 0.48, bgCy = height * 0.36;
     const opacity = 0.06 + subFrame * 0.015;
-    const bgGrad = ctx.createRadialGradient(bgCx, bgCy, 30, bgCx, bgCy, 932 * 0.6);
+    const bgGrad = ctx.createRadialGradient(bgCx, bgCy, 30, bgCx, bgCy, height * 0.6);
     bgGrad.addColorStop(0, `rgba(28, 16, 18, ${opacity})`);
     bgGrad.addColorStop(0.5, `rgba(20, 15, 14, ${opacity * 0.6})`);
     bgGrad.addColorStop(1, `rgba(13, 13, 13, 0)`);
     ctx.fillStyle = bgGrad;
-    ctx.fillRect(0, 0, 430, 932);
+    ctx.fillRect(0, 0, width, height);
   } else {
     // Noise texture dots
     const dotsPerFrame = Math.ceil(3000 / (total - 15));
     for (let i = 0; i < dotsPerFrame; i++) {
-      const nx = sRand() * 430;
-      const ny = sRand() * 932;
+      const nx = sRand() * width;
+      const ny = sRand() * height;
       const nr = 12 + sGauss(0, 6);
       const ng = 11 + sGauss(0, 4);
       const nb = 10 + sGauss(0, 4);
