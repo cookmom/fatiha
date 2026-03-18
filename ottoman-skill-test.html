@@ -14,19 +14,19 @@
 <body>
 <script>
 // ============================================================
-// OTTOMAN GARDEN SKILL TEST
-// Hybrid: 2D p5.Graphics for Tyler Hobbs watercolor
-//         WEBGL main canvas for p5.brush strokes
+// OTTOMAN ROSE — painted stroke by stroke like @imcharleslo
+// Background FIRST, then subject layered on top
 // ============================================================
 
 const OTTOMAN = {
   crimson: "#c41e3a", crimsonLight: "#d73c5a", crimsonDark: "#911a2a",
   gold: "#c5a030", goldLight: "#dab94e", goldDark: "#8b7020",
   forestGreen: "#266428", forestGreenLight: "#3a8a3c", forestGreenDark: "#1a4a1a",
+  earth: "#6b4226", earthLight: "#8b6240", earthDark: "#3a2210",
 };
 
 // ============================================================
-// Tyler Hobbs Watercolor Engine (2D canvas operations)
+// Tyler Hobbs Watercolor Engine
 // ============================================================
 function gaussRand(m, s) {
   const u1 = Math.random(), u2 = Math.random();
@@ -66,14 +66,13 @@ let wcGfx;
 function watercolorFill(polygon, r, g, b, layers, alpha, variance) {
   const basePoly = deformN(polygon, 5, variance || 0.15);
   const ctx = wcGfx.drawingContext;
-
   for (let i = 0; i < layers; i++) {
     const lp = deformN(basePoly, 3, (variance || 0.15) * 0.7);
     ctx.save();
     ctx.globalAlpha = alpha / 255;
-    const jr = Math.max(0,Math.min(255,Math.round(r + gaussRand(0,6))));
-    const jg = Math.max(0,Math.min(255,Math.round(g + gaussRand(0,5))));
-    const jb = Math.max(0,Math.min(255,Math.round(b + gaussRand(0,5))));
+    const jr = Math.max(0,Math.min(255,Math.round(r + gaussRand(0,5))));
+    const jg = Math.max(0,Math.min(255,Math.round(g + gaussRand(0,4))));
+    const jb = Math.max(0,Math.min(255,Math.round(b + gaussRand(0,4))));
     ctx.fillStyle = `rgb(${jr},${jg},${jb})`;
     ctx.beginPath();
     ctx.moveTo(lp[0][0], lp[0][1]);
@@ -86,27 +85,22 @@ function watercolorFill(polygon, r, g, b, layers, alpha, variance) {
 
 function hexRgb(h) { return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]; }
 
-// Petal polygon (ogee shape)
-function ogeePetal(px, py, angle, len, w) {
-  const pts = [], steps = 16;
+// Rose petal — wide elliptical cup, much wider than long
+function rosePetal(px, py, angle, len, w) {
+  const pts = [], steps = 24;
   const ca = Math.cos(angle), sa = Math.sin(angle), nx = -sa, ny = ca;
+  // Trace an elliptical petal shape — wide, round, cupped
   for (let s = 0; s <= steps; s++) {
-    const t = s/steps;
-    let wf; // width factor
-    if (t < 0.12) wf = t/0.12*0.3;
-    else if (t < 0.45) wf = 0.3 + (t-0.12)/0.33*0.7;
-    else if (t < 0.75) wf = 1.0 - (t-0.45)/0.3*0.35;
-    else wf = 0.65*(1-(t-0.75)/0.25);
-    pts.push([px+ca*t*len+nx*wf*w*0.55, py+sa*t*len+ny*wf*w*0.55]);
-  }
-  for (let s = steps; s >= 0; s--) {
-    const t = s/steps;
-    let wf;
-    if (t < 0.12) wf = t/0.12*0.3;
-    else if (t < 0.45) wf = 0.3 + (t-0.12)/0.33*0.7;
-    else if (t < 0.75) wf = 1.0 - (t-0.45)/0.3*0.35;
-    else wf = 0.65*(1-(t-0.75)/0.25);
-    pts.push([px+ca*t*len-nx*wf*w*0.35, py+sa*t*len-ny*wf*w*0.35]);
+    const t = s / steps;
+    const theta = t * Math.PI * 2; // full ellipse
+    // Ellipse: wider perpendicular to petal direction, shorter along it
+    const along = Math.cos(theta) * len * 0.5; // half-length along direction
+    const across = Math.sin(theta) * w * 0.6;  // full width across
+    // Shift so base is at px,py
+    pts.push([
+      px + ca * (along + len*0.5) + nx * across,
+      py + sa * (along + len*0.5) + ny * across
+    ]);
   }
   return pts;
 }
@@ -130,127 +124,176 @@ function sazPoly(cx, cy, a, len, w) {
   return pts;
 }
 
-// Golden spiral
-function spiral(cx, cy, r0, turns, n) {
-  const phi = (1+Math.sqrt(5))/2, pts = [];
-  for (let i = 0; i <= n; i++) {
-    const t = i/n, a = t*turns*Math.PI*2;
-    const r = r0 * Math.pow(phi, a/(Math.PI*2));
-    if (r > 400) break;
-    pts.push([cx+Math.cos(a)*r, cy+Math.sin(a)*r, a]);
-  }
-  return pts;
-}
-
 // ============================================================
-// SETUP
+// SETUP — paint layer by layer
 // ============================================================
 function setup() {
   createCanvas(430, 932, WEBGL);
   brush.load();
   translate(-width/2, -height/2);
-  randomSeed(777);
-  background(13, 13, 13);
+  randomSeed(42);
 
   // Register brushes
+  brush.add("ottoman_petal", {
+    type: "custom", weight: 8, opacity: 60, spacing: 0.3,
+    pressure: [0.3, 1.2, 0.1], markerTip: false, rotate: "natural",
+    tip: (_m) => {
+      _m.beginShape();
+      _m.vertex(0, -2); _m.bezierVertex(1.5, -1.5, 2, 0, 1.2, 1.5);
+      _m.vertex(0, 3); _m.bezierVertex(-2, 0, -1.5, -1.5, 0, -2);
+      _m.endShape(CLOSE);
+    }
+  });
   brush.add("tahrir", {
     type: "default", weight: 0.3, scatter: 0.1, sharpness: 0.9,
     grain: 3, opacity: 180, spacing: 0.08,
     pressure: [0.8, 1.0, 0.8], rotate: "natural"
   });
   brush.add("gold_leaf", {
-    type: "spray", weight: 3, scatter: 4, opacity: 80,
-    spacing: 0.8, pressure: [1, 0.5], rotate: "random"
+    type: "spray", weight: 3, scatter: 2.5, opacity: 100,
+    spacing: 0.6, pressure: [1, 0.5], rotate: "random"
   });
 
-  // Subtle ground hatch
-  brush.noFill();
-  brush.hatchStyle("2H", "#151515", 0.2);
-  brush.hatch(55, 25, { rand: 0.5 });
-  brush.rect(0, 0, width, height);
-  brush.noHatch();
-
   // ============================================================
-  // WATERCOLOR LAYER
+  // LAYER 1: BACKGROUND WASH (Tyler Hobbs watercolor)
   // ============================================================
   wcGfx = createGraphics(width, height);
-  // CRITICAL: Tyler Hobbs watercolor needs a solid background for alpha stacking
   wcGfx.background(13, 13, 13);
 
-  // Spiral path — bigger, fills the canvas
-  const sCx = width * 0.48, sCy = height * 0.35;
-  const sp = spiral(sCx, sCy, 18, 3, 180);
+  // Background: direct canvas painting — no watercolor deformation edges
+  const bgCtx = wcGfx.drawingContext;
+  // Warm base wash — radial gradient centered on rose position
+  const bgCx = width * 0.48, bgCy = height * 0.36;
+  const bgGrad = bgCtx.createRadialGradient(
+    bgCx, bgCy, 30,
+    bgCx, bgCy, height * 0.6
+  );
+  bgGrad.addColorStop(0, 'rgb(28, 16, 18)');   // warm center
+  bgGrad.addColorStop(0.5, 'rgb(20, 15, 14)'); // warm mid
+  bgGrad.addColorStop(1, 'rgb(13, 13, 13)');    // dark edge
+  bgCtx.fillStyle = bgGrad;
+  bgCtx.fillRect(0, 0, width, height);
+  // Add subtle noise variation
+  for (let i = 0; i < 3000; i++) {
+    const nx = Math.random() * width;
+    const ny = Math.random() * height;
+    const nr = 12 + gaussRand(0, 6);
+    const ng = 11 + gaussRand(0, 4);
+    const nb = 10 + gaussRand(0, 4);
+    bgCtx.fillStyle = `rgba(${Math.max(0,Math.min(50,Math.round(nr)))},${Math.max(0,Math.min(50,Math.round(ng)))},${Math.max(0,Math.min(50,Math.round(nb)))},0.15)`;
+    bgCtx.fillRect(nx, ny, 3 + Math.random()*8, 3 + Math.random()*8);
+  }
 
-  // --- SAZ LEAVES ---
-  const leafI = [12, 26, 40, 55, 70, 85, 100, 115];
+  // ============================================================
+  // LAYER 3: GREEN VINE — S-curve from bottom to center
+  // ============================================================
+  const vinePoints = [];
+  const vineSegs = 40;
+  // Vine goes from very bottom to just below the rose
+  const vineEndY = height * 0.44;
+  for (let i = 0; i <= vineSegs; i++) {
+    const t = i / vineSegs;
+    const x = width*0.5 + Math.sin(t * Math.PI * 1.8) * 55 * (1-t*0.4);
+    const y = height*0.92 - t * (height*0.92 - vineEndY);
+    vinePoints.push([x, y]);
+  }
+
+  // Vine is painted with p5.brush charcoal (no watercolor segments — they bleed)
+
+  // ============================================================
+  // LAYER 4: SAZ LEAVES — 3 leaves branching off the vine
+  // ============================================================
+  const leafConfigs = [
+    { vineT: 0.22, side: -1, angle: -Math.PI*0.38, len: 110, w: 30 },
+    { vineT: 0.45, side: 1,  angle: Math.PI*0.32,  len: 95, w: 26 },
+    { vineT: 0.68, side: -1, angle: -Math.PI*0.42, len: 85, w: 24 },
+  ];
   const leafData = [];
-  for (const idx of leafI) {
-    if (idx >= sp.length) continue;
-    const [lx, ly, la] = sp[idx];
-    const side = idx % 2 === 0 ? 1 : -1;
-    const lAngle = la + side * Math.PI/2 + gaussRand(0, 0.2);
-    const lLen = 50 + Math.random()*40;
-    const lW = 16 + Math.random()*10;
-    const [cr,cg,cb] = hexRgb(Math.random()>0.4 ? OTTOMAN.forestGreen : OTTOMAN.forestGreenLight);
-
-    watercolorFill(sazPoly(lx, ly, lAngle, lLen, lW), cr, cg, cb, 30, 14, 0.13);
-    leafData.push({x:lx, y:ly, a:lAngle, len:lLen, w:lW});
+  for (const lc of leafConfigs) {
+    const idx = Math.floor(lc.vineT * vineSegs);
+    const [lx, ly] = vinePoints[idx];
+    const baseAngle = Math.atan2(
+      vinePoints[Math.min(idx+1, vineSegs)][1] - ly,
+      vinePoints[Math.min(idx+1, vineSegs)][0] - lx
+    );
+    const leafAngle = baseAngle + lc.angle;
+    const [cr,cg,cb] = hexRgb(Math.random() > 0.5 ? OTTOMAN.forestGreen : OTTOMAN.forestGreenDark);
+    watercolorFill(sazPoly(lx, ly, leafAngle, lc.len, lc.w), cr, cg, cb, 35, 14, 0.13);
+    leafData.push({ x:lx, y:ly, a:leafAngle, len:lc.len, w:lc.w });
   }
 
-  // --- CRIMSON ROSE at center ---
-  const roseCx = sCx, roseCy = sCy, rS = 75;
-  const rRings = [
-    {n:7, dist:rS*0.32, len:rS*1.0,  w:rS*0.58, c:hexRgb(OTTOMAN.crimsonLight), off:0.15},
-    {n:8, dist:rS*0.17, len:rS*0.7,  w:rS*0.44, c:hexRgb(OTTOMAN.crimson), off:0.5},
-    {n:6, dist:rS*0.07, len:rS*0.45, w:rS*0.32, c:hexRgb(OTTOMAN.crimsonDark), off:0.3},
-    {n:4, dist:rS*0.02, len:rS*0.28, w:rS*0.2,  c:[110,28,35], off:0},
-  ];
-  for (const ring of rRings) {
-    for (let i = 0; i < ring.n; i++) {
-      const a = (i/ring.n)*Math.PI*2 + ring.off + gaussRand(0,0.12);
-      const px = roseCx + Math.cos(a)*ring.dist;
-      const py = roseCy + Math.sin(a)*ring.dist;
-      const ta = a + Math.PI/2 + gaussRand(0,0.08);
-      watercolorFill(ogeePetal(px,py,ta,ring.len,ring.w), ring.c[0],ring.c[1],ring.c[2], 30, 14, 0.12);
-    }
+  // ============================================================
+  // LAYER 6: ROSE PETALS — layer by layer, outer to inner
+  // ============================================================
+  const roseCx = width * 0.48, roseCy = height * 0.36;
+  const rS = 90;
+
+  // Outer ring: lighter pink (7 petals) — wide ellipses radiating outward
+  const outerC = hexRgb(OTTOMAN.crimsonLight);
+  for (let i = 0; i < 7; i++) {
+    const a = (i/7)*Math.PI*2 + gaussRand(0, 0.15);
+    const px = roseCx + Math.cos(a)*rS*0.35;
+    const py = roseCy + Math.sin(a)*rS*0.35;
+    const ta = a + gaussRand(0, 0.15); // point outward from center
+    watercolorFill(rosePetal(px, py, ta, rS*0.7, rS*0.65), outerC[0], outerC[1], outerC[2], 35, 13, 0.13);
   }
 
-  // --- GOLD ROSE at outer spiral ---
-  const gi = Math.min(sp.length-1, 90);
-  const [grx, gry] = sp[gi];
-  const gS = 50;
-  const gRings = [
-    {n:6, dist:gS*0.3,  len:gS*0.95, w:gS*0.5,  c:hexRgb(OTTOMAN.goldLight)},
-    {n:7, dist:gS*0.14, len:gS*0.6,  w:gS*0.38, c:hexRgb(OTTOMAN.gold)},
-    {n:4, dist:gS*0.04, len:gS*0.35, w:gS*0.24, c:hexRgb(OTTOMAN.goldDark)},
-  ];
-  for (const ring of gRings) {
-    for (let i = 0; i < ring.n; i++) {
-      const a = (i/ring.n)*Math.PI*2 + gaussRand(0,0.15);
-      const px = grx + Math.cos(a)*ring.dist;
-      const py = gry + Math.sin(a)*ring.dist;
-      const ta = a + Math.PI/2;
-      watercolorFill(ogeePetal(px,py,ta,ring.len,ring.w), ring.c[0],ring.c[1],ring.c[2], 22, 16, 0.12);
-    }
+  // Mid ring: crimson (8 petals, offset)
+  const midC = hexRgb(OTTOMAN.crimson);
+  for (let i = 0; i < 8; i++) {
+    const a = (i/8)*Math.PI*2 + 0.4 + gaussRand(0, 0.12);
+    const px = roseCx + Math.cos(a)*rS*0.18;
+    const py = roseCy + Math.sin(a)*rS*0.18;
+    const ta = a + gaussRand(0, 0.12);
+    watercolorFill(rosePetal(px, py, ta, rS*0.5, rS*0.5), midC[0], midC[1], midC[2], 30, 14, 0.11);
   }
 
-  // --- SMALL CRIMSON ROSE at another spiral position ---
-  const si2 = Math.min(sp.length-1, 55);
-  const [sr2x, sr2y] = sp[si2];
-  const s2S = 38;
-  const s2Rings = [
-    {n:5, dist:s2S*0.28, len:s2S*0.9,  w:s2S*0.5,  c:hexRgb(OTTOMAN.crimson)},
-    {n:6, dist:s2S*0.12, len:s2S*0.55, w:s2S*0.35, c:hexRgb(OTTOMAN.crimsonDark)},
-    {n:3, dist:s2S*0.03, len:s2S*0.3,  w:s2S*0.2,  c:[100,25,30]},
-  ];
-  for (const ring of s2Rings) {
-    for (let i = 0; i < ring.n; i++) {
-      const a = (i/ring.n)*Math.PI*2 + gaussRand(0,0.2);
-      const px = sr2x + Math.cos(a)*ring.dist;
-      const py = sr2y + Math.sin(a)*ring.dist;
-      const ta = a + Math.PI/2;
-      watercolorFill(ogeePetal(px,py,ta,ring.len,ring.w), ring.c[0],ring.c[1],ring.c[2], 18, 16, 0.12);
+  // Inner ring: deep burgundy (6 petals, tighter)
+  const innerC = hexRgb(OTTOMAN.crimsonDark);
+  for (let i = 0; i < 6; i++) {
+    const a = (i/6)*Math.PI*2 + 0.25 + gaussRand(0, 0.12);
+    const px = roseCx + Math.cos(a)*rS*0.08;
+    const py = roseCy + Math.sin(a)*rS*0.08;
+    const ta = a + gaussRand(0, 0.1);
+    watercolorFill(rosePetal(px, py, ta, rS*0.32, rS*0.35), innerC[0], innerC[1], innerC[2], 25, 16, 0.10);
+  }
+
+  // Core: darkest center (5 small overlapping circles)
+  for (let i = 0; i < 5; i++) {
+    const a = (i/5)*Math.PI*2 + gaussRand(0, 0.2);
+    const px = roseCx + Math.cos(a)*rS*0.04;
+    const py = roseCy + Math.sin(a)*rS*0.04;
+    const ta = a + gaussRand(0, 0.15);
+    watercolorFill(rosePetal(px, py, ta, rS*0.18, rS*0.2), 100, 22, 30, 22, 18, 0.10);
+  }
+
+  // GOLDEN CENTER — watercolor dots on 2D buffer
+  const [gr, gg, gb] = hexRgb(OTTOMAN.goldLight);
+  for (let i = 0; i < 30; i++) {
+    const ga = Math.random() * Math.PI * 2;
+    const gd = Math.random() * 18;
+    const gx = roseCx + Math.cos(ga) * gd;
+    const gy = roseCy + Math.sin(ga) * gd;
+    const dotSize = 3 + Math.random() * 5;
+    const dot = [];
+    for (let s = 0; s < 8; s++) {
+      const sa2 = (s/8) * Math.PI * 2;
+      dot.push([gx + Math.cos(sa2)*dotSize, gy + Math.sin(sa2)*dotSize]);
     }
+    watercolorFill(dot, gr, gg, gb, 10, 25, 0.08);
+  }
+  // Bright center dots
+  for (let i = 0; i < 15; i++) {
+    const ga = Math.random() * Math.PI * 2;
+    const gd = Math.random() * 8;
+    const gx = roseCx + Math.cos(ga) * gd;
+    const gy = roseCy + Math.sin(ga) * gd;
+    const dot = [];
+    for (let s = 0; s < 8; s++) {
+      const sa2 = (s/8) * Math.PI * 2;
+      dot.push([gx + Math.cos(sa2)*3, gy + Math.sin(sa2)*3]);
+    }
+    watercolorFill(dot, 240, 208, 96, 8, 30, 0.06);
   }
 
   // ============================================================
@@ -259,114 +302,142 @@ function setup() {
   image(wcGfx, 0, 0);
 
   // ============================================================
-  // P5.BRUSH STROKES
+  // LAYER 2: PAPER TEXTURE — very subtle grain, barely visible
   // ============================================================
+  brush.noFill();
+  brush.hatchStyle("2H", "#161412", 0.08);
+  brush.hatch(50, 30, { rand: 0.8 });
+  brush.rect(0, 0, width, height);
+  brush.noHatch();
 
-  // Vine stem along spiral
-  brush.set("charcoal", OTTOMAN.forestGreenDark, 2);
-  for (let i = 1; i < sp.length; i++) {
-    brush.line(sp[i-1][0], sp[i-1][1], sp[i][0], sp[i][1]);
+  // ============================================================
+  // LAYER 3b: VINE STROKE (p5.brush on top)
+  // ============================================================
+  brush.set("charcoal", OTTOMAN.forestGreenDark, 3);
+  const splinePts = [];
+  for (let i = 0; i < vinePoints.length; i += 3) {
+    splinePts.push(vinePoints[i]);
   }
+  // Draw vine as connected segments
+  for (let i = 1; i < vinePoints.length; i++) {
+    brush.line(vinePoints[i-1][0], vinePoints[i-1][1], vinePoints[i][0], vinePoints[i][1]);
+  }
+  // Thin gold highlight along vine
   brush.set("rotring", OTTOMAN.goldDark, 0.4);
-  for (let i = 1; i < sp.length; i += 3) {
-    brush.line(sp[i-1][0], sp[i-1][1], sp[i][0], sp[i][1]);
+  for (let i = 2; i < vinePoints.length; i += 4) {
+    brush.line(vinePoints[i-1][0], vinePoints[i-1][1], vinePoints[i][0], vinePoints[i][1]);
   }
 
-  // Leaf veins
+  // ============================================================
+  // LAYER 4b: LEAF VEINS (p5.brush)
+  // ============================================================
   for (const ld of leafData) {
     const ca = Math.cos(ld.a), sa = Math.sin(ld.a), nx = -sa, ny = ca;
-    brush.set("tahrir", OTTOMAN.forestGreenDark, 0.3);
-    brush.line(ld.x, ld.y, ld.x+ca*ld.len*0.9, ld.y+sa*ld.len*0.9);
+    // Central vein
+    brush.set("tahrir", OTTOMAN.forestGreenDark, 0.35);
+    brush.line(ld.x, ld.y, ld.x+ca*ld.len*0.92, ld.y+sa*ld.len*0.92);
+    // Side veins
     brush.set("2H", OTTOMAN.forestGreenDark, 0.2);
-    for (let v = 1; v <= 5; v++) {
-      const t = 0.12+(v/6)*0.72;
+    for (let v = 1; v <= 6; v++) {
+      const t = 0.1 + (v/7)*0.75;
       const vx = ld.x+ca*t*ld.len, vy = ld.y+sa*t*ld.len;
-      const vL = ld.w*0.35*Math.sin(t*Math.PI);
+      const vL = ld.w*0.4*Math.sin(t*Math.PI);
       brush.line(vx, vy, vx+nx*vL+ca*vL*0.2, vy+ny*vL+sa*vL*0.2);
       brush.line(vx, vy, vx-nx*vL*0.5, vy-ny*vL*0.5);
     }
   }
 
-  // Buds along vine
-  const budI = [18, 32, 48, 63, 80, 95];
-  for (const idx of budI) {
-    if (idx >= sp.length) continue;
-    const [bx, by, ba] = sp[idx];
-    const side = idx % 2 === 0 ? 1 : -1;
+  // ============================================================
+  // LAYER 5: SMALL BUDS near leaf junctions
+  // ============================================================
+  for (const ld of leafData) {
+    // Bud near base of each leaf
+    const bx = ld.x + Math.cos(ld.a)*(-5);
+    const by = ld.y + Math.sin(ld.a)*(-5);
     push();
     translate(bx, by);
-    rotate(ba + side * HALF_PI * 0.7);
+    rotate(ld.a + Math.PI*0.3);
     brush.noStroke();
-    brush.fill(OTTOMAN.crimsonLight, random(70,100));
-    brush.fillBleed(random(0.2,0.5), "out");
-    brush.fillTexture(random(0.3,0.5), 0.3);
+    brush.fill(OTTOMAN.crimsonLight, random(90, 130));
+    brush.fillBleed(random(0.3, 0.5), "out");
+    brush.fillTexture(random(0.3, 0.5), 0.3);
     brush.beginShape(0.8);
-    brush.vertex(0,0); brush.vertex(7,-5); brush.vertex(14,-3);
-    brush.vertex(18,0); brush.vertex(14,2); brush.vertex(7,3);
+    brush.vertex(0,0); brush.vertex(8,-6); brush.vertex(18,-3);
+    brush.vertex(24,0); brush.vertex(18,3); brush.vertex(8,5);
     brush.endShape(true);
-    brush.fill(OTTOMAN.forestGreenDark, 90);
+    // Small green sepal
+    brush.fill(OTTOMAN.forestGreenDark, 110);
     brush.fillBleed(0.2);
     brush.beginShape(0.6);
-    brush.vertex(-2,0); brush.vertex(4,-3); brush.vertex(7,0); brush.vertex(4,3);
+    brush.vertex(-3,0); brush.vertex(4,-4); brush.vertex(9,0); brush.vertex(4,4);
     brush.endShape(true);
     pop();
   }
 
-  // Pollen spray at flower centers
-  brush.set("gold_leaf", OTTOMAN.goldLight, 3);
-  for (let i = 0; i < 40; i++) {
-    const a = random(TWO_PI), d = random(3,14);
-    brush.line(roseCx+cos(a)*d, roseCy+sin(a)*d, roseCx+cos(a)*(d+5), roseCy+sin(a)*(d+5));
+  // ============================================================
+  // LAYER 7: GOLDEN CENTER — dense stipple dots
+  // ============================================================
+  // Outer spray
+  brush.set("gold_leaf", OTTOMAN.goldLight, 5);
+  for (let i = 0; i < 80; i++) {
+    const a = random(TWO_PI), d = random(2, 25);
+    brush.line(roseCx+cos(a)*d, roseCy+sin(a)*d, roseCx+cos(a)*(d+6), roseCy+sin(a)*(d+6));
   }
-  for (let i = 0; i < 25; i++) {
-    const a = random(TWO_PI), d = random(2,10);
-    brush.line(grx+cos(a)*d, gry+sin(a)*d, grx+cos(a)*(d+3), gry+sin(a)*(d+3));
+  // Dense inner cluster
+  brush.set("gold_leaf", OTTOMAN.gold, 4);
+  for (let i = 0; i < 60; i++) {
+    const a = random(TWO_PI), d = random(0, 14);
+    brush.line(roseCx+cos(a)*d, roseCy+sin(a)*d, roseCx+cos(a)*(d+4), roseCy+sin(a)*(d+4));
   }
-  for (let i = 0; i < 15; i++) {
-    const a = random(TWO_PI), d = random(2,6);
-    brush.line(sr2x+cos(a)*d, sr2y+sin(a)*d, sr2x+cos(a)*(d+2), sr2y+sin(a)*(d+2));
+  // Bright center
+  brush.set("gold_leaf", "#f0d060", 6);
+  for (let i = 0; i < 35; i++) {
+    const a = random(TWO_PI), d = random(0, 7);
+    brush.line(roseCx+cos(a)*d, roseCy+sin(a)*d, roseCx+cos(a)*(d+3), roseCy+sin(a)*(d+3));
   }
 
-  // Tahrir outlines — selective on outer petals
+  // ============================================================
+  // LAYER 8: TAHRIR — fine dark contour lines (LAST)
+  // ============================================================
   brush.noFill();
-  brush.set("tahrir", OTTOMAN.crimsonDark, 0.3);
-  for (let i = 0; i < 5; i++) {
-    const a = (i/5)*TWO_PI + 0.3;
-    const px = roseCx + cos(a)*rS*0.32;
-    const py = roseCy + sin(a)*rS*0.32;
-    const ta = a + HALF_PI;
-    brush.beginShape(0.7);
-    brush.vertex(px, py);
-    brush.vertex(px+cos(ta)*rS*0.4-sin(ta)*rS*0.3, py+sin(ta)*rS*0.4+cos(ta)*rS*0.3);
-    brush.vertex(px+cos(ta)*rS*0.8-sin(ta)*rS*0.12, py+sin(ta)*rS*0.8+cos(ta)*rS*0.12);
-    brush.vertex(px+cos(ta)*rS, py+sin(ta)*rS);
+
+  // Tahrir on outer petal tips — short curved strokes at petal outer edges
+  brush.set("tahrir", OTTOMAN.crimsonDark, 0.25);
+  for (let i = 0; i < 6; i++) {
+    const a = (i/6)*TWO_PI + 0.2;
+    // Draw a short arc at the outer edge of the petal
+    const outerDist = rS * 0.85;
+    const arcLen = 0.3; // short arc span
+    brush.beginShape(0.4);
+    for (let s = 0; s <= 6; s++) {
+      const t = (s/6 - 0.5) * arcLen;
+      brush.vertex(
+        roseCx + cos(a + t) * outerDist,
+        roseCy + sin(a + t) * outerDist
+      );
+    }
     brush.endShape(false);
   }
 
-  brush.set("tahrir", OTTOMAN.goldDark, 0.25);
-  for (let i = 0; i < 4; i++) {
-    const a = (i/4)*TWO_PI + 0.5;
-    const px = grx + cos(a)*gS*0.3;
-    const py = gry + sin(a)*gS*0.3;
-    const ta = a + HALF_PI;
-    brush.line(px, py, px+cos(ta)*gS*0.9, py+sin(ta)*gS*0.9);
+  // Tahrir on leaves (partial outlines)
+  brush.set("tahrir", OTTOMAN.forestGreenDark, 0.25);
+  for (const ld of leafData) {
+    const ca = Math.cos(ld.a), sa = Math.sin(ld.a), nx = -sa, ny = ca;
+    // Trace one side of leaf
+    brush.beginShape(0.5);
+    for (let s = 0; s <= 8; s++) {
+      const t = s/8;
+      const wf = Math.sin(t*Math.PI) * ld.w * 0.6;
+      brush.vertex(ld.x+ca*t*ld.len+nx*wf, ld.y+sa*t*ld.len+ny*wf);
+    }
+    brush.endShape(false);
   }
 
-  // Atmospheric glow
+  // Atmospheric glow around rose — very subtle
   brush.noStroke();
-  brush.fill(OTTOMAN.crimsonLight, 12);
-  brush.fillBleed(0.7, "out");
-  brush.circle(roseCx, roseCy, rS * 1.5);
-
-  brush.fill(OTTOMAN.goldLight, 12);
-  brush.fillBleed(0.6, "out");
-  brush.circle(grx, gry, gS * 1.4);
-
-  // Gold dust
-  brush.set("gold_leaf", OTTOMAN.gold, 1);
-  for (let i = 0; i < 30; i++) {
-    brush.flowLine(random(30,width-30), random(30,height-30), random(4,12), random(TWO_PI));
-  }
+  brush.fill(OTTOMAN.crimsonLight, 6);
+  brush.fillBleed(0.9, "out");
+  brush.circle(roseCx, roseCy, rS * 2.0);
 
   console.log("Ottoman garden skill test complete");
 }
