@@ -16,19 +16,13 @@ function setup() {
   createCanvas(430, 932, WEBGL);
   brush.load();
   translate(-width / 2, -height / 2);
-
   background(13, 13, 13);
   randomSeed(314159);
   brush.scaleBrushes(1.5);
 
-  // ═══════════════════════════════════════════════════
-  //  OTTOMAN ROSE — Botanical watercolor on dark ground
-  // ═══════════════════════════════════════════════════
-
   const cx = width / 2;
-  const cy = height * 0.42;
+  const cy = height * 0.40;
 
-  // ── PALETTE ──────────────────────────────────────
   const DEEP_CRIMSON = '#5A0A18';
   const CRIMSON      = '#8B1A2B';
   const ROSE         = '#B83050';
@@ -38,346 +32,243 @@ function setup() {
   const LEAF_GREEN   = '#2A6A1A';
   const STEM_GREEN   = '#3A5828';
   const GOLD         = '#D4A030';
+  const PALE_GOLD    = '#E8C050';
   const VINE_DARK    = '#2A3A18';
 
-  // ── ATMOSPHERIC BACKGROUND WASH ──────────────────
-  // Subtle dark crimson atmosphere around where the rose will be
+  // ═══════════════════════════════════════════
+  //  ATMOSPHERIC BACKGROUND
+  // ═══════════════════════════════════════════
   brush.noStroke();
-  brush.fill(DEEP_CRIMSON, 15);
+  brush.fill(DEEP_CRIMSON, 25);
   brush.fillBleed(0.7, "out");
   brush.fillTexture(0.4, 0.2);
   brush.circle(cx, cy, 200);
-  brush.noFill();
 
-  // Second darker atmospheric layer
-  brush.fill('#1A0508', 20);
-  brush.fillBleed(0.6, "out");
+  brush.fill('#2A0810', 30);
+  brush.fillBleed(0.5, "out");
   brush.fillTexture(0.3, 0.15);
-  brush.circle(cx, cy, 160);
+  brush.circle(cx, cy, 140);
   brush.noFill();
 
-  // ── STEM ─────────────────────────────────────────
-  brush.field("curved");
-  brush.set("cpencil", STEM_GREEN, 2.5);
-  // Main stem
+  // ═══════════════════════════════════════════
+  //  STEM — cpencil green vine
+  // ═══════════════════════════════════════════
+  brush.set("cpencil", STEM_GREEN, 3.5);
   brush.spline([
-    [cx, cy + 140, 1.2],
-    [cx - 8, cy + 220, 1.0],
-    [cx - 15, cy + 340, 0.9],
-    [cx - 5, cy + 460, 0.8],
-    [cx + 2, cy + 560, 0.6],
-    [cx, cy + 650, 0.4]
+    [cx, cy + 130, 1.3],
+    [cx - 10, cy + 230, 1.1],
+    [cx - 18, cy + 360, 0.9],
+    [cx - 8, cy + 490, 0.7],
+    [cx + 3, cy + 600, 0.5],
+    [cx, cy + 720, 0.3]
   ], 0.7);
 
-  // Stem wash for painted feel
-  brush.noStroke();
-  for (let i = 0; i < 6; i++) {
-    let sy = cy + 180 + i * 80;
-    brush.fill(STEM_GREEN, 18 + random(-4, 4));
-    brush.fillBleed(random(0.2, 0.5), "out");
-    brush.fillTexture(0.4, 0.3);
-    brush.circle(cx - 5 + random(-6, 6), sy + random(-10, 10), 8 + random(2, 6));
-    brush.noFill();
-  }
+  // Darker accent line
+  brush.set("2B", VINE_DARK, 2);
+  brush.spline([
+    [cx, cy + 135, 1.0],
+    [cx - 10, cy + 235, 0.9],
+    [cx - 18, cy + 365, 0.7],
+    [cx - 8, cy + 495, 0.5],
+    [cx + 3, cy + 605, 0.3],
+    [cx, cy + 725, 0.2]
+  ], 0.7);
 
-  // ── LEAVES ON STEM ───────────────────────────────
-  drawSazLeaf(cx + 45, cy + 240, 70, -0.8);
-  drawSazLeaf(cx - 50, cy + 320, 65, 0.6);
-  drawSazLeaf(cx + 40, cy + 420, 55, -0.5);
-  drawSazLeaf(cx - 35, cy + 500, 45, 0.7);
-
-  // Small leaves near base
-  drawSazLeaf(cx + 25, cy + 560, 30, -0.4);
-  drawSazLeaf(cx - 20, cy + 590, 25, 0.5);
-
-  brush.noField();
-
-  // ── SEPALS ───────────────────────────────────────
-  // Small green sepals peeking from behind the rose
-  for (let i = 0; i < 5; i++) {
-    let sa = (i / 5) * TWO_PI + 0.3;
-    let sx = cx + cos(sa) * 65;
-    let sy = cy + sin(sa) * 55 + 20;
+  // ═══════════════════════════════════════════
+  //  LEAVES — watercolor circles + spline outlines
+  // ═══════════════════════════════════════════
+  let leafData = [
+    {x: cx+8, y: cy+210, s: 80, a: -0.7},
+    {x: cx-12, y: cy+310, s: 75, a: PI+0.5},
+    {x: cx+5, y: cy+410, s: 60, a: -0.5},
+    {x: cx-10, y: cy+500, s: 50, a: PI+0.6}
+  ];
+  for (let lf of leafData) {
+    // Green watercolor body
     brush.noStroke();
-    brush.fill(DARK_GREEN, 50);
-    brush.fillBleed(0.3, "out");
-    brush.fillTexture(0.4, 0.3);
-    brush.beginShape(0.6);
-    brush.vertex(cx + cos(sa) * 30, cy + sin(sa) * 25 + 10);
-    brush.vertex(sx - 5, sy - 3);
-    brush.vertex(sx + cos(sa) * 15, sy + sin(sa) * 15);
-    brush.vertex(sx + 5, sy + 3);
-    brush.endShape(true);
-    brush.noFill();
-  }
-
-  // ── OUTER PETAL RING (Ring 1) — largest, darkest ─
-  let outerPetals = 9;
-  let outerRadius = 110;
-  for (let i = 0; i < outerPetals; i++) {
-    let angle = (i / outerPetals) * TWO_PI + random(-0.1, 0.1);
-    let petalLen = outerRadius * random(0.38, 0.48);
-    let petalWid = outerRadius * random(0.18, 0.25);
-    let px = cx + cos(angle) * outerRadius * 0.55;
-    let py = cy + sin(angle) * outerRadius * 0.45;
-
-    // Watercolor fill — dark crimson outer petals
-    brush.noStroke();
-    brush.fill(CRIMSON, 55 + random(-10, 10));
-    brush.fillBleed(random(0.3, 0.55), "out");
+    brush.fill(LEAF_GREEN, 80);
+    brush.fillBleed(0.4, "out");
     brush.fillTexture(0.45, 0.3);
-    drawPetalShape(px, py, petalLen, petalWid, angle);
-    brush.noFill();
+    brush.circle(lf.x + cos(lf.a)*lf.s*0.3, lf.y + sin(lf.a)*lf.s*0.3, lf.s*0.3);
 
-    // Darker wash toward center of each petal
-    brush.fill(DEEP_CRIMSON, 35);
+    // Darker core
+    brush.fill(DARK_GREEN, 60);
     brush.fillBleed(0.25, "in");
     brush.fillTexture(0.3, 0.2);
-    drawPetalShape(px + cos(angle) * -5, py + sin(angle) * -5,
-                   petalLen * 0.6, petalWid * 0.6, angle);
+    brush.circle(lf.x + cos(lf.a)*lf.s*0.35, lf.y + sin(lf.a)*lf.s*0.35, lf.s*0.15);
     brush.noFill();
+
+    // Central vein + outline
+    let tx = lf.x + cos(lf.a)*lf.s;
+    let ty = lf.y + sin(lf.a)*lf.s;
+    brush.set("2H", VINE_DARK, 0.7);
+    brush.line(lf.x, lf.y, tx, ty);
+    // Leaf edge splines
+    let px = cos(lf.a + HALF_PI);
+    let py = sin(lf.a + HALF_PI);
+    let w = lf.s * 0.22;
+    brush.spline([
+      [lf.x, lf.y, 0.3],
+      [lf.x + cos(lf.a)*lf.s*0.35 + px*w, lf.y + sin(lf.a)*lf.s*0.35 + py*w, 1.0],
+      [tx, ty, 0.1]
+    ], 0.8);
+    brush.spline([
+      [lf.x, lf.y, 0.3],
+      [lf.x + cos(lf.a)*lf.s*0.35 - px*w*0.8, lf.y + sin(lf.a)*lf.s*0.35 - py*w*0.8, 1.0],
+      [tx, ty, 0.1]
+    ], 0.8);
   }
 
-  // ── MIDDLE PETAL RING (Ring 2) ───────────────────
-  let midPetals = 7;
-  let midRadius = 75;
-  for (let i = 0; i < midPetals; i++) {
-    let angle = (i / midPetals) * TWO_PI + 0.35 + random(-0.1, 0.1);
-    let petalLen = midRadius * random(0.4, 0.5);
-    let petalWid = midRadius * random(0.2, 0.28);
-    let px = cx + cos(angle) * midRadius * 0.45;
-    let py = cy + sin(angle) * midRadius * 0.38;
-
-    brush.noStroke();
-    brush.fill(ROSE, 60 + random(-8, 8));
-    brush.fillBleed(random(0.25, 0.45), "out");
-    brush.fillTexture(0.4, 0.25);
-    drawPetalShape(px, py, petalLen, petalWid, angle);
-    brush.noFill();
-  }
-
-  // ── INNER PETAL RING (Ring 3) ────────────────────
-  let innerPetals = 6;
-  let innerRadius = 45;
-  for (let i = 0; i < innerPetals; i++) {
-    let angle = (i / innerPetals) * TWO_PI + 0.7 + random(-0.15, 0.15);
-    let petalLen = innerRadius * random(0.45, 0.55);
-    let petalWid = innerRadius * random(0.22, 0.3);
-    let px = cx + cos(angle) * innerRadius * 0.35;
-    let py = cy + sin(angle) * innerRadius * 0.3;
-
-    brush.noStroke();
-    brush.fill(BLUSH, 65 + random(-8, 8));
-    brush.fillBleed(random(0.2, 0.4), "out");
-    brush.fillTexture(0.35, 0.2);
-    drawPetalShape(px, py, petalLen, petalWid, angle);
-    brush.noFill();
-  }
-
-  // ── TIGHT CENTER PETALS (Ring 4) ─────────────────
-  let centerPetals = 5;
-  let centerRadius = 22;
-  for (let i = 0; i < centerPetals; i++) {
-    let angle = (i / centerPetals) * TWO_PI + 1.0 + random(-0.2, 0.2);
-    let petalLen = centerRadius * random(0.5, 0.65);
-    let petalWid = centerRadius * random(0.25, 0.35);
-    let px = cx + cos(angle) * centerRadius * 0.25;
-    let py = cy + sin(angle) * centerRadius * 0.2;
-
-    brush.noStroke();
-    brush.fill(BLUSH, 70);
-    brush.fillBleed(0.2, "out");
-    brush.fillTexture(0.3, 0.15);
-    drawPetalShape(px, py, petalLen, petalWid, angle);
-    brush.noFill();
-  }
-
-  // ── DARK CENTER ──────────────────────────────────
+  // ═══════════════════════════════════════════
+  //  SEPALS — small green circles behind rose
+  // ═══════════════════════════════════════════
   brush.noStroke();
-  brush.fill(DARK_CENTER, 90);
-  brush.fillBleed(0.3, "in");
-  brush.fillTexture(0.5, 0.4);
-  brush.circle(cx, cy, 12);
-  brush.noFill();
+  for (let i = 0; i < 5; i++) {
+    let sa = (i/5)*TWO_PI + 0.2;
+    brush.fill(DARK_GREEN, 70);
+    brush.fillBleed(0.35, "out");
+    brush.fillTexture(0.4, 0.3);
+    brush.circle(cx + cos(sa)*60, cy + sin(sa)*50 + 15, 18);
+    brush.noFill();
+  }
 
-  // Pollen dots in center
-  brush.fill(GOLD, 70);
-  brush.fillBleed(0.15, "out");
+  // ═══════════════════════════════════════════
+  //  ROSE — OUTER RING (deep crimson, 8 petals)
+  // ═══════════════════════════════════════════
   for (let i = 0; i < 8; i++) {
-    let a = (i / 8) * TWO_PI + random(-0.2, 0.2);
-    let r = random(5, 14);
-    brush.circle(cx + cos(a) * r, cy + sin(a) * r, random(2, 4));
+    let angle = (i/8)*TWO_PI;
+    let px = cx + cos(angle)*52;
+    let py = cy + sin(angle)*44;
+
+    brush.noStroke();
+    brush.fill(CRIMSON, 100);
+    brush.fillBleed(0.4, "out");
+    brush.fillTexture(0.45, 0.3);
+    brush.circle(px, py, 32);
+
+    // Darker wash toward center
+    brush.fill(DEEP_CRIMSON, 55);
+    brush.fillBleed(0.2, "in");
+    brush.fillTexture(0.3, 0.2);
+    brush.circle(cx + cos(angle)*31, cy + sin(angle)*26, 18);
+    brush.noFill();
   }
+
+  // ── MIDDLE RING (rose pink, 6 petals) ──
+  for (let i = 0; i < 6; i++) {
+    let angle = (i/6)*TWO_PI + 0.3;
+    brush.noStroke();
+    brush.fill(ROSE, 110);
+    brush.fillBleed(0.35, "out");
+    brush.fillTexture(0.4, 0.25);
+    brush.circle(cx + cos(angle)*32, cy + sin(angle)*27, 24);
+    brush.noFill();
+  }
+
+  // Fill budget: ~39 fills used. Keep remaining under 50.
+
+  // ── INNER RING (blush, 4 petals — fewer to stay in budget) ──
+  for (let i = 0; i < 4; i++) {
+    let angle = (i/4)*TWO_PI + 0.7;
+    brush.noStroke();
+    brush.fill(BLUSH, 120);
+    brush.fillBleed(0.25, "out");
+    brush.fillTexture(0.35, 0.2);
+    brush.circle(cx + cos(angle)*16, cy + sin(angle)*14, 16);
+    brush.noFill();
+  }
+  // Total fills: ~43. Safe.
+
+  // ═══════════════════════════════════════════
+  //  CENTER + POLLEN (strokes, not fills)
+  // ═══════════════════════════════════════════
   brush.noFill();
+  // Dark center
+  brush.set("charcoal", DARK_CENTER, 4);
+  for (let i = 0; i < 8; i++) {
+    let a = (i/8)*TWO_PI;
+    brush.line(cx + cos(a)*2, cy + sin(a)*2, cx + cos(a+0.5)*5, cy + sin(a+0.5)*5);
+  }
 
-  // ── TAHRIR OUTLINES — Fine pen strokes on petals ─
-  brush.noField();
+  // Gold pollen spray
+  brush.set("spray", GOLD, 1.5);
+  for (let i = 0; i < 12; i++) {
+    let a = (i/12)*TWO_PI;
+    let r = 6 + (i%3)*4;
+    brush.line(cx + cos(a)*r, cy + sin(a)*r, cx + cos(a)*(r+2), cy + sin(a)*(r+2));
+  }
+
+  // Fine gold marker accents
+  brush.set("marker", PALE_GOLD, 0.4);
+  for (let i = 0; i < 6; i++) {
+    let a = (i/6)*TWO_PI + 0.3;
+    brush.line(cx + cos(a)*4, cy + sin(a)*4, cx + cos(a)*13, cy + sin(a)*13);
+  }
+
+  // ═══════════════════════════════════════════
+  //  PETAL OUTLINES — rotring tahrir strokes
+  // ═══════════════════════════════════════════
   brush.set("rotring", DEEP_CRIMSON, 0.4);
-
-  // Outline outer petals
-  for (let i = 0; i < outerPetals; i++) {
-    let angle = (i / outerPetals) * TWO_PI + random(-0.05, 0.05);
-    let petalLen = outerRadius * 0.43;
-    let px = cx + cos(angle) * outerRadius * 0.55;
-    let py = cy + sin(angle) * outerRadius * 0.45;
-    drawPetalOutline(px, py, petalLen, outerRadius * 0.21, angle);
+  for (let i = 0; i < 8; i++) {
+    let angle = (i/8)*TWO_PI;
+    let px = cx + cos(angle)*52;
+    let py = cy + sin(angle)*44;
+    let pts = [];
+    for (let j = 0; j <= 12; j++) {
+      let t = j/12;
+      let a = angle - 0.9 + t * 1.8;
+      pts.push([px + cos(a)*28, py + sin(a)*24, 0.2 + sin(t*PI)*0.8]);
+    }
+    brush.spline(pts, 0.7);
   }
 
-  // Outline middle petals
   brush.set("rotring", '#7A1A2B', 0.3);
-  for (let i = 0; i < midPetals; i++) {
-    let angle = (i / midPetals) * TWO_PI + 0.35;
-    let petalLen = midRadius * 0.45;
-    let px = cx + cos(angle) * midRadius * 0.45;
-    let py = cy + sin(angle) * midRadius * 0.38;
-    drawPetalOutline(px, py, petalLen, midRadius * 0.24, angle);
+  for (let i = 0; i < 6; i++) {
+    let angle = (i/6)*TWO_PI + 0.3;
+    let px = cx + cos(angle)*32;
+    let py = cy + sin(angle)*27;
+    let pts = [];
+    for (let j = 0; j <= 10; j++) {
+      let t = j/10;
+      let a = angle - 0.7 + t * 1.4;
+      pts.push([px + cos(a)*21, py + sin(a)*18, 0.3 + sin(t*PI)*0.6]);
+    }
+    brush.spline(pts, 0.7);
   }
 
-  // ── LEAF VEIN DETAILS ────────────────────────────
-  brush.set("2H", VINE_DARK, 0.5);
-  brush.wiggle(2);
-  // Central veins on the larger leaves
-  brush.line(cx + 45, cy + 240, cx + 85, cy + 200);
-  brush.line(cx - 50, cy + 320, cx - 90, cy + 285);
-  brush.line(cx + 40, cy + 420, cx + 75, cy + 390);
-  brush.noField();
-
-  // ── CROSS-HATCH TEXTURE ON DARK AREAS ────────────
-  // Subtle hatch in the background behind the rose
+  // ═══════════════════════════════════════════
+  //  CROSS-HATCH BACKGROUND TEXTURE
+  // ═══════════════════════════════════════════
   brush.noFill();
   brush.noStroke();
   brush.hatch(25, 45, { rand: 0.3 });
-  brush.hatchStyle("2H", '#1a0508', 0.2);
-  brush.circle(cx, cy, 180);
+  brush.hatchStyle("2H", '#150308', 0.15);
+  brush.rect(0, 0, width, height);
   brush.noHatch();
 
-  // ── SPRAY POLLEN / SPARKLE ───────────────────────
-  brush.set("spray", GOLD, 0.8);
-  for (let i = 0; i < 30; i++) {
-    let a = random(TWO_PI);
-    let r = random(3, 20);
-    brush.line(cx + cos(a) * r, cy + sin(a) * r,
-               cx + cos(a) * (r + 2), cy + sin(a) * (r + 2));
-  }
+  // Second hatch layer at perpendicular angle
+  brush.hatch(30, -30, { rand: 0.25 });
+  brush.hatchStyle("2H", '#0A0205', 0.1);
+  brush.rect(0, 0, width, height);
+  brush.noHatch();
 
-  // Atmospheric gold dust scattered wider
+  // ═══════════════════════════════════════════
+  //  ATMOSPHERIC GOLD DUST
+  // ═══════════════════════════════════════════
   brush.set("spray", GOLD, 0.3);
   for (let i = 0; i < 15; i++) {
     let a = random(TWO_PI);
-    let r = random(50, 150);
-    brush.line(cx + cos(a) * r, cy + sin(a) * r,
-               cx + cos(a) * (r + 5), cy + sin(a) * (r + 5));
+    let r = random(70, 200);
+    brush.line(cx + cos(a)*r, cy + sin(a)*r, cx + cos(a)*(r+8), cy + sin(a)*(r+8));
   }
-}
 
-// ═══════════════════════════════════════════════════
-//  HELPER: Draw ogee petal shape using beginShape
-// ═══════════════════════════════════════════════════
-function drawPetalShape(px, py, len, wid, angle) {
-  brush.beginShape(0.7);
-  // Base of petal
-  brush.vertex(px, py);
-  // Right curve
-  let rx1 = px + cos(angle + 0.5) * len * 0.4 + cos(angle + HALF_PI) * wid;
-  let ry1 = py + sin(angle + 0.5) * len * 0.4 + sin(angle + HALF_PI) * wid;
-  brush.vertex(rx1, ry1);
-  // Tip
-  let tx = px + cos(angle) * len;
-  let ty = py + sin(angle) * len;
-  brush.vertex(tx, ty);
-  // Left curve
-  let lx1 = px + cos(angle - 0.5) * len * 0.4 - cos(angle + HALF_PI) * wid;
-  let ly1 = py + sin(angle - 0.5) * len * 0.4 - sin(angle + HALF_PI) * wid;
-  brush.vertex(lx1, ly1);
-  brush.endShape(true);
-}
-
-// ═══════════════════════════════════════════════════
-//  HELPER: Draw petal outline with spline
-// ═══════════════════════════════════════════════════
-function drawPetalOutline(px, py, len, wid, angle) {
-  let pts = [];
-  let steps = 12;
-  // Right side
-  for (let i = 0; i <= steps; i++) {
-    let t = i / steps;
-    let along = len * t;
-    let bulge = sin(t * PI) * wid;
-    pts.push([
-      px + cos(angle) * along + cos(angle + HALF_PI) * bulge,
-      py + sin(angle) * along + sin(angle + HALF_PI) * bulge,
-      0.3 + sin(t * PI) * 0.7  // pressure: thin at ends, thick in middle
-    ]);
+  // Charcoal texture strokes in background
+  brush.field("curved");
+  brush.set("charcoal", '#0C0506', 0.6);
+  for (let i = 0; i < 6; i++) {
+    brush.flowLine(random(30, width-30), random(cy+200, height-60), random(40, 100), random(TWO_PI));
   }
-  // Left side (back)
-  for (let i = steps; i >= 0; i--) {
-    let t = i / steps;
-    let along = len * t;
-    let bulge = sin(t * PI) * wid;
-    pts.push([
-      px + cos(angle) * along - cos(angle + HALF_PI) * bulge,
-      py + sin(angle) * along - sin(angle + HALF_PI) * bulge,
-      0.3 + sin(t * PI) * 0.7
-    ]);
-  }
-  brush.spline(pts, 0.8);
-}
-
-// ═══════════════════════════════════════════════════
-//  HELPER: Draw saz leaf with watercolor fill + outline
-// ═══════════════════════════════════════════════════
-function drawSazLeaf(x, y, size, curveDir) {
-  let leafAngle = atan2(-1, curveDir > 0 ? 1 : -1) + random(-0.2, 0.2);
-  let tipX = x + cos(leafAngle) * size;
-  let tipY = y + sin(leafAngle) * size;
-
-  // Watercolor fill
-  brush.noStroke();
-  brush.fill('#2A6A1A', 50);
-  brush.fillBleed(0.4, "out");
-  brush.fillTexture(0.45, 0.3);
-  brush.beginShape(0.6);
-  brush.vertex(x, y);
-  brush.vertex(x + cos(leafAngle + 0.5) * size * 0.5 + cos(leafAngle + HALF_PI) * size * 0.2,
-               y + sin(leafAngle + 0.5) * size * 0.5 + sin(leafAngle + HALF_PI) * size * 0.2);
-  brush.vertex(tipX, tipY);
-  brush.vertex(x + cos(leafAngle - 0.5) * size * 0.5 - cos(leafAngle + HALF_PI) * size * 0.15,
-               y + sin(leafAngle - 0.5) * size * 0.5 - sin(leafAngle + HALF_PI) * size * 0.15);
-  brush.endShape(true);
-  brush.noFill();
-
-  // Darker wash for depth
-  brush.fill('#0E3A0E', 35);
-  brush.fillBleed(0.25, "in");
-  brush.fillTexture(0.3, 0.2);
-  brush.beginShape(0.5);
-  brush.vertex(x + cos(leafAngle) * size * 0.15, y + sin(leafAngle) * size * 0.15);
-  brush.vertex(x + cos(leafAngle) * size * 0.5 + cos(leafAngle + HALF_PI) * size * 0.08,
-               y + sin(leafAngle) * size * 0.5 + sin(leafAngle + HALF_PI) * size * 0.08);
-  brush.vertex(tipX, tipY);
-  brush.vertex(x + cos(leafAngle) * size * 0.5 - cos(leafAngle + HALF_PI) * size * 0.06,
-               y + sin(leafAngle) * size * 0.5 - sin(leafAngle + HALF_PI) * size * 0.06);
-  brush.endShape(true);
-  brush.noFill();
-
-  // Outline
-  brush.set("2H", '#2A3A18', 0.6);
-  brush.spline([
-    [x, y, 0.3],
-    [x + cos(leafAngle + 0.4) * size * 0.4 + cos(leafAngle + HALF_PI) * size * 0.18,
-     y + sin(leafAngle + 0.4) * size * 0.4 + sin(leafAngle + HALF_PI) * size * 0.18, 0.8],
-    [tipX, tipY, 0.2]
-  ], 0.7);
-  brush.spline([
-    [x, y, 0.3],
-    [x + cos(leafAngle - 0.4) * size * 0.4 - cos(leafAngle + HALF_PI) * size * 0.13,
-     y + sin(leafAngle - 0.4) * size * 0.4 - sin(leafAngle + HALF_PI) * size * 0.13, 0.8],
-    [tipX, tipY, 0.2]
-  ], 0.7);
-
-  // Central vein
-  brush.set("2H", '#2A3A18', 0.4);
-  brush.line(x, y, tipX, tipY);
+  brush.noField();
 }
 </script>
 </body>
