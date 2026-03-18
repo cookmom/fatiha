@@ -188,8 +188,14 @@ function setup() {
     pressure: [0.3, 1.2, 0.1], markerTip: false, rotate: "natural",
     tip: (_m) => {
       _m.beginShape();
-      _m.vertex(0, -2); _m.bezierVertex(1.5, -1.5, 2, 0, 1.2, 1.5);
-      _m.vertex(0, 3); _m.bezierVertex(-2, 0, -1.5, -1.5, 0, -2);
+      _m.vertex(0, -2);
+      _m.vertex(1.5, -1);
+      _m.vertex(2, 0);
+      _m.vertex(1.2, 1.5);
+      _m.vertex(0, 3);
+      _m.vertex(-1.2, 1.5);
+      _m.vertex(-2, 0);
+      _m.vertex(-1.5, -1);
       _m.endShape(CLOSE);
     }
   });
