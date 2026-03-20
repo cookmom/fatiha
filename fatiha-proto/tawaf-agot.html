@@ -518,20 +518,20 @@ scene.add(pilgrimPoints);
 // Multiple rings: inner dense (slow), outer sparse (faster)
 // Radii: 1.2 to 6.0 — around the cube at ground level
 for (let i = 0; i < PILGRIM_COUNT; i++) {
-  // Distribute across rings with inner density bias
-  const ringT = Math.pow(Math.random(), 0.7); // bias toward inner
-  const radius = 1.2 + ringT * 4.8; // 1.2 to 6.0
+  // Distribute across rings with strong inner density bias
+  const ringT = Math.pow(Math.random(), 1.4); // heavy bias toward inner
+  const radius = 1.1 + ringT * 5.0; // 1.1 to 6.1
 
-  // Inner = slower, outer = faster (like real tawaf — outer pilgrims walk faster)
-  const baseSpeed = 0.06 + ringT * 0.20; // rad/s
+  // Inner = slower, outer = faster (like real tawaf)
+  const baseSpeed = 0.05 + ringT * 0.22; // rad/s
 
   const angle = Math.random() * TAU;
 
-  // Ground level — all pilgrims at cube base (y ≈ 0)
-  const y = 0.02 + Math.random() * 0.08;
+  // Ground level — pilgrims at cube base, slight height variation for depth
+  const y = 0.02 + Math.random() * 0.25;
 
-  // Size: small points, inner slightly larger
-  const size = 0.8 + (1.0 - ringT) * 1.2 + Math.random() * 0.5;
+  // Size: small but visible — flowing stream of light
+  const size = 0.18 + (1.0 - ringT) * 0.25 + Math.random() * 0.12;
 
   const wobbleAmp = 0.01 + Math.random() * 0.04;
   const wobbleFreq = 1.5 + Math.random() * 3.0;
@@ -539,11 +539,11 @@ for (let i = 0; i < PILGRIM_COUNT; i++) {
 
   pilgrimData.push({ radius, angle, speed: baseSpeed, y, size, wobbleAmp, wobbleFreq, wobblePhase });
 
-  // Color: warm white/cream — stream of light
-  const warmth = 0.85 + Math.random() * 0.15;
-  pilgrimColors[i * 3] = warmth;
-  pilgrimColors[i * 3 + 1] = warmth * 0.93;
-  pilgrimColors[i * 3 + 2] = warmth * 0.80;
+  // Color: bright warm white/cream — stream of sacred light
+  const warmth = 0.92 + Math.random() * 0.08;
+  pilgrimColors[i * 3] = warmth * 1.1;
+  pilgrimColors[i * 3 + 1] = warmth * 1.0;
+  pilgrimColors[i * 3 + 2] = warmth * 0.82;
   pilgrimSizes[i] = size;
 }
 pilgrimGeo.attributes.color.needsUpdate = true;
@@ -617,14 +617,16 @@ function animate() {
   }
   pilgrimGeo.attributes.position.needsUpdate = true;
 
-  // ── FBO PASS (capture scene without cube) ──
+  // ── FBO PASS (capture scene without cube or pilgrims) ──
   cubeMesh.visible = false;
+  pilgrimPoints.visible = false;
   renderer.setRenderTarget(fboRT);
   renderer.render(scene, camera);
   renderer.setRenderTarget(null);
 
-  // ── MAIN PASS (render with cube + refracted FBO) ──
+  // ── MAIN PASS (render with cube + refracted FBO + pilgrims) ──
   cubeMesh.visible = true;
+  pilgrimPoints.visible = true;
   cubeMat.uniforms.uScene.value = fboRT.texture;
   updateRectLightUniform(plinthRect);
   renderer.render(scene, camera);

@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Slug Calligraphy Prototype — Al-Fatiha</title>
+<title>Slug Calligraphy — Al-Fatiha</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #0d0d12; overflow: hidden; }
@@ -16,7 +16,7 @@
 </style>
 </head>
 <body>
-<div id="info">Slug Calligraphy Proto — Al-Fatiha</div>
+<div id="info">Loading...</div>
 
 <script type="importmap">
 {
@@ -33,29 +33,6 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-// Al-Fatiha verses
-const FATIHA = [
-  'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
-  'ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَٰلَمِينَ',
-  'ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
-  'مَٰلِكِ يَوْمِ ٱلدِّينِ',
-  'إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ',
-  'ٱهْدِنَا ٱلصِّرَٰطَ ٱلْمُسْتَقِيمَ',
-  'صِرَٰطَ ٱلَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ ٱلْمَغْضُوبِ عَلَيْهِمْ وَلَا ٱلضَّآلِّينَ'
-];
-
-// ============================================================
-// Phase 1: Canvas2D bezier extraction → texture → GPU rendering
-// We use opentype.js in-browser to get the path commands,
-// then render them with a custom shader that does per-pixel
-// winding number evaluation (Slug-style).
-//
-// For this prototype, we use a hybrid: extract bezier curves
-// from the font, pack into a DataTexture, then evaluate in
-// a fragment shader. This gives us resolution-independent
-// rendering with Slug's core idea.
-// ============================================================
-
 // --- Scene setup ---
 const W = window.innerWidth, H = window.innerHeight;
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -63,108 +40,98 @@ renderer.setSize(W, H);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setClearColor(0x0d0d12);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 const camera = new THREE.OrthographicCamera(-W/2, W/2, H/2, -H/2, -1000, 1000);
 camera.position.z = 10;
 
-// --- Load opentype.js dynamically ---
-const OT_URL = 'https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js';
+// --- Load pre-shaped curve data ---
+const data = await fetch('fatiha-curves.json').then(r => r.json());
+console.log('Loaded:', data.totalCurves, 'curves across', data.verses.length, 'verses');
 
-async function loadScript(url) {
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = url;
-    s.onload = resolve;
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
-}
+// --- Layout: Mihrab arch ---
+// Fit all verses vertically with Bismillah at top
+const maxWidth = W * 0.88;
+const lineSpacing = H / (data.verses.length + 2); // even spacing
+const topY = H * 0.38;
 
-// --- Bezier curve packing for GPU ---
-// Each quadratic bezier: 3 control points = 6 floats
-// Each line segment: converted to degenerate quadratic (p2 = midpoint)
-// Stored in a float texture: RGBA32F, each texel = 4 floats
-// Curve i: texel 2i = (p1.x, p1.y, p2.x, p2.y), texel 2i+1 = (p3.x, p3.y, 0, 0)
+// Scale each verse to fit width, handle verse 7 (longest) by splitting
+const verseLayouts = [];
+for (let v = 0; v < data.verses.length; v++) {
+  const verse = data.verses[v];
+  let scale = Math.min(maxWidth / verse.width, 1.5); // cap upscale
 
-function packCurvesForGPU(commands, offsetX, offsetY, scale) {
-  const curves = [];
-  let cx = 0, cy = 0; // current point
-
-  for (const cmd of commands) {
-    if (cmd.type === 'M') {
-      cx = cmd.x; cy = cmd.y;
-    } else if (cmd.type === 'L') {
-      // Line → degenerate quadratic
-      const mx = (cx + cmd.x) * 0.5;
-      const my = (cy + cmd.y) * 0.5;
-      curves.push({
-        p1: { x: cx * scale + offsetX, y: -cy * scale + offsetY },
-        p2: { x: mx * scale + offsetX, y: -my * scale + offsetY },
-        p3: { x: cmd.x * scale + offsetX, y: -cmd.y * scale + offsetY }
-      });
-      cx = cmd.x; cy = cmd.y;
-    } else if (cmd.type === 'Q') {
-      curves.push({
-        p1: { x: cx * scale + offsetX, y: -cy * scale + offsetY },
-        p2: { x: cmd.x1 * scale + offsetX, y: -cmd.y1 * scale + offsetY },
-        p3: { x: cmd.x * scale + offsetX, y: -cmd.y * scale + offsetY }
-      });
-      cx = cmd.x; cy = cmd.y;
-    } else if (cmd.type === 'C') {
-      // Cubic → approximate as 2 quadratics
-      // Simple midpoint subdivision
-      const mx = (cmd.x1 + cmd.x2) * 0.5;
-      const my = (cmd.y1 + cmd.y2) * 0.5;
-      curves.push({
-        p1: { x: cx * scale + offsetX, y: -cy * scale + offsetY },
-        p2: { x: cmd.x1 * scale + offsetX, y: -cmd.y1 * scale + offsetY },
-        p3: { x: mx * scale + offsetX, y: -my * scale + offsetY }
-      });
-      curves.push({
-        p1: { x: mx * scale + offsetX, y: -my * scale + offsetY },
-        p2: { x: cmd.x2 * scale + offsetX, y: -cmd.y2 * scale + offsetY },
-        p3: { x: cmd.x * scale + offsetX, y: -cmd.y * scale + offsetY }
-      });
-      cx = cmd.x; cy = cmd.y;
-    } else if (cmd.type === 'Z') {
-      // Close path — line back to path start (handled by winding)
-    }
+  // Verse 7: split into two lines if too wide
+  if (verse.width * scale > maxWidth && v === 6) {
+    scale = maxWidth / (verse.width * 0.55); // scale for half
+    // We'll handle the split later
   }
-  return curves;
+
+  const scaledW = verse.width * scale;
+  const ox = scaledW * 0.5; // shift right since text goes R→L from origin
+  const oy = topY - v * lineSpacing;
+
+  verseLayouts.push({ scale, ox, oy, verse });
 }
 
-function createCurveTexture(allCurves) {
-  // Pack into DataTexture: 2 texels per curve
-  const texWidth = 4096;
-  const numTexels = allCurves.length * 2;
-  const texHeight = Math.ceil(numTexels / texWidth);
-  const data = new Float32Array(texWidth * texHeight * 4);
+// --- Pack all curves into GPU texture ---
+let allCurves = [];
+const verseBoundsData = [];
+const verseRangesData = [];
 
-  for (let i = 0; i < allCurves.length; i++) {
+for (let v = 0; v < verseLayouts.length; v++) {
+  const { scale, ox, oy, verse } = verseLayouts[v];
+  const startIdx = allCurves.length;
+
+  for (const c of verse.curves) {
+    allCurves.push({
+      p1x: c[0] * scale + ox, p1y: c[1] * scale + oy,
+      p2x: c[2] * scale + ox, p2y: c[3] * scale + oy,
+      p3x: c[4] * scale + ox, p3y: c[5] * scale + oy
+    });
+  }
+
+  const endIdx = allCurves.length;
+  verseRangesData.push(startIdx, endIdx);
+
+  // Bounding box
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (let i = startIdx; i < endIdx; i++) {
     const c = allCurves[i];
-    const base = i * 2 * 4;
-    // Texel 2i: p1.x, p1.y, p2.x, p2.y
-    data[base + 0] = c.p1.x;
-    data[base + 1] = c.p1.y;
-    data[base + 2] = c.p2.x;
-    data[base + 3] = c.p2.y;
-    // Texel 2i+1: p3.x, p3.y, 0, 0
-    data[base + 4] = c.p3.x;
-    data[base + 5] = c.p3.y;
-    data[base + 6] = 0;
-    data[base + 7] = 0;
+    minX = Math.min(minX, c.p1x, c.p2x, c.p3x);
+    maxX = Math.max(maxX, c.p1x, c.p2x, c.p3x);
+    minY = Math.min(minY, c.p1y, c.p2y, c.p3y);
+    maxY = Math.max(maxY, c.p1y, c.p2y, c.p3y);
   }
-
-  const tex = new THREE.DataTexture(data, texWidth, texHeight, THREE.RGBAFormat, THREE.FloatType);
-  tex.needsUpdate = true;
-  return { texture: tex, curveCount: allCurves.length, texWidth, texHeight };
+  const cx = (minX + maxX) * 0.5;
+  const cy = (minY + maxY) * 0.5;
+  const hw = (maxX - minX) * 0.5 + 8;
+  const hh = (maxY - minY) * 0.5 + 8;
+  verseBoundsData.push(cx, cy, hw, hh);
 }
 
-// --- Slug-style fragment shader ---
-const slugVertexShader = `
+console.log('Total GPU curves:', allCurves.length);
+
+// Create float texture
+const texWidth = 4096;
+const numTexels = allCurves.length * 2;
+const texHeight = Math.ceil(numTexels / texWidth) || 1;
+const texData = new Float32Array(texWidth * texHeight * 4);
+
+for (let i = 0; i < allCurves.length; i++) {
+  const c = allCurves[i];
+  const base = i * 2 * 4;
+  texData[base + 0] = c.p1x; texData[base + 1] = c.p1y;
+  texData[base + 2] = c.p2x; texData[base + 3] = c.p2y;
+  texData[base + 4] = c.p3x; texData[base + 5] = c.p3y;
+}
+
+const curveTexture = new THREE.DataTexture(texData, texWidth, texHeight, THREE.RGBAFormat, THREE.FloatType);
+curveTexture.needsUpdate = true;
+
+// --- Shaders ---
+const vertexShader = `
   varying vec2 vUv;
   void main() {
     vUv = uv;
@@ -172,30 +139,26 @@ const slugVertexShader = `
   }
 `;
 
-const slugFragmentShader = `
+const fragmentShader = `
   precision highp float;
 
   uniform sampler2D curveData;
   uniform int curveCount;
   uniform float texWidth;
-  uniform float texHeight;
   uniform vec2 resolution;
   uniform float time;
-  uniform float revealProgress; // 0..1 how much text revealed
   uniform vec3 inkColor;
-  uniform vec4 verseBounds[7]; // xy = center, zw = halfSize per verse
-  uniform vec2 verseRanges[7]; // x = startCurve, y = endCurve (float, cast to int)
+  uniform vec4 verseBounds[7];
+  uniform vec2 verseRanges[7];
 
   varying vec2 vUv;
 
-  // Fetch texel by linear index
   vec4 fetchTexel(int idx) {
     int y = idx / int(texWidth);
     int x = idx - y * int(texWidth);
     return texelFetch(curveData, ivec2(x, y), 0);
   }
 
-  // Slug core: calculate root eligibility
   uint calcRootCode(float y1, float y2, float y3) {
     uint i1 = floatBitsToUint(y1) >> 31u;
     uint i2 = floatBitsToUint(y2) >> 30u;
@@ -205,7 +168,6 @@ const slugFragmentShader = `
     return ((0x2E74u >> shift) & 0x0101u);
   }
 
-  // Solve for horizontal ray intersections
   vec2 solveHorizPoly(vec4 p12, vec2 p3) {
     vec2 a = p12.xy - p12.zw * 2.0 + p3;
     vec2 b = p12.xy - p12.zw;
@@ -222,211 +184,108 @@ const slugFragmentShader = `
   }
 
   void main() {
-    // Fragment position in world coords
     vec2 fragPos = (vUv - 0.5) * resolution;
-
-    float coverage = 0.0;
-    float pixelSize = resolution.x / (resolution.x * 0.5); // ~2.0 for our setup
-
-    // Simple winding number: cast horizontal ray from fragPos
-    // Count signed crossings
+    float pixelSize = 2.0;
     float winding = 0.0;
 
-    // Per-verse spatial culling: only check curves from nearby verses
     for (int v = 0; v < 7; v++) {
       vec4 vb = verseBounds[v];
-      // Skip this verse if fragment is far from its bounding box
       vec2 d = abs(fragPos - vb.xy) - vb.zw;
       if (d.x > pixelSize * 2.0 || d.y > pixelSize * 2.0) continue;
 
       int startC = int(verseRanges[v].x);
       int endC = int(verseRanges[v].y);
 
-    for (int i = 0; i < 4000; i++) {
-      if (i + startC >= endC) break;
-      int ci = i + startC;
+      for (int i = 0; i < 4000; i++) {
+        if (i + startC >= endC) break;
+        int ci = i + startC;
 
-      vec4 t0 = fetchTexel(ci * 2);     // p1.xy, p2.xy
-      vec4 t1 = fetchTexel(ci * 2 + 1); // p3.xy, 0, 0
+        vec4 t0 = fetchTexel(ci * 2);
+        vec4 t1 = fetchTexel(ci * 2 + 1);
 
-      // Make curve relative to fragment
-      vec4 p12 = vec4(t0.xy - fragPos, t0.zw - fragPos);
-      vec2 p3 = t1.xy - fragPos;
+        vec4 p12 = vec4(t0.xy - fragPos, t0.zw - fragPos);
+        vec2 p3 = t1.xy - fragPos;
 
-      uint code = calcRootCode(p12.y, p12.w, p3.y);
-      if (code != 0u) {
-        vec2 r = solveHorizPoly(p12, p3);
-
-        if ((code & 1u) != 0u) {
-          winding += clamp(r.x / pixelSize + 0.5, 0.0, 1.0);
-        }
-        if (code > 1u) {
-          winding -= clamp(r.y / pixelSize + 0.5, 0.0, 1.0);
+        uint code = calcRootCode(p12.y, p12.w, p3.y);
+        if (code != 0u) {
+          vec2 r = solveHorizPoly(p12, p3);
+          if ((code & 1u) != 0u) {
+            winding += clamp(r.x / pixelSize + 0.5, 0.0, 1.0);
+          }
+          if (code > 1u) {
+            winding -= clamp(r.y / pixelSize + 0.5, 0.0, 1.0);
+          }
         }
       }
-    } // end inner curve loop
-    } // end outer verse loop
+    } // end verse loop
 
-    coverage = clamp(abs(winding), 0.0, 1.0);
+    float coverage = clamp(abs(winding), 0.0, 1.0);
 
-    // Watercolor-like edge softening
-    float soft = smoothstep(0.0, 0.15, coverage);
+    // Soft watercolor edges
+    float soft = smoothstep(0.0, 0.12, coverage);
 
-    // Subtle ink texture variation
+    // Subtle ink texture
     float noise = fract(sin(dot(fragPos * 0.1, vec2(12.9898, 78.233))) * 43758.5453);
-    soft *= 0.85 + 0.15 * noise;
+    soft *= 0.88 + 0.12 * noise;
 
     vec3 color = inkColor * soft;
 
-    // Subtle warm glow at edges
-    float edge = smoothstep(0.8, 0.2, coverage) * 0.15;
-    color += vec3(0.4, 0.2, 0.05) * edge;
+    // Warm glow at edges
+    float edge = smoothstep(0.7, 0.2, coverage) * 0.12;
+    color += vec3(0.4, 0.25, 0.08) * edge;
 
     gl_FragColor = vec4(color, soft);
   }
 `;
 
-// --- Main ---
-async function init() {
-  await loadScript(OT_URL);
+// --- Build mesh ---
+const geo = new THREE.PlaneGeometry(W, H);
+const mat = new THREE.ShaderMaterial({
+  vertexShader, fragmentShader,
+  uniforms: {
+    curveData: { value: curveTexture },
+    curveCount: { value: allCurves.length },
+    texWidth: { value: texWidth },
+    resolution: { value: new THREE.Vector2(W, H) },
+    time: { value: 0 },
+    inkColor: { value: new THREE.Color(0.95, 0.88, 0.75) },
+    verseBounds: { value: [] },
+    verseRanges: { value: [] }
+  },
+  transparent: true,
+  depthWrite: false
+});
 
-  // Load Amiri Quran font
-  const fontUrl = 'fonts/AmiriQuran.ttf';
-  const font = await new Promise((resolve, reject) => {
-    opentype.load(fontUrl, (err, f) => err ? reject(err) : resolve(f));
-  });
-  console.log('Font loaded:', font.names.fontFamily.en, '| glyphs:', font.numGlyphs);
-
-  const dpr = Math.min(window.devicePixelRatio, 2);
-  const canvasW = W * dpr;
-  const canvasH = H * dpr;
-
-  // Layout: mihrab arch
-  // For now, simple centered layout — each verse on its own line
-  const fontSize = Math.min(W * 0.055, 28);
-  const lineSpacing = fontSize * 2.8;
-  const totalH = (FATIHA.length - 1) * lineSpacing;
-  const startY = totalH * 0.5; // top verse starts here
-
-  let allCurves = [];
-  const verseCurveCounts = []; // track curves per verse for animation
-
-  for (let v = 0; v < FATIHA.length; v++) {
-    const verse = FATIHA[v];
-    const path = font.getPath(verse, 0, 0, fontSize);
-    const bbox = path.getBoundingBox();
-    const textW = bbox.x2 - bbox.x1;
-
-    // Center each verse horizontally
-    const ox = -textW * 0.5 - bbox.x1;
-    // Verse 0 (Bismillah) at top, verse 6 at bottom
-    const oy = startY - v * lineSpacing;
-
-    const curves = packCurvesForGPU(path.commands, ox, oy, 1.0);
-    verseCurveCounts.push(curves.length);
-    allCurves = allCurves.concat(curves);
-  }
-
-  console.log('Total curves:', allCurves.length, '| Per verse:', verseCurveCounts);
-
-  // Compute verse bounding boxes and curve ranges
-  const verseBoundsData = [];
-  const verseRangesData = [];
-  let curveOffset = 0;
-  for (let v = 0; v < FATIHA.length; v++) {
-    const count = verseCurveCounts[v];
-    const start = curveOffset;
-    const end = curveOffset + count;
-    verseRangesData.push(start, end);
-
-    // Compute bounding box for this verse's curves
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (let i = start; i < end; i++) {
-      const c = allCurves[i];
-      for (const p of [c.p1, c.p2, c.p3]) {
-        minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-        minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
-      }
-    }
-    const cx = (minX + maxX) * 0.5;
-    const cy = (minY + maxY) * 0.5;
-    const hw = (maxX - minX) * 0.5 + 5; // pad
-    const hh = (maxY - minY) * 0.5 + 5;
-    verseBoundsData.push(cx, cy, hw, hh);
-    curveOffset = end;
-  }
-
-  const { texture, curveCount, texWidth, texHeight } = createCurveTexture(allCurves);
-
-  // Full-screen quad
-  const geo = new THREE.PlaneGeometry(W, H);
-  const mat = new THREE.ShaderMaterial({
-    vertexShader: slugVertexShader,
-    fragmentShader: slugFragmentShader,
-    uniforms: {
-      curveData: { value: texture },
-      curveCount: { value: curveCount },
-      texWidth: { value: texWidth },
-      texHeight: { value: texHeight },
-      resolution: { value: new THREE.Vector2(W, H) },
-      time: { value: 0 },
-      revealProgress: { value: 1.0 }, // show all for testing
-      inkColor: { value: new THREE.Color(0.95, 0.90, 0.80) }, // warm ivory
-      verseBounds: { value: [] },
-      verseRanges: { value: [] }
-    },
-    transparent: true,
-    depthWrite: false
-  });
-
-  // Set verse bounds and ranges uniforms
-  const vbArr = [];
-  for (let i = 0; i < 7; i++) {
-    const bi = i * 4;
-    vbArr.push(new THREE.Vector4(
-      verseBoundsData[bi] || 0, verseBoundsData[bi+1] || 0,
-      verseBoundsData[bi+2] || 0, verseBoundsData[bi+3] || 0
-    ));
-  }
-  mat.uniforms.verseBounds.value = vbArr;
-
-  const vrArr = [];
-  for (let i = 0; i < 7; i++) {
-    const ri = i * 2;
-    vrArr.push(new THREE.Vector2(verseRangesData[ri] || 0, verseRangesData[ri+1] || 0));
-  }
-  mat.uniforms.verseRanges.value = vrArr;
-
-  const mesh = new THREE.Mesh(geo, mat);
-  scene.add(mesh);
-
-  // Post-processing
-  const composer = new EffectComposer(renderer);
-  composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), 0.3, 0.2, 0.9);
-  composer.addPass(bloom);
-
-  // Animation: reveal over 46 seconds (full Fatiha recitation)
-  const TOTAL_DUR = 46.0;
-  const startTime = performance.now();
-
-  function animate() {
-    requestAnimationFrame(animate);
-    const elapsed = (performance.now() - startTime) / 1000;
-    const progress = Math.min(elapsed / TOTAL_DUR, 1.0);
-
-    mat.uniforms.time.value = elapsed;
-    mat.uniforms.revealProgress.value = progress;
-
-    composer.render();
-  }
-  animate();
-
-  document.getElementById('info').textContent =
-    `Slug Proto — ${allCurves.length} curves, ${FATIHA.length} verses`;
+// Set verse uniforms
+const vbArr = [], vrArr = [];
+for (let i = 0; i < 7; i++) {
+  const bi = i * 4;
+  vbArr.push(new THREE.Vector4(
+    verseBoundsData[bi] || 0, verseBoundsData[bi+1] || 0,
+    verseBoundsData[bi+2] || 0, verseBoundsData[bi+3] || 0
+  ));
+  const ri = i * 2;
+  vrArr.push(new THREE.Vector2(verseRangesData[ri] || 0, verseRangesData[ri+1] || 0));
 }
+mat.uniforms.verseBounds.value = vbArr;
+mat.uniforms.verseRanges.value = vrArr;
 
-init().catch(console.error);
+scene.add(new THREE.Mesh(geo, mat));
+
+// Post-processing
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(W, H), 0.25, 0.2, 0.92));
+
+function animate() {
+  requestAnimationFrame(animate);
+  mat.uniforms.time.value = performance.now() / 1000;
+  composer.render();
+}
+animate();
+
+document.getElementById('info').textContent =
+  `Slug — ${allCurves.length} curves, ${data.verses.length} verses (HarfBuzz shaped)`;
 </script>
 </body>
 </html>
