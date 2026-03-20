@@ -6,268 +6,251 @@
 <title>Eid Mubarak</title>
 <style>
   * { margin: 0; padding: 0; }
-  body { background: #0a0a10; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh; }
+  body { background: #f0e8d8; overflow: hidden; }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+<script src="mixbox.js"></script>
 </head>
 <body>
 <script>
 const W = 1080, H = 1920;
-const canvas = document.createElement('canvas');
-canvas.width = W; canvas.height = H;
-document.body.appendChild(canvas);
-canvas.style.maxWidth = '100vw';
-canvas.style.maxHeight = '100vh';
-canvas.style.objectFit = 'contain';
-const ctx = canvas.getContext('2d');
-
-const BG = '#0a0a10';
-const GOLD = '#c9a84c';
-const GOLD_LIGHT = '#ecd888';
-const DARK_GREEN = '#1a5a32';
-const SAGE = '#4a8a5a';
-const CRIMSON = '#b82040';
-
-let seed = 42;
-function sRand() { seed=(seed*16807)%2147483647; return(seed-1)/2147483646; }
-
-// Ottoman leaf
-function drawLeaf(cx, cy, angle, size, color) {
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(angle);
-  ctx.globalAlpha = 0.55 + sRand() * 0.15;
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.bezierCurveTo(size*.4, -size*.5, size*.9, -size*.25, size, 0);
-  ctx.bezierCurveTo(size*.9, size*.25, size*.4, size*.5, 0, 0);
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.globalAlpha = 0.2;
-  ctx.beginPath();
-  ctx.moveTo(size*.08, 0);
-  ctx.lineTo(size*.82, 0);
-  ctx.strokeStyle = '#041008';
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
-  ctx.restore();
-}
-
-// Rose
-function drawRose(cx, cy, size, color) {
-  ctx.save();
-  ctx.translate(cx, cy);
-  for (let ring = 2; ring >= 0; ring--) {
-    const rs = size * (0.35 + ring * 0.35);
-    const np = 5 + Math.floor(sRand() * 3);
-    for (let i = 0; i < np; i++) {
-      const a = (i/np)*Math.PI*2 + ring*0.4 + sRand()*0.3;
-      ctx.save();
-      ctx.rotate(a);
-      ctx.globalAlpha = 0.3 + ring*0.1;
-      ctx.beginPath();
-      ctx.ellipse(rs*0.42, 0, rs*0.42, rs*0.18, 0, 0, Math.PI*2);
-      ctx.fillStyle = color;
-      ctx.fill();
-      ctx.restore();
-    }
-  }
-  ctx.globalAlpha = 0.75;
-  ctx.beginPath();
-  ctx.arc(0, 0, size*0.1, 0, Math.PI*2);
-  ctx.fillStyle = GOLD_LIGHT;
-  ctx.fill();
-  ctx.restore();
-}
-
+let svgLayers = [];
+let paperImg;
+let paintQueue = [];
+let paintIdx = 0;
+let gardenQueue = [];
+let gardenIdx = 0;
 let frame = 0;
-const FPS = 30, DUR = 10, TOTAL = FPS * DUR;
 
-async function init() {
-  // Load traced SVG
+// Colors
+const INK_GREEN = [26, 58, 30];    // dark green
+const INK_SAGE = [74, 120, 74];    // sage
+const GOLD = [154, 122, 48];       // gold ink
+const CRIMSON = [138, 26, 42];     // deep crimson
+const CREAM = [196, 164, 74];      // light gold
+
+function preload() {
+  paperImg = loadImage('paper-texture.jpg');
+}
+
+function setup() {
+  createCanvas(W, H, WEBGL);
+  brush.load();
+  frameRate(30);
+  
+  // Draw paper background
+  background(240, 228, 210);
+  push();
+  translate(-W/2, -H/2);
+  image(paperImg, 0, 0, W, H);
+  pop();
+  
+  // Load SVG and build paint queue
+  loadSVGPaths();
+}
+
+async function loadSVGPaths() {
   const resp = await fetch('eid-traced-color.svg');
   const svgText = await resp.text();
-  
-  // Parse SVG paths
   const parser = new DOMParser();
   const doc = parser.parseFromString(svgText, 'image/svg+xml');
-  const svgPaths = doc.querySelectorAll('path');
+  const paths = doc.querySelectorAll('path');
   
-  console.log('SVG paths:', svgPaths.length);
+  // Scale SVG 800x800 to canvas
+  const targetW = W * 0.88;
+  const sc = targetW / 800;
+  const ox = (W - targetW) / 2;
+  const oy = H * 0.16;
   
-  // Convert to Path2D objects with transforms and colors
-  // Skip background paths (very light fills) and keep calligraphy
-  const layers = [];
-  for (const p of svgPaths) {
-    const d = p.getAttribute('d');
+  for (const p of paths) {
     const fill = p.getAttribute('fill') || '#000';
-    const transform = p.getAttribute('transform') || '';
-    
-    // Parse fill color brightness — skip light fills (background)
     const hex = fill.replace('#','');
     const r = parseInt(hex.substr(0,2),16);
     const g = parseInt(hex.substr(2,2),16);
     const b = parseInt(hex.substr(4,2),16);
     const brightness = (r + g + b) / 3;
+    if (brightness > 175) continue; // skip bg
     
-    // Skip very light paths (background, white elements)
-    if (brightness > 180) continue;
-    
-    // Parse translate
+    const transform = p.getAttribute('transform') || '';
     let tx = 0, ty = 0;
     const m = transform.match(/translate\(([^,)]+)[,\s]([^)]+)\)/);
     if (m) { tx = parseFloat(m[1]); ty = parseFloat(m[2]); }
     
-    // Classify: dark = main calligraphy, mid = gold accents
-    const type = brightness < 130 ? 'calligraphy' : 'accent';
+    // Sample points along the path contour
+    const d = p.getAttribute('d');
+    const points = sampleSVGPath(d, tx, ty, sc, ox, oy);
     
-    layers.push({ d, fill, tx, ty, type, brightness, path2d: new Path2D(d) });
+    if (points.length < 3) continue;
+    
+    const type = brightness < 130 ? 'main' : 'accent';
+    svgLayers.push({ points, type });
   }
-  console.log('Filtered layers:', layers.length, '(removed bg)');
   
-  // Source SVG is 800x800 — scale to fill 9:16 portrait
-  const svgW = 800, svgH = 800;
-  const targetW = W * 0.92;
-  const targetH = targetW; // keep square aspect
-  const scaleX = targetW / svgW;
-  const scaleY = targetH / svgH;
-  const offsetX = (W - targetW) / 2;
-  const offsetY = H * 0.18; // position in upper portion
+  console.log('Layers:', svgLayers.length);
   
-  requestAnimationFrame(function loop() {
-    frame++;
-    const t = Math.min(frame / TOTAL, 1.0);
+  // Build paint queue: brush strokes along each contour
+  for (const layer of svgLayers) {
+    const color = layer.type === 'main' ? INK_GREEN : GOLD;
+    const pts = layer.points;
     
-    ctx.fillStyle = BG;
-    ctx.fillRect(0, 0, W, H);
-    
-    // Warm vignette
-    const vig = ctx.createRadialGradient(W/2, H*.38, 100, W/2, H*.38, H*.5);
-    vig.addColorStop(0, 'rgba(30,25,15,0.25)');
-    vig.addColorStop(1, 'rgba(10,10,16,0)');
-    ctx.fillStyle = vig;
-    ctx.fillRect(0, 0, W, H);
-    
-    // Progressive reveal of SVG layers
-    const layersToShow = Math.ceil(layers.length * Math.min(t * 2, 1.0));
-    
-    for (let li = 0; li < layersToShow; li++) {
-      const layer = layers[li];
-      const layerProgress = Math.min((t * 2 - li / layers.length) * layers.length * 0.5, 1.0);
-      if (layerProgress <= 0) continue;
-      
-      ctx.save();
-      ctx.translate(offsetX + layer.tx * scaleX, offsetY + layer.ty * scaleY);
-      ctx.scale(scaleX, scaleY);
-      
-      // Multi-pass watercolor fill
-      const passes = Math.ceil(layerProgress * 10);
-      for (let pass = 0; pass < passes; pass++) {
-        ctx.save();
-        const jx = (sRand() - 0.5) * 2;
-        const jy = (sRand() - 0.5) * 2;
-        ctx.translate(jx, jy);
-        
-        if (layer.type === 'calligraphy') {
-          // Main calligraphy: dark base → gold → bright gold
-          if (pass < 3) {
-            ctx.globalAlpha = 0.18;
-            ctx.fillStyle = '#3a2a10'; // dark warm base
-          } else if (pass < 7) {
-            ctx.globalAlpha = 0.12;
-            ctx.fillStyle = GOLD;
-          } else {
-            ctx.globalAlpha = 0.08;
-            ctx.fillStyle = GOLD_LIGHT;
-          }
-        } else {
-          // Accents: warm gold/amber
-          if (pass < 5) {
-            ctx.globalAlpha = 0.12;
-            ctx.fillStyle = GOLD;
-          } else {
-            ctx.globalAlpha = 0.08;
-            ctx.fillStyle = GOLD_LIGHT;
-          }
-        }
-        
-        ctx.fill(layer.path2d);
-        ctx.restore();
-      }
-      
-      // Fine outline
-      if (layerProgress > 0.5) {
-        ctx.globalAlpha = 0.25 * Math.min((layerProgress - 0.5) * 2, 1.0);
-        ctx.strokeStyle = layer.type === 'calligraphy' ? GOLD : GOLD_LIGHT;
-        ctx.lineWidth = 1.2 / scaleX;
-        ctx.stroke(layer.path2d);
-      }
-      
-      ctx.restore();
+    // Paint the filled contour with overlapping brush strokes
+    // Scan through points in segments
+    for (let i = 0; i < pts.length - 1; i += 2) {
+      paintQueue.push({
+        x1: pts[i].x, y1: pts[i].y,
+        x2: pts[i+1].x, y2: pts[i+1].y,
+        color, type: layer.type,
+        weight: 8 + Math.random() * 6
+      });
     }
-    
-    // Garden wreath
-    if (t > 0.25) {
-      const gp = Math.min((t - 0.25) / 0.5, 1.0);
-      seed = 555;
-      
-      const nc = 40; // leaves
-      for (let i = 0; i < Math.floor(gp * nc); i++) {
-        const a = sRand() * Math.PI * 2;
-        const r = 350 + sRand() * 280;
-        drawLeaf(
-          W/2 + Math.cos(a) * r,
-          H*0.38 + Math.sin(a) * r * 0.45,
-          a + 1 + sRand() * 0.5,
-          25 + sRand() * 42,
-          [DARK_GREEN, SAGE, '#2a7a42', '#3a6a4a'][i%4]
-        );
-      }
-      
-      seed = 666;
-      const nf = 10;
-      for (let i = 0; i < Math.floor(gp * nf); i++) {
-        const a = sRand() * Math.PI * 2;
-        const r = 380 + sRand() * 200;
-        drawRose(
-          W/2 + Math.cos(a) * r,
-          H*0.38 + Math.sin(a) * r * 0.4,
-          16 + sRand() * 24,
-          [CRIMSON, '#E83E6C', '#d44060'][i%3]
-        );
-      }
-      
-      // Gold dust
-      seed = 777;
-      for (let i = 0; i < Math.floor(gp * 60); i++) {
-        ctx.save();
-        ctx.globalAlpha = 0.2 + sRand() * 0.45;
-        ctx.beginPath();
-        ctx.arc(W*0.08+sRand()*W*0.84, H*0.15+sRand()*H*0.5, 1+sRand()*3.5, 0, Math.PI*2);
-        ctx.fillStyle = GOLD;
-        ctx.fill();
-        ctx.restore();
-      }
-    }
-    
-    // "Eid Mubarak" English
-    if (t > 0.55) {
-      ctx.save();
-      ctx.globalAlpha = Math.min((t - 0.55) / 0.15, 1.0) * 0.4;
-      ctx.fillStyle = GOLD;
-      ctx.font = '300 32px Georgia, serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Eid Mubarak', W/2, H * 0.72);
-      ctx.restore();
-    }
-    
-    window._frame = frame;
-    window._done = frame >= TOTAL;
-    
-    if (frame < TOTAL) requestAnimationFrame(loop);
-  });
+  }
+  
+  // Garden elements queue
+  const gardenSeed = 500;
+  let gs = gardenSeed;
+  function gRand() { gs=(gs*16807)%2147483647; return(gs-1)/2147483646; }
+  
+  for (let i = 0; i < 40; i++) {
+    const a = gRand() * Math.PI * 2;
+    const r = 320 + gRand() * 300;
+    gardenQueue.push({
+      type: 'leaf',
+      x: W/2 + Math.cos(a) * r,
+      y: H*0.36 + Math.sin(a) * r * 0.45,
+      angle: a + 1 + gRand() * 0.6,
+      size: 25 + gRand() * 40,
+      color: [INK_GREEN, INK_SAGE, [42, 100, 58]][i%3]
+    });
+  }
+  
+  gs = 600;
+  for (let i = 0; i < 8; i++) {
+    const a = gRand() * Math.PI * 2;
+    const r = 360 + gRand() * 220;
+    gardenQueue.push({
+      type: 'rose',
+      x: W/2 + Math.cos(a) * r,
+      y: H*0.36 + Math.sin(a) * r * 0.4,
+      size: 14 + gRand() * 22,
+      color: [CRIMSON, [194, 40, 74], [212, 64, 96]][i%3]
+    });
+  }
+  
+  console.log('Paint queue:', paintQueue.length, 'Garden:', gardenQueue.length);
 }
 
-init();
+function sampleSVGPath(d, tx, ty, scale, ox, oy) {
+  // Simple SVG path parser — extract M, L, C, Z points
+  const pts = [];
+  const cmds = d.match(/[MLHVCSQTAZ][^MLHVCSQTAZ]*/gi) || [];
+  let cx = 0, cy = 0;
+  
+  for (const cmd of cmds) {
+    const type = cmd[0];
+    const nums = cmd.slice(1).trim().split(/[\s,]+/).map(Number);
+    
+    if (type === 'M' || type === 'm') {
+      cx = type === 'M' ? nums[0] : cx + nums[0];
+      cy = type === 'M' ? nums[1] : cy + nums[1];
+      pts.push({ x: (cx + tx) * scale + ox, y: (cy + ty) * scale + oy });
+    } else if (type === 'L' || type === 'l') {
+      for (let i = 0; i < nums.length; i += 2) {
+        cx = type === 'L' ? nums[i] : cx + nums[i];
+        cy = type === 'L' ? nums[i+1] : cy + nums[i+1];
+        pts.push({ x: (cx + tx) * scale + ox, y: (cy + ty) * scale + oy });
+      }
+    } else if (type === 'C' || type === 'c') {
+      for (let i = 0; i < nums.length; i += 6) {
+        let x1,y1,x2,y2,x3,y3;
+        if (type === 'C') {
+          x3 = nums[i+4]; y3 = nums[i+5];
+        } else {
+          x3 = cx + nums[i+4]; y3 = cy + nums[i+5];
+        }
+        // Sample cubic bezier
+        for (let t = 0.33; t <= 1; t += 0.33) {
+          const mt = 1 - t;
+          // Simplified — just endpoint
+          pts.push({ x: (x3 + tx) * scale + ox, y: (y3 + ty) * scale + oy });
+        }
+        cx = x3; cy = y3;
+      }
+    } else if (type === 'Z' || type === 'z') {
+      // Close — add first point again
+      if (pts.length > 0) pts.push({...pts[0]});
+    }
+  }
+  return pts;
+}
+
+function draw() {
+  frame++;
+  
+  // Paint calligraphy strokes progressively
+  const strokesPerFrame = Math.ceil(paintQueue.length / 120); // ~4s to paint all
+  
+  push();
+  translate(-W/2, -H/2);
+  
+  for (let s = 0; s < strokesPerFrame && paintIdx < paintQueue.length; s++) {
+    const stroke = paintQueue[paintIdx++];
+    const [r, g, b] = stroke.color;
+    
+    brush.set(stroke.type === 'main' ? 'marker' : 'HB', r, g, b, Math.random() * 80 + 60);
+    brush.strokeWeight(stroke.weight);
+    brush.line(stroke.x1, stroke.y1, stroke.x2, stroke.y2);
+  }
+  
+  // Garden elements after calligraphy 60% done
+  if (paintIdx > paintQueue.length * 0.5) {
+    const gardenPerFrame = 1;
+    for (let g = 0; g < gardenPerFrame && gardenIdx < gardenQueue.length; g++) {
+      const item = gardenQueue[gardenIdx++];
+      const [r, gv, b] = item.color;
+      
+      if (item.type === 'leaf') {
+        brush.set('marker', r, gv, b, 120);
+        brush.strokeWeight(item.size * 0.4);
+        const ex = item.x + Math.cos(item.angle) * item.size;
+        const ey = item.y + Math.sin(item.angle) * item.size;
+        brush.line(item.x, item.y, ex, ey);
+        // Second stroke for leaf width
+        brush.strokeWeight(item.size * 0.25);
+        brush.line(
+          item.x + Math.cos(item.angle + 0.3) * item.size * 0.3,
+          item.y + Math.sin(item.angle + 0.3) * item.size * 0.3,
+          ex, ey
+        );
+      } else if (item.type === 'rose') {
+        // Paint petals as short strokes radiating out
+        const petals = 6;
+        for (let p = 0; p < petals; p++) {
+          const a = (p / petals) * Math.PI * 2 + Math.random() * 0.3;
+          brush.set('marker', r, gv, b, 80 + Math.random() * 60);
+          brush.strokeWeight(item.size * 0.3);
+          brush.line(
+            item.x + Math.cos(a) * item.size * 0.15,
+            item.y + Math.sin(a) * item.size * 0.15,
+            item.x + Math.cos(a) * item.size * 0.5,
+            item.y + Math.sin(a) * item.size * 0.5
+          );
+        }
+        // Gold center
+        brush.set('HB', ...CREAM, 160);
+        brush.strokeWeight(item.size * 0.2);
+        brush.point(item.x, item.y);
+      }
+    }
+  }
+  
+  pop();
+  
+  window._frame = frame;
+  window._done = paintIdx >= paintQueue.length && gardenIdx >= gardenQueue.length;
+  
+  if (window._done && frame > 180) noLoop(); // stop after completion + hold
+}
 </script>
 </body>
 </html>
