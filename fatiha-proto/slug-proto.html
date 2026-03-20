@@ -130,7 +130,7 @@ function packCurvesForGPU(commands, offsetX, offsetY, scale) {
       });
       cx = cmd.x; cy = cmd.y;
     } else if (cmd.type === 'Z') {
-      // Close path — ignore for now
+      // Close path — line back to path start (handled by winding)
     }
   }
   return curves;
@@ -183,6 +183,8 @@ const slugFragmentShader = `
   uniform float time;
   uniform float revealProgress; // 0..1 how much text revealed
   uniform vec3 inkColor;
+  uniform vec4 verseBounds[7]; // xy = center, zw = halfSize per verse
+  uniform ivec2 verseRanges[7]; // x = startCurve, y = endCurve
 
   varying vec2 vUv;
 
@@ -230,13 +232,22 @@ const slugFragmentShader = `
     // Count signed crossings
     float winding = 0.0;
 
-    int maxCurve = int(float(curveCount) * revealProgress);
+    // Per-verse spatial culling: only check curves from nearby verses
+    for (int v = 0; v < 7; v++) {
+      vec4 vb = verseBounds[v];
+      // Skip this verse if fragment is far from its bounding box
+      vec2 d = abs(fragPos - vb.xy) - vb.zw;
+      if (d.x > pixelSize * 2.0 || d.y > pixelSize * 2.0) continue;
 
-    for (int i = 0; i < 8192; i++) {
-      if (i >= maxCurve) break;
+      int startC = verseRanges[v].x;
+      int endC = verseRanges[v].y;
 
-      vec4 t0 = fetchTexel(i * 2);     // p1.xy, p2.xy
-      vec4 t1 = fetchTexel(i * 2 + 1); // p3.xy, 0, 0
+    for (int i = 0; i < 4000; i++) {
+      if (i + startC >= endC) break;
+      int ci = i + startC;
+
+      vec4 t0 = fetchTexel(ci * 2);     // p1.xy, p2.xy
+      vec4 t1 = fetchTexel(ci * 2 + 1); // p3.xy, 0, 0
 
       // Make curve relative to fragment
       vec4 p12 = vec4(t0.xy - fragPos, t0.zw - fragPos);
@@ -254,6 +265,9 @@ const slugFragmentShader = `
         }
       }
     }
+
+    } // end curve loop
+    } // end verse loop
 
     coverage = clamp(abs(winding), 0.0, 1.0);
 
@@ -291,9 +305,10 @@ async function init() {
 
   // Layout: mihrab arch
   // For now, simple centered layout — each verse on its own line
-  const fontSize = Math.min(W * 0.06, 36);
-  const lineSpacing = fontSize * 2.2;
-  const startY = -(FATIHA.length - 1) * lineSpacing * 0.5;
+  const fontSize = Math.min(W * 0.055, 28);
+  const lineSpacing = fontSize * 2.8;
+  const totalH = (FATIHA.length - 1) * lineSpacing;
+  const startY = totalH * 0.5; // top verse starts here
 
   let allCurves = [];
   const verseCurveCounts = []; // track curves per verse for animation
@@ -304,9 +319,10 @@ async function init() {
     const bbox = path.getBoundingBox();
     const textW = bbox.x2 - bbox.x1;
 
-    // Center each verse horizontally (R→L text, opentype handles direction)
+    // Center each verse horizontally
     const ox = -textW * 0.5 - bbox.x1;
-    const oy = startY + v * lineSpacing;
+    // Verse 0 (Bismillah) at top, verse 6 at bottom
+    const oy = startY - v * lineSpacing;
 
     const curves = packCurvesForGPU(path.commands, ox, oy, 1.0);
     verseCurveCounts.push(curves.length);
@@ -314,6 +330,33 @@ async function init() {
   }
 
   console.log('Total curves:', allCurves.length, '| Per verse:', verseCurveCounts);
+
+  // Compute verse bounding boxes and curve ranges
+  const verseBoundsData = [];
+  const verseRangesData = [];
+  let curveOffset = 0;
+  for (let v = 0; v < FATIHA.length; v++) {
+    const count = verseCurveCounts[v];
+    const start = curveOffset;
+    const end = curveOffset + count;
+    verseRangesData.push(start, end);
+
+    // Compute bounding box for this verse's curves
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (let i = start; i < end; i++) {
+      const c = allCurves[i];
+      for (const p of [c.p1, c.p2, c.p3]) {
+        minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+        minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+      }
+    }
+    const cx = (minX + maxX) * 0.5;
+    const cy = (minY + maxY) * 0.5;
+    const hw = (maxX - minX) * 0.5 + 5; // pad
+    const hh = (maxY - minY) * 0.5 + 5;
+    verseBoundsData.push(cx, cy, hw, hh);
+    curveOffset = end;
+  }
 
   const { texture, curveCount, texWidth, texHeight } = createCurveTexture(allCurves);
 
@@ -329,12 +372,32 @@ async function init() {
       texHeight: { value: texHeight },
       resolution: { value: new THREE.Vector2(W, H) },
       time: { value: 0 },
-      revealProgress: { value: 0 },
-      inkColor: { value: new THREE.Color(0.95, 0.90, 0.80) } // warm ivory
+      revealProgress: { value: 1.0 }, // show all for testing
+      inkColor: { value: new THREE.Color(0.95, 0.90, 0.80) }, // warm ivory
+      verseBounds: { value: [] },
+      verseRanges: { value: [] }
     },
     transparent: true,
     depthWrite: false
   });
+
+  // Set verse bounds and ranges uniforms
+  const vbArr = [];
+  for (let i = 0; i < 7; i++) {
+    const bi = i * 4;
+    vbArr.push(new THREE.Vector4(
+      verseBoundsData[bi] || 0, verseBoundsData[bi+1] || 0,
+      verseBoundsData[bi+2] || 0, verseBoundsData[bi+3] || 0
+    ));
+  }
+  mat.uniforms.verseBounds.value = vbArr;
+
+  const vrArr = [];
+  for (let i = 0; i < 7; i++) {
+    const ri = i * 2;
+    vrArr.push(new THREE.Vector2(verseRangesData[ri] || 0, verseRangesData[ri+1] || 0));
+  }
+  mat.uniforms.verseRanges.value = vrArr;
 
   const mesh = new THREE.Mesh(geo, mat);
   scene.add(mesh);
