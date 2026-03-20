@@ -1,0 +1,414 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Ottoman Rose — 6 Styles</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<script src="https://cdn.jsdelivr.net/npm/p5@2/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.0-beta"></script>
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #0d0d0d; }
+  canvas { display: block; position: relative; z-index: 1; }
+  #labels { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+  .label { position: absolute; color: #999; font: bold 10px monospace; text-align: center; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+</style>
+</head>
+<body>
+<div id="labels"></div>
+<script>
+// ============================================================
+// OTTOMAN ROSE — 6 BRUSH STYLES GRID
+// Same petal geometry, different p5.brush techniques
+// ============================================================
+
+const PAD = 10;
+let cellW, cellH, roseScale;
+
+function gridPos(idx) {
+  const col = idx % 2, row = Math.floor(idx / 2);
+  const x0 = PAD + col * (cellW + PAD);
+  const y0 = PAD + row * (cellH + PAD);
+  return { x0, y0, cx: x0 + cellW / 2, cy: y0 + cellH * 0.44 };
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight, WEBGL);
+  pixelDensity(1);
+
+  const cols = 2, rows = 3;
+  cellW = (width - PAD * 3) / cols;
+  cellH = (height - PAD * 4) / rows;
+  roseScale = Math.min(cellW, cellH) * 0.33;
+
+  translate(-width / 2, -height / 2);
+  background(13, 13, 13);
+
+  const styles = [
+    { name: "Watercolor", fn: drawWatercolor },
+    { name: "Charcoal", fn: drawCharcoal },
+    { name: "Pencil", fn: drawPencil },
+    { name: "Marker", fn: drawMarker },
+    { name: "Ink Wash", fn: drawInkWash },
+    { name: "Gold Leaf", fn: drawGoldLeafFull },
+  ];
+
+  // Draw cells
+  for (let i = 0; i < styles.length; i++) {
+    const g = gridPos(i);
+    // Dark cell bg
+    push();
+    noStroke();
+    fill(22, 22, 25);
+    rect(g.x0, g.y0, cellW, cellH, 5);
+    pop();
+
+    // Draw the rose
+    push();
+    randomSeed(42 + i);
+    styles[i].fn(g.cx, g.cy, roseScale);
+    pop();
+  }
+
+  // HTML labels
+  const el = document.getElementById("labels");
+  el.innerHTML = "";
+  for (let i = 0; i < styles.length; i++) {
+    const g = gridPos(i);
+    const lbl = document.createElement("div");
+    lbl.className = "label";
+    lbl.textContent = styles[i].name;
+    lbl.style.left = g.x0 + "px";
+    lbl.style.top = (g.y0 + cellH - 22) + "px";
+    lbl.style.width = cellW + "px";
+    el.appendChild(lbl);
+  }
+
+  console.log("Ottoman rose styles grid complete");
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  setup();
+}
+
+// ============================================================
+// SHARED PETAL GEOMETRY
+// ============================================================
+function petalPts(len, w) {
+  return [
+    [0, 0],
+    [len * 0.2, -w * 0.5],
+    [len * 0.35, -w * 0.8],
+    [len * 0.5, -w * 0.9],
+    [len * 0.7, -w * 0.6],
+    [len * 0.9, -w * 0.2],
+    [len, 0],
+    [len * 0.9, w * 0.15],
+    [len * 0.7, w * 0.4],
+    [len * 0.5, w * 0.5],
+    [len * 0.35, w * 0.45],
+    [len * 0.2, w * 0.3],
+  ];
+}
+
+function drawShape(pts, curv) {
+  brush.beginShape(curv || 0.8);
+  for (const p of pts) brush.vertex(p[0], p[1]);
+  brush.endShape(true);
+}
+
+// Ring generators — call drawFn for each petal
+// Reduced petal counts to stay within p5.brush rendering budget
+function outerRing(cx, cy, s, fn) {
+  for (let i = 0; i < 5; i++) {
+    let a = (i / 5) * TWO_PI + 0.2;
+    fn(cx, cy, a, random(0.22, 0.28) * s, a + HALF_PI + random(-0.15, 0.15),
+       random(0.82, 1.0) * s, random(0.42, 0.55) * s, 0);
+  }
+}
+function midRing(cx, cy, s, fn) {
+  for (let i = 0; i < 5; i++) {
+    let a = (i / 5) * TWO_PI + 0.55;
+    fn(cx, cy, a, random(0.11, 0.18) * s, a + HALF_PI + random(-0.2, 0.2),
+       random(0.54, 0.68) * s, random(0.32, 0.42) * s, 1);
+  }
+}
+function innerRing(cx, cy, s, fn) {
+  for (let i = 0; i < 4; i++) {
+    let a = (i / 4) * TWO_PI + random(-0.2, 0.5);
+    fn(cx, cy, a, random(0.04, 0.09) * s, a + HALF_PI + random(-0.25, 0.25),
+       random(0.34, 0.44) * s, random(0.22, 0.32) * s, 2);
+  }
+}
+function centerRing(cx, cy, s, fn) {
+  for (let i = 0; i < 3; i++) {
+    let a = (i / 3) * TWO_PI + random(-0.3, 0.3);
+    fn(cx, cy, a, random(-0.03, 0.03) * s, a + HALF_PI * 0.4,
+       random(0.17, 0.26) * s, random(0.13, 0.21) * s, 3);
+  }
+}
+function allRings(cx, cy, s, fn) {
+  outerRing(cx, cy, s, fn);
+  midRing(cx, cy, s, fn);
+  innerRing(cx, cy, s, fn);
+  centerRing(cx, cy, s, fn);
+}
+
+// Helper: draw paper card behind a cell rose
+function paperCard(cx, cy, s, r, g, b) {
+  push(); noStroke(); fill(r, g, b);
+  rect(cx - s * 0.95, cy - s * 0.82, s * 1.9, s * 1.64, 4);
+  pop();
+}
+
+// ============================================================
+// 1. WATERCOLOR — heavy fillBleed, soft edges, translucent
+// ============================================================
+function drawWatercolor(cx, cy, s) {
+  const C = ["#d73c5a", "#b91e3c", "#911a2a", "#691e1e"];
+
+  function petal(ccx, ccy, a, sd, ta, len, w, ring) {
+    push();
+    translate(ccx + cos(a) * sd, ccy + sin(a) * sd);
+    rotate(ta);
+    brush.noStroke();
+    brush.fill(C[ring], random(55, 130));
+    brush.fillBleed(random(0.45, 0.85), random() > 0.5 ? "out" : "in");
+    brush.fillTexture(random(0.35, 0.6), random(0.2, 0.4));
+    drawShape(petalPts(len, w));
+    pop();
+  }
+
+  allRings(cx, cy, s, petal);
+
+  // Extra washes for depth
+  for (let i = 0; i < 4; i++) {
+    let ang = random(TWO_PI), d = random(0.05, 0.35) * s;
+    brush.noStroke();
+    brush.fill(random(C), random(15, 40));
+    brush.fillBleed(random(0.5, 0.95), "out");
+    brush.fillTexture(random(0.5, 0.7), random(0.2, 0.5));
+    brush.circle(cx + cos(ang) * d, cy + sin(ang) * d, random(0.15, 0.4) * s);
+  }
+}
+
+// ============================================================
+// 2. CHARCOAL — rough textured strokes, dark on cream, grainy
+// ============================================================
+function drawCharcoal(cx, cy, s) {
+  paperCard(cx, cy, s, 232, 225, 212);
+  brush.wiggle(3);
+
+  function petal(ccx, ccy, a, sd, ta, len, w, ring) {
+    push();
+    translate(ccx + cos(a) * sd, ccy + sin(a) * sd);
+    rotate(ta);
+    const pts = petalPts(len, w);
+
+    // Outline
+    brush.set("charcoal", "#231a14", random(0.5, 1.1));
+    brush.noFill();
+    drawShape(pts, 0.7);
+
+    // Grainy hatch fill — sparser for outer, denser for inner
+    let spacing = ring === 0 ? random(5, 8) : ring === 3 ? random(2, 3) : random(3, 5);
+    brush.hatchStyle("charcoal", "#3a2a20", random(0.25, 0.6));
+    brush.hatch(spacing, random(TWO_PI), { rand: 0.12 });
+    brush.noStroke();
+    brush.noFill();
+    drawShape(pts, 0.7);
+    brush.noHatch();
+    pop();
+  }
+
+  allRings(cx, cy, s, petal);
+  brush.noField();
+  brush.wiggle(0);
+}
+
+// ============================================================
+// 3. PENCIL SKETCH — fine lines, cross-hatching, light touch
+// ============================================================
+function drawPencil(cx, cy, s) {
+  paperCard(cx, cy, s, 248, 244, 238);
+
+  function petal(ccx, ccy, a, sd, ta, len, w, ring) {
+    push();
+    translate(ccx + cos(a) * sd, ccy + sin(a) * sd);
+    rotate(ta);
+    const pts = petalPts(len, w);
+
+    // Fine outline
+    brush.set("HB", "#444", 0.25);
+    brush.noFill();
+    drawShape(pts);
+
+    // Cross-hatching for shading
+    let sp1 = ring === 0 ? random(5, 7) : random(3, 5);
+    brush.hatchStyle("2H", "#666", 0.12);
+    brush.hatch(sp1, random(0.3, 0.9), { rand: 0.06, continuous: false });
+    brush.noStroke(); brush.noFill();
+    drawShape(pts);
+    brush.noHatch();
+
+    pop();
+  }
+
+  allRings(cx, cy, s, petal);
+}
+
+// ============================================================
+// 4. MARKER — bold opaque strokes, flat color fills, graphic
+// ============================================================
+function drawMarker(cx, cy, s) {
+  const C = ["#e8476e", "#d42854", "#a31e3a", "#7a1a2a"];
+
+  function petal(ccx, ccy, a, sd, ta, len, w, ring) {
+    push();
+    translate(ccx + cos(a) * sd, ccy + sin(a) * sd);
+    rotate(ta);
+    const pts = petalPts(len, w);
+
+    // Very opaque flat fill — minimal bleed
+    brush.noStroke();
+    brush.fill(C[ring], 230);
+    brush.fillBleed(0.01);
+    brush.fillTexture(0.03, 0.01);
+    drawShape(pts);
+
+    // Bold marker outline
+    brush.set("marker", "#110810", 1.2);
+    brush.noFill();
+    drawShape(pts, 0.65);
+
+    pop();
+  }
+
+  allRings(cx, cy, s, petal);
+}
+
+// ============================================================
+// 5. INK WASH — Chinese brush painting, flowing, minimal
+// ============================================================
+function drawInkWash(cx, cy, s) {
+  // Rice paper background
+  paperCard(cx, cy, s, 240, 235, 225);
+
+  function petal(ccx, ccy, a, sd, ta, len, w, ring) {
+    push();
+    translate(ccx + cos(a) * sd, ccy + sin(a) * sd);
+    rotate(ta);
+    const pts = petalPts(len, w);
+
+    // Wet ink wash — translucent with heavy bleed
+    brush.noStroke();
+    let opa = ring === 0 ? random(25, 45) : ring === 3 ? random(60, 90) : random(35, 60);
+    brush.fill("#1a1a1a", opa);
+    brush.fillBleed(random(0.6, 1.0), "out");
+    brush.fillTexture(random(0.55, 0.85), random(0.3, 0.6));
+    drawShape(pts);
+
+    // Subtle center vein
+    if (ring >= 2) {
+      brush.set("rotring", "#222", 0.2);
+      brush.noFill();
+      brush.line(len * 0.1, 0, len * 0.7, -w * 0.03);
+    }
+
+    pop();
+  }
+
+  allRings(cx, cy, s, petal);
+
+  // Ink splatter dots at center
+  for (let i = 0; i < 3; i++) {
+    let ang = random(TWO_PI), d = random(0.02, 0.12) * s;
+    brush.noStroke();
+    brush.fill("#0a0a0a", random(50, 100));
+    brush.fillBleed(0.8, "out");
+    brush.circle(cx + cos(ang) * d, cy + sin(ang) * d, random(0.04, 0.1) * s);
+  }
+}
+
+// ============================================================
+// 6. GOLD LEAF — spray particles, amber/gold, ornate
+// ============================================================
+function drawGoldLeafFull(cx, cy, s) {
+  const GL = "#f0d060", GM = "#c9a020", GD = "#8a6a10", AM = "#d4950a";
+  const C = [GL, GM, AM, GD];
+
+  function petal(ccx, ccy, a, sd, ta, len, w, ring) {
+    push();
+    translate(ccx + cos(a) * sd, ccy + sin(a) * sd);
+    rotate(ta);
+    const pts = petalPts(len, w);
+
+    // Gold fill with heavy texture
+    brush.noStroke();
+    brush.fill(C[ring], random(140, 210));
+    brush.fillBleed(random(0.08, 0.2), "out");
+    brush.fillTexture(random(0.75, 0.98), random(0.5, 0.8));
+    drawShape(pts);
+
+    pop();
+  }
+
+  allRings(cx, cy, s, petal);
+
+  // Scattered gold dust particles
+  for (let i = 0; i < 12; i++) {
+    let ang = random(TWO_PI), d = random(0.1, 0.85) * s;
+    let x = cx + cos(ang) * d, y = cy + sin(ang) * d;
+    brush.noStroke();
+    brush.fill(random([GL, GM, AM]), random(50, 100));
+    brush.fillBleed(random(0.2, 0.5), "out");
+    brush.fillTexture(random(0.85, 1.0), random(0.5, 0.8));
+    brush.circle(x, y, random(2, 7));
+  }
+}
+
+function drawGoldLeaf(cx, cy, s) {
+  const GL = "#f0d060", GM = "#c9a020", GD = "#8a6a10", AM = "#d4950a";
+  const C = [GL, GM, AM, GD];
+
+  function petal(ccx, ccy, a, sd, ta, len, w, ring) {
+    push();
+    translate(ccx + cos(a) * sd, ccy + sin(a) * sd);
+    rotate(ta);
+    const pts = petalPts(len, w);
+
+    // Gold fill with heavy texture — ornate feel
+    brush.noStroke();
+    brush.fill(C[ring], random(140, 210));
+    brush.fillBleed(random(0.08, 0.2), "out");
+    brush.fillTexture(random(0.75, 0.98), random(0.5, 0.8));
+    drawShape(pts);
+
+    pop();
+  }
+
+  allRings(cx, cy, s, petal);
+
+  // Gold hatch overlay for ornate shimmer
+  brush.hatchStyle("2H", GL, 0.2);
+  brush.hatch(3, 0.5, { rand: 0.1 });
+  brush.noStroke();
+  brush.noFill();
+  brush.circle(cx, cy, s * 0.6);
+  brush.noHatch();
+
+  // Scattered gold dust particles
+  for (let i = 0; i < 30; i++) {
+    let ang = random(TWO_PI), d = random(0.1, 0.85) * s;
+    let x = cx + cos(ang) * d, y = cy + sin(ang) * d;
+    brush.noStroke();
+    brush.fill(random([GL, GM, AM]), random(50, 100));
+    brush.fillBleed(random(0.2, 0.5), "out");
+    brush.fillTexture(random(0.85, 1.0), random(0.5, 0.8));
+    brush.circle(x, y, random(2, 8));
+  }
+}
+</script>
+</body>
+</html>

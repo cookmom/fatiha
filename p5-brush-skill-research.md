@@ -293,8 +293,13 @@ for (let i = 0; i < 12; i++) {
 ```
 Faster but less authentic — good for small shapes (buds, pollen).
 
+### Critical: Fill Budget is HARD ~43
+Empirically tested: p5.brush v2.0.0-beta crashes with `t.reduce(...).map is not a function` when exceeding ~43-45 watercolor fills in a single sketch. This is a hard limit, not a soft performance suggestion. For an Ottoman rose with stem, leaves, sepals, and petal rings, the budget is:
+- 2 atmospheric halos + 8 leaves (2 fills each) + 5 sepals + 16 outer petals (2 each) + 6 mid + 4 inner = **47 fills → CRASH**
+- Solution: Use stroke-based alternatives (spray, charcoal, marker) for center details and pollen instead of fills
+
 ### Recommendation
-**Use Hybrid (Option A) for large shapes** (roses, main leaves) and **Option B for small shapes** (buds, tendrils, pollen dots). This keeps the fill budget under p5.brush's ~50 limit while getting authentic watercolor for focal elements.
+**Use Hybrid (Option A) for large shapes** (roses, main leaves) and **Option B for small shapes** (buds, tendrils, pollen dots). This keeps the fill budget under p5.brush's ~43 hard limit while getting authentic watercolor for focal elements.
 
 ---
 
