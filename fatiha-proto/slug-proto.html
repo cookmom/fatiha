@@ -51,26 +51,35 @@ const data = await fetch('fatiha-curves.json').then(r => r.json());
 console.log('Loaded:', data.totalCurves, 'curves across', data.verses.length, 'verses');
 
 // --- Layout: Mihrab arch ---
-// Fit all verses vertically with Bismillah at top
-const maxWidth = W * 0.88;
-const lineSpacing = H / (data.verses.length + 2); // even spacing
-const topY = H * 0.38;
+// Pointed arch shape: wider at top, narrowing toward base
+// Bismillah crowns the keystone, verses flow down inside the arch
+const totalVerses = data.verses.length; // 8 lines (verse 7 split)
+const archTopY = H * 0.40;    // top of arch
+const archBottomY = -H * 0.38; // bottom
+const archHeight = archTopY - archBottomY;
+const archMaxWidth = W * 0.88; // widest point
+const archMinWidth = W * 0.55; // narrowest (keep readable)
 
-// Scale each verse to fit width, handle verse 7 (longest) by splitting
+// Mihrab arch width: gentle narrowing, text stays readable
+function archWidthAt(t) {
+  // t: 0 = top, 1 = bottom
+  // Very gentle S-curve narrowing — keeps lower verses readable
+  const ease = Math.pow(t, 1.5) * 0.6; // much gentler
+  return archMaxWidth * (1 - ease) + archMinWidth * ease;
+}
+
+const lineSpacing = archHeight / (totalVerses + 0.5);
+
 const verseLayouts = [];
-for (let v = 0; v < data.verses.length; v++) {
+for (let v = 0; v < totalVerses; v++) {
   const verse = data.verses[v];
-  let scale = Math.min(maxWidth / verse.width, 1.5); // cap upscale
-
-  // Verse 7: split into two lines if too wide
-  if (verse.width * scale > maxWidth && v === 6) {
-    scale = maxWidth / (verse.width * 0.55); // scale for half
-    // We'll handle the split later
-  }
+  const t = v / (totalVerses - 1); // 0 at top, 1 at bottom
+  const availWidth = archWidthAt(t);
+  let scale = Math.min(availWidth / verse.width, 1.8);
 
   const scaledW = verse.width * scale;
-  const ox = -scaledW * 0.5; // center: shift left by half width
-  const oy = topY - v * lineSpacing;
+  const ox = -scaledW * 0.5;
+  const oy = archTopY - v * lineSpacing;
 
   verseLayouts.push({ scale, ox, oy, verse });
 }
@@ -148,8 +157,8 @@ const fragmentShader = `
   uniform vec2 resolution;
   uniform float time;
   uniform vec3 inkColor;
-  uniform vec4 verseBounds[7];
-  uniform vec2 verseRanges[7];
+  uniform vec4 verseBounds[8];
+  uniform vec2 verseRanges[8];
 
   varying vec2 vUv;
 
@@ -188,7 +197,7 @@ const fragmentShader = `
     float pixelSize = 2.0;
     float winding = 0.0;
 
-    for (int v = 0; v < 7; v++) {
+    for (int v = 0; v < 8; v++) {
       vec4 vb = verseBounds[v];
       vec2 d = abs(fragPos - vb.xy) - vb.zw;
       if (d.x > pixelSize * 2.0 || d.y > pixelSize * 2.0) continue;
@@ -258,7 +267,7 @@ const mat = new THREE.ShaderMaterial({
 
 // Set verse uniforms
 const vbArr = [], vrArr = [];
-for (let i = 0; i < 7; i++) {
+for (let i = 0; i < 8; i++) {
   const bi = i * 4;
   vbArr.push(new THREE.Vector4(
     verseBoundsData[bi] || 0, verseBoundsData[bi+1] || 0,
@@ -271,6 +280,57 @@ mat.uniforms.verseBounds.value = vbArr;
 mat.uniforms.verseRanges.value = vrArr;
 
 scene.add(new THREE.Mesh(geo, mat));
+
+// --- Mihrab arch outline (proper pointed arch) ---
+// Islamic pointed arch: two circular arcs with centers offset inward
+const archPoints = [];
+const archSegs = 100;
+const archW = archMaxWidth * 0.52; // half-width at base
+const archH = archHeight * 0.55;   // height of arch
+const archBaseY = archBottomY + archHeight * 0.1;
+const archPeakY = archBaseY + archH;
+
+// Pointed arch: each side is a circular arc
+// Arc center is offset inward from the base corner
+const inset = archW * 0.3; // how pointed (smaller = more pointed)
+const R = Math.sqrt((archW - inset) * (archW - inset) + archH * archH);
+
+for (let i = 0; i <= archSegs; i++) {
+  const t = i / archSegs;
+  let x, y;
+
+  if (t <= 0.5) {
+    // Left arc: center at (-inset, archBaseY)
+    const s = t * 2;
+    const startAngle = Math.atan2(0, -(archW - inset)); // pointing left
+    const endAngle = Math.atan2(archH, inset); // pointing to peak
+    const angle = startAngle + s * (endAngle - startAngle);
+    x = -inset + R * Math.cos(angle);
+    y = archBaseY + R * Math.sin(angle);
+  } else {
+    // Right arc: center at (inset, archBaseY)
+    const s = (t - 0.5) * 2;
+    const startAngle = Math.atan2(archH, -inset); // from peak
+    const endAngle = Math.atan2(0, (archW - inset)); // pointing right
+    const angle = startAngle + s * (endAngle - startAngle);
+    x = inset + R * Math.cos(angle);
+    y = archBaseY + R * Math.sin(angle);
+  }
+
+  archPoints.push(new THREE.Vector3(x, y, 0));
+}
+
+// Close the bottom
+archPoints.push(new THREE.Vector3(archW, archBaseY, 0));
+archPoints.push(new THREE.Vector3(-archW, archBaseY, 0));
+
+const archGeo = new THREE.BufferGeometry().setFromPoints(archPoints);
+const archMat = new THREE.LineBasicMaterial({
+  color: 0xd4a86a,
+  transparent: true,
+  opacity: 0.08
+});
+scene.add(new THREE.Line(archGeo, archMat));
 
 // Post-processing
 const composer = new EffectComposer(renderer);
