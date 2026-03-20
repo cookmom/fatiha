@@ -17,6 +17,9 @@
 </head>
 <body>
 <div id="info">Loading...</div>
+<div id="tap" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:20;cursor:pointer;">
+  <div style="color:rgba(255,255,255,0.5);font:18px 'Georgia',serif;letter-spacing:2px;">tap to begin</div>
+</div>
 
 <script type="importmap">
 {
@@ -159,6 +162,7 @@ const fragmentShader = `
   uniform vec3 inkColor;
   uniform vec4 verseBounds[8];
   uniform vec2 verseRanges[8];
+  uniform float verseReveal[8]; // 0..1 per verse
 
   varying vec2 vUv;
 
@@ -203,7 +207,8 @@ const fragmentShader = `
       if (d.x > pixelSize * 2.0 || d.y > pixelSize * 2.0) continue;
 
       int startC = int(verseRanges[v].x);
-      int endC = int(verseRanges[v].y);
+      int totalC = int(verseRanges[v].y) - startC;
+      int endC = startC + int(float(totalC) * verseReveal[v]);
 
       for (int i = 0; i < 4000; i++) {
         if (i + startC >= endC) break;
@@ -259,7 +264,8 @@ const mat = new THREE.ShaderMaterial({
     time: { value: 0 },
     inkColor: { value: new THREE.Color(0.95, 0.88, 0.75) },
     verseBounds: { value: [] },
-    verseRanges: { value: [] }
+    verseRanges: { value: [] },
+    verseReveal: { value: new Array(8).fill(0.0) }
   },
   transparent: true,
   depthWrite: false
@@ -280,6 +286,25 @@ mat.uniforms.verseBounds.value = vbArr;
 mat.uniforms.verseRanges.value = vrArr;
 
 scene.add(new THREE.Mesh(geo, mat));
+
+// --- Audio: Mishary Al-Fatiha recitation ---
+// Ayah timestamps (seconds): start time for each verse
+const AYAH_TIMES = [0, 5.5, 11.5, 16.0, 21.0, 28.0, 34.0, 34.0]; // line 7&8 are same verse
+const TOTAL_DUR = 46.0;
+
+// Create audio element
+const audio = new Audio('mishary-fatiha.mp3');
+audio.preload = 'auto';
+let audioStarted = false;
+
+// Tap to start
+document.addEventListener('click', () => {
+  if (!audioStarted) {
+    audio.play();
+    audioStarted = true;
+    document.getElementById('tap').style.display = 'none';
+  }
+}, { once: true });
 
 // --- Mihrab arch outline (proper pointed arch) ---
 // Islamic pointed arch: two circular arcs with centers offset inward
@@ -339,7 +364,28 @@ composer.addPass(new UnrealBloomPass(new THREE.Vector2(W, H), 0.25, 0.2, 0.92));
 
 function animate() {
   requestAnimationFrame(animate);
-  mat.uniforms.time.value = performance.now() / 1000;
+
+  const t = audioStarted ? audio.currentTime : 0;
+  mat.uniforms.time.value = t;
+
+  // Per-verse reveal based on audio position
+  const reveal = mat.uniforms.verseReveal.value;
+  for (let v = 0; v < 8; v++) {
+    const verseStart = AYAH_TIMES[v];
+    const verseEnd = (v < 7) ? AYAH_TIMES[v + 1] : TOTAL_DUR;
+    const verseDur = verseEnd - verseStart;
+
+    if (t < verseStart) {
+      reveal[v] = 0.0;
+    } else if (t >= verseEnd) {
+      reveal[v] = 1.0;
+    } else {
+      // Ease-out for natural stroke feel
+      const raw = (t - verseStart) / verseDur;
+      reveal[v] = 1.0 - Math.pow(1.0 - raw, 2.0); // ease-out quadratic
+    }
+  }
+
   composer.render();
 }
 animate();
