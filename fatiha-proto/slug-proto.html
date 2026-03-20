@@ -184,7 +184,7 @@ const slugFragmentShader = `
   uniform float revealProgress; // 0..1 how much text revealed
   uniform vec3 inkColor;
   uniform vec4 verseBounds[7]; // xy = center, zw = halfSize per verse
-  uniform ivec2 verseRanges[7]; // x = startCurve, y = endCurve
+  uniform vec2 verseRanges[7]; // x = startCurve, y = endCurve (float, cast to int)
 
   varying vec2 vUv;
 
@@ -239,8 +239,8 @@ const slugFragmentShader = `
       vec2 d = abs(fragPos - vb.xy) - vb.zw;
       if (d.x > pixelSize * 2.0 || d.y > pixelSize * 2.0) continue;
 
-      int startC = verseRanges[v].x;
-      int endC = verseRanges[v].y;
+      int startC = int(verseRanges[v].x);
+      int endC = int(verseRanges[v].y);
 
     for (int i = 0; i < 4000; i++) {
       if (i + startC >= endC) break;
@@ -264,10 +264,8 @@ const slugFragmentShader = `
           winding -= clamp(r.y / pixelSize + 0.5, 0.0, 1.0);
         }
       }
-    }
-
-    } // end curve loop
-    } // end verse loop
+    } // end inner curve loop
+    } // end outer verse loop
 
     coverage = clamp(abs(winding), 0.0, 1.0);
 
