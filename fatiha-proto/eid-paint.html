@@ -5,9 +5,8 @@
 <meta charset="utf-8">
 <title>Eid Mubarak</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&display=swap');
   * { margin: 0; padding: 0; }
-  body { background: #0d0d12; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh; }
+  body { background: #0a0a10; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh; }
 </style>
 </head>
 <body>
@@ -21,64 +20,58 @@ canvas.style.maxHeight = '100vh';
 canvas.style.objectFit = 'contain';
 const ctx = canvas.getContext('2d');
 
-// Offscreen canvas for text mask
-const maskCanvas = document.createElement('canvas');
-maskCanvas.width = W; maskCanvas.height = H;
-const maskCtx = maskCanvas.getContext('2d');
-
-// Palette
 const BG = '#0a0a10';
 const GOLD = '#c9a84c';
-const GOLD_LIGHT = '#e8d090';
+const GOLD_LIGHT = '#ecd888';
 const DARK_GREEN = '#1a5a32';
 const SAGE = '#4a8a5a';
-const CREAM = '#f5e8d0';
 const CRIMSON = '#b82040';
 
 let seed = 42;
 function sRand() { seed=(seed*16807)%2147483647; return(seed-1)/2147483646; }
 
-function drawLeaf(x, y, angle, size, color) {
+// Ottoman leaf
+function drawLeaf(cx, cy, angle, size, color) {
   ctx.save();
-  ctx.translate(x, y);
+  ctx.translate(cx, cy);
   ctx.rotate(angle);
-  ctx.globalAlpha = 0.6;
+  ctx.globalAlpha = 0.55 + sRand() * 0.15;
   ctx.beginPath();
   ctx.moveTo(0, 0);
-  ctx.bezierCurveTo(size*.35, -size*.5, size*.85, -size*.25, size, 0);
-  ctx.bezierCurveTo(size*.85, size*.25, size*.35, size*.5, 0, 0);
+  ctx.bezierCurveTo(size*.4, -size*.5, size*.9, -size*.25, size, 0);
+  ctx.bezierCurveTo(size*.9, size*.25, size*.4, size*.5, 0, 0);
   ctx.fillStyle = color;
   ctx.fill();
-  // vein
   ctx.globalAlpha = 0.2;
   ctx.beginPath();
-  ctx.moveTo(size*.1, 0);
-  ctx.lineTo(size*.8, 0);
-  ctx.strokeStyle = '#082010';
-  ctx.lineWidth = 1;
+  ctx.moveTo(size*.08, 0);
+  ctx.lineTo(size*.82, 0);
+  ctx.strokeStyle = '#041008';
+  ctx.lineWidth = 1.2;
   ctx.stroke();
   ctx.restore();
 }
 
-function drawRose(x, y, size, color) {
+// Rose
+function drawRose(cx, cy, size, color) {
   ctx.save();
-  ctx.translate(x, y);
+  ctx.translate(cx, cy);
   for (let ring = 2; ring >= 0; ring--) {
-    const rs = size * (0.4 + ring * 0.35);
+    const rs = size * (0.35 + ring * 0.35);
     const np = 5 + Math.floor(sRand() * 3);
     for (let i = 0; i < np; i++) {
-      const a = (i/np) * Math.PI*2 + ring*0.4 + sRand()*0.3;
+      const a = (i/np)*Math.PI*2 + ring*0.4 + sRand()*0.3;
       ctx.save();
       ctx.rotate(a);
-      ctx.globalAlpha = 0.3 + ring*0.12;
+      ctx.globalAlpha = 0.3 + ring*0.1;
       ctx.beginPath();
-      ctx.ellipse(rs*0.45, 0, rs*0.45, rs*0.2, 0, 0, Math.PI*2);
+      ctx.ellipse(rs*0.42, 0, rs*0.42, rs*0.18, 0, 0, Math.PI*2);
       ctx.fillStyle = color;
       ctx.fill();
       ctx.restore();
     }
   }
-  ctx.globalAlpha = 0.8;
+  ctx.globalAlpha = 0.75;
   ctx.beginPath();
   ctx.arc(0, 0, size*0.1, 0, Math.PI*2);
   ctx.fillStyle = GOLD_LIGHT;
@@ -87,177 +80,194 @@ function drawRose(x, y, size, color) {
 }
 
 let frame = 0;
-const FPS = 30, DUR = 8, TOTAL = FPS * DUR;
+const FPS = 30, DUR = 10, TOTAL = FPS * DUR;
 
-// Wait for font
-document.fonts.ready.then(() => {
-  console.log('Fonts ready');
-  requestAnimationFrame(loop);
-});
-
-function loop() {
-  frame++;
-  const t = Math.min(frame / TOTAL, 1.0);
+async function init() {
+  // Load traced SVG
+  const resp = await fetch('eid-traced-color.svg');
+  const svgText = await resp.text();
   
-  // Clear
-  ctx.fillStyle = BG;
-  ctx.fillRect(0, 0, W, H);
+  // Parse SVG paths
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svgText, 'image/svg+xml');
+  const svgPaths = doc.querySelectorAll('path');
   
-  // Warm vignette
-  const vig = ctx.createRadialGradient(W/2, H*.42, 80, W/2, H*.42, H*.5);
-  vig.addColorStop(0, 'rgba(35,28,18,0.3)');
-  vig.addColorStop(1, 'rgba(10,10,16,0)');
-  ctx.fillStyle = vig;
-  ctx.fillRect(0, 0, W, H);
+  console.log('SVG paths:', svgPaths.length);
   
-  // === CALLIGRAPHY ===
-  // Two lines: عيد (big) and مبارك (slightly smaller below)
-  const textReveal = Math.min(t * 2.0, 1.0);
+  // Convert to Path2D objects with transforms and colors
+  // Skip background paths (very light fills) and keep calligraphy
+  const layers = [];
+  for (const p of svgPaths) {
+    const d = p.getAttribute('d');
+    const fill = p.getAttribute('fill') || '#000';
+    const transform = p.getAttribute('transform') || '';
+    
+    // Parse fill color brightness — skip light fills (background)
+    const hex = fill.replace('#','');
+    const r = parseInt(hex.substr(0,2),16);
+    const g = parseInt(hex.substr(2,2),16);
+    const b = parseInt(hex.substr(4,2),16);
+    const brightness = (r + g + b) / 3;
+    
+    // Skip very light paths (background, white elements)
+    if (brightness > 180) continue;
+    
+    // Parse translate
+    let tx = 0, ty = 0;
+    const m = transform.match(/translate\(([^,)]+)[,\s]([^)]+)\)/);
+    if (m) { tx = parseFloat(m[1]); ty = parseFloat(m[2]); }
+    
+    // Classify: dark = main calligraphy, mid = gold accents
+    const type = brightness < 130 ? 'calligraphy' : 'accent';
+    
+    layers.push({ d, fill, tx, ty, type, brightness, path2d: new Path2D(d) });
+  }
+  console.log('Filtered layers:', layers.length, '(removed bg)');
   
-  if (textReveal > 0) {
-    // Draw text to mask (white on black)
-    maskCtx.fillStyle = '#000';
-    maskCtx.fillRect(0, 0, W, H);
-    maskCtx.fillStyle = '#fff';
-    maskCtx.textAlign = 'center';
-    maskCtx.textBaseline = 'middle';
+  // Source SVG is 800x800 — scale to fill 9:16 portrait
+  const svgW = 800, svgH = 800;
+  const targetW = W * 0.92;
+  const targetH = targetW; // keep square aspect
+  const scaleX = targetW / svgW;
+  const scaleY = targetH / svgH;
+  const offsetX = (W - targetW) / 2;
+  const offsetY = H * 0.18; // position in upper portion
+  
+  requestAnimationFrame(function loop() {
+    frame++;
+    const t = Math.min(frame / TOTAL, 1.0);
     
-    // عيد — large
-    maskCtx.font = 'bold 220px "Aref Ruqaa", serif';
-    maskCtx.fillText('عيد', W/2, H*0.36);
+    ctx.fillStyle = BG;
+    ctx.fillRect(0, 0, W, H);
     
-    // مبارك — slightly smaller
-    maskCtx.font = 'bold 180px "Aref Ruqaa", serif';
-    maskCtx.fillText('مبارك', W/2, H*0.48);
+    // Warm vignette
+    const vig = ctx.createRadialGradient(W/2, H*.38, 100, W/2, H*.38, H*.5);
+    vig.addColorStop(0, 'rgba(30,25,15,0.25)');
+    vig.addColorStop(1, 'rgba(10,10,16,0)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, W, H);
     
-    const maskData = maskCtx.getImageData(0, 0, W, H);
+    // Progressive reveal of SVG layers
+    const layersToShow = Math.ceil(layers.length * Math.min(t * 2, 1.0));
     
-    // Paint calligraphy using mask — layered approach
-    seed = 200;
-    const passes = Math.floor(textReveal * 10);
-    
-    // Layer 1: Solid fill (clean readable text)
-    ctx.save();
-    ctx.globalAlpha = 0.85 * textReveal;
-    ctx.fillStyle = GOLD;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = 'bold 220px "Aref Ruqaa", serif';
-    ctx.fillText('عيد', W/2, H*0.36);
-    ctx.font = 'bold 180px "Aref Ruqaa", serif';
-    ctx.fillText('مبارك', W/2, H*0.48);
-    ctx.restore();
-    
-    // Layer 2: Watercolor texture overlay (scatter dots on text)
-    for (let pass = 0; pass < passes; pass++) {
-      const nDots = 800;
-      for (let d = 0; d < nDots; d++) {
-        const x = Math.floor(sRand() * W);
-        const y = Math.floor(H*0.25 + sRand() * H*0.35);
-        const idx = (y * W + x) * 4;
-        if (maskData.data[idx] < 128) continue;
-        
+    for (let li = 0; li < layersToShow; li++) {
+      const layer = layers[li];
+      const layerProgress = Math.min((t * 2 - li / layers.length) * layers.length * 0.5, 1.0);
+      if (layerProgress <= 0) continue;
+      
+      ctx.save();
+      ctx.translate(offsetX + layer.tx * scaleX, offsetY + layer.ty * scaleY);
+      ctx.scale(scaleX, scaleY);
+      
+      // Multi-pass watercolor fill
+      const passes = Math.ceil(layerProgress * 10);
+      for (let pass = 0; pass < passes; pass++) {
         ctx.save();
-        ctx.globalAlpha = 0.04 + sRand() * 0.06;
+        const jx = (sRand() - 0.5) * 2;
+        const jy = (sRand() - 0.5) * 2;
+        ctx.translate(jx, jy);
+        
+        if (layer.type === 'calligraphy') {
+          // Main calligraphy: dark base → gold → bright gold
+          if (pass < 3) {
+            ctx.globalAlpha = 0.18;
+            ctx.fillStyle = '#3a2a10'; // dark warm base
+          } else if (pass < 7) {
+            ctx.globalAlpha = 0.12;
+            ctx.fillStyle = GOLD;
+          } else {
+            ctx.globalAlpha = 0.08;
+            ctx.fillStyle = GOLD_LIGHT;
+          }
+        } else {
+          // Accents: warm gold/amber
+          if (pass < 5) {
+            ctx.globalAlpha = 0.12;
+            ctx.fillStyle = GOLD;
+          } else {
+            ctx.globalAlpha = 0.08;
+            ctx.fillStyle = GOLD_LIGHT;
+          }
+        }
+        
+        ctx.fill(layer.path2d);
+        ctx.restore();
+      }
+      
+      // Fine outline
+      if (layerProgress > 0.5) {
+        ctx.globalAlpha = 0.25 * Math.min((layerProgress - 0.5) * 2, 1.0);
+        ctx.strokeStyle = layer.type === 'calligraphy' ? GOLD : GOLD_LIGHT;
+        ctx.lineWidth = 1.2 / scaleX;
+        ctx.stroke(layer.path2d);
+      }
+      
+      ctx.restore();
+    }
+    
+    // Garden wreath
+    if (t > 0.25) {
+      const gp = Math.min((t - 0.25) / 0.5, 1.0);
+      seed = 555;
+      
+      const nc = 40; // leaves
+      for (let i = 0; i < Math.floor(gp * nc); i++) {
+        const a = sRand() * Math.PI * 2;
+        const r = 350 + sRand() * 280;
+        drawLeaf(
+          W/2 + Math.cos(a) * r,
+          H*0.38 + Math.sin(a) * r * 0.45,
+          a + 1 + sRand() * 0.5,
+          25 + sRand() * 42,
+          [DARK_GREEN, SAGE, '#2a7a42', '#3a6a4a'][i%4]
+        );
+      }
+      
+      seed = 666;
+      const nf = 10;
+      for (let i = 0; i < Math.floor(gp * nf); i++) {
+        const a = sRand() * Math.PI * 2;
+        const r = 380 + sRand() * 200;
+        drawRose(
+          W/2 + Math.cos(a) * r,
+          H*0.38 + Math.sin(a) * r * 0.4,
+          16 + sRand() * 24,
+          [CRIMSON, '#E83E6C', '#d44060'][i%3]
+        );
+      }
+      
+      // Gold dust
+      seed = 777;
+      for (let i = 0; i < Math.floor(gp * 60); i++) {
+        ctx.save();
+        ctx.globalAlpha = 0.2 + sRand() * 0.45;
         ctx.beginPath();
-        const r = 3 + sRand() * 8;
-        ctx.arc(x + (sRand()-.5)*4, y + (sRand()-.5)*4, r, 0, Math.PI*2);
-        
-        if (pass < 4) ctx.fillStyle = '#6a4a1a';
-        else if (pass < 7) ctx.fillStyle = GOLD_LIGHT;
-        else ctx.fillStyle = CREAM;
-        
+        ctx.arc(W*0.08+sRand()*W*0.84, H*0.15+sRand()*H*0.5, 1+sRand()*3.5, 0, Math.PI*2);
+        ctx.fillStyle = GOLD;
         ctx.fill();
         ctx.restore();
       }
     }
     
-    // Gold outline pass (thin)
-    if (textReveal > 0.5) {
-      const outlineAlpha = Math.min((textReveal - 0.5) * 2, 1.0) * 0.4;
+    // "Eid Mubarak" English
+    if (t > 0.55) {
       ctx.save();
-      ctx.globalAlpha = outlineAlpha;
+      ctx.globalAlpha = Math.min((t - 0.55) / 0.15, 1.0) * 0.4;
       ctx.fillStyle = GOLD;
+      ctx.font = '300 32px Georgia, serif';
       ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      
-      ctx.font = 'bold 220px "Aref Ruqaa", serif';
-      ctx.strokeStyle = GOLD;
-      ctx.lineWidth = 2;
-      ctx.strokeText('عيد', W/2, H*0.36);
-      
-      ctx.font = 'bold 180px "Aref Ruqaa", serif';
-      ctx.strokeText('مبارك', W/2, H*0.48);
+      ctx.fillText('Eid Mubarak', W/2, H * 0.72);
       ctx.restore();
     }
-  }
-  
-  // === GARDEN ELEMENTS ===
-  if (t > 0.3) {
-    const gp = Math.min((t - 0.3) / 0.5, 1.0);
-    seed = 500;
     
-    // Leaves wreathing the text
-    const nl = Math.floor(gp * 36);
-    for (let i = 0; i < nl; i++) {
-      const a = sRand() * Math.PI * 2;
-      const r = 240 + sRand() * 300;
-      drawLeaf(
-        W/2 + Math.cos(a) * r,
-        H*0.42 + Math.sin(a) * r * 0.35,
-        a + 1 + sRand(),
-        24 + sRand() * 40,
-        [DARK_GREEN, SAGE, '#2a7a42', '#3a6a4a'][i%4]
-      );
-    }
+    window._frame = frame;
+    window._done = frame >= TOTAL;
     
-    // Roses
-    const nr = Math.floor(gp * 8);
-    seed = 600;
-    for (let i = 0; i < nr; i++) {
-      const a = sRand() * Math.PI * 2;
-      const r = 300 + sRand() * 200;
-      drawRose(
-        W/2 + Math.cos(a) * r,
-        H*0.42 + Math.sin(a) * r * 0.35,
-        15 + sRand() * 25,
-        [CRIMSON, '#E83E6C', '#d44060', '#c2284a'][i%4]
-      );
-    }
-    
-    // Gold dust
-    seed = 700;
-    const nd = Math.floor(gp * 50);
-    for (let i = 0; i < nd; i++) {
-      const x = W*0.1 + sRand()*W*0.8;
-      const y = H*0.22 + sRand()*H*0.4;
-      ctx.save();
-      ctx.globalAlpha = 0.25 + sRand() * 0.4;
-      ctx.beginPath();
-      ctx.arc(x, y, 1 + sRand()*3, 0, Math.PI*2);
-      ctx.fillStyle = GOLD;
-      ctx.fill();
-      ctx.restore();
-    }
-  }
-  
-  // English subtitle
-  if (t > 0.6) {
-    const sa = Math.min((t - 0.6) / 0.15, 1.0) * 0.4;
-    ctx.save();
-    ctx.globalAlpha = sa;
-    ctx.fillStyle = GOLD;
-    ctx.font = '300 30px Georgia, serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Eid Mubarak', W/2, H * 0.58);
-    ctx.restore();
-  }
-  
-  window._frame = frame;
-  window._done = frame >= TOTAL;
-  
-  if (frame < TOTAL) requestAnimationFrame(loop);
+    if (frame < TOTAL) requestAnimationFrame(loop);
+  });
 }
+
+init();
 </script>
 </body>
 </html>
