@@ -69,7 +69,7 @@ for (let v = 0; v < data.verses.length; v++) {
   }
 
   const scaledW = verse.width * scale;
-  const ox = scaledW * 0.5; // shift right since text goes R→L from origin
+  const ox = -scaledW * 0.5; // center: shift left by half width
   const oy = topY - v * lineSpacing;
 
   verseLayouts.push({ scale, ox, oy, verse });
