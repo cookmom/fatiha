@@ -1,219 +1,523 @@
 <!-- بسم الله الرحمن الرحيم -->
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html>
 <head>
-<meta charset="utf-8">
-<title>Eid Mubarak</title>
-<style>
-  * { margin: 0; padding: 0; }
-  body { background: #f2ead8; overflow: hidden; }
-</style>
-<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+  <meta charset="utf-8">
+  <title>Eid Mubarak — Ottoman Garden Calligraphy</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@2/lib/p5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.0-beta"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #1a1610; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    canvas { display: block; }
+  </style>
 </head>
 <body>
 <script>
-const W = 1080, H = 1920;
-let calliData = null;
-let paintQueue = [];
-let paintIdx = 0;
-let gardenQueue = [];
-let gardenIdx = 0;
-let frame = 0;
-let setupDone = false;
+// ============================================================
+// SEEDED PRNG (reproducible watercolor)
+// ============================================================
+let _wcSeed = 12345;
+function wcRandom() {
+  _wcSeed = (_wcSeed * 16807) % 2147483647;
+  return (_wcSeed - 1) / 2147483646;
+}
+function gaussRand(mean, std) {
+  const u1 = wcRandom(), u2 = wcRandom();
+  return mean + std * Math.sqrt(-2 * Math.log(u1 || 0.001)) * Math.cos(2 * Math.PI * u2);
+}
 
-function setup() {
-  createCanvas(W, H, WEBGL);
+// ============================================================
+// TYLER HOBBS WATERCOLOR ENGINE (2D buffer)
+// ============================================================
+let wcGfx;
+
+function deformOnce(poly, variances) {
+  const result = [], newVars = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], c = poly[(i + 1) % poly.length];
+    result.push([a[0], a[1]]);
+    const v = variances ? variances[i] : 0.15;
+    const bx = (a[0] + c[0]) / 2, by = (a[1] + c[1]) / 2;
+    const dx = c[0] - a[0], dy = c[1] - a[1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.5) { result.push([bx, by]); newVars.push(v, v); continue; }
+    const nx = -dy / len, ny = dx / len;
+    const offset = gaussRand(0, v * len);
+    result.push([bx + nx * offset, by + ny * offset]);
+    newVars.push(v * (0.6 + wcRandom() * 0.6), v * (0.6 + wcRandom() * 0.6));
+  }
+  return { poly: result, variances: newVars };
+}
+
+function deformN(poly, n, baseVariance) {
+  let p = poly.map(pt => [pt[0], pt[1]]);
+  let vars = poly.map(() => baseVariance);
+  for (let i = 0; i < n; i++) {
+    const res = deformOnce(p, vars);
+    p = res.poly; vars = res.variances;
+  }
+  return p;
+}
+
+function watercolorFill(polygon, r, g, b, layers, alpha, variance, baseRounds, layerRounds) {
+  baseRounds = baseRounds || 4;
+  layerRounds = layerRounds || 2;
+  variance = variance || 0.12;
+  const basePoly = deformN(polygon, baseRounds, variance);
+  const ctx = wcGfx.drawingContext;
+  for (let i = 0; i < layers; i++) {
+    const layerPoly = deformN(basePoly, layerRounds, variance * 0.7);
+    ctx.save();
+    ctx.globalAlpha = alpha / 255;
+    const jr = Math.max(0, Math.min(255, Math.round(r + gaussRand(0, 4))));
+    const jg = Math.max(0, Math.min(255, Math.round(g + gaussRand(0, 3))));
+    const jb = Math.max(0, Math.min(255, Math.round(b + gaussRand(0, 3))));
+    ctx.fillStyle = `rgb(${jr},${jg},${jb})`;
+    ctx.beginPath();
+    ctx.moveTo(layerPoly[0][0], layerPoly[0][1]);
+    for (let j = 1; j < layerPoly.length; j++) ctx.lineTo(layerPoly[j][0], layerPoly[j][1]);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ============================================================
+// CONTOUR HELPERS
+// ============================================================
+function simplifyContour(pts, maxPts) {
+  if (pts.length <= maxPts) return pts;
+  const step = Math.ceil(pts.length / maxPts);
+  const result = [];
+  for (let i = 0; i < pts.length; i += step) result.push(pts[i]);
+  if (result.length > 1) result.push(pts[pts.length - 1]);
+  return result;
+}
+
+function removeDuplicates(pts) {
+  if (pts.length < 2) return pts;
+  const cleaned = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const prev = cleaned[cleaned.length - 1];
+    if (Math.abs(pts[i][0] - prev[0]) > 0.3 || Math.abs(pts[i][1] - prev[1]) > 0.3) {
+      cleaned.push(pts[i]);
+    }
+  }
+  return cleaned;
+}
+
+function transformContours(contours, lineWidth, targetCX, targetCY, scaleFactor) {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const c of contours) {
+    for (const p of c) {
+      const px = p.x !== undefined ? p.x : p[0];
+      const py = p.y !== undefined ? p.y : p[1];
+      minX = Math.min(minX, px); maxX = Math.max(maxX, px);
+      minY = Math.min(minY, py); maxY = Math.max(maxY, py);
+    }
+  }
+  const midX = (minX + maxX) / 2;
+  const midY = (minY + maxY) / 2;
+
+  return contours.map(c => {
+    let pts = c.map(p => {
+      const px = p.x !== undefined ? p.x : p[0];
+      const py = p.y !== undefined ? p.y : p[1];
+      return [
+        targetCX + (px - midX) * scaleFactor,
+        targetCY - (py - midY) * scaleFactor
+      ];
+    });
+    pts = removeDuplicates(pts);
+    pts = simplifyContour(pts, 55);
+    return pts;
+  });
+}
+
+// ============================================================
+// GARDEN POLYGON BUILDERS
+// ============================================================
+function sazLeafPoly(cx, cy, ang, len, maxW) {
+  const poly = [];
+  const ca = Math.cos(ang), sa = Math.sin(ang);
+  const nx = -sa, ny = ca;
+  const steps = 18;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const w = Math.sin(t * Math.PI) * maxW * (0.5 + 0.5 * Math.sin(t * Math.PI * 0.8));
+    const sc = Math.sin(t * Math.PI * 1.2) * maxW * 0.15;
+    poly.push([cx + ca * t * len + nx * (w + sc), cy + sa * t * len + ny * (w + sc)]);
+  }
+  for (let i = steps; i >= 0; i--) {
+    const t = i / steps;
+    const w = Math.sin(t * Math.PI) * maxW * 0.35;
+    const sc = Math.sin(t * Math.PI * 1.2) * maxW * 0.1;
+    poly.push([cx + ca * t * len - nx * (w - sc), cy + sa * t * len - ny * (w - sc)]);
+  }
+  return poly;
+}
+
+function petalPoly(cx, cy, ang, len, wid) {
+  const poly = [];
+  const ca = Math.cos(ang), sa = Math.sin(ang);
+  const nx = -sa, ny = ca;
+  const steps = 14;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    let w;
+    if (t < 0.15) w = t / 0.15 * 0.4;
+    else if (t < 0.5) w = 0.4 + (t - 0.15) / 0.35 * 0.6;
+    else if (t < 0.8) w = 1.0 - (t - 0.5) / 0.3 * 0.4;
+    else w = 0.6 * (1 - (t - 0.8) / 0.2);
+    poly.push([cx + ca * t * len + nx * w * wid * 0.5, cy + sa * t * len + ny * w * wid * 0.5]);
+  }
+  for (let i = steps; i >= 0; i--) {
+    const t = i / steps;
+    let w;
+    if (t < 0.15) w = t / 0.15 * 0.4;
+    else if (t < 0.5) w = 0.4 + (t - 0.15) / 0.35 * 0.6;
+    else if (t < 0.8) w = 1.0 - (t - 0.5) / 0.3 * 0.4;
+    else w = 0.6 * (1 - (t - 0.8) / 0.2);
+    poly.push([cx + ca * t * len - nx * w * wid * 0.3, cy + sa * t * len - ny * w * wid * 0.3]);
+  }
+  return poly;
+}
+
+// ============================================================
+// COLOR PALETTE
+// ============================================================
+const PAL = {
+  inkGreen:      [18, 58, 22],
+  inkGreenLight: [28, 78, 32],
+  leafGreen:     [38, 100, 42],
+  leafDark:      [22, 70, 26],
+  crimson:       [196, 30, 58],
+  crimsonLight:  [215, 60, 85],
+  crimsonDark:   [140, 20, 40],
+  gold:          [195, 160, 48],
+  goldLight:     [218, 186, 72],
+  goldDark:      [140, 110, 30],
+  earth:         [107, 66, 38],
+};
+
+function varyColor(c, amt) {
+  const s = gaussRand(0, amt || 6);
+  return [
+    Math.max(0, Math.min(255, Math.round(c[0] + s))),
+    Math.max(0, Math.min(255, Math.round(c[1] + s * 0.7))),
+    Math.max(0, Math.min(255, Math.round(c[2] + s * 0.5)))
+  ];
+}
+
+// ============================================================
+// CALLIGRAPHY DATA (loaded from JSON)
+// ============================================================
+let CAL;
+// ============================================================
+// MAIN SETUP
+// ============================================================
+async function setup() {
+  createCanvas(1080, 1920, WEBGL);
   brush.load();
-  frameRate(30);
-  background(242, 234, 218);
-  
-  // Add subtle paper texture with brush
-  brush.set('2H', 220, 215, 200, 15);
-  brush.strokeWeight(0.5);
-  for (let i = 0; i < 300; i++) {
-    const x = random(W);
-    const y = random(H);
-    brush.line(x, y, x + random(-30, 30), y + random(-30, 30));
-  }
-  
-  loadCalligraphy();
-}
+  translate(-width / 2, -height / 2);
+  randomSeed(42);
+  brush.scaleBrushes(2);
 
-async function loadCalligraphy() {
+  // Load calligraphy data
   const resp = await fetch('eid-calligraphy.json');
-  calliData = await resp.json();
-  
-  // Scale and center
-  const scale1 = (W * 0.65) / calliData.line1.width;
-  const scale2 = (W * 0.65) / calliData.line2.width;
-  
-  const cx = W / 2;
-  const line1Y = H * 0.34;
-  const line2Y = H * 0.48;
-  
-  // Build paint strokes for each contour
-  function buildStrokes(contours, textWidth, scale, centerY) {
-    const ox = cx - (textWidth * scale) / 2;
-    
-    for (const contour of contours) {
-      const pts = contour.map(p => ({
-        x: p.x * scale + ox,
-        y: -p.y * scale + centerY  // flip Y
-      }));
-      
-      // Paint along contour in segments
-      for (let i = 0; i < pts.length - 1; i++) {
-        paintQueue.push({
-          x1: pts[i].x, y1: pts[i].y,
-          x2: pts[i+1].x, y2: pts[i+1].y,
-          layer: 'base'
-        });
-      }
-      
-      // Second pass: fill interior with cross-strokes
-      const bbox = pts.reduce((b, p) => ({
-        minX: Math.min(b.minX, p.x), maxX: Math.max(b.maxX, p.x),
-        minY: Math.min(b.minY, p.y), maxY: Math.max(b.maxY, p.y)
-      }), {minX:Infinity, maxX:-Infinity, minY:Infinity, maxY:-Infinity});
-      
-      // Horizontal fill strokes inside the contour
-      for (let y = bbox.minY; y < bbox.maxY; y += 4) {
-        // Find intersections with contour at this Y
-        const intersections = [];
-        for (let i = 0; i < pts.length - 1; i++) {
-          const p1 = pts[i], p2 = pts[i+1];
-          if ((p1.y <= y && p2.y > y) || (p2.y <= y && p1.y > y)) {
-            const t = (y - p1.y) / (p2.y - p1.y);
-            intersections.push(p1.x + t * (p2.x - p1.x));
-          }
-        }
-        intersections.sort((a,b) => a - b);
-        
-        for (let j = 0; j < intersections.length - 1; j += 2) {
-          paintQueue.push({
-            x1: intersections[j], y1: y,
-            x2: intersections[j+1], y2: y,
-            layer: 'fill'
-          });
-        }
-      }
-    }
-  }
-  
-  buildStrokes(calliData.line1.contours, calliData.line1.width, scale1, line1Y);
-  buildStrokes(calliData.line2.contours, calliData.line2.width, scale2, line2Y);
-  
-  console.log('Paint queue:', paintQueue.length);
-  
-  // Garden elements
-  let gs = 500;
-  function gRand() { gs=(gs*16807)%2147483647; return(gs-1)/2147483646; }
-  
-  // Leaves
-  for (let i = 0; i < 45; i++) {
-    const a = gRand() * Math.PI * 2;
-    const r = 280 + gRand() * 320;
-    gardenQueue.push({
-      type: 'leaf',
-      x: cx + Math.cos(a) * r,
-      y: H*0.40 + Math.sin(a) * r * 0.40,
-      angle: a + 1 + gRand() * 0.8,
-      size: 20 + gRand() * 45,
-      colorIdx: i % 3
-    });
-  }
-  
-  // Roses
-  gs = 600;
-  for (let i = 0; i < 10; i++) {
-    const a = gRand() * Math.PI * 2;
-    const r = 330 + gRand() * 250;
-    gardenQueue.push({
-      type: 'rose',
-      x: cx + Math.cos(a) * r,
-      y: H*0.40 + Math.sin(a) * r * 0.38,
-      size: 12 + gRand() * 20,
-      colorIdx: i % 3
-    });
-  }
-  
-  setupDone = true;
-}
+  CAL = await resp.json();
 
-function draw() {
-  if (!setupDone) return;
-  frame++;
-  
-  push();
-  translate(-W/2, -H/2);
-  
-  // Paint calligraphy
-  const strokesPerFrame = Math.max(Math.ceil(paintQueue.length / 150), 8);
-  
-  for (let s = 0; s < strokesPerFrame && paintIdx < paintQueue.length; s++) {
-    const st = paintQueue[paintIdx++];
-    
-    if (st.layer === 'base') {
-      // Outline strokes — dark green ink
-      brush.set('marker', color(22, 82, 38), random(100, 180));
-      brush.strokeWeight(random(2, 4));
-      brush.line(st.x1, st.y1, st.x2, st.y2);
-    } else {
-      // Fill strokes — slightly lighter green
-      brush.set('HB', color(35, 95, 45), random(30, 70));
-      brush.strokeWeight(random(1.5, 3));
-      brush.line(st.x1, st.y1, st.x2, st.y2);
+  background(242, 234, 218);
+
+  // --- Register Ottoman brushes ---
+  brush.add("tahrir", {
+    type: "default", weight: 0.3, scatter: 0.1, sharpness: 0.9,
+    grain: 3, opacity: 180, spacing: 0.08,
+    pressure: [0.8, 1.0, 0.8], rotate: "natural"
+  });
+  brush.add("gold_leaf", {
+    type: "spray", weight: 3, scatter: 4, opacity: 80,
+    spacing: 0.8, pressure: [1, 0.5], rotate: "random"
+  });
+  brush.add("ottoman_petal", {
+    type: "custom", weight: 8, opacity: 60, spacing: 0.3,
+    pressure: [0.3, 1.2, 0.1], rotate: "natural",
+    tip: (_m) => {
+      _m.beginShape();
+      _m.vertex(0, -2); _m.bezierVertex(1.5, -1.5, 2, 0, 1.2, 1.5);
+      _m.vertex(0, 3); _m.bezierVertex(-2, 0, -1.5, -1.5, 0, -2);
+      _m.endShape(CLOSE);
     }
+  });
+
+  // --- Watercolor buffer ---
+  wcGfx = createGraphics(1080, 1920);
+  wcGfx.background(242, 234, 218);
+  _wcSeed = 12345;
+
+  // --- Transform calligraphy contours ---
+  const scale1 = (width * 0.65) / CAL.line1.width;
+  const scale2 = (width * 0.65) / CAL.line2.width;
+  const line1Polys = transformContours(CAL.line1.contours, CAL.line1.width, width / 2, 670, scale1);
+  const line2Polys = transformContours(CAL.line2.contours, CAL.line2.width, width / 2, 1130, scale2);
+
+  // ==========================================================
+  // LAYER 1: WATERCOLOR (2D buffer)
+  // ==========================================================
+
+  // --- Subtle background wash ---
+  watercolorFill([[20,20],[1060,20],[1060,1900],[20,1900]], 235, 226, 208, 6, 5, 0.02, 2, 1);
+
+  // --- Saz leaves ---
+  const leaves = [
+    // Top wreath: [cx, cy, angle, length, width, colorIdx]
+    [155, 360, -2.2, 195, 44, 0],
+    [925, 360, -0.94, 195, 44, 1],
+    [330, 250, -1.85, 160, 36, 0],
+    [750, 250, -1.29, 160, 36, 1],
+    [540, 180, -1.57, 135, 34, 0],
+    // Sides
+    [75, 690, -0.25, 165, 36, 1],
+    [65, 1060, 0.35, 165, 36, 0],
+    [1005, 690, -2.89, 165, 36, 0],
+    [1015, 1060, -3.49, 165, 36, 1],
+    // Bottom wreath
+    [155, 1500, 2.2, 195, 44, 1],
+    [925, 1500, 0.94, 195, 44, 0],
+    [330, 1610, 1.85, 160, 36, 1],
+    [750, 1610, 1.29, 160, 36, 0],
+    [540, 1690, 1.57, 135, 34, 1],
+    // Between words
+    [215, 905, -0.1, 105, 24, 0],
+    [865, 905, -3.04, 105, 24, 1],
+  ];
+
+  for (const lf of leaves) {
+    const col = lf[5] === 0 ? PAL.leafGreen : PAL.leafDark;
+    const vc = varyColor(col, 8);
+    const poly = sazLeafPoly(lf[0], lf[1], lf[2], lf[3], lf[4]);
+    watercolorFill(poly, vc[0], vc[1], vc[2], 25, 11, 0.12, 4, 2);
   }
-  
-  // Garden after 40% calligraphy done
-  if (paintIdx > paintQueue.length * 0.4) {
-    const gardenPerFrame = 1;
-    for (let g = 0; g < gardenPerFrame && gardenIdx < gardenQueue.length; g++) {
-      const item = gardenQueue[gardenIdx++];
-      
-      if (item.type === 'leaf') {
-        const colors = [[22,58,28], [58,100,58], [34,86,46]][item.colorIdx];
-        brush.set('marker', color(...colors), random(80, 140));
-        brush.strokeWeight(item.size * 0.35);
-        const ex = item.x + Math.cos(item.angle) * item.size;
-        const ey = item.y + Math.sin(item.angle) * item.size;
-        brush.line(item.x, item.y, ex, ey);
-        // Width stroke
-        brush.strokeWeight(item.size * 0.2);
-        brush.set('HB', color(...colors), random(60, 100));
-        brush.line(
-          item.x + Math.cos(item.angle+0.4)*item.size*0.25,
-          item.y + Math.sin(item.angle+0.4)*item.size*0.25,
-          ex, ey
-        );
-      } else if (item.type === 'rose') {
-        const colors = [[138,26,42], [194,40,74], [178,50,66]][item.colorIdx];
-        for (let p = 0; p < 6; p++) {
-          const a = (p/6)*Math.PI*2 + random(0.2);
-          brush.set('marker', color(...colors), random(60, 120));
-          brush.strokeWeight(item.size * 0.28);
-          brush.line(
-            item.x + Math.cos(a)*item.size*0.12,
-            item.y + Math.sin(a)*item.size*0.12,
-            item.x + Math.cos(a)*item.size*0.45,
-            item.y + Math.sin(a)*item.size*0.45
-          );
-        }
-        // Gold center
-        brush.set('HB', color(180, 150, 60), 160);
-        brush.strokeWeight(item.size * 0.15);
-        brush.line(item.x-1, item.y, item.x+1, item.y);
+
+  // --- Hatâyî flowers ---
+  function paintFlower(cx, cy, size, palette) {
+    const rings = [
+      { n: 6, dist: size * 0.22, len: size * 0.88, wid: size * 0.44, col: palette[0] },
+      { n: 7, dist: size * 0.06, len: size * 0.52, wid: size * 0.28, col: palette[1] },
+    ];
+    for (const ring of rings) {
+      for (let i = 0; i < ring.n; i++) {
+        const a = (i / ring.n) * Math.PI * 2 + gaussRand(0, 0.08);
+        const px = cx + Math.cos(a) * ring.dist;
+        const py = cy + Math.sin(a) * ring.dist;
+        const vc = varyColor(ring.col, 10);
+        const poly = petalPoly(px, py, a + Math.PI / 2, ring.len, ring.wid);
+        watercolorFill(poly, vc[0], vc[1], vc[2], 20, 13, 0.10, 4, 2);
       }
     }
   }
-  
-  pop();
-  
-  window._frame = frame;
-  window._done = paintIdx >= paintQueue.length && gardenIdx >= gardenQueue.length;
-  if (window._done && frame > 200) noLoop();
+
+  paintFlower(540, 145, 78, [PAL.crimson, PAL.crimsonDark]);
+  paintFlower(540, 1715, 78, [PAL.crimson, PAL.crimsonDark]);
+  paintFlower(85, 878, 52, [PAL.crimsonLight, PAL.crimson]);
+  paintFlower(995, 878, 52, [PAL.crimsonLight, PAL.crimson]);
+
+  // --- Calligraphy watercolor: deep green ink ---
+  for (const poly of line1Polys) {
+    if (poly.length < 4) continue;
+    const vc = varyColor(PAL.inkGreen, 3);
+    watercolorFill(poly, vc[0], vc[1], vc[2], 40, 10, 0.035, 3, 2);
+  }
+  for (const poly of line2Polys) {
+    if (poly.length < 4) continue;
+    const vc = varyColor(PAL.inkGreen, 3);
+    watercolorFill(poly, vc[0], vc[1], vc[2], 40, 10, 0.035, 3, 2);
+  }
+
+  // --- Subtle gold wash on calligraphy ---
+  for (const poly of line1Polys) {
+    if (poly.length < 4) continue;
+    watercolorFill(poly, PAL.gold[0], PAL.gold[1], PAL.gold[2], 6, 4, 0.04, 3, 2);
+  }
+  for (const poly of line2Polys) {
+    if (poly.length < 4) continue;
+    watercolorFill(poly, PAL.gold[0], PAL.gold[1], PAL.gold[2], 6, 4, 0.04, 3, 2);
+  }
+
+  // ==========================================================
+  // COMPOSITE to WEBGL canvas
+  // ==========================================================
+  image(wcGfx, 0, 0);
+
+  // ==========================================================
+  // LAYER 2: p5.brush STROKES
+  // ==========================================================
+
+  // --- Leaf veins ---
+  brush.noFill();
+  brush.noHatch();
+  for (const lf of leaves) {
+    const ca = Math.cos(lf[2]), sa = Math.sin(lf[2]);
+    const nx = -sa, ny = ca;
+    brush.set("tahrir", "#1a4a1a", 0.3);
+    brush.line(lf[0], lf[1], lf[0] + ca * lf[3] * 0.9, lf[1] + sa * lf[3] * 0.9);
+    brush.set("2H", "#1a4a1a", 0.15);
+    for (let v = 1; v <= 5; v++) {
+      const t = 0.12 + (v / 6) * 0.72;
+      const vx = lf[0] + ca * t * lf[3];
+      const vy = lf[1] + sa * t * lf[3];
+      const vLen = lf[4] * 0.35 * Math.sin(t * Math.PI);
+      brush.line(vx, vy, vx + nx * vLen + ca * vLen * 0.2, vy + ny * vLen + sa * vLen * 0.2);
+      brush.line(vx, vy, vx - nx * vLen * 0.5 + ca * vLen * 0.15, vy - ny * vLen * 0.5 + sa * vLen * 0.15);
+    }
+  }
+
+  // --- Vine stems ---
+  /* DISABLED — vines too thick, drowning calligraphy
+  brush.set("charcoal", "#3a2a15", 0.15);
+  brush.strokeWeight(0.5);
+  brush.field("curved");
+  brush.flowLine(290, 240, 240, -0.6);
+  brush.flowLine(790, 240, 240, -2.54);
+  brush.flowLine(540, 190, 170, -1.57);
+  brush.flowLine(290, 1620, 240, 0.6);
+  brush.flowLine(790, 1620, 240, 2.54);
+  brush.flowLine(540, 1680, 170, 1.57);
+  brush.flowLine(85, 740, 280, 1.4);
+  brush.flowLine(995, 740, 280, 1.74);
+  */
+  brush.noField();
+
+  // --- Small buds (p5.brush fillBleed) ---
+  const buds = [
+    [265, 300, 17], [815, 300, 16], [435, 195, 13], [645, 195, 13],
+    [375, 155, 11], [705, 155, 11], [460, 130, 9], [620, 130, 9],
+    [315, 890, 11], [765, 890, 11], [435, 900, 9], [645, 900, 9],
+    [265, 1560, 17], [815, 1560, 16], [435, 1665, 13], [645, 1665, 13],
+    [375, 1720, 11], [705, 1720, 11], [460, 1740, 9], [620, 1740, 9],
+    [115, 640, 9], [965, 640, 9], [115, 1150, 9], [965, 1150, 9],
+  ];
+  for (const bd of buds) {
+    brush.noStroke();
+    const col = random() < 0.4 ? "#c8305a" : "#d75c6a";
+    brush.fill(col, random(50, 80));
+    brush.fillBleed(random(0.3, 0.55), "out");
+    brush.fillTexture(random(0.3, 0.5), random(0.2, 0.4));
+    brush.circle(bd[0], bd[1], bd[2], true);
+  }
+  brush.noFill();
+
+  // --- Flower centers ---
+  function flowerCenter(cx, cy, size) {
+    brush.set("gold_leaf", "#c5a030", 1.5);
+    for (let i = 0; i < 14; i++) {
+      const a = random(TWO_PI);
+      const r = random(size * 0.05, size * 0.22);
+      brush.line(cx + cos(a) * r, cy + sin(a) * r, cx + cos(a) * (r + 6), cy + sin(a) * (r + 6));
+    }
+    brush.set("tahrir", "#911a2a", 0.25);
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * TWO_PI + random(-0.2, 0.2);
+      brush.line(cx, cy, cx + cos(a) * size * 0.6, cy + sin(a) * size * 0.6);
+    }
+  }
+  flowerCenter(540, 145, 78);
+  flowerCenter(540, 1715, 78);
+  flowerCenter(85, 878, 52);
+  flowerCenter(995, 878, 52);
+
+  // --- Calligraphy outlines (selective tahrir) ---
+  brush.noFill();
+  brush.set("tahrir", "#0e3212", 0.35);
+  function partialOutline(polys) {
+    for (const poly of polys) {
+      if (poly.length < 6) continue;
+      const start = Math.floor(random(poly.length * 0.1));
+      const len = Math.floor(poly.length * random(0.3, 0.6));
+      const pts = [];
+      for (let i = start; i < start + len && i < poly.length; i++) pts.push(poly[i]);
+      if (pts.length > 3) brush.spline(pts, 0.6);
+    }
+  }
+  partialOutline(line1Polys);
+  partialOutline(line2Polys);
+
+  // --- Gold decorative arcs ---
+  brush.set("tahrir", "#c5a030", 0.3);
+  let arcPts = [];
+  for (let i = 0; i <= 20; i++) {
+    const t = i / 20;
+    arcPts.push([540 + Math.cos(Math.PI + t * Math.PI) * 370, 465 + Math.sin(Math.PI + t * Math.PI) * 115]);
+  }
+  brush.spline(arcPts, 0.8);
+  arcPts = [];
+  for (let i = 0; i <= 20; i++) {
+    const t = i / 20;
+    arcPts.push([540 + Math.cos(t * Math.PI) * 370, 1395 + Math.sin(t * Math.PI) * 115]);
+  }
+  brush.spline(arcPts, 0.8);
+
+  // --- Gold divider between words ---
+  brush.set("tahrir", "#c5a030", 0.25);
+  const divPts = [];
+  for (let i = 0; i <= 16; i++) {
+    const t = i / 16;
+    divPts.push([195 + t * 690, 900 + Math.sin(t * Math.PI * 2) * 14]);
+  }
+  brush.spline(divPts, 0.7);
+
+  brush.set("gold_leaf", "#dab94e", 1.0);
+  for (let i = 0; i < 8; i++) {
+    brush.line(255 + i * 80, 896, 258 + i * 80, 900);
+  }
+
+  // --- Gold spray on calligraphy ---
+  brush.set("gold_leaf", "#c5a030", 0.8);
+  function goldSpray(polys) {
+    for (const poly of polys) {
+      if (poly.length < 4) continue;
+      for (let i = 0; i < 5; i++) {
+        const idx = Math.floor(random(poly.length));
+        const p = poly[idx];
+        brush.line(p[0], p[1], p[0] + random(-10, 10), p[1] + random(-10, 10));
+      }
+    }
+  }
+  goldSpray(line1Polys);
+  goldSpray(line2Polys);
+
+  // --- Tendrils (gold curls) ---
+  brush.set("tahrir", "#8b7020", 0.2);
+  const tendrils = [
+    [195, 285], [885, 285], [475, 165], [605, 165],
+    [195, 1575], [885, 1575], [475, 1695], [605, 1695],
+  ];
+  for (const t of tendrils) {
+    const pts = [];
+    let a = random(TWO_PI), x = t[0], y = t[1];
+    for (let i = 0; i < 8; i++) {
+      pts.push([x, y]);
+      a += random(0.3, 0.7);
+      x += Math.cos(a) * 13;
+      y += Math.sin(a) * 13;
+    }
+    brush.spline(pts, 0.9);
+  }
+
+  // Paper texture grain — REMOVED (too dominant)
+
+  // --- Corner flourishes ---
+  brush.set("tahrir", "#c5a030", 0.22);
+  const corners = [[55, 55], [1025, 55], [55, 1865], [1025, 1865]];
+  for (const c of corners) {
+    const dx = c[0] < 540 ? 1 : -1;
+    const dy = c[1] < 960 ? 1 : -1;
+    brush.line(c[0], c[1], c[0] + dx * 55, c[1]);
+    brush.line(c[0], c[1], c[0], c[1] + dy * 55);
+    brush.arc(c[0] + dx * 28, c[1] + dy * 28, 22,
+      dx > 0 ? (dy > 0 ? PI : HALF_PI) : (dy > 0 ? -HALF_PI : 0),
+      dx > 0 ? (dy > 0 ? PI + HALF_PI : PI) : (dy > 0 ? 0 : HALF_PI));
+  }
 }
 </script>
 </body>
