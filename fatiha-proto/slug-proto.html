@@ -365,7 +365,7 @@ composer.addPass(new UnrealBloomPass(new THREE.Vector2(W, H), 0.25, 0.2, 0.92));
 function animate() {
   requestAnimationFrame(animate);
 
-  const t = audioStarted ? audio.currentTime : 0;
+  const t = window._synthTime !== undefined ? window._synthTime : (audioStarted ? audio.currentTime : 0);
   mat.uniforms.time.value = t;
 
   // Per-verse reveal based on audio position
