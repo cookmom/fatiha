@@ -38,11 +38,14 @@ GPU-native bezier curve rendering. No rasterization, no texture atlases. Each gl
 - [ ] Map audio recitation progress → stroke progress
 - [ ] Each letter appears as it's being recited
 
-### Phase 4: Integration with Garden
-- [ ] Calligraphy follows the golden spiral path
-- [ ] Letters bend/warp along curves
+### Phase 4: Mihrab Arch Composition
+- [ ] Calligraphy follows mihrab arch form (prayer niche shape)
+- [ ] Each verse = a line flowing R→L, stacking within the arch
+- [ ] Bismillah crowns the top of the arch
+- [ ] Ottoman garden grows AROUND the verses — vines and flowers as illuminated borders
 - [ ] Tyler Hobbs watercolor deformation on letterforms
-- [ ] Letters ARE the vine/leaves (the calligraphy IS the garden)
+- [ ] The calligraphy IS the content; the garden frames it like a manuscript page
+- [ ] Decision: mihrab > spiral. Arabic flows horizontally R→L; spiral fights the script.
 
 ## HLSL → GLSL Translation Notes
 | HLSL | GLSL |
