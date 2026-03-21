@@ -1,0 +1,10 @@
+<!DOCTYPE html><html><head>
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.0-beta"></script>
+</head><body><script>
+function setup() {
+  createCanvas(100, 100, WEBGL);
+  brush.load();
+  console.log("BRUSHES: " + JSON.stringify(brush.box()));
+}
+</script></body></html>

@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<!-- بسم الله الرحمن الرحيم -->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>عيد مبارك — Ottoman Levha Illuminated Panel</title>
+  <script src="p5.min.js"></script>
+  <script src="p5.brush.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #2a1f14; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script>
+// ============================================================
+// EID MASTERPIECE — Ottoman Levha Illuminated Panel
+// Combines: Islamic geometry, Ottoman tezhip painting, calligraphy composition
+// ============================================================
+
+const W = 1080, H = 1920;
+let wcGfx; // 2D graphics buffer for Tyler Hobbs watercolor
+
+// ─── HISTORICAL PIGMENT PALETTE ───
+const PAL = {
+  ivory:      [244, 237, 227],  // ahar-prepared paper
+  gold:       [205, 170, 55],   // shell gold 22kt (warmed)
+  goldLight:  [225, 195, 85],   // leaf gold burnished
+  goldPale:   [238, 218, 148],  // dilute gold wash
+  lapis:      [26, 58, 108],    // lapis lazuli
+  lapisLight: [42, 90, 156],    // lighter grade lapis
+  lapisDark:  [14, 34, 68],     // indigo-deep
+  crimson:    [196, 30, 58],    // vermilion/cinnabar
+  crimsonDark:[145, 26, 42],    // cochineal
+  forest:     [38, 100, 40],    // malachite green
+  forestLight:[58, 138, 60],    // verdigris
+  earth:      [107, 66, 38],    // sienna/haematite
+  ink:        [26, 20, 16],     // lampblack
+  turquoise:  [26, 122, 122],   // faience turquoise
+};
+
+// ─── TYLER HOBBS WATERCOLOR ENGINE ───
+function gaussRand(mean, std) {
+  const u1 = Math.random(), u2 = Math.random();
+  return mean + std * Math.sqrt(-2 * Math.log(u1 || 0.001)) * Math.cos(2 * Math.PI * u2);
+}
+
+function deformOnce(poly, variances) {
+  const result = [], newVars = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], c = poly[(i + 1) % poly.length];
+    result.push([a[0], a[1]]);
+    const v = variances ? variances[i] : 0.15;
+    const bx = (a[0] + c[0]) / 2, by = (a[1] + c[1]) / 2;
+    const dx = c[0] - a[0], dy = c[1] - a[1];
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if (len < 0.5) { result.push([bx, by]); newVars.push(v, v); continue; }
+    const nx = -dy/len, ny = dx/len;
+    const offset = gaussRand(0, v * len);
+    result.push([bx + nx * offset, by + ny * offset]);
+    newVars.push(v * (0.6 + Math.random() * 0.6), v * (0.6 + Math.random() * 0.6));
+  }
+  return { poly: result, variances: newVars };
+}
+
+function deformN(poly, n, baseVariance) {
+  let p = poly.map(pt => [pt[0], pt[1]]);
+  let vars = poly.map(() => baseVariance);
+  for (let i = 0; i < n; i++) {
+    const res = deformOnce(p, vars);
+    p = res.poly; vars = res.variances;
+  }
+  return p;
+}
+
+function watercolorFill(polygon, r, g, b, layers, alpha, variance) {
+  const basePoly = deformN(polygon, 5, variance || 0.15);
+  const ctx = wcGfx.drawingContext;
+  for (let i = 0; i < layers; i++) {
+    const layerPoly = deformN(basePoly, 3, (variance || 0.15) * 0.7);
+    ctx.save();
+    ctx.globalAlpha = alpha / 255;
+    const jr = Math.max(0, Math.min(255, Math.round(r + gaussRand(0, 6))));
+    const jg = Math.max(0, Math.min(255, Math.round(g + gaussRand(0, 5))));
+    const jb = Math.max(0, Math.min(255, Math.round(b + gaussRand(0, 4))));
+    ctx.fillStyle = `rgb(${jr},${jg},${jb})`;
+    ctx.beginPath();
+    ctx.moveTo(layerPoly[0][0], layerPoly[0][1]);
+    for (let j = 1; j < layerPoly.length; j++) ctx.lineTo(layerPoly[j][0], layerPoly[j][1]);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ─── GEOMETRIC HELPERS ───
+function circlePoints(cx, cy, r, n, offset) {
+  const pts = [];
+  offset = offset || 0;
+  for (let i = 0; i < n; i++) {
+    const a = (Math.PI * 2 * i) / n - Math.PI/2 + offset;
+    pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+  }
+  return pts;
+}
+
+function lerpPt(a, b, t) {
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+}
+
+// ─── BOTANICAL SHAPES ───
+function rosePetal(px, py, angle, len, w) {
+  const pts = [], steps = 24;
+  const ca = Math.cos(angle), sa = Math.sin(angle), nx = -sa, ny = ca;
+  for (let s = 0; s <= steps; s++) {
+    const t = s / steps;
+    const theta = t * Math.PI * 2;
+    const along = Math.cos(theta) * len * 0.5;
+    const across = Math.sin(theta) * w * 0.6;
+    pts.push([px + ca * (along + len * 0.5) + nx * across, py + sa * (along + len * 0.5) + ny * across]);
+  }
+  return pts;
+}
+
+function ottomanRose(cx, cy, size, palette) {
+  const wash = [];
+  for (let s = 0; s < 16; s++) {
+    const a = (s / 16) * TWO_PI;
+    wash.push([cx + Math.cos(a) * size * 0.65, cy + Math.sin(a) * size * 0.65]);
+  }
+  watercolorFill(wash, ...palette.outer, 18, 5, 0.22);
+  const rings = [
+    { n: 7, dist: size*0.36, len: size*0.75, w: size*0.68, color: palette.outer, layers: 50, alpha: 11, variance: 0.20 },
+    { n: 8, dist: size*0.18, len: size*0.50, w: size*0.50, color: palette.mid,   layers: 45, alpha: 12, variance: 0.18 },
+    { n: 6, dist: size*0.08, len: size*0.32, w: size*0.35, color: palette.inner, layers: 38, alpha: 14, variance: 0.15 },
+    { n: 5, dist: size*0.03, len: size*0.18, w: size*0.20, color: palette.center,layers: 28, alpha: 16, variance: 0.12 },
+  ];
+  for (const ring of rings) {
+    for (let i = 0; i < ring.n; i++) {
+      const a = (i / ring.n) * TWO_PI + gaussRand(0, 0.15);
+      const px = cx + Math.cos(a) * ring.dist;
+      const py = cy + Math.sin(a) * ring.dist;
+      const petal = rosePetal(px, py, a + gaussRand(0, 0.1), ring.len, ring.w);
+      watercolorFill(petal, ...ring.color, ring.layers, ring.alpha, ring.variance);
+    }
+  }
+  // Gold center
+  for (let i = 0; i < 20; i++) {
+    const ga = Math.random() * TWO_PI;
+    const gd = Math.random() * size * 0.10;
+    const dot = [];
+    for (let s = 0; s < 8; s++) {
+      const a = (s / 8) * TWO_PI;
+      dot.push([cx + Math.cos(ga)*gd + Math.cos(a)*3, cy + Math.sin(ga)*gd + Math.sin(a)*3]);
+    }
+    watercolorFill(dot, ...PAL.goldLight, 10, 22, 0.08);
+  }
+}
+
+function sazLeaf(cx, cy, angle, length, maxWidth, r, g, b) {
+  const poly = [];
+  const steps = 22;
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  const nx = -sa, ny = ca;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const w = Math.sin(t * Math.PI) * maxWidth * (0.5 + 0.5 * Math.sin(t * Math.PI * 0.8));
+    const sCurve = Math.sin(t * Math.PI * 1.2) * maxWidth * 0.15;
+    poly.push([cx + ca*t*length + nx*(w+sCurve), cy + sa*t*length + ny*(w+sCurve)]);
+  }
+  for (let i = steps; i >= 0; i--) {
+    const t = i / steps;
+    const w = Math.sin(t * Math.PI) * maxWidth * 0.30;
+    const sCurve = Math.sin(t * Math.PI * 1.2) * maxWidth * 0.10;
+    poly.push([cx + ca*t*length - nx*(w-sCurve), cy + sa*t*length - ny*(w-sCurve)]);
+  }
+  watercolorFill(poly, r, g, b, 12, 5, 0.22);
+  watercolorFill(poly, r, g, b, 38, 11, 0.16);
+  // Central vein
+  const vein = [];
+  for (let i = 0; i <= 10; i++) {
+    const t = i / 10;
+    vein.push([cx + ca*t*length*0.90 + nx*1.2, cy + sa*t*length*0.90 + ny*1.2]);
+  }
+  for (let i = 10; i >= 0; i--) {
+    const t = i / 10;
+    vein.push([cx + ca*t*length*0.90 - nx*1.2, cy + sa*t*length*0.90 - ny*1.2]);
+  }
+  watercolorFill(vein, Math.max(0,r-25), Math.max(0,g-35), Math.max(0,b-25), 7, 18, 0.08);
+}
+
+function tulipPetal(bx, by, angle, len, w, curv) {
+  const pts = [], n = 28;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    let ww;
+    if (t < 0.05) ww = t / 0.05 * 0.1;
+    else if (t < 0.25) ww = 0.1 + (t - 0.05) / 0.2 * 0.9;
+    else if (t < 0.55) ww = 1.0 - (t - 0.25) * 0.15;
+    else if (t < 0.85) ww = (1.0 - (t - 0.25) * 0.15) * (1 - (t - 0.55) / 0.3 * 0.3);
+    else ww = Math.max(0, Math.cos((t - 0.85) / 0.15 * Math.PI * 0.5) * 0.4);
+    const along = t * len;
+    const across = ww * w * 0.5;
+    const sc = Math.sin(t * Math.PI * 1.3) * curv * len * 0.06;
+    pts.push([bx + along*Math.cos(angle) - (across+sc)*Math.sin(angle),
+              by + along*Math.sin(angle) + (across+sc)*Math.cos(angle)]);
+  }
+  for (let i = n; i >= 0; i--) {
+    const t = i / n;
+    let ww;
+    if (t < 0.05) ww = t / 0.05 * 0.1;
+    else if (t < 0.25) ww = 0.1 + (t - 0.05) / 0.2 * 0.9;
+    else if (t < 0.55) ww = 1.0 - (t - 0.25) * 0.15;
+    else if (t < 0.85) ww = (1.0 - (t - 0.25) * 0.15) * (1 - (t - 0.55) / 0.3 * 0.3);
+    else ww = Math.max(0, Math.cos((t - 0.85) / 0.15 * Math.PI * 0.5) * 0.4);
+    const along = t * len;
+    const across = -ww * w * 0.5;
+    const sc = Math.sin(t * Math.PI * 1.3) * curv * len * 0.06;
+    pts.push([bx + along*Math.cos(angle) - (across+sc)*Math.sin(angle),
+              by + along*Math.sin(angle) + (across+sc)*Math.cos(angle)]);
+  }
+  return pts;
+}
+
+function ottomanTulip(cx, cy, size, baseAngle) {
+  baseAngle = baseAngle || -Math.PI / 2;
+  const wash = [];
+  for (let s = 0; s < 12; s++) {
+    const a = (s / 12) * TWO_PI;
+    wash.push([cx + Math.cos(a)*size*0.5, cy + Math.sin(a)*size*0.5]);
+  }
+  watercolorFill(wash, 210, 65, 30, 12, 5, 0.20);
+  const petalAngles = [-0.32, -0.10, 0.10, 0.32];
+  for (let i = 0; i < 4; i++) {
+    const a = baseAngle + petalAngles[i] + gaussRand(0, 0.04);
+    const isOuter = (i === 0 || i === 3);
+    const pLen = size * (isOuter ? 0.82 : 0.92);
+    const pWid = size * (isOuter ? 0.50 : 0.44);
+    const rr = isOuter ? 210 : 230, gg = isOuter ? 60 : 80, bb = isOuter ? 18 : 22;
+    const petal = tulipPetal(cx, cy, a, pLen, pWid, gaussRand(0.5, 0.3) * (i < 2 ? 1 : -1));
+    watercolorFill(petal, rr, gg, bb, 40, 12, 0.15);
+  }
+  // Inner golden stripes
+  for (let i = -1; i <= 1; i++) {
+    const a = baseAngle + i * 0.06;
+    const stripe = tulipPetal(cx, cy, a, size * 0.65, size * 0.08, 0);
+    watercolorFill(stripe, ...PAL.goldLight, 12, 18, 0.06);
+  }
+}
+
+function hyacinthSpike(cx, cy, size, angle) {
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  // Stack of tiny florets along stem
+  const nFlorets = 12;
+  for (let i = 0; i < nFlorets; i++) {
+    const t = i / nFlorets;
+    const fx = cx + ca * t * size;
+    const fy = cy + sa * t * size;
+    const fSize = size * 0.12 * (1 - t * 0.5);
+    const floret = [];
+    for (let s = 0; s < 10; s++) {
+      const a = (s / 10) * TWO_PI;
+      floret.push([fx + Math.cos(a)*fSize, fy + Math.sin(a)*fSize]);
+    }
+    const purple = [120, 60, 160];
+    watercolorFill(floret, purple[0]+gaussRand(0,10), purple[1]+gaussRand(0,8), purple[2]+gaussRand(0,8), 22, 14, 0.12);
+  }
+}
+
+function roseBud(cx, cy, angle, size, r, g, b) {
+  const wash = [];
+  for (let s = 0; s < 10; s++) {
+    const a = (s / 10) * TWO_PI;
+    wash.push([cx + Math.cos(a)*size*0.45, cy + Math.sin(a)*size*0.45]);
+  }
+  watercolorFill(wash, r, g, b, 10, 5, 0.20);
+  const rings = [
+    { n: 5, dist: size*0.22, len: size*0.55, w: size*0.45 },
+    { n: 4, dist: size*0.07, len: size*0.30, w: size*0.25 },
+  ];
+  for (const ring of rings) {
+    for (let i = 0; i < ring.n; i++) {
+      const a = (i / ring.n) * TWO_PI + gaussRand(0, 0.2);
+      const px = cx + Math.cos(a) * ring.dist;
+      const py = cy + Math.sin(a) * ring.dist;
+      const petal = rosePetal(px, py, a, ring.len, ring.w);
+      watercolorFill(petal, r, g, b, 28, 12, 0.16);
+    }
+  }
+}
+
+// ─── VINE / TENDRIL (p5.brush) ───
+function drawVineTendril(x1, y1, x2, y2, col, weight) {
+  brush.set('2H', weight || 0.8, 45);
+  brush.setColor(col);
+  const mx = (x1+x2)/2 + gaussRand(0, 15);
+  const my = (y1+y2)/2 + gaussRand(0, 15);
+  brush.spline([[x1,y1,0.3],[mx,my,0.6],[x2,y2,0.2]], 0.4);
+}
+
+// ============================================================
+// 12-FOLD SHAMSA — Geometric star medallion (compass-ruler construction)
+// ============================================================
+function drawShamsa(cx, cy, outerR, innerR) {
+  const ctx = wcGfx.drawingContext;
+
+  // --- LAPIS GROUND RING ---
+  // Outer ring filled with lapis lazuli blue
+  const ringOuter = [], ringInner = [];
+  for (let i = 0; i <= 64; i++) {
+    const a = (i / 64) * TWO_PI;
+    ringOuter.push([cx + Math.cos(a) * outerR, cy + Math.sin(a) * outerR]);
+    ringInner.push([cx + Math.cos(a) * innerR, cy + Math.sin(a) * innerR]);
+  }
+  // Full disc of lapis
+  watercolorFill(ringOuter, ...PAL.lapis, 50, 14, 0.04);
+  // Cut out inner with ivory
+  watercolorFill(ringInner, ...PAL.ivory, 40, 22, 0.03);
+
+  // --- 12-POINTED STAR (Two overlaid hexagons) --- Khatam construction
+  const N = 12;
+  const starR = outerR * 0.92;
+  const innerStarR = outerR * 0.58;
+
+  // Draw the geometric strapwork — gold lines forming 12-pointed star
+  const outerPts = circlePoints(cx, cy, starR, N);
+  const innerPts = circlePoints(cx, cy, innerStarR, N, Math.PI / N);
+
+  // Interleave: outer point, inner point, outer point...
+  const starPath = [];
+  for (let i = 0; i < N; i++) {
+    starPath.push(outerPts[i]);
+    starPath.push(innerPts[i]);
+  }
+
+  // Draw gold strapwork lines (tahrir style)
+  ctx.save();
+  ctx.strokeStyle = `rgba(${PAL.gold.join(',')}, 0.85)`;
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+
+  // 12-pointed star outline
+  ctx.beginPath();
+  ctx.moveTo(starPath[0].x, starPath[0].y);
+  for (let i = 1; i < starPath.length; i++) ctx.lineTo(starPath[i].x, starPath[i].y);
+  ctx.closePath();
+  ctx.stroke();
+
+  // Fill star points — opaque cream base then bright gold layers
+  for (let i = 0; i < N; i++) {
+    const op = outerPts[i];
+    const ip1 = innerPts[i];
+    const ip2 = innerPts[(i + N - 1) % N];
+    const triPoly = [[op.x, op.y], [ip1.x, ip1.y], [ip2.x, ip2.y]];
+    // Opaque cream base to block lapis bleed-through
+    ctx.save();
+    ctx.fillStyle = `rgb(${PAL.ivory.join(',')})`;
+    ctx.beginPath();
+    ctx.moveTo(triPoly[0][0], triPoly[0][1]);
+    ctx.lineTo(triPoly[1][0], triPoly[1][1]);
+    ctx.lineTo(triPoly[2][0], triPoly[2][1]);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    // Warm gold layers
+    watercolorFill(triPoly, 215, 180, 65, 35, 16, 0.03);
+    watercolorFill(triPoly, 240, 210, 100, 18, 12, 0.02);
+  }
+
+  // --- INNER PATTERN: 6-pointed Seal of Solomon ---
+  const sealR = innerStarR * 0.85;
+  const hex1 = circlePoints(cx, cy, sealR, 6, 0);
+  const hex2 = circlePoints(cx, cy, sealR, 6, Math.PI / 6);
+
+  ctx.strokeStyle = `rgba(${PAL.gold.join(',')}, 0.7)`;
+  ctx.lineWidth = 1.8;
+  // First triangle
+  ctx.beginPath();
+  ctx.moveTo(hex1[0].x, hex1[0].y);
+  for (let i = 1; i < 6; i++) ctx.lineTo(hex1[i].x, hex1[i].y);
+  ctx.closePath();
+  ctx.stroke();
+  // Second triangle
+  ctx.beginPath();
+  ctx.moveTo(hex2[0].x, hex2[0].y);
+  for (let i = 1; i < 6; i++) ctx.lineTo(hex2[i].x, hex2[i].y);
+  ctx.closePath();
+  ctx.stroke();
+
+  // Shamsa center: concentric rings of crimson, gold, lapis — like a true shamsa "sun"
+  // Outer ring: crimson
+  const cRing1 = [];
+  for (let i = 0; i <= 32; i++) {
+    const a = (i / 32) * TWO_PI;
+    cRing1.push([cx + Math.cos(a)*sealR*0.55, cy + Math.sin(a)*sealR*0.55]);
+  }
+  watercolorFill(cRing1, ...PAL.crimson, 30, 12, 0.04);
+
+  // Middle ring: gold
+  const cRing2 = [];
+  for (let i = 0; i <= 32; i++) {
+    const a = (i / 32) * TWO_PI;
+    cRing2.push([cx + Math.cos(a)*sealR*0.38, cy + Math.sin(a)*sealR*0.38]);
+  }
+  watercolorFill(cRing2, 220, 190, 80, 25, 14, 0.03);
+
+  // Inner ring: lapis
+  const cRing3 = [];
+  for (let i = 0; i <= 32; i++) {
+    const a = (i / 32) * TWO_PI;
+    cRing3.push([cx + Math.cos(a)*sealR*0.22, cy + Math.sin(a)*sealR*0.22]);
+  }
+  watercolorFill(cRing3, ...PAL.lapisLight, 22, 12, 0.03);
+
+  // Center: bright gold dot (the sun itself)
+  const cCenter = [];
+  for (let i = 0; i <= 16; i++) {
+    const a = (i / 16) * TWO_PI;
+    cCenter.push([cx + Math.cos(a)*sealR*0.10, cy + Math.sin(a)*sealR*0.10]);
+  }
+  watercolorFill(cCenter, 235, 210, 100, 20, 18, 0.02);
+
+  // --- RADIAL LINES (extending from star to border ring) ---
+  ctx.strokeStyle = `rgba(${PAL.gold.join(',')}, 0.5)`;
+  ctx.lineWidth = 1.2;
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * TWO_PI - Math.PI/2;
+    const r1 = starR * 1.0;
+    const r2 = outerR * 0.98;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a)*r1, cy + Math.sin(a)*r1);
+    ctx.lineTo(cx + Math.cos(a)*r2, cy + Math.sin(a)*r2);
+    ctx.stroke();
+  }
+
+  // --- OUTER RING DECORATION: repeating penç (5-petal motifs) in lapis band ---
+  const pencN = 24;
+  for (let i = 0; i < pencN; i++) {
+    const a = (i / pencN) * TWO_PI;
+    const px = cx + Math.cos(a) * (outerR * 0.80 + innerR * 0.20);
+    const py = cy + Math.sin(a) * (outerR * 0.80 + innerR * 0.20);
+    // Tiny 5-petal flower in gold
+    const fSize = (outerR - innerR) * 0.18;
+    for (let p = 0; p < 5; p++) {
+      const pa = a + (p / 5) * TWO_PI;
+      const dotPoly = [];
+      for (let s = 0; s < 8; s++) {
+        const sa = (s / 8) * TWO_PI;
+        dotPoly.push([px + Math.cos(pa)*fSize*0.6 + Math.cos(sa)*fSize*0.3,
+                      py + Math.sin(pa)*fSize*0.6 + Math.sin(sa)*fSize*0.3]);
+      }
+      watercolorFill(dotPoly, ...PAL.goldLight, 8, 18, 0.06);
+    }
+  }
+
+  // --- TAHRIR OUTLINES (fine gold lines on border) ---
+  ctx.strokeStyle = `rgba(${PAL.gold.join(',')}, 0.6)`;
+  ctx.lineWidth = 1.0;
+  ctx.beginPath();
+  for (let i = 0; i <= 64; i++) {
+    const a = (i / 64) * TWO_PI;
+    const x = cx + Math.cos(a) * outerR;
+    const y = cy + Math.sin(a) * outerR;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.beginPath();
+  for (let i = 0; i <= 64; i++) {
+    const a = (i / 64) * TWO_PI;
+    const x = cx + Math.cos(a) * (outerR * 1.03);
+    const y = cy + Math.sin(a) * (outerR * 1.03);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// ============================================================
+// GEOMETRIC BORDER — 8-fold star pattern running along frame
+// ============================================================
+function drawGeometricBorder(x, y, w, h, thickness) {
+  const ctx = wcGfx.drawingContext;
+  ctx.save();
+
+  // Lapis ground for border band — solid fill for clean edges
+  ctx.fillStyle = `rgb(${PAL.lapisDark.join(',')})`;
+  ctx.fillRect(x, y, w, h);
+
+  // Inner cream cutout
+  const inset = thickness;
+  ctx.fillStyle = `rgb(${PAL.ivory.join(',')})`;
+  ctx.fillRect(x + inset, y + inset, w - inset*2, h - inset*2);
+
+  // Repeating 8-pointed stars along the border
+  ctx.strokeStyle = `rgba(${PAL.gold.join(',')}, 0.75)`;
+  ctx.lineWidth = 1.4;
+
+  const starSize = thickness * 0.38;
+  const spacing = starSize * 2.5;
+
+  // Top and bottom edges
+  for (let side = 0; side < 2; side++) {
+    const sy = side === 0 ? y + thickness/2 : y + h - thickness/2;
+    const nStars = Math.floor(w / spacing);
+    const startX = x + (w - nStars * spacing) / 2 + spacing/2;
+    for (let i = 0; i < nStars; i++) {
+      const sx = startX + i * spacing;
+      drawMiniStar8(ctx, sx, sy, starSize);
+    }
+  }
+
+  // Left and right edges
+  for (let side = 0; side < 2; side++) {
+    const sx = side === 0 ? x + thickness/2 : x + w - thickness/2;
+    const nStars = Math.floor(h / spacing);
+    const startY = y + (h - nStars * spacing) / 2 + spacing/2;
+    for (let i = 0; i < nStars; i++) {
+      const sy = startY + i * spacing;
+      drawMiniStar8(ctx, sx, sy, starSize);
+    }
+  }
+
+  // Corner ornaments — small rosettes
+  const corners = [[x+thickness/2, y+thickness/2], [x+w-thickness/2, y+thickness/2],
+                   [x+w-thickness/2, y+h-thickness/2], [x+thickness/2, y+h-thickness/2]];
+  for (const [ccx, ccy] of corners) {
+    drawMiniStar8(ctx, ccx, ccy, starSize * 1.3);
+    // Gold dot center
+    ctx.fillStyle = `rgba(${PAL.gold.join(',')}, 0.6)`;
+    ctx.beginPath();
+    ctx.arc(ccx, ccy, starSize * 0.25, 0, TWO_PI);
+    ctx.fill();
+  }
+
+  // Tahrir lines — fine double outline
+  ctx.strokeStyle = `rgba(${PAL.gold.join(',')}, 0.5)`;
+  ctx.lineWidth = 0.8;
+  ctx.strokeRect(x + 2, y + 2, w - 4, h - 4);
+  ctx.strokeRect(x + thickness - 2, y + thickness - 2, w - thickness*2 + 4, h - thickness*2 + 4);
+
+  ctx.restore();
+}
+
+function drawMiniStar8(ctx, cx, cy, r) {
+  const inner = r * 0.42;
+  ctx.beginPath();
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * TWO_PI - Math.PI/2;
+    const rad = i % 2 === 0 ? r : inner;
+    const x = cx + Math.cos(a) * rad;
+    const y = cy + Math.sin(a) * rad;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.stroke();
+}
+
+// ============================================================
+// CALLIGRAPHIC COMPOSITION — Gestural Thuluth-inspired strokes
+// Hassan Massoudy approach: bold sweeping forms that embody meaning
+// ============================================================
+function drawCalligraphicZone(cx, cy) {
+  const ctx = wcGfx.drawingContext;
+  const N = W / 42; // nuqta
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Sulandirma glow behind text (concentrating gold wash at center, fading at edges)
+  const washPoly = [];
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * TWO_PI;
+    const rx = W * 0.32, ry = N * 11;
+    washPoly.push([cx + Math.cos(a)*rx, cy + Math.sin(a)*ry]);
+  }
+  watercolorFill(washPoly, 240, 225, 180, 14, 5, 0.08);
+  // Inner brighter glow
+  const washInner = [];
+  for (let i = 0; i < 20; i++) {
+    const a = (i / 20) * TWO_PI;
+    washInner.push([cx + Math.cos(a)*W*0.20, cy + Math.sin(a)*N*7]);
+  }
+  watercolorFill(washInner, 245, 232, 195, 10, 4, 0.06);
+
+  // Variable-width bezier stroke renderer — simulates qalam pen
+  function qalamStroke(path, maxW, inkR, inkG, inkB) {
+    const len = path.length;
+    for (let i = 0; i < len - 1; i++) {
+      const [x1,y1,p1] = path[i], [x2,y2,p2] = path[i+1];
+      const w = maxW * (p1 + p2) / 2;
+      ctx.strokeStyle = `rgba(${inkR},${inkG},${inkB}, 0.88)`;
+      ctx.lineWidth = w;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+  }
+
+  // Diamond-shaped nuqta (dot)
+  function nuqtaDot(x, y, size) {
+    ctx.fillStyle = `rgba(${PAL.ink.join(',')}, 0.88)`;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillRect(-size, -size, size*2, size*2);
+    ctx.restore();
+  }
+
+  // ─── عيد (Eid) — TOP LINE, larger, right-aligned ───
+  const eidY = cy - N * 3;
+  const eidX = cx + W * 0.18;
+
+  // عـ (Ayn initial) — sweeping eye loop + descending body
+  // Upper eye: a smooth loop curving right-to-left
+  const aynPath = [];
+  for (let t = 0; t <= 1; t += 0.02) {
+    const angle = Math.PI * 0.3 + t * Math.PI * 1.6;
+    const rx = N * 2.8, ry = N * 1.8;
+    const pressure = 0.4 + 0.6 * Math.sin(t * Math.PI);
+    aynPath.push([eidX + Math.cos(angle)*rx, eidY - N*2.5 + Math.sin(angle)*ry, pressure]);
+  }
+  qalamStroke(aynPath, N * 1.4, ...PAL.ink);
+
+  // Ayn body descends and connects rightward to ya
+  const aynBody = [];
+  for (let t = 0; t <= 1; t += 0.03) {
+    const x = eidX - N * (1.5 + t * 1);
+    const y = eidY - N * 0.5 + t * N * 5;
+    const p = 0.8 - t * 0.3;
+    aynBody.push([x, y, p]);
+  }
+  qalamStroke(aynBody, N * 1.3, ...PAL.ink);
+
+  // ـيـ (Ya medial) — horizontal connection with gentle curve, flowing left
+  const yaPath = [];
+  const yaStartX = eidX - N * 2.5;
+  for (let t = 0; t <= 1; t += 0.03) {
+    const x = yaStartX - t * N * 7;
+    const y = eidY + N * (4 + Math.sin(t * Math.PI) * 1.8);
+    const p = 0.5 + 0.4 * Math.sin(t * Math.PI * 0.8);
+    yaPath.push([x, y, p]);
+  }
+  qalamStroke(yaPath, N * 1.0, ...PAL.ink);
+
+  // Ya dots — two diamonds below
+  nuqtaDot(yaStartX - N*3, eidY + N * 8.5, N * 0.45);
+  nuqtaDot(yaStartX - N*4.2, eidY + N * 9.2, N * 0.45);
+
+  // د (Dal final) — elegant head serif + sweeping S-curve
+  const dalX = yaStartX - N * 8;
+  const dalPath = [];
+  // Entry serif
+  dalPath.push([dalX + N*1, eidY + N*2, 0.3]);
+  dalPath.push([dalX + N*0.3, eidY + N*1.5, 0.8]);
+  // Body — smooth arc curving down then right (Thuluth dal)
+  for (let t = 0; t <= 1; t += 0.03) {
+    const x = dalX - t * N * 5;
+    const y = eidY + N * (2 + Math.sin(t * Math.PI * 0.7) * 3);
+    const p = 0.7 + 0.3 * Math.sin(t * Math.PI * 0.6);
+    dalPath.push([x, y, p]);
+  }
+  // Upward hook at end (Thuluth signature)
+  dalPath.push([dalX - N*5.2, eidY + N*3.5, 0.4]);
+  dalPath.push([dalX - N*5, eidY + N*2, 0.15]);
+  qalamStroke(dalPath, N * 1.2, ...PAL.ink);
+
+  // ─── مبارك (Mubarak) — BOTTOM LINE, slightly smaller ───
+  const mubY = cy + N * 7;
+  const mubX = cx + W * 0.20;
+  const mS = 0.85; // scale factor
+
+  // مـ (Mim initial) — circular head + short tail
+  const mimPath = [];
+  for (let t = 0; t <= 1; t += 0.02) {
+    const angle = Math.PI * 0.3 + t * Math.PI * 1.7;
+    const r = N * 2.2 * mS;
+    const p = 0.5 + 0.5 * Math.sin(t * Math.PI);
+    mimPath.push([mubX + Math.cos(angle)*r, mubY + Math.sin(angle)*r*0.85, p]);
+  }
+  qalamStroke(mimPath, N * 1.1, ...PAL.ink);
+
+  // ـبـ (Ba medial) — horizontal baseline connector
+  const baStartX = mubX - N * 2.5 * mS;
+  const baPath = [];
+  for (let t = 0; t <= 1; t += 0.03) {
+    baPath.push([baStartX - t*N*5*mS, mubY + N*(1.5 + Math.sin(t*Math.PI*0.3)*0.5), 0.5 + 0.4*Math.sin(t*Math.PI)]);
+  }
+  qalamStroke(baPath, N * 0.9, ...PAL.ink);
+  nuqtaDot(baStartX - N*2.5*mS, mubY + N*4, N*0.4);
+
+  // ا (Alif) — tall vertical staff, 9 nuqtas, slight leftward lean
+  const alifX = baStartX - N * 6 * mS;
+  const alifPath = [];
+  alifPath.push([alifX + N*0.5, mubY - N*8*mS, 0.3]); // entry serif
+  alifPath.push([alifX + N*0.2, mubY - N*7.5*mS, 0.9]);
+  for (let t = 0; t <= 1; t += 0.05) {
+    alifPath.push([alifX - t*N*0.3, mubY - N*7.5*mS + t*N*9*mS, 0.85 - t*0.2]);
+  }
+  qalamStroke(alifPath, N * 1.1, ...PAL.ink);
+
+  // ر (Ra) — short descending curve + upward hook
+  const raX = alifX - N * 1.5 * mS;
+  const raPath = [];
+  for (let t = 0; t <= 1; t += 0.03) {
+    const x = raX - t * N * 3.5 * mS;
+    const y = mubY + N * (1.5 + t * 3 * mS + Math.sin(t*Math.PI*0.5)*1.5);
+    raPath.push([x, y, 0.7 - t*0.4]);
+  }
+  // Upward hook
+  raPath.push([raX - N*3.8*mS, mubY + N*3*mS, 0.2]);
+  raPath.push([raX - N*3.5*mS, mubY + N*1.5*mS, 0.1]);
+  qalamStroke(raPath, N * 0.9, ...PAL.ink);
+
+  // ك (Kaf final) — vertical staff + horizontal base + hamza mark inside
+  const kafX = raX - N * 5 * mS;
+  const kafStaff = [];
+  kafStaff.push([kafX + N*0.3, mubY - N*6*mS, 0.3]);
+  kafStaff.push([kafX + N*0.1, mubY - N*5.5*mS, 0.85]);
+  for (let t = 0; t <= 1; t += 0.05) {
+    kafStaff.push([kafX - t*N*0.2, mubY - N*5.5*mS + t*N*7*mS, 0.8 - t*0.2]);
+  }
+  qalamStroke(kafStaff, N * 1.0, ...PAL.ink);
+
+  // Kaf horizontal base — sweeps left
+  const kafBase = [];
+  for (let t = 0; t <= 1; t += 0.03) {
+    kafBase.push([kafX - t*N*5*mS, mubY + N*1.5 + Math.sin(t*Math.PI*0.3)*N*0.3, 0.6 + 0.3*Math.sin(t*Math.PI)]);
+  }
+  // Upward hook at terminal
+  kafBase.push([kafX - N*5.2*mS, mubY + N*0.5, 0.2]);
+  kafBase.push([kafX - N*5*mS, mubY - N*0.5, 0.08]);
+  qalamStroke(kafBase, N * 0.85, ...PAL.ink);
+
+  // Small hamza mark inside kaf
+  nuqtaDot(kafX - N*1.5*mS, mubY - N*2*mS, N*0.3);
+
+  // ─── DECORATIVE FILL DOTS (levha tradition — balance composition) ───
+  ctx.fillStyle = `rgba(${PAL.ink.join(',')}, 0.35)`;
+  const fillDots = [
+    [cx + N*2, eidY - N*6], [cx - N*5, eidY + N*1],
+    [cx + N*8, mubY - N*4], [cx - N*12, mubY + N*2],
+    [cx + N*12, eidY + N*6], [cx - N*8, eidY + N*8],
+  ];
+  for (const [dx, dy] of fillDots) {
+    nuqtaDot(dx, dy, N * 0.22);
+  }
+
+  // ─── TASHKEEL (red diacritics — traditional vermilion accent) ───
+  // Fatha marks (small diagonal strokes above letters)
+  ctx.strokeStyle = `rgba(${PAL.crimson.join(',')}, 0.75)`;
+  ctx.lineWidth = N * 0.35;
+  ctx.lineCap = 'round';
+
+  // Fatha over ayn (عيد)
+  ctx.beginPath();
+  ctx.moveTo(eidX - N*0.5, eidY - N*5.5);
+  ctx.lineTo(eidX + N*0.8, eidY - N*6);
+  ctx.stroke();
+
+  // Damma over mim (مبارك)
+  ctx.beginPath();
+  ctx.arc(mubX + N*0.5, mubY - N*3, N*0.5, Math.PI*0.3, Math.PI*1.3);
+  ctx.stroke();
+
+  // Fatha over ba
+  ctx.beginPath();
+  ctx.moveTo(baStartX - N*1.5*mS, mubY - N*1.5);
+  ctx.lineTo(baStartX - N*0.3*mS, mubY - N*2);
+  ctx.stroke();
+
+  // Kasra under ra (below baseline)
+  ctx.beginPath();
+  ctx.moveTo(raX - N*2*mS, mubY + N*6.5);
+  ctx.lineTo(raX - N*0.8*mS, mubY + N*6);
+  ctx.stroke();
+
+  // ─── KASHIDA (gold connecting line for visual balance) ───
+  ctx.strokeStyle = `rgba(${PAL.gold.join(',')}, 0.35)`;
+  ctx.lineWidth = N * 0.5;
+  ctx.beginPath();
+  ctx.moveTo(cx + W*0.15, eidY + N*5.5);
+  ctx.bezierCurveTo(cx + W*0.05, eidY + N*6.2, cx - W*0.05, eidY + N*5.8, cx - W*0.15, eidY + N*5.5);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// ============================================================
+// GOLD DUST / ZEREFSAN (gold sprinkling)
+// ============================================================
+function drawGoldDust(region, density) {
+  const ctx = wcGfx.drawingContext;
+  ctx.save();
+  for (let i = 0; i < density; i++) {
+    const x = region.x + Math.random() * region.w;
+    const y = region.y + Math.random() * region.h;
+    const size = 0.5 + Math.random() * 2;
+    const alpha = 0.1 + Math.random() * 0.25;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = `rgb(${PAL.goldLight.join(',')})`;
+    ctx.beginPath();
+    ctx.arc(x, y, size, 0, TWO_PI);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ============================================================
+// MAIN SETUP
+// ============================================================
+function setup() {
+  createCanvas(W, H, WEBGL);
+  brush.load();
+  pixelDensity(1);
+
+  // Create 2D buffer for watercolor (Tyler Hobbs technique needs Canvas2D)
+  wcGfx = createGraphics(W, H);
+  wcGfx.pixelDensity(1);
+
+  // ─── 1. AHAR PAPER BACKGROUND ───
+  wcGfx.background(244, 237, 227);
+  // Paper texture — subtle warm grain
+  const ctx = wcGfx.drawingContext;
+  for (let i = 0; i < 8000; i++) {
+    const x = Math.random() * W;
+    const y = Math.random() * H;
+    const size = 0.3 + Math.random() * 1.5;
+    ctx.globalAlpha = 0.02 + Math.random() * 0.04;
+    const warm = 200 + Math.random() * 40;
+    ctx.fillStyle = `rgb(${warm},${warm-15},${warm-30})`;
+    ctx.fillRect(x, y, size, size);
+  }
+  ctx.globalAlpha = 1;
+
+  // ─── 2. GEOMETRIC BORDER FRAME (Islamic geometry) ───
+  const borderThick = 42;
+  drawGeometricBorder(30, 30, W - 60, H - 60, borderThick);
+
+  // ─── 3. SHAMSA MEDALLION (12-fold star — top center) ───
+  const shamsaCX = W / 2;
+  const shamsaCY = H * 0.18;
+  const shamsaR = W * 0.28;
+  drawShamsa(shamsaCX, shamsaCY, shamsaR, shamsaR * 0.55);
+
+  // ─── 4. CALLIGRAPHIC COMPOSITION (center) ───
+  drawCalligraphicZone(W / 2, H * 0.46);
+
+  // ─── 5. LOWER SHAMSA (smaller, mirroring top) ───
+  drawShamsa(W / 2, H * 0.82, shamsaR * 0.65, shamsaR * 0.35);
+
+  // ─── 6. OTTOMAN GARDEN FLOWERS (tezhip botanical wreath) ───
+
+  // Rose palette (vermilion outer → crimson inner → gold center)
+  const rosePal = {
+    outer: PAL.crimson,
+    mid: PAL.crimsonDark,
+    inner: [180, 50, 70],
+    center: PAL.goldLight,
+  };
+
+  // Flanking roses around upper shamsa (koltuk illumination areas)
+  ottomanRose(W * 0.15, H * 0.10, 50, rosePal);
+  ottomanRose(W * 0.85, H * 0.10, 50, rosePal);
+  ottomanRose(W * 0.13, H * 0.24, 42, rosePal);
+  ottomanRose(W * 0.87, H * 0.24, 42, rosePal);
+
+  // Roses around lower shamsa
+  ottomanRose(W * 0.18, H * 0.76, 38, rosePal);
+  ottomanRose(W * 0.82, H * 0.76, 38, rosePal);
+  ottomanRose(W * 0.15, H * 0.88, 45, rosePal);
+  ottomanRose(W * 0.85, H * 0.88, 45, rosePal);
+
+  // Central flanking roses (beside calligraphy — dressing the text)
+  ottomanRose(W * 0.15, H * 0.43, 48, rosePal);
+  ottomanRose(W * 0.85, H * 0.43, 48, rosePal);
+  ottomanRose(W * 0.17, H * 0.54, 35, rosePal);
+  ottomanRose(W * 0.83, H * 0.54, 35, rosePal);
+
+  // Additional carnations near center (renewal symbol)
+  const carnPal = { outer: [210, 80, 120], mid: [190, 60, 100], inner: [170, 50, 90], center: PAL.goldLight };
+  roseBud(W * 0.28, H * 0.38, 0, 25, 210, 80, 120);
+  roseBud(W * 0.72, H * 0.38, 0, 25, 210, 80, 120);
+  roseBud(W * 0.32, H * 0.58, 0, 22, 210, 80, 120);
+  roseBud(W * 0.68, H * 0.58, 0, 22, 210, 80, 120);
+
+  // Tulips — flame-shaped, the holiest flower of Ottoman art
+  ottomanTulip(W * 0.13, H * 0.35, 45, -Math.PI/2 + 0.12);
+  ottomanTulip(W * 0.87, H * 0.35, 45, -Math.PI/2 - 0.12);
+  ottomanTulip(W * 0.11, H * 0.58, 40, -Math.PI/2 + 0.15);
+  ottomanTulip(W * 0.89, H * 0.58, 40, -Math.PI/2 - 0.15);
+  ottomanTulip(W * 0.50, H * 0.66, 45, -Math.PI/2);
+  // Flanking tulips near bottom shamsa
+  ottomanTulip(W * 0.25, H * 0.90, 38, -Math.PI/2 + 0.1);
+  ottomanTulip(W * 0.75, H * 0.90, 38, -Math.PI/2 - 0.1);
+
+  // Gold kusak (belt) divider between text and bottom shamsa — horizontal gold band
+  const kusY = H * 0.67;
+  const kusLine = [[W*0.15, kusY-3], [W*0.85, kusY-3], [W*0.85, kusY+3], [W*0.15, kusY+3]];
+  watercolorFill(kusLine, 220, 190, 80, 20, 14, 0.03);
+  // Gold penç flowers along the kusak
+  for (let i = 0; i < 7; i++) {
+    const px = W * 0.22 + (i / 6) * W * 0.56;
+    roseBud(px, kusY, 0, 14, 220, 190, 80);
+  }
+
+  // Additional roses in the gap below text
+  ottomanRose(W * 0.35, H * 0.63, 28, rosePal);
+  ottomanRose(W * 0.65, H * 0.63, 28, rosePal);
+
+  // Saz leaves (enchanted garden — feathery, serrated)
+  // Saz leaves — enchanted garden framing the composition (all inside border)
+  // Large dramatic leaves along sides
+  sazLeaf(W*0.10, H*0.38, -0.3, 120, 28, ...PAL.forest);
+  sazLeaf(W*0.90, H*0.38, Math.PI+0.3, 120, 28, ...PAL.forest);
+  sazLeaf(W*0.09, H*0.60, -0.5, 110, 24, ...PAL.forestLight);
+  sazLeaf(W*0.91, H*0.60, Math.PI+0.5, 110, 24, ...PAL.forestLight);
+  // Smaller leaves near top shamsa
+  sazLeaf(W*0.20, H*0.28, -0.8, 80, 20, ...PAL.forest);
+  sazLeaf(W*0.80, H*0.28, Math.PI+0.8, 80, 20, ...PAL.forest);
+  // Leaves near bottom
+  sazLeaf(W*0.22, H*0.84, -1.0, 85, 20, ...PAL.forestLight);
+  sazLeaf(W*0.78, H*0.84, Math.PI+1.0, 85, 20, ...PAL.forestLight);
+  // Smaller leaves near calligraphy (dressing the text)
+  sazLeaf(W*0.24, H*0.44, -0.6, 60, 15, ...PAL.forestLight);
+  sazLeaf(W*0.76, H*0.44, Math.PI+0.6, 60, 15, ...PAL.forestLight);
+  sazLeaf(W*0.27, H*0.53, -0.7, 50, 13, ...PAL.forest);
+  sazLeaf(W*0.73, H*0.53, Math.PI+0.7, 50, 13, ...PAL.forest);
+
+  // Small rose buds scattered
+  roseBud(W*0.20, H*0.18, 0, 22, ...PAL.crimson);
+  roseBud(W*0.80, H*0.18, 0, 22, ...PAL.crimson);
+  roseBud(W*0.25, H*0.55, 0, 18, 210, 80, 100);
+  roseBud(W*0.75, H*0.55, 0, 18, 210, 80, 100);
+  roseBud(W*0.40, H*0.75, 0, 20, ...PAL.crimsonDark);
+  roseBud(W*0.60, H*0.75, 0, 20, ...PAL.crimsonDark);
+
+  // ─── 7. GOLD DUST (zerefsan technique) ───
+  drawGoldDust({x: 60, y: 60, w: W-120, h: H-120}, 1500);
+
+  // ─── 8. COMPOSITE onto WEBGL canvas ───
+  translate(-W/2, -H/2);
+  image(wcGfx, 0, 0, W, H);
+
+  // ─── 9. P5.BRUSH FINE DETAILS ───
+  const VINE = '#1a4a1a';
+  const GOLD = '#c5a030';
+  const GOLD_PALE = '#dab94e';
+  const INK = '#1a1410';
+
+  // Vine tendrils connecting flowers (left side)
+  brush.set('rotring', VINE, 0.6);
+  brush.spline([[W*0.08,H*0.15,0.2],[W*0.06,H*0.22,0.5],[W*0.07,H*0.30,0.4],[W*0.06,H*0.38,0.3]], 0.5);
+  brush.spline([[W*0.06,H*0.50,0.3],[W*0.05,H*0.58,0.4],[W*0.06,H*0.65,0.3]], 0.5);
+
+  // Right side vines
+  brush.set('rotring', VINE, 0.6);
+  brush.spline([[W*0.92,H*0.15,0.2],[W*0.94,H*0.22,0.5],[W*0.93,H*0.30,0.4],[W*0.94,H*0.38,0.3]], 0.5);
+  brush.spline([[W*0.94,H*0.50,0.3],[W*0.95,H*0.58,0.4],[W*0.94,H*0.65,0.3]], 0.5);
+
+  // Gold tahrir ray highlights around upper shamsa
+  brush.set('rotring', GOLD, 0.4);
+  for (let i = 0; i < 36; i++) {
+    const a = (i / 36) * TWO_PI;
+    const r1 = shamsaR * 1.04;
+    const r2 = shamsaR * 1.09;
+    brush.line(shamsaCX + Math.cos(a)*r1, shamsaCY + Math.sin(a)*r1,
+               shamsaCX + Math.cos(a)*r2, shamsaCY + Math.sin(a)*r2);
+  }
+
+  // Gold tahrir frame lines (cifttahrir — double outline)
+  brush.set('rotring', GOLD, 0.8);
+  const m = 32;
+  brush.spline([[m,m,0.5],[W-m,m,0.5]], 0.1);
+  brush.spline([[W-m,m,0.5],[W-m,H-m,0.5]], 0.1);
+  brush.spline([[W-m,H-m,0.5],[m,H-m,0.5]], 0.1);
+  brush.spline([[m,H-m,0.5],[m,m,0.5]], 0.1);
+
+  brush.set('rotring', GOLD_PALE, 0.4);
+  const m2 = 70;
+  brush.spline([[m2,m2,0.3],[W-m2,m2,0.3]], 0.1);
+  brush.spline([[W-m2,m2,0.3],[W-m2,H-m2,0.3]], 0.1);
+  brush.spline([[W-m2,H-m2,0.3],[m2,H-m2,0.3]], 0.1);
+  brush.spline([[m2,H-m2,0.3],[m2,m2,0.3]], 0.1);
+
+  // Gold spray (zerefsan) via p5.brush
+  brush.set('spray', GOLD, 0.15);
+  for (let i = 0; i < 400; i++) {
+    const gx = W*0.08 + Math.random()*W*0.84;
+    const gy = H*0.04 + Math.random()*H*0.92;
+    brush.line(gx, gy, gx + random(2, 5), gy + random(-1.5, 1.5));
+  }
+
+  noLoop();
+}
+
+function draw() {}
+</script>
+</body>
+</html>

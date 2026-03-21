@@ -1,0 +1,738 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Ottoman Garden — Eid Mubarak</title>
+<link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #0d0d0d; display: flex; justify-content: center; align-items: center; height: 100vh; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+// ============================================================
+// ABSTRACT OTTOMAN GARDEN — EID MUBARAK v2
+// Dense illuminated manuscript garden, 1080×1920
+// ============================================================
+
+const W = 1080, H = 1920;
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+// --- Seeded RNG ---
+let seed = 77;
+function rand() {
+  seed = (seed * 16807 + 0) % 2147483647;
+  return (seed - 1) / 2147483646;
+}
+function gauss(mean, std) {
+  const u1 = rand(), u2 = rand();
+  return mean + std * Math.sqrt(-2 * Math.log(u1 || 0.001)) * Math.cos(2 * Math.PI * u2);
+}
+function randInt(a, b) { return Math.floor(rand() * (b - a + 1)) + a; }
+function lerpV(a, b, t) { return a + (b - a) * t; }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+// ============================================================
+// Noise
+// ============================================================
+const NOISE_SIZE = 128;
+const noiseGrid = [];
+for (let i = 0; i < NOISE_SIZE * NOISE_SIZE; i++) noiseGrid.push(rand());
+
+function smoothNoise(x, y) {
+  const ix = Math.floor(x) % NOISE_SIZE, iy = Math.floor(y) % NOISE_SIZE;
+  const sx = x - Math.floor(x), sy = y - Math.floor(y);
+  const i00 = noiseGrid[iy * NOISE_SIZE + ix];
+  const i10 = noiseGrid[iy * NOISE_SIZE + (ix + 1) % NOISE_SIZE];
+  const i01 = noiseGrid[((iy + 1) % NOISE_SIZE) * NOISE_SIZE + ix];
+  const i11 = noiseGrid[((iy + 1) % NOISE_SIZE) * NOISE_SIZE + (ix + 1) % NOISE_SIZE];
+  return lerpV(lerpV(i00, i10, sx), lerpV(i01, i11, sx), sy);
+}
+
+function fbmNoise(x, y, octaves) {
+  let val = 0, amp = 1, freq = 1, total = 0;
+  for (let i = 0; i < octaves; i++) {
+    val += amp * smoothNoise(x * freq, y * freq);
+    total += amp; amp *= 0.5; freq *= 2;
+  }
+  return val / total;
+}
+
+// ============================================================
+// Tyler Hobbs Polygon Deformation
+// ============================================================
+function deformOnce(poly, variance) {
+  const result = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i];
+    const c = poly[(i + 1) % poly.length];
+    result.push([a[0], a[1]]);
+    const bx = (a[0] + c[0]) / 2, by = (a[1] + c[1]) / 2;
+    const dx = c[0] - a[0], dy = c[1] - a[1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.5) continue;
+    const nx = -dy / len, ny = dx / len;
+    const offset = gauss(0, variance * len);
+    result.push([bx + nx * offset, by + ny * offset]);
+  }
+  return result;
+}
+
+function deformN(poly, n, variance) {
+  let p = poly.map(pt => [pt[0], pt[1]]);
+  for (let i = 0; i < n; i++) p = deformOnce(p, variance * Math.pow(0.7, i));
+  return p;
+}
+
+function makeBase(poly) { return deformN(poly, 5, 0.15); }
+
+// ============================================================
+// Paper background
+// ============================================================
+function drawPaperBackground() {
+  ctx.fillStyle = '#f4ede3';
+  ctx.fillRect(0, 0, W, H);
+  const imgData = ctx.getImageData(0, 0, W, H);
+  const d = imgData.data;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const idx = (y * W + x) * 4;
+      const grain = gauss(0, 3);
+      const tooth = (fbmNoise(x * 0.15, y * 0.15, 3) - 0.5) * 5;
+      const localVar = (fbmNoise(x * 0.01, y * 0.01, 5) - 0.5) * 14;
+      const total = grain + tooth + localVar;
+      d[idx]     = clamp(d[idx] + total, 0, 255);
+      d[idx + 1] = clamp(d[idx + 1] + total, 0, 255);
+      d[idx + 2] = clamp(d[idx + 2] + total - 1, 0, 255);
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+drawPaperBackground();
+
+// ============================================================
+// Color
+// ============================================================
+function varyColor(base, spread) {
+  const s = spread || 8;
+  const shift = gauss(0, s);
+  return [
+    clamp(Math.round(base[0] + shift), 0, 255),
+    clamp(Math.round(base[1] + shift * 0.4), 0, 255),
+    clamp(Math.round(base[2] + shift * 0.6), 0, 255)
+  ];
+}
+
+const PAL = {
+  crimson: [196, 30, 58], crimsonLight: [215, 60, 90], crimsonDark: [145, 26, 42],
+  gold: [197, 160, 48], goldLight: [218, 185, 78], goldDark: [139, 112, 32],
+  green: [38, 100, 40], greenLight: [58, 138, 60], greenDark: [26, 74, 26],
+  ivory: [244, 237, 227], earth: [107, 66, 38],
+};
+
+// ============================================================
+// Element collector
+// ============================================================
+const elements = [];
+function addEl(poly, color, opts) {
+  elements.push({
+    base: opts.skipDeform ? poly : makeBase(poly),
+    color, layerVariance: opts.lv || 0.08,
+    alphaScale: opts.as || 1.0, priority: opts.p || 0,
+    index: elements.length
+  });
+}
+
+// ============================================================
+// Shape generators
+// ============================================================
+
+// Rose petal — ogee shape
+function petalPoly(bx, by, angle, len, wid, curve) {
+  const pts = [], n = 24;
+  const profile = (t) => {
+    if (t < 0.08) return t / 0.08 * 0.2;
+    if (t < 0.3) return 0.2 + (t - 0.08) / 0.22 * 0.8;
+    if (t < 0.75) return 1.0;
+    return Math.cos((t - 0.75) / 0.25 * Math.PI * 0.5);
+  };
+  for (let side = 0; side < 2; side++) {
+    const dir = side === 0 ? 1 : -1;
+    const start = side === 0 ? 0 : n;
+    const end = side === 0 ? n : 0;
+    const step = side === 0 ? 1 : -1;
+    for (let i = start; side === 0 ? i <= end : i >= end; i += step) {
+      const t = i / n;
+      const w = profile(t);
+      const along = t * len;
+      const across = dir * w * wid * (side === 0 ? 0.5 : 0.35);
+      const cv = curve * Math.sin(t * Math.PI) * len * 0.08;
+      const ca = Math.cos(angle), sa = Math.sin(angle);
+      pts.push([bx + ca * along - (-sa) * (across + cv), by + sa * along + ca * (across + cv)]);
+    }
+  }
+  return pts;
+}
+
+// Saz leaf
+function sazLeaf(cx, cy, angle, length, maxW) {
+  const poly = [], steps = 24;
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  const nx = -sa, ny = ca;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const w = Math.sin(t * Math.PI) * maxW * (0.5 + 0.5 * Math.sin(t * Math.PI * 0.8));
+    const sc = Math.sin(t * Math.PI * 1.2) * maxW * 0.15;
+    poly.push([cx + ca * t * length + nx * (w + sc), cy + sa * t * length + ny * (w + sc)]);
+  }
+  for (let i = steps; i >= 0; i--) {
+    const t = i / steps;
+    const w = Math.sin(t * Math.PI) * maxW * 0.35;
+    const sc = Math.sin(t * Math.PI * 1.2) * maxW * 0.1;
+    poly.push([cx + ca * t * length - nx * (w - sc), cy + sa * t * length - ny * (w - sc)]);
+  }
+  return poly;
+}
+
+// Small oval
+function ovalPoly(cx, cy, rx, ry) {
+  const pts = [], n = 28;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    pts.push([cx + Math.cos(a) * rx + gauss(0, 0.5), cy + Math.sin(a) * ry + gauss(0, 0.5)]);
+  }
+  return pts;
+}
+
+// Vine segment
+function vinePoly(x1, y1, x2, y2, thick) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const nx = -dy / len * thick, ny = dx / len * thick;
+  const n = 12, right = [], left = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const x = lerpV(x1, x2, t) + gauss(0, 2);
+    const y = lerpV(y1, y2, t) + gauss(0, 2);
+    const w = 0.7 + 0.3 * Math.sin(t * Math.PI);
+    right.push([x + nx * w, y + ny * w]);
+    left.push([x - nx * w, y - ny * w]);
+  }
+  return [...right, ...left.reverse()];
+}
+
+// Bud
+function budPoly(cx, cy, angle, len, wid) {
+  const pts = [], n = 18;
+  const profile = (t) => {
+    if (t < 0.15) return t / 0.15 * 0.2;
+    if (t < 0.5) return 0.2 + (t - 0.15) / 0.35 * 0.8;
+    if (t < 0.7) return 1.0;
+    return Math.cos((t - 0.7) / 0.3 * Math.PI * 0.5);
+  };
+  for (let side = 0; side < 2; side++) {
+    const dir = side === 0 ? 1 : -1;
+    for (let i = side === 0 ? 0 : n; side === 0 ? i <= n : i >= 0; i += side === 0 ? 1 : -1) {
+      const t = i / n;
+      const along = t * len;
+      const across = dir * profile(t) * wid * 0.5;
+      const ca = Math.cos(angle), sa = Math.sin(angle);
+      pts.push([cx + ca * along + sa * across, cy + sa * along - ca * across]);
+    }
+  }
+  return pts;
+}
+
+// Carnation — ruffled
+function carnationPoly(cx, cy, r, amp, ruffles) {
+  const pts = [], n = 100;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const ru = Math.sin(a * ruffles) * amp + Math.sin(a * ruffles * 2.3 + 1.5) * amp * 0.4;
+    const radius = r + ru + gauss(0, amp * 0.25);
+    pts.push([cx + Math.cos(a) * radius, cy + Math.sin(a) * radius]);
+  }
+  return pts;
+}
+
+// ============================================================
+// BUILD COMPOSITION
+// ============================================================
+
+// --- Big background saz leaves (faded, behind everything) ---
+const bgLeaves = [
+  [60, 100, -0.4, 400, 75], [950, 80, -2.6, 420, 80],
+  [80, 500, 0.2, 380, 70], [980, 480, -2.9, 400, 72],
+  [100, 900, -0.3, 360, 68], [960, 860, -2.7, 380, 70],
+  [80, 1300, 0.1, 370, 72], [970, 1280, -2.8, 390, 74],
+  [120, 1650, -0.5, 340, 65], [940, 1620, -2.5, 360, 68],
+  [450, 50, -1.3, 350, 65], [630, 60, -1.7, 360, 68],
+  [350, 350, -0.9, 300, 58], [730, 330, -2.1, 310, 60],
+  [300, 700, -0.7, 320, 62], [780, 680, -2.3, 330, 64],
+  [400, 1050, -1.1, 310, 60], [680, 1030, -1.9, 320, 62],
+  [350, 1400, -0.8, 300, 58], [730, 1380, -2.2, 310, 60],
+  [450, 1750, -1.2, 280, 55], [630, 1720, -1.8, 290, 57],
+  [540, 500, -1.5, 330, 63], [540, 1200, -1.5, 320, 61],
+];
+
+for (const [x, y, a, len, w] of bgLeaves) {
+  addEl(
+    sazLeaf(x + gauss(0, 10), y + gauss(0, 10), a + gauss(0, 0.1), len, w),
+    varyColor(PAL.greenDark, 8),
+    { lv: 0.12, as: 0.5, p: 0 }
+  );
+}
+
+// --- Vine network ---
+const vines = [
+  [[60, 0], [150, 350], [100, 700], [180, 1050], [120, 1400], [160, 1750], [100, 1920]],
+  [[1020, 0], [930, 320], [980, 680], [900, 1020], [960, 1380], [910, 1720], [980, 1920]],
+  [[540, 0], [480, 300], [560, 600], [500, 900], [570, 1200], [510, 1500], [550, 1800], [540, 1920]],
+  [[0, 300], [300, 350], [540, 300], [780, 360], [1080, 310]],
+  [[0, 750], [280, 800], [540, 740], [800, 790], [1080, 760]],
+  [[0, 1200], [300, 1250], [540, 1190], [780, 1240], [1080, 1210]],
+  [[0, 1650], [280, 1690], [540, 1640], [800, 1680], [1080, 1660]],
+  // Diagonal accents
+  [[0, 0], [300, 200], [540, 450]], [[1080, 0], [780, 200], [540, 450]],
+  [[0, 1920], [300, 1720], [540, 1500]], [[1080, 1920], [780, 1720], [540, 1500]],
+];
+
+for (const vine of vines) {
+  for (let i = 0; i < vine.length - 1; i++) {
+    addEl(
+      vinePoly(vine[i][0], vine[i][1], vine[i + 1][0], vine[i + 1][1], 3.5),
+      varyColor(PAL.greenDark, 5),
+      { lv: 0.05, as: 0.8, p: 1 }
+    );
+  }
+}
+
+// --- Secondary saz leaves along vines ---
+for (const vine of vines) {
+  for (let i = 0; i < vine.length - 1; i++) {
+    const mx = (vine[i][0] + vine[i + 1][0]) / 2;
+    const my = (vine[i][1] + vine[i + 1][1]) / 2;
+    const da = Math.atan2(vine[i + 1][1] - vine[i][1], vine[i + 1][0] - vine[i][0]);
+    addEl(sazLeaf(mx, my, da + 0.7 + gauss(0, 0.15), 140 + gauss(0, 20), 32 + gauss(0, 4)),
+      varyColor(PAL.green, 7), { lv: 0.10, as: 0.7, p: 2 });
+    addEl(sazLeaf(mx, my, da - 0.7 + gauss(0, 0.15), 130 + gauss(0, 20), 30 + gauss(0, 4)),
+      varyColor(PAL.green, 7), { lv: 0.10, as: 0.7, p: 2 });
+  }
+}
+
+// --- LARGE FOCAL ROSES ---
+// Rose = concentric rings of fat overlapping oval petals
+function makeRosePetalOval(cx, cy, angle, dist, rx, ry) {
+  // Oval petal centered at (cx + cos(angle)*dist, cy + sin(angle)*dist)
+  // rotated by angle, with radii rx (along) and ry (across)
+  const pts = [], n = 28;
+  const px = cx + Math.cos(angle) * dist;
+  const py = cy + Math.sin(angle) * dist;
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  for (let i = 0; i < n; i++) {
+    const t = (i / n) * Math.PI * 2;
+    // Egg shape: wider at outer end, narrower toward center
+    const eggFactor = 1 + 0.3 * Math.cos(t);
+    const lx = Math.cos(t) * rx * eggFactor;
+    const ly = Math.sin(t) * ry;
+    // Rotate by petal angle
+    pts.push([px + ca * lx - sa * ly, py + sa * lx + ca * ly]);
+  }
+  return pts;
+}
+
+function addRose(cx, cy, size, palette) {
+  // Outer ring: large, light petals
+  const outerN = 8;
+  for (let i = 0; i < outerN; i++) {
+    const a = (i / outerN) * Math.PI * 2 + gauss(0, 0.15);
+    addEl(
+      makeRosePetalOval(cx, cy, a, size * 0.22 + gauss(0, 3),
+        size * 0.32 + gauss(0, 4), size * 0.22 + gauss(0, 3)),
+      varyColor(palette[0], 8), { lv: 0.11, as: 1.4, p: 4 }
+    );
+  }
+  // Mid ring
+  const midN = 7;
+  for (let i = 0; i < midN; i++) {
+    const a = (i / midN) * Math.PI * 2 + 0.25 + gauss(0, 0.15);
+    addEl(
+      makeRosePetalOval(cx, cy, a, size * 0.12 + gauss(0, 2),
+        size * 0.24 + gauss(0, 3), size * 0.18 + gauss(0, 2)),
+      varyColor(palette[1], 7), { lv: 0.10, as: 1.3, p: 5 }
+    );
+  }
+  // Inner ring
+  const innerN = 5;
+  for (let i = 0; i < innerN; i++) {
+    const a = (i / innerN) * Math.PI * 2 + 0.5 + gauss(0, 0.2);
+    addEl(
+      makeRosePetalOval(cx, cy, a, size * 0.05 + gauss(0, 1),
+        size * 0.16 + gauss(0, 2), size * 0.13 + gauss(0, 2)),
+      varyColor(palette[2], 6), { lv: 0.09, as: 1.2, p: 5 }
+    );
+  }
+  // Core
+  const coreN = 4;
+  for (let i = 0; i < coreN; i++) {
+    const a = (i / coreN) * Math.PI * 2 + gauss(0, 0.3);
+    addEl(
+      makeRosePetalOval(cx, cy, a, size * 0.02,
+        size * 0.10, size * 0.08),
+      varyColor(palette[3], 5), { lv: 0.07, as: 1.1, p: 6 }
+    );
+  }
+  // Dark center
+  addEl(ovalPoly(cx, cy, size * 0.08, size * 0.08), varyColor(palette[3], 3), { lv: 0.05, as: 2.5, p: 7 });
+}
+
+function crimsonPalette() {
+  return [
+    varyColor([225, 130, 150], 10), varyColor([200, 75, 105], 8),
+    varyColor([170, 45, 70], 6), varyColor([120, 20, 40], 5)
+  ];
+}
+function deepCrimsonPalette() {
+  return [
+    varyColor([180, 45, 65], 10), varyColor([155, 30, 50], 8),
+    varyColor([130, 22, 40], 6), varyColor([95, 12, 28], 5)
+  ];
+}
+function goldPalette() {
+  return [
+    varyColor([230, 185, 65], 10), varyColor([210, 155, 45], 8),
+    varyColor([185, 120, 30], 6), varyColor([155, 85, 20], 5)
+  ];
+}
+function pinkPalette() {
+  return [
+    varyColor([238, 175, 185], 10), varyColor([220, 135, 155], 8),
+    varyColor([195, 95, 125], 6), varyColor([155, 55, 85], 5)
+  ];
+}
+
+// Major roses — large and prominent
+const majorRoses = [
+  [540, 280, 220],   // top center — hero rose
+  [160, 550, 190],   // left upper
+  [920, 500, 195],   // right upper
+  [540, 920, 240],   // dead center — largest
+  [180, 1200, 185],  // left lower
+  [900, 1150, 190],  // right lower
+  [380, 1620, 200],  // bottom left
+  [720, 1580, 195],  // bottom right
+];
+
+for (const [x, y, size] of majorRoses) {
+  const v = rand();
+  const pal = v < 0.5 ? crimsonPalette() : v < 0.75 ? deepCrimsonPalette() : pinkPalette();
+  addRose(x + gauss(0, 5), y + gauss(0, 5), size, pal);
+}
+
+// Secondary roses — medium
+const secRoses = [
+  [350, 400, 140], [750, 350, 135],
+  [300, 800, 130], [780, 780, 135],
+  [450, 1100, 125], [650, 1050, 130],
+  [300, 1450, 128], [780, 1420, 132],
+  [540, 1780, 135],
+  [120, 300, 115], [960, 300, 118],
+  [120, 950, 110], [960, 920, 115],
+  [120, 1550, 108], [960, 1530, 112],
+];
+
+for (const [x, y, size] of secRoses) {
+  const v = rand();
+  const pal = v < 0.4 ? crimsonPalette() : v < 0.7 ? pinkPalette() : deepCrimsonPalette();
+  addRose(x + gauss(0, 5), y + gauss(0, 5), size, pal);
+}
+
+// Golden roses — accent
+const goldenRosePos = [
+  [540, 580, 150], [350, 1350, 130], [730, 1350, 135],
+  [250, 100, 110], [830, 100, 115], [540, 1850, 120],
+];
+for (const [x, y, size] of goldenRosePos) {
+  addRose(x + gauss(0, 3), y + gauss(0, 3), size, goldPalette());
+}
+
+// --- Carnations ---
+const carnations = [
+  [270, 150, 50], [810, 170, 48],
+  [450, 550, 42], [650, 500, 44],
+  [300, 950, 46], [780, 900, 44],
+  [500, 1320, 48], [600, 1700, 45],
+];
+for (const [x, y, r] of carnations) {
+  const col = rand() < 0.6 ? [220, 85, 115] : [240, 200, 215];
+  addEl(carnationPoly(x + gauss(0, 5), y + gauss(0, 5), r, r * 0.14, 8 + randInt(0, 3)),
+    varyColor(col, 10), { lv: 0.12, as: 1.2, p: 3 });
+}
+
+// --- Buds along vines ---
+for (const vine of vines) {
+  for (let i = 0; i < vine.length - 1; i++) {
+    if (rand() < 0.5) {
+      const t = 0.3 + rand() * 0.4;
+      const x = lerpV(vine[i][0], vine[i + 1][0], t);
+      const y = lerpV(vine[i][1], vine[i + 1][1], t);
+      const da = Math.atan2(vine[i + 1][1] - vine[i][1], vine[i + 1][0] - vine[i][0]);
+      const side = rand() < 0.5 ? 1 : -1;
+      addEl(budPoly(x, y, da + side * 0.8, 35 + gauss(0, 5), 16 + gauss(0, 2)),
+        varyColor(rand() < 0.6 ? PAL.crimson : PAL.gold, 8), { lv: 0.09, as: 1.0, p: 3 });
+    }
+  }
+}
+
+// --- Small jasmine ---
+function addJasmine(cx, cy, size) {
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 + gauss(0, 0.1);
+    const d = size * 0.35;
+    addEl(ovalPoly(cx + Math.cos(a) * d, cy + Math.sin(a) * d, size * 0.3, size * 0.45),
+      varyColor([248, 244, 236], 4), { lv: 0.07, as: 0.9, p: 3 });
+  }
+  addEl(ovalPoly(cx, cy, size * 0.1, size * 0.1), varyColor([220, 195, 60], 4), { lv: 0.04, as: 1.5, p: 6 });
+}
+
+for (let i = 0; i < 40; i++) {
+  addJasmine(50 + rand() * (W - 100), 50 + rand() * (H - 100), 16 + gauss(0, 3));
+}
+
+// --- Penç fillers ---
+function addPenc(cx, cy, size, color) {
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    const pts = [], n = 14;
+    for (let j = 0; j <= n; j++) {
+      const t = j / n;
+      const w = Math.sin(t * Math.PI) * size * 0.35;
+      const along = t * size;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      pts.push([cx + ca * along + sa * w, cy + sa * along - ca * w]);
+    }
+    for (let j = n; j >= 0; j--) {
+      const t = j / n;
+      const w = -Math.sin(t * Math.PI) * size * 0.25;
+      const along = t * size;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      pts.push([cx + ca * along + sa * w, cy + sa * along - ca * w]);
+    }
+    addEl(pts, varyColor(color, 5), { lv: 0.08, as: 1.0, p: 3 });
+  }
+  addEl(ovalPoly(cx, cy, size * 0.12, size * 0.12), varyColor(PAL.gold, 3), { lv: 0.04, as: 1.5, p: 6 });
+}
+
+const pencPos = [
+  [380, 140], [700, 160], [130, 450], [950, 420],
+  [440, 720], [660, 700], [130, 800], [950, 780],
+  [380, 1060], [700, 1040], [130, 1180], [950, 1160],
+  [440, 1480], [660, 1500], [130, 1620], [950, 1600],
+  [300, 1850], [780, 1860], [540, 1880],
+];
+for (const [x, y] of pencPos) {
+  addPenc(x + gauss(0, 8), y + gauss(0, 8), 25 + gauss(0, 4),
+    rand() < 0.5 ? PAL.crimsonLight : PAL.ivory);
+}
+
+// ============================================================
+// RENDER ALL WATERCOLOR ELEMENTS
+// ============================================================
+elements.sort((a, b) => a.priority - b.priority || a.index - b.index);
+
+const NUM_MASKS = 4;
+const maskCircles = [];
+for (let m = 0; m < NUM_MASKS; m++) {
+  const circles = [];
+  for (let j = 0; j < 400; j++) circles.push([rand() * W, rand() * H, Math.abs(gauss(W * 0.05, W * 0.02))]);
+  maskCircles.push(circles);
+}
+
+for (const el of elements) {
+  const layers = 35;
+  const baseAlpha = 0.035 * el.alphaScale;
+  const [r, g, b] = el.color;
+
+  for (let L = 0; L < layers; L++) {
+    const layerPoly = deformN(el.base, 3, el.layerVariance * 0.7);
+    ctx.save();
+    ctx.globalAlpha = baseAlpha;
+    const jr = clamp(Math.round(r + gauss(0, 5)), 0, 255);
+    const jg = clamp(Math.round(g + gauss(0, 4)), 0, 255);
+    const jb = clamp(Math.round(b + gauss(0, 4)), 0, 255);
+    ctx.fillStyle = `rgb(${jr},${jg},${jb})`;
+    ctx.beginPath();
+    ctx.moveTo(layerPoly[0][0], layerPoly[0][1]);
+    for (let j = 1; j < layerPoly.length; j++) ctx.lineTo(layerPoly[j][0], layerPoly[j][1]);
+    ctx.closePath();
+
+    if (L % 4 === 0) {
+      const mask = maskCircles[L % NUM_MASKS];
+      ctx.save();
+      ctx.clip();
+      ctx.globalAlpha = baseAlpha * 0.6;
+      for (const [mx, my, mr] of mask) {
+        ctx.beginPath(); ctx.arc(mx, my, mr, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    } else {
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+// ============================================================
+// Gold accents
+// ============================================================
+function drawGoldDust() {
+  ctx.save();
+  for (let i = 0; i < 2000; i++) {
+    const x = rand() * W, y = rand() * H;
+    const r = 0.4 + rand() * 2.5;
+    ctx.globalAlpha = 0.08 + rand() * 0.2;
+    ctx.fillStyle = `rgb(${197 + Math.round(gauss(0, 10))},${160 + Math.round(gauss(0, 8))},${48 + Math.round(gauss(0, 6))})`;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawTahrirBorder() {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(197, 160, 48, 0.5)';
+  ctx.lineWidth = 2.5;
+  const m = 28;
+  ctx.strokeRect(m, m, W - 2 * m, H - 2 * m);
+  ctx.strokeStyle = 'rgba(197, 160, 48, 0.3)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(m + 10, m + 10, W - 2 * m - 20, H - 2 * m - 20);
+  // Corner ornaments
+  const corners = [[m + 25, m + 25], [W - m - 25, m + 25], [m + 25, H - m - 25], [W - m - 25, H - m - 25]];
+  for (const [cx, cy] of corners) {
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = 'rgb(197, 160, 48)';
+    for (let p = 0; p < 6; p++) {
+      const a = (p / 6) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.ellipse(cx + Math.cos(a) * 10, cy + Math.sin(a) * 10, 6, 10, a, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawVineTendrils() {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(38, 100, 40, 0.25)';
+  ctx.lineWidth = 1.5;
+  for (const vine of vines) {
+    for (let i = 0; i < vine.length - 1; i++) {
+      if (rand() < 0.4) {
+        const t = 0.2 + rand() * 0.6;
+        const x = lerpV(vine[i][0], vine[i + 1][0], t);
+        const y = lerpV(vine[i][1], vine[i + 1][1], t);
+        const da = Math.atan2(vine[i + 1][1] - vine[i][1], vine[i + 1][0] - vine[i][0]);
+        const side = rand() < 0.5 ? 1 : -1;
+        ctx.beginPath();
+        let px = x, py = y, a = da + side * 1.0;
+        ctx.moveTo(px, py);
+        for (let s = 0; s < 20; s++) {
+          a += 0.15 + (s / 20) * 0.1;
+          const step = (50 / 20) * (1 - s / 20 * 0.3);
+          px += Math.cos(a) * step;
+          py += Math.sin(a) * step;
+          ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+// Leaf vein highlights
+function drawLeafVeins() {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(26, 74, 26, 0.15)';
+  ctx.lineWidth = 0.8;
+  for (const [x, y, a, len] of bgLeaves) {
+    const ca = Math.cos(a), sa = Math.sin(a);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + ca * len * 0.9, y + sa * len * 0.9);
+    ctx.stroke();
+    // Side veins
+    for (let i = 1; i <= 5; i++) {
+      const t = 0.1 + (i / 6) * 0.7;
+      const vx = x + ca * t * len;
+      const vy = y + sa * t * len;
+      const vLen = 30 * Math.sin(t * Math.PI);
+      const nx = -sa, ny = ca;
+      ctx.beginPath();
+      ctx.moveTo(vx, vy);
+      ctx.lineTo(vx + nx * vLen + ca * vLen * 0.2, vy + ny * vLen + sa * vLen * 0.2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(vx, vy);
+      ctx.lineTo(vx - nx * vLen * 0.7 + ca * vLen * 0.15, vy - ny * vLen * 0.7 + sa * vLen * 0.15);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+drawLeafVeins();
+drawVineTendrils();
+drawGoldDust();
+drawTahrirBorder();
+
+// ============================================================
+// عيد مبارك — calligraphy overlay
+// ============================================================
+function drawCalligraphy() {
+  // Text removed — garden painting stands alone
+  console.log('Garden complete, no text overlay');
+
+  // Main text — dark green, strong
+  tctx.fillStyle = 'rgba(22, 62, 22, 0.9)';
+  tctx.font = `700 ${fontSize}px "Aref Ruqaa", serif`;
+  tctx.fillText('عيد مبارك', W / 2, ty);
+
+  // Gold outline
+  tctx.strokeStyle = 'rgba(175, 140, 40, 0.45)';
+  tctx.lineWidth = 2.5;
+  tctx.font = `700 ${fontSize}px "Aref Ruqaa", serif`;
+  tctx.strokeText('عيد مبارك', W / 2, ty);
+
+  // Draw text directly onto main canvas — clear overlay on the garden
+  // First pass: multiply for integration with garden
+  ctx.save();
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.drawImage(tCanvas, 0, 0);
+  ctx.restore();
+
+  // Second pass: direct overlay for readability
+  ctx.save();
+  ctx.globalAlpha = 0.6;
+  ctx.drawImage(tCanvas, 0, 0);
+  ctx.restore();
+}
+
+// Wait for font to load
+document.fonts.ready.then(() => {
+  document.fonts.load('700 260px "Aref Ruqaa"').then(() => {
+    drawCalligraphy();
+    console.log('Eid Mubarak garden complete:', elements.length, 'elements');
+  }).catch(() => {
+    setTimeout(drawCalligraphy, 3000);
+    console.log('Font fallback, drawing after delay');
+  });
+});
+</script>
+</body>
+</html>

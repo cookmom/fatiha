@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<!-- بسم الله الرحمن الرحيم -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>عيد مبارك — Botanical Calligraphy</title>
+<script src="https://cdn.jsdelivr.net/npm/p5@2/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.0-beta"></script>
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #f5f0e8; display: flex; justify-content: center; align-items: center; height: 100vh; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<script>
+// ============================================================
+// TYLER HOBBS WATERCOLOR ENGINE
+// ============================================================
+let wcGfx;
+const TWO_PI = Math.PI * 2;
+
+function gaussRand(mean, std) {
+  const u1 = Math.random(), u2 = Math.random();
+  return mean + std * Math.sqrt(-2 * Math.log(u1 || 0.001)) * Math.cos(TWO_PI * u2);
+}
+
+function deformOnce(poly, variance) {
+  const result = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], c = poly[(i + 1) % poly.length];
+    result.push([a[0], a[1]]);
+    const bx = (a[0] + c[0]) / 2, by = (a[1] + c[1]) / 2;
+    const dx = c[0] - a[0], dy = c[1] - a[1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.5) continue;
+    const nx = -dy / len, ny = dx / len;
+    const offset = gaussRand(0, variance * len);
+    result.push([bx + nx * offset, by + ny * offset]);
+  }
+  return result;
+}
+
+function deformN(poly, n, variance) {
+  let p = poly.map(pt => [pt[0], pt[1]]);
+  for (let i = 0; i < n; i++) p = deformOnce(p, variance * Math.pow(0.7, i));
+  return p;
+}
+
+function watercolorFill(polygon, r, g, b, layers, alpha, variance) {
+  const ctx = wcGfx.drawingContext;
+  const basePoly = deformN(polygon, 5, variance || 0.15);
+  for (let i = 0; i < layers; i++) {
+    const layerPoly = deformN(basePoly, 3, (variance || 0.15) * 0.75);
+    ctx.save();
+    ctx.globalAlpha = alpha / 255;
+    const jr = Math.max(0, Math.min(255, Math.round(r + gaussRand(0, 6))));
+    const jg = Math.max(0, Math.min(255, Math.round(g + gaussRand(0, 5))));
+    const jb = Math.max(0, Math.min(255, Math.round(b + gaussRand(0, 4))));
+    ctx.fillStyle = `rgb(${jr},${jg},${jb})`;
+    ctx.beginPath();
+    ctx.moveTo(layerPoly[0][0], layerPoly[0][1]);
+    for (let j = 1; j < layerPoly.length; j++) ctx.lineTo(layerPoly[j][0], layerPoly[j][1]);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ============================================================
+// BOTANICAL SHAPES
+// ============================================================
+
+// Rose cluster — fills thick letter parts
+function drawRoseCluster(cx, cy, size) {
+  // Soft wash behind
+  const wash = [];
+  for (let s = 0; s < 12; s++) {
+    const a = (s / 12) * TWO_PI;
+    wash.push([cx + Math.cos(a) * size * 0.6, cy + Math.sin(a) * size * 0.6]);
+  }
+  watercolorFill(wash, 196, 30, 58, 15, 5, 0.25);
+
+  // Petal rings
+  const rings = [
+    { n: 6, dist: size * 0.30, len: size * 0.65, w: size * 0.55, layers: 30, alpha: 12 },
+    { n: 5, dist: size * 0.14, len: size * 0.42, w: size * 0.38, layers: 25, alpha: 14 },
+    { n: 4, dist: size * 0.05, len: size * 0.25, w: size * 0.22, layers: 18, alpha: 16 },
+  ];
+  const colors = [[196, 30, 58], [215, 60, 90], [145, 26, 42]];
+
+  for (let ri = 0; ri < rings.length; ri++) {
+    const ring = rings[ri];
+    const col = colors[ri];
+    for (let i = 0; i < ring.n; i++) {
+      const a = (i / ring.n) * TWO_PI + gaussRand(0, 0.2);
+      const px = cx + Math.cos(a) * ring.dist;
+      const py = cy + Math.sin(a) * ring.dist;
+      const petal = ovalPetal(px, py, a + gaussRand(0, 0.15), ring.len, ring.w);
+      watercolorFill(petal, ...col, ring.layers, ring.alpha, 0.16);
+    }
+  }
+  // Gold center
+  for (let i = 0; i < 8; i++) {
+    const ga = Math.random() * TWO_PI, gd = Math.random() * size * 0.08;
+    const gx = cx + Math.cos(ga) * gd, gy = cy + Math.sin(ga) * gd;
+    const dot = [];
+    for (let s = 0; s < 6; s++) dot.push([gx + Math.cos((s/6)*TWO_PI)*2.5, gy + Math.sin((s/6)*TWO_PI)*2.5]);
+    watercolorFill(dot, 218, 185, 78, 8, 20, 0.08);
+  }
+}
+
+// Small rose bud — replaces dots
+function drawBud(cx, cy, size) {
+  const wash = [];
+  for (let s = 0; s < 8; s++) {
+    const a = (s / 8) * TWO_PI;
+    wash.push([cx + Math.cos(a) * size * 0.5, cy + Math.sin(a) * size * 0.5]);
+  }
+  watercolorFill(wash, 220, 100, 130, 10, 5, 0.22);
+  // Petals
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * TWO_PI + gaussRand(0, 0.2);
+    const px = cx + Math.cos(a) * size * 0.18;
+    const py = cy + Math.sin(a) * size * 0.18;
+    const petal = ovalPetal(px, py, a, size * 0.52, size * 0.38);
+    watercolorFill(petal, 210, 70, 100, 22, 12, 0.14);
+  }
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * TWO_PI + gaussRand(0, 0.3);
+    const petal = ovalPetal(cx, cy, a, size * 0.22, size * 0.18);
+    watercolorFill(petal, 180, 40, 70, 14, 15, 0.10);
+  }
+}
+
+// Saz leaf
+function drawLeaf(cx, cy, angle, length, maxWidth, r, g, b) {
+  const poly = [];
+  const steps = 18;
+  const ca = Math.cos(angle), sa = Math.sin(angle), nx = -sa, ny = ca;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const w = Math.sin(t * Math.PI) * maxWidth * (0.5 + 0.5 * Math.sin(t * Math.PI * 0.8));
+    const sc = Math.sin(t * Math.PI * 1.2) * maxWidth * 0.15;
+    poly.push([cx + ca * t * length + nx * (w + sc), cy + sa * t * length + ny * (w + sc)]);
+  }
+  for (let i = steps; i >= 0; i--) {
+    const t = i / steps;
+    const w = Math.sin(t * Math.PI) * maxWidth * 0.32;
+    const sc = Math.sin(t * Math.PI * 1.2) * maxWidth * 0.10;
+    poly.push([cx + ca * t * length - nx * (w - sc), cy + sa * t * length - ny * (w - sc)]);
+  }
+  watercolorFill(poly, r, g, b, 12, 6, 0.22);
+  watercolorFill(poly, r, g, b, 25, 12, 0.15);
+  // Vein
+  const vein = [];
+  for (let i = 0; i <= 8; i++) {
+    const t = i / 8;
+    vein.push([cx + ca * t * length * 0.9 + nx * 1.2, cy + sa * t * length * 0.9 + ny * 1.2]);
+  }
+  for (let i = 8; i >= 0; i--) {
+    const t = i / 8;
+    vein.push([cx + ca * t * length * 0.9 - nx * 1.2, cy + sa * t * length * 0.9 - ny * 1.2]);
+  }
+  watercolorFill(vein, Math.max(0, r - 25), Math.max(0, g - 30), Math.max(0, b - 25), 6, 18, 0.08);
+}
+
+// Small leaf
+function drawSmallLeaf(cx, cy, angle, length, r, g, b) {
+  const poly = [];
+  const ca = Math.cos(angle), sa = Math.sin(angle), nx = -sa, ny = ca;
+  const w = length * 0.28;
+  for (let i = 0; i <= 10; i++) {
+    const t = i / 10;
+    const ww = Math.sin(t * Math.PI) * w;
+    poly.push([cx + ca * t * length + nx * ww, cy + sa * t * length + ny * ww]);
+  }
+  for (let i = 10; i >= 0; i--) {
+    const t = i / 10;
+    const ww = Math.sin(t * Math.PI) * w * 0.3;
+    poly.push([cx + ca * t * length - nx * ww, cy + sa * t * length - ny * ww]);
+  }
+  watercolorFill(poly, r, g, b, 18, 13, 0.14);
+}
+
+// Oval petal polygon
+function ovalPetal(px, py, angle, len, w) {
+  const pts = [], steps = 20;
+  const ca = Math.cos(angle), sa = Math.sin(angle), nx = -sa, ny = ca;
+  for (let s = 0; s <= steps; s++) {
+    const t = s / steps, theta = t * TWO_PI;
+    const along = Math.cos(theta) * len * 0.5;
+    const across = Math.sin(theta) * w * 0.6;
+    pts.push([px + ca * (along + len * 0.5) + nx * across, py + sa * (along + len * 0.5) + ny * across]);
+  }
+  return pts;
+}
+
+// ============================================================
+// p5.js SETUP — BOTANICAL CALLIGRAPHY
+// ============================================================
+
+function setup() {
+  createCanvas(1080, 1920, WEBGL);
+  brush.load();
+  translate(-width / 2, -height / 2);
+  randomSeed(271828);
+
+  const W = 1080, H = 1920;
+  const cx = W / 2;
+
+  // Colors
+  const CREAM     = '#f5f0e8';
+  const CREAM_MID = '#e8dfd0';
+  const V         = '#1e2e14';  // vine dark
+  const VM        = '#2d4420';  // vine medium
+  const GOLD      = '#c4a94e';
+
+  // Greens for watercolor leaves
+  const GD = [26, 68, 26];
+  const GM = [42, 105, 45];
+  const GL = [65, 135, 60];
+
+  // ═══════════════════════════════════════
+  // PAPER BACKGROUND
+  // ═══════════════════════════════════════
+  background(CREAM);
+  brush.noStroke();
+  brush.fill(CREAM_MID, 12);
+  brush.fillBleed(0.2, "out");
+  brush.fillTexture(0.3, 0.1);
+  for (let i = 0; i < 5; i++) {
+    brush.circle(random(150, W - 150), random(150, H - 150), random(250, 500));
+  }
+  brush.noFill();
+
+  // ═══════════════════════════════════════
+  // WATERCOLOR BUFFER
+  // ═══════════════════════════════════════
+  wcGfx = createGraphics(W, H);
+  wcGfx.clear();
+
+  // ═════════════════════════════════════════════════════════════
+  //  عيد — EID (top word)
+  //  Right to left: ع → ي → د
+  //  Centered around x=540, baseline y≈600
+  //  Compact connected forms — letters flow into each other
+  // ═════════════════════════════════════════════════════════════
+
+  const eidBase = 620;
+
+  // ──────────────────────────────────────
+  // ع (AYN) — rightmost, initial form
+  // Small head/hook at top → descending into eye bowl → tail exits left
+  // ──────────────────────────────────────
+  const ax = 740, ay = eidBase;
+
+  // Head hook — descends from top-right, sweeps into a clear eye bowl
+  // The eye should be an OPEN U-shape — wide enough that the rose sits inside
+  brush.set("cpencil", V, 15);
+  brush.spline([
+    [ax + 50,  ay - 200, 0.4],    // hook tip (top)
+    [ax + 80,  ay - 150, 0.6],    // curving right
+    [ax + 100, ay - 80, 1.0],     // descending right side
+    [ax + 105, ay - 10, 1.4],     // right wall of eye
+    [ax + 90,  ay + 50, 1.8],     // bottom-right of eye
+    [ax + 50,  ay + 90, 2.2],     // bottom center (thickest)
+    [ax,       ay + 85, 2.0],     // bottom-left
+    [ax - 45,  ay + 55, 1.6],     // left wall rising
+    [ax - 65,  ay + 10, 1.2],     // upper-left of eye
+    [ax - 55,  ay - 30, 0.9],     // exit point (clear gap = open eye)
+  ], 0.65);
+
+  // Tail — exits eye left, flows along baseline to ي
+  brush.set("cpencil", V, 12);
+  brush.spline([
+    [ax - 55,  ay - 30, 1.0],     // from eye upper-left
+    [ax - 90,  ay + 15, 1.2],     // dipping down to baseline
+    [ax - 140, ay + 30, 1.1],     // along baseline
+    [ax - 200, ay + 25, 1.0],     // flowing left
+    [ax - 250, ay + 20, 0.9],     // approaching ي
+  ], 0.6);
+
+  // ROSE filling the eye bowl of ع
+  drawRoseCluster(ax + 40, ay + 30, 95);
+
+  // Leaves at the hook top and left side
+  drawLeaf(ax + 45, ay - 220, -0.6, 90, 26, ...GD);
+  drawSmallLeaf(ax + 105, ay - 110, 0.3, 55, ...GM);
+  drawLeaf(ax - 75, ay + 5, -2.3, 65, 20, ...GL);
+
+  // ──────────────────────────────────────
+  // ي (YAA) — medial form: tooth rising from baseline
+  // Two dots below
+  // ──────────────────────────────────────
+  const yx = 490, yy = eidBase;
+
+  // Smooth tooth — wide rounded arch
+  brush.set("cpencil", V, 13);
+  brush.spline([
+    [ax - 250, ay + 20, 0.9],     // from ayn tail
+    [yx + 60,  yy + 15, 1.0],     // baseline right
+    [yx + 35,  yy - 20, 1.3],     // starting rise
+    [yx + 15,  yy - 70, 1.7],     // rising
+    [yx - 5,   yy - 110, 2.0],    // approaching peak
+    [yx - 25,  yy - 125, 2.2],    // peak right
+    [yx - 50,  yy - 130, 2.2],    // peak center (rounded)
+    [yx - 75,  yy - 118, 2.0],    // peak left
+    [yx - 95,  yy - 85, 1.6],     // descending
+    [yx - 115, yy - 40, 1.3],     // continuing down
+    [yx - 130, yy + 10, 1.0],     // back at baseline
+    [yx - 160, yy + 20, 0.8],     // flowing to dal
+  ], 0.65);
+
+  // Leaves at the arch peak
+  drawLeaf(yx - 40, yy - 142, -1.0, 75, 22, ...GM);
+  drawSmallLeaf(yx + 5, yy - 100, -0.2, 50, ...GL);
+
+  // Two rose buds for the dots of ي (below the tooth)
+  drawBud(yx - 55, yy + 100, 32);
+  drawBud(yx - 15, yy + 105, 30);
+
+  // ──────────────────────────────────────
+  // د (DAL) — final form: SHORT curved stroke
+  // Like a small triangular wedge — rises slightly, curves right
+  // NOT a tall letter — only ~80px above baseline
+  // ──────────────────────────────────────
+  const dx = 300, dy = eidBase;
+
+  brush.set("cpencil", V, 14);
+  brush.spline([
+    [yx - 160, yy + 20, 0.8],     // from yaa
+    [dx + 60,  dy + 15, 1.0],     // approaching on baseline
+    [dx + 30,  dy, 1.4],          // baseline
+    [dx,       dy - 35, 1.9],     // rising (thickening)
+    [dx - 20,  dy - 65, 2.4],     // peak (thickest — short!)
+    [dx - 15,  dy - 80, 2.0],     // tip curving slightly right
+    [dx + 5,   dy - 85, 1.4],     // top-right curve
+    [dx + 30,  dy - 75, 0.9],     // exiting right at top
+    [dx + 55,  dy - 55, 0.5],     // tail tip
+  ], 0.6);
+
+  // Rose bud at the thick body of dal
+  drawBud(dx - 15, dy - 45, 40);
+
+  // Leaves at dal curve
+  drawLeaf(dx + 45, dy - 70, -0.3, 75, 22, ...GD);
+  drawSmallLeaf(dx - 30, dy - 75, -2.0, 55, ...GM);
+  drawSmallLeaf(dx + 65, dy + 5, 0.5, 50, ...GL);
+
+  // ═════════════════════════════════════════════════════════════
+  //  مبارك — MUBARAK (bottom word)
+  //  Right to left: م → ب → ا → ر → ك
+  //  Centered around x=540, baseline y≈1150
+  //  Note: ا and ر are non-connecting (break after each)
+  // ═════════════════════════════════════════════════════════════
+
+  const mbBase = 1150;
+
+  // ──────────────────────────────────────
+  // م (MEEM) — initial form
+  // Small head loop → descending into round bowl → exits left
+  // ──────────────────────────────────────
+  const mx = 830, my = mbBase;
+
+  // Head loop rising, then descending into bowl
+  brush.set("cpencil", V, 14);
+  brush.spline([
+    [mx + 90,  my + 10, 0.6],     // entry from right
+    [mx + 60,  my - 30, 0.9],     // rising
+    [mx + 30,  my - 80, 1.3],     // approaching peak
+    [mx,       my - 100, 1.5],    // peak
+    [mx - 25,  my - 75, 1.4],     // descending from peak
+    [mx - 35,  my - 30, 1.5],     // curving into bowl
+  ], 0.65);
+
+  // Bowl — smooth round loop below baseline
+  brush.set("cpencil", V, 15);
+  brush.spline([
+    [mx - 35,  my - 30, 1.5],     // entering bowl from left
+    [mx - 25,  my + 30, 1.9],     // left wall going down
+    [mx + 5,   my + 75, 2.4],     // bottom center (thickest)
+    [mx + 45,  my + 80, 2.2],     // bottom-right
+    [mx + 70,  my + 45, 1.8],     // right wall going up
+    [mx + 65,  my, 1.3],          // closing bowl at baseline
+    [mx + 40,  my - 20, 1.0],     // final close
+  ], 0.7);
+
+  // Baseline connection from meem to baa — thick and clear
+  brush.set("cpencil", V, 12);
+  brush.spline([
+    [mx - 35, my - 30, 1.2],      // from meem bowl entry
+    [mx - 80, my, 1.1],           // flowing left
+    [mx - 140, my + 10, 1.1],     // along baseline
+    [mx - 200, my + 10, 1.0],     // approaching baa
+  ], 0.55);
+
+  // Rose in meem bowl
+  drawRoseCluster(mx + 15, my + 30, 75);
+
+  // Leaves at meem peak
+  drawLeaf(mx + 5, my - 110, -0.9, 80, 24, ...GD);
+  drawSmallLeaf(mx - 30, my - 80, -2.2, 50, ...GM);
+
+  // ──────────────────────────────────────
+  // ب (BAA) — medial→final form (before non-connecting ا)
+  // Smooth tooth/arch, one dot below
+  // ──────────────────────────────────────
+  const bx = 630, by = mbBase;
+
+  brush.set("cpencil", V, 13);
+  brush.spline([
+    [mx - 200, my + 10, 1.0],     // from meem
+    [bx + 50,  by + 5, 1.1],      // baseline right
+    [bx + 25,  by - 25, 1.4],     // starting rise
+    [bx,       by - 65, 1.8],     // rising
+    [bx - 20,  by - 100, 2.1],    // approaching peak
+    [bx - 40,  by - 110, 2.2],    // peak right (rounded)
+    [bx - 60,  by - 112, 2.2],    // peak center
+    [bx - 80,  by - 100, 2.0],    // peak left
+    [bx - 100, by - 70, 1.6],     // descending
+    [bx - 115, by - 30, 1.2],     // approaching baseline
+    [bx - 130, by + 5, 0.9],      // baseline
+    [bx - 155, by + 15, 0.7],     // tail toward alif
+  ], 0.65);
+
+  // Leaves at baa tooth
+  drawLeaf(bx - 50, by - 122, -1.1, 70, 20, ...GM);
+  drawSmallLeaf(bx + 10, by - 80, -0.1, 48, ...GL);
+
+  // Bud for baa dot (centered below tooth)
+  drawBud(bx - 40, by + 100, 34);
+
+  // ──────────────────────────────────────
+  // ا (ALIF) — tall vertical vine stem
+  // Non-connecting: small gap before and after
+  // ──────────────────────────────────────
+  const alfx = 460, alfy = mbBase;
+
+  // Short connection stroke from baa to alif base
+  brush.set("cpencil", V, 11);
+  brush.spline([
+    [bx - 155, by + 15, 0.7],
+    [alfx + 15, alfy + 15, 0.8],
+  ], 0.4);
+
+  // Tall vertical stem — slightly organic lean
+  brush.set("cpencil", V, 16);
+  brush.spline([
+    [alfx + 5,  alfy + 20, 0.7],   // base
+    [alfx + 3,  alfy - 30, 1.5],   // lower
+    [alfx,      alfy - 100, 2.0],  // lower-mid (thick)
+    [alfx - 3,  alfy - 190, 2.3],  // mid (thickest)
+    [alfx - 5,  alfy - 280, 1.8],  // upper-mid
+    [alfx - 3,  alfy - 350, 1.2],  // upper
+    [alfx,      alfy - 400, 0.6],  // tip
+  ], 0.2);
+
+  // Leaves climbing alif like ivy
+  drawLeaf(alfx - 2, alfy - 405, -1.3, 85, 25, ...GD);
+  drawSmallLeaf(alfx + 15, alfy - 320, 0.4, 50, ...GM);
+  drawLeaf(alfx - 18, alfy - 230, -2.5, 65, 18, ...GL);
+  drawSmallLeaf(alfx + 15, alfy - 140, 0.5, 45, ...GM);
+  drawSmallLeaf(alfx - 12, alfy - 60, Math.PI + 0.5, 38, ...GD);
+
+  // ──────────────────────────────────────
+  // ر (RAA) — non-connecting: curves below baseline
+  // Small hook descending — similar to dal but goes left
+  // ──────────────────────────────────────
+  const rx = 330, ry = mbBase;
+
+  // Short gap, then raa stroke
+  brush.set("cpencil", V, 13);
+  brush.spline([
+    [alfx + 5,  alfy + 20, 0.7],   // from alif base (small gap)
+    [rx + 50,  ry + 10, 0.9],      // approaching
+    [rx + 30,  ry + 15, 1.2],      // baseline
+    [rx + 10,  ry + 40, 1.6],      // starting to curve down
+    [rx - 5,   ry + 80, 2.0],      // curving below baseline
+    [rx - 10,  ry + 130, 1.6],     // descending
+    [rx,       ry + 175, 1.1],     // lower
+    [rx + 15,  ry + 200, 0.7],     // bottom tip
+    [rx + 35,  ry + 205, 0.4],     // exit tip
+  ], 0.6);
+
+  // Leaves on raa
+  drawLeaf(rx + 30, ry + 200, 0.8, 70, 20, ...GD);
+  drawSmallLeaf(rx - 15, ry + 100, -2.3, 50, ...GM);
+  drawSmallLeaf(rx + 45, ry + 15, 0.4, 50, ...GL);
+
+  // ──────────────────────────────────────
+  // ك (KAF) — final form
+  // Rising arch with swooping descender + hamza mark
+  // Distinctively wider than alif — has a bend/knee
+  // ──────────────────────────────────────
+  const kx = 180, ky = mbBase;
+
+  // Main stroke: rises from baseline, arches over, descends
+  brush.set("cpencil", V, 14);
+  brush.spline([
+    [rx + 30,  ry + 15, 0.6],      // connection from raa area
+    [kx + 80,  ky + 10, 0.8],      // base right
+    [kx + 55,  ky - 30, 1.3],      // rising
+    [kx + 35,  ky - 90, 1.8],      // body
+    [kx + 15,  ky - 160, 2.1],     // thick mid
+    [kx - 5,   ky - 230, 1.8],     // upper body
+    [kx - 15,  ky - 290, 1.2],     // near top
+    [kx - 10,  ky - 330, 0.7],     // tip
+  ], 0.3);
+
+  // Horizontal foot/base extending right (distinctive kaf feature)
+  brush.set("cpencil", V, 11);
+  brush.spline([
+    [kx + 80,  ky + 10, 0.9],
+    [kx + 60,  ky + 50, 1.3],
+    [kx + 40,  ky + 100, 1.1],
+    [kx + 25,  ky + 150, 0.7],
+  ], 0.5);
+
+  // Hamza-like mark inside kaf (small S-curve)
+  brush.set("cpencil", V, 7);
+  brush.spline([
+    [kx - 5,  ky - 180, 0.4],
+    [kx + 20, ky - 165, 0.8],
+    [kx + 45, ky - 175, 0.5],
+  ], 0.55);
+
+  // Leaves on kaf
+  drawLeaf(kx - 15, ky - 340, -1.1, 80, 24, ...GD);
+  drawSmallLeaf(kx + 50, ky - 170, 0.3, 50, ...GM);
+  drawSmallLeaf(kx - 20, ky - 230, -2.5, 48, ...GL);
+  drawLeaf(kx + 30, ky + 145, 1.5, 70, 20, ...GM);
+
+  // Small bud at hamza mark area
+  drawBud(kx + 25, ky - 100, 26);
+
+  // ═══════════════════════════════════════
+  // ORNAMENTAL VINE DIVIDER between عيد and مبارك
+  // ═══════════════════════════════════════
+  const divY = (eidBase + mbBase) / 2 + 20;
+
+  // Graceful S-curve vine divider — prominent enough to separate the two words
+  brush.set("cpencil", VM, 6);
+  brush.spline([
+    [cx - 250, divY, 0.3],
+    [cx - 160, divY - 15, 0.6],
+    [cx - 80, divY + 10, 0.8],
+    [cx, divY - 5, 1.0],
+    [cx + 80, divY + 10, 0.8],
+    [cx + 160, divY - 15, 0.6],
+    [cx + 250, divY, 0.3],
+  ], 0.7);
+
+  // Leaves and buds on divider
+  drawSmallLeaf(cx - 200, divY - 10, -0.7, 38, ...GM);
+  drawSmallLeaf(cx - 100, divY + 5, 0.9, 35, ...GL);
+  drawSmallLeaf(cx + 100, divY - 5, -0.9, 35, ...GL);
+  drawSmallLeaf(cx + 200, divY + 8, 0.7, 38, ...GM);
+  drawBud(cx, divY - 8, 24);
+  drawBud(cx - 60, divY + 8, 16);
+  drawBud(cx + 60, divY - 3, 16);
+
+  // ═══════════════════════════════════════
+  // DECORATIVE ACCENT VINES + LEAVES
+  // ═══════════════════════════════════════
+
+  // Thin tendrils from key letter points
+  brush.set("cpencil", VM, 3);
+  brush.spline([
+    [ax + 95, ay - 30, 0.4],
+    [ax + 120, ay - 80, 0.3],
+    [ax + 130, ay - 120, 0.2],
+  ], 0.6);
+  brush.spline([
+    [mx + 70, my + 50, 0.4],
+    [mx + 110, my + 20, 0.3],
+    [mx + 140, my - 15, 0.2],
+  ], 0.6);
+
+  // Extra accent leaves
+  drawSmallLeaf(ax + 125, ay - 115, -0.5, 42, ...GL);
+  drawSmallLeaf(mx + 135, my - 10, -0.8, 42, ...GL);
+
+  // ═══════════════════════════════════════
+  // SCATTERED GARDEN — bottom area
+  // Rich garden wreath at the bottom to balance the composition
+  // ═══════════════════════════════════════
+
+  // Bottom garden vine — sweeping arc across the bottom
+  brush.set("cpencil", VM, 4);
+  brush.spline([
+    [200, 1650, 0.3],
+    [350, 1620, 0.5],
+    [500, 1640, 0.6],
+    [650, 1625, 0.5],
+    [800, 1640, 0.4],
+    [900, 1660, 0.3],
+  ], 0.65);
+
+  // Larger garden elements
+  drawBud(200, 1620, 30);
+  drawBud(880, 1600, 28);
+  drawBud(540, 1660, 26);
+  drawBud(380, 1700, 22);
+  drawBud(700, 1690, 22);
+  drawSmallLeaf(150, 1590, -0.5, 50, ...GD);
+  drawSmallLeaf(250, 1650, 0.8, 45, ...GM);
+  drawSmallLeaf(830, 1570, -1.0, 50, ...GD);
+  drawSmallLeaf(930, 1620, 0.5, 40, ...GL);
+  drawSmallLeaf(500, 1680, -1.5, 45, ...GM);
+  drawSmallLeaf(600, 1700, 1.2, 40, ...GL);
+  drawLeaf(310, 1640, -0.3, 70, 19, ...GD);
+  drawLeaf(720, 1620, 0.8, 65, 18, ...GM);
+  drawLeaf(450, 1720, -1.0, 60, 16, ...GL);
+  drawSmallLeaf(170, 1680, 1.2, 38, ...GM);
+  drawSmallLeaf(850, 1660, -0.8, 40, ...GD);
+
+  // Extra scattered leaves further down
+  drawSmallLeaf(300, 1760, 0.5, 35, ...GL);
+  drawSmallLeaf(540, 1770, -0.7, 35, ...GM);
+  drawSmallLeaf(750, 1750, 1.0, 35, ...GD);
+  drawBud(440, 1780, 18);
+  drawBud(650, 1760, 18);
+
+  // Scattered buds/leaves in upper margin
+  drawSmallLeaf(100, 200, 0.5, 38, ...GL);
+  drawSmallLeaf(980, 180, -0.6, 38, ...GM);
+  drawBud(180, 250, 18);
+  drawBud(900, 230, 16);
+
+  // ═══════════════════════════════════════
+  // GOLD BORDER (drawn on watercolor canvas with Canvas2D)
+  // ═══════════════════════════════════════
+  const bctx = wcGfx.drawingContext;
+  const m = 38;
+  // Outer border
+  bctx.strokeStyle = '#b89a3e';
+  bctx.lineWidth = 3;
+  bctx.globalAlpha = 0.8;
+  bctx.strokeRect(m, m, W - 2 * m, H - 2 * m);
+  // Inner border
+  const m2 = m + 14;
+  bctx.strokeStyle = '#c4a94e';
+  bctx.lineWidth = 1.5;
+  bctx.globalAlpha = 0.6;
+  bctx.strokeRect(m2, m2, W - 2 * m2, H - 2 * m2);
+  bctx.globalAlpha = 1.0;
+
+  // ═══════════════════════════════════════
+  // COMPOSITE WATERCOLOR ONTO MAIN CANVAS
+  // ═══════════════════════════════════════
+  image(wcGfx, 0, 0);
+
+  console.log('Botanical calligraphy render complete');
+}
+</script>
+</body>
+</html>

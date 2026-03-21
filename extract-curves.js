@@ -24,15 +24,16 @@ function extractVerseCurves(font, hb, hbFont, face, blob, text, fontSize) {
 
   const shaped = buffer.json();
   const scale = fontSize / font.unitsPerEm;
-  const curves = [];
+  const glyphCurveGroups = []; // curves grouped per glyph
 
   // RTL: glyphs come in visual order (left to right) from HarfBuzz
   let cursorX = 0;
   for (const g of shaped) {
+    const glyphCurves = [];
     const glyph = font.glyphs.get(g.g);
-    if (!glyph) { cursorX += g.ax * scale; continue; }
+    if (!glyph) { cursorX += g.ax * scale; glyphCurveGroups.push(glyphCurves); continue; }
 
-    const path = glyph.getPath(0, 0, font.unitsPerEm); // get at unitsPerEm, we'll scale ourselves
+    const path = glyph.getPath(0, 0, font.unitsPerEm);
     let cx = 0, cy = 0;
 
     for (const cmd of path.commands) {
@@ -41,14 +42,14 @@ function extractVerseCurves(font, hb, hbFont, face, blob, text, fontSize) {
       } else if (cmd.type === 'L') {
         const mx = (cx + cmd.x) * 0.5;
         const my = (cy + cmd.y) * 0.5;
-        curves.push([
+        glyphCurves.push([
           (cx * scale + cursorX + g.dx * scale), (-cy * scale + g.dy * scale),
           (mx * scale + cursorX + g.dx * scale), (-my * scale + g.dy * scale),
           (cmd.x * scale + cursorX + g.dx * scale), (-cmd.y * scale + g.dy * scale)
         ]);
         cx = cmd.x; cy = cmd.y;
       } else if (cmd.type === 'Q') {
-        curves.push([
+        glyphCurves.push([
           (cx * scale + cursorX + g.dx * scale), (-cy * scale + g.dy * scale),
           (cmd.x1 * scale + cursorX + g.dx * scale), (-cmd.y1 * scale + g.dy * scale),
           (cmd.x * scale + cursorX + g.dx * scale), (-cmd.y * scale + g.dy * scale)
@@ -58,12 +59,12 @@ function extractVerseCurves(font, hb, hbFont, face, blob, text, fontSize) {
         // Approximate cubic with 2 quadratics
         const mx = (cmd.x1 + cmd.x2) * 0.5;
         const my = (cmd.y1 + cmd.y2) * 0.5;
-        curves.push([
+        glyphCurves.push([
           (cx * scale + cursorX + g.dx * scale), (-cy * scale + g.dy * scale),
           (cmd.x1 * scale + cursorX + g.dx * scale), (-cmd.y1 * scale + g.dy * scale),
           (mx * scale + cursorX + g.dx * scale), (-my * scale + g.dy * scale)
         ]);
-        curves.push([
+        glyphCurves.push([
           (mx * scale + cursorX + g.dx * scale), (-my * scale + g.dy * scale),
           (cmd.x2 * scale + cursorX + g.dx * scale), (-cmd.y2 * scale + g.dy * scale),
           (cmd.x * scale + cursorX + g.dx * scale), (-cmd.y * scale + g.dy * scale)
@@ -72,9 +73,22 @@ function extractVerseCurves(font, hb, hbFont, face, blob, text, fontSize) {
       }
     }
     cursorX += g.ax * scale;
+    glyphCurveGroups.push(glyphCurves);
   }
 
   buffer.destroy();
+
+  // Reverse glyph order for RTL reveal (right-to-left)
+  // Each glyph's internal curves stay in order (preserves winding)
+  glyphCurveGroups.reverse();
+  
+  // Filter degenerate curves: extremely long straight lines
+  const maxLen = cursorX * 0.4; // no single curve should span >40% of verse width
+  const curves = glyphCurveGroups.flat().filter(c => {
+    const dx = Math.abs(c[4] - c[0]); // p3.x - p1.x
+    const dy = Math.abs(c[5] - c[1]); // p3.y - p1.y
+    return dx < maxLen && dy < maxLen;
+  });
 
   // Compute bounding box
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;

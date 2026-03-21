@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html><head>
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.0-beta"></script>
+</head><body><script>
+function setup() {
+  createCanvas(1080, 1920, WEBGL);
+  brush.load();
+  translate(-width/2, -height/2);
+  background(244, 237, 227);
+  randomSeed(777);
+  
+  console.log("STEP 1: basic line");
+  brush.set("charcoal", "#1a1410", 1.5);
+  brush.line(100, 100, 500, 500);
+  
+  console.log("STEP 2: circle");
+  brush.noFill();
+  brush.set("2H", "#5a4a3a", 0.4);
+  brush.circle(400, 400, 200);
+  
+  console.log("STEP 3: arc");
+  brush.arc(400, 400, 150, 0, 1.5);
+  
+  console.log("STEP 4: fill");
+  brush.noStroke();
+  brush.fill("#1a3a6c", 45);
+  brush.fillBleed(0.5, "out");
+  brush.fillTexture(0.6, 0.4);
+  brush.circle(300, 300, 80);
+  
+  console.log("STEP 5: beginShape");
+  brush.beginShape(0.4);
+  brush.vertex(200, 200);
+  brush.vertex(300, 180);
+  brush.vertex(280, 300);
+  brush.endShape(true);
+  
+  console.log("STEP 6: polygon");
+  brush.fill("#c5a030", 55);
+  brush.polygon([[400, 400], [450, 380], [430, 450]]);
+  
+  console.log("ALL DONE");
+}
+</script></body></html>
