@@ -3,14 +3,21 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="fatiha.studio">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#1a1a24">
+  <link rel="manifest" href="studio-manifest.json">
   <title>fatiha.studio</title>
   <script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; touch-action: none; }
     html, body {
       overflow: hidden;
+      overscroll-behavior: none;
       height: 100vh;
       width: 100vw;
       background: #16151e;
@@ -628,7 +635,7 @@ function setup() {
     console.warn('brush.box() unavailable:', e);
   }
 
-  noLoop();
+  frameRate(30); // keep loop running for touch events
   redraw();
 }
 
@@ -932,8 +939,11 @@ function mouseReleased(e) {
 
 // Touch equivalents
 function touchStarted(e) {
-  if (e.touches && e.touches.length > 0) {
-    const t = e.touches[0];
+  if (e && e.preventDefault) e.preventDefault();
+  const evt = e.originalEvent || e;
+  const touches = evt.touches || (e && e.touches);
+  if (touches && touches.length > 0) {
+    const t = touches[0];
     const rect = myCanvas.elt.getBoundingClientRect();
     const sx = t.clientX - rect.left;
     const sy = t.clientY - rect.top;
@@ -974,8 +984,11 @@ function touchStarted(e) {
 }
 
 function touchMoved(e) {
-  if (e.touches && e.touches.length > 0) {
-    const t = e.touches[0];
+  if (e && e.preventDefault) e.preventDefault();
+  const evt = e.originalEvent || e;
+  const touches = evt.touches || (e && e.touches);
+  if (touches && touches.length > 0) {
+    const t = touches[0];
     const rect = myCanvas.elt.getBoundingClientRect();
     const sx = t.clientX - rect.left;
     const sy = t.clientY - rect.top;
