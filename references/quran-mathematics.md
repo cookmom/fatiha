@@ -52,3 +52,40 @@ For each surah:
 - Use abjad/gematria for "proofs"
 - Reference Rashad Khalifa or similar controversial figures
 - Assert mathematical "miracles" — the miracle is the MESSAGE
+
+## Visualization References (@prathyvsh)
+
+### Trig Wave Shadows
+- Rotating spiral projected orthogonally → different waveforms per dimension
+- Apply: surah rhythm waveform as 3D spiral projection
+- https://x.com/prathyvsh/status/1164158097121656832
+
+### All Trig Functions on One Canvas
+- Each tajweed rule maps to a trig function: madd=sine, qalqalah=sawtooth, ghunna=damped cosine
+- https://x.com/prathyvsh/status/1432875306319233024
+
+### Locus of Sine/Cosine (Super Ellipse Twirl)
+- Breath curve from recitation as animated locus
+- https://x.com/prathyvsh/status/1523060114554458112
+
+### Trig-Generated Tree
+- Verse count → branch count, word count → branch angle
+- Generative tree from pure surah structure
+- https://x.com/prathyvsh/status/1616533524646952984
+
+### Fourier Transform Visualization
+- Letter frequency spectrum per surah as frequency domain render
+- https://x.com/prathyvsh/status/1941417447288078799
+
+### Complex Roots Plotter
+- Surah parameters as complex numbers → unique geometric pattern
+- Interactive: https://thegraycuber.github.io/grapher.html
+- https://x.com/prathyvsh/status/1937543595323707392
+
+### Novel Mapping Ideas
+- Surah rhythm → 3D spiral shadow projection
+- Tajweed events → trig function composition (each rule = different wave)
+- Letter frequency → Fourier series visualization
+- Verse structure → generative tree branching
+- Breath pattern → locus curve animation
+- All overlaid as semi-transparent layers on the p5.brush painting
