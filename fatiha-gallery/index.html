@@ -1,0 +1,249 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fatiha.app — Art Gallery</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0d0d12; color: #e8e0d0; font-family: 'Georgia', serif; }
+  
+  header {
+    text-align: center; padding: 40px 20px 20px;
+    border-bottom: 1px solid rgba(200,168,76,0.2);
+  }
+  header h1 { font-size: 28px; color: #c8a84c; font-weight: 300; letter-spacing: 3px; }
+  header p { font-size: 14px; color: rgba(232,224,208,0.5); margin-top: 8px; }
+  
+  .filters {
+    display: flex; gap: 12px; padding: 16px 20px; justify-content: center; flex-wrap: wrap;
+  }
+  .filters select, .filters input {
+    background: #1a1a22; border: 1px solid rgba(200,168,76,0.3); color: #e8e0d0;
+    padding: 8px 14px; border-radius: 6px; font-size: 13px;
+  }
+  
+  .gallery {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px; padding: 20px; max-width: 1400px; margin: 0 auto;
+  }
+  
+  .card {
+    background: #14141c; border-radius: 12px; overflow: hidden;
+    border: 1px solid rgba(200,168,76,0.1); transition: border-color 0.3s;
+  }
+  .card:hover { border-color: rgba(200,168,76,0.4); }
+  
+  .card img {
+    width: 100%; aspect-ratio: 9/16; object-fit: cover; cursor: pointer;
+  }
+  
+  .card-info { padding: 14px; }
+  .card-info .tag {
+    display: inline-block; background: rgba(200,168,76,0.15); color: #c8a84c;
+    padding: 3px 10px; border-radius: 12px; font-size: 11px; margin-right: 6px;
+  }
+  .card-info .title { font-size: 15px; margin-top: 8px; }
+  .card-info .meta { font-size: 12px; color: rgba(232,224,208,0.4); margin-top: 4px; }
+  
+  /* Rating */
+  .rating { display: flex; gap: 4px; margin-top: 10px; }
+  .rating .star {
+    width: 28px; height: 28px; cursor: pointer; opacity: 0.3;
+    transition: opacity 0.2s;
+  }
+  .rating .star.active { opacity: 1; }
+  .rating .star:hover { opacity: 0.8; }
+  
+  /* Feedback */
+  .feedback { margin-top: 10px; }
+  .feedback textarea {
+    width: 100%; background: #1a1a22; border: 1px solid rgba(200,168,76,0.2);
+    color: #e8e0d0; padding: 8px; border-radius: 6px; font-size: 12px;
+    resize: vertical; min-height: 50px;
+  }
+  .feedback .ref-input {
+    margin-top: 6px; display: flex; gap: 6px;
+  }
+  .feedback input[type="text"] {
+    flex: 1; background: #1a1a22; border: 1px solid rgba(200,168,76,0.2);
+    color: #e8e0d0; padding: 6px 10px; border-radius: 6px; font-size: 12px;
+  }
+  .feedback input[type="file"] { display: none; }
+  .feedback label {
+    background: rgba(200,168,76,0.15); color: #c8a84c; padding: 6px 12px;
+    border-radius: 6px; cursor: pointer; font-size: 12px; white-space: nowrap;
+  }
+  .feedback button {
+    background: #c8a84c; color: #0d0d12; border: none; padding: 6px 16px;
+    border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;
+    margin-top: 8px;
+  }
+  
+  /* Lightbox */
+  .lightbox {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.95);
+    z-index: 100; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: 95vw; max-height: 95vh; object-fit: contain; }
+  
+  /* Auto score badge */
+  .auto-score {
+    position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7);
+    color: #c8a84c; padding: 3px 8px; border-radius: 10px; font-size: 11px;
+  }
+  
+  .surah-header {
+    text-align: center; padding: 30px 20px 10px;
+  }
+  .surah-header h2 { color: #c8a84c; font-weight: 300; font-size: 20px; }
+  .surah-header .arabic { font-size: 24px; direction: rtl; margin-top: 4px; }
+  .surah-header .theme { font-size: 13px; color: rgba(232,224,208,0.4); margin-top: 6px; }
+  
+  .empty { text-align: center; padding: 60px; color: rgba(232,224,208,0.3); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>fatiha.app</h1>
+  <p>Generative Islamic Art — Gallery & Feedback</p>
+</header>
+
+<div class="filters">
+  <select id="surahFilter">
+    <option value="all">All Surahs</option>
+    <option value="1">1. Al-Fatiha</option>
+  </select>
+  <select id="sortBy">
+    <option value="newest">Newest First</option>
+    <option value="highest">Highest Rated</option>
+    <option value="unrated">Unrated First</option>
+  </select>
+</div>
+
+<div id="gallery" class="gallery"></div>
+
+<div id="lightbox" class="lightbox" onclick="this.classList.remove('open')">
+  <img id="lightboxImg" src="">
+</div>
+
+<script>
+// Supabase config
+const SUPABASE_URL = 'https://ypniokxbftuebagppxzj.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlwbmlva3hiZnR1ZWJhZ3BweHpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExOTQ2MjcsImV4cCI6MjA4Njc3MDYyN30.u63gpVUX7bOm5WQZkgt1elVWwwSBx_UGektwDTnllhw';
+
+// For now: load iterations from a local JSON manifest
+// Later: connect to Supabase
+let iterations = [];
+
+async function loadIterations() {
+  try {
+    const resp = await fetch('iterations.json');
+    iterations = await resp.json();
+  } catch (e) {
+    // Fallback: scan for known files
+    iterations = [];
+  }
+  renderGallery();
+}
+
+function renderGallery() {
+  const gallery = document.getElementById('gallery');
+  
+  if (iterations.length === 0) {
+    gallery.innerHTML = '<div class="empty">No iterations yet. The pipeline will publish here.</div>';
+    return;
+  }
+  
+  const sort = document.getElementById('sortBy').value;
+  let sorted = [...iterations];
+  if (sort === 'highest') sorted.sort((a,b) => (b.humanScore||0) - (a.humanScore||0));
+  else if (sort === 'unrated') sorted.sort((a,b) => (a.humanScore?1:0) - (b.humanScore?1:0));
+  else sorted.sort((a,b) => new Date(b.created) - new Date(a.created));
+  
+  const surah = document.getElementById('surahFilter').value;
+  if (surah !== 'all') sorted = sorted.filter(i => i.surah == surah);
+  
+  gallery.innerHTML = sorted.map((it, idx) => `
+    <div class="card">
+      <div style="position:relative">
+        <img src="${it.image}" alt="${it.title}" onclick="openLightbox('${it.image}')">
+        ${it.autoScore ? `<span class="auto-score">⚡${it.autoScore}</span>` : ''}
+      </div>
+      <div class="card-info">
+        <span class="tag">${it.surahName || 'Al-Fatiha'}</span>
+        <span class="tag">${it.verse || 'Bismillah'}</span>
+        <span class="tag">v${it.version || idx+1}</span>
+        <div class="title">${it.title || 'Iteration ' + (idx+1)}</div>
+        <div class="meta">${it.created || ''} · ${it.generator || 'Chris/Opus'}</div>
+        
+        <div class="rating" data-id="${it.id || idx}">
+          ${[1,2,3,4,5].map(s => `
+            <div class="star ${(it.humanScore||0) >= s ? 'active' : ''}" 
+                 onclick="rate('${it.id||idx}', ${s})"
+                 title="${s} star${s>1?'s':''}">
+              ⭐
+            </div>
+          `).join('')}
+        </div>
+        
+        <div class="feedback">
+          <textarea placeholder="Notes (e.g. 'less brown, more pressure variation')" 
+                    id="notes-${it.id||idx}"></textarea>
+          <div class="ref-input">
+            <input type="text" placeholder="Reference URL" id="ref-${it.id||idx}">
+            <label for="refimg-${it.id||idx}">📎 Ref Image</label>
+            <input type="file" id="refimg-${it.id||idx}" accept="image/*">
+          </div>
+          <button onclick="submitFeedback('${it.id||idx}')">Submit Feedback</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openLightbox(src) {
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightbox').classList.add('open');
+}
+
+function rate(id, score) {
+  // Update UI
+  const stars = document.querySelectorAll(`.rating[data-id="${id}"] .star`);
+  stars.forEach((s, i) => s.classList.toggle('active', i < score));
+  
+  // Save to localStorage for now (Supabase later)
+  const ratings = JSON.parse(localStorage.getItem('ratings') || '{}');
+  ratings[id] = score;
+  localStorage.setItem('ratings', JSON.stringify(ratings));
+  
+  console.log(`Rated ${id}: ${score} stars`);
+}
+
+function submitFeedback(id) {
+  const notes = document.getElementById(`notes-${id}`).value;
+  const ref = document.getElementById(`ref-${id}`).value;
+  
+  const feedback = JSON.parse(localStorage.getItem('feedback') || '{}');
+  feedback[id] = { notes, ref, timestamp: new Date().toISOString() };
+  localStorage.setItem('feedback', JSON.stringify(feedback));
+  
+  // Clear inputs
+  document.getElementById(`notes-${id}`).value = '';
+  document.getElementById(`ref-${id}`).value = '';
+  
+  console.log(`Feedback for ${id}:`, { notes, ref });
+  alert('Feedback saved! Will feed into next generation.');
+}
+
+// Filters
+document.getElementById('surahFilter').addEventListener('change', renderGallery);
+document.getElementById('sortBy').addEventListener('change', renderGallery);
+
+loadIterations();
+</script>
+</body>
+</html>
