@@ -1,64 +1,54 @@
-# Quran Mathematics — Generative Art Data Sources
+# Quran Structure — Generative Art Data (Accepted Sources Only)
 
-## Word Count Symmetries (for data viz layers)
-| Word Pair | Count | Real-World Correlation |
-|---|---|---|
-| Day (يوم) | 365 | Days in a year |
-| Month (شهر) | 12 | Months in a year |
-| Days plural (أيام) | 30 | Days in a month |
-| Man (رجل) | 24 | = Woman (امرأة) 24 |
-| Sea (بحر) | 32 | 71.1% of 45 total |
-| Land (بر) | 13 | 28.9% of 45 total (≈ Earth ratio) |
-| Life (حياة) | 145 | = Death (موت) 145 |
-| Angels (ملائكة) | 88 | = Devils (شياطين) 88 |
-| This world (دنيا) | 115 | = Hereafter (آخرة) 115 |
+## Principles
+- Use only universally accepted Quranic facts (verse counts, surah structure)
+- Islamic geometric art tradition (centuries of scholarship) is safe ground
+- Golden ratio in nature as reflection of divine design — standard Islamic understanding
+- Tajweed as codified recitation science
+- NO controversial numerology (Number 19 claims, abjad codes, word-count "miracles")
+- The art should honor the text, not claim hidden codes
 
-## The Number 19 System
-- Bismillah: 19 Arabic letters
-- 114 surahs = 19 × 6
-- First revelation (96:1-5): 19 words, 76 letters (19 × 4)
-- Surah 96 = 19 verses
-- "Bismillah" total across all surahs: 114 = 19 × 6
-- Quran 74:30: "Over it are nineteen"
+## Accepted Structural Data
 
-## Golden Ratio (φ = 1.618...)
-- 114 / 70.449 ≈ 1.618
-- Al-Fatiha position in the golden ratio of the Quran's structure
-- Fibonacci in verse groupings
+### Per-Surah Facts (114 surahs)
+- Surah number, name, verse count, Meccan/Medinan
+- These are factual — every mushaf has them
+- Verse count can drive: layer count, density, ring count
 
-## Abjad Numerals (letter → number mapping)
-| Letter | Value | Letter | Value | Letter | Value |
-|---|---|---|---|---|---|
-| ا | 1 | ح | 8 | س | 60 |
-| ب | 2 | ط | 9 | ع | 70 |
-| ج | 3 | ي | 10 | ف | 80 |
-| د | 4 | ك | 20 | ص | 90 |
-| ه | 5 | ل | 30 | ق | 100 |
-| و | 6 | م | 40 | ر | 200 |
-| ز | 7 | ن | 50 | ش | 300 |
+### Al-Fatiha Structure (from classical tafsir)
+- 7 verses — "Sab'al-Mathani" (the Seven Oft-Repeated)
+- Structure: Praise (1-3) → Pivot (4: مالك يوم الدين) → Prayer (5-7)
+- 3-1-3 bilateral symmetry — well established in tafsir literature
+- This structural symmetry CAN drive visual composition
 
-## Per-Surah Generative Parameters
-For each surah, derive:
-- `verse_count` → number of concentric rings/layers
-- `word_count` → stroke density
-- `abjad_sum` → color temperature (cool → warm)
-- `surah_number % 19` → symmetry fold (0-18)
-- `verse_count / word_count` → aspect ratio of composition
-- `unique_letters` → palette size
-- `longest_verse / shortest_verse` → contrast ratio
+### Tajweed Rules (codified science)
+- Idgham, ghunna, madd, ikhfa, qalqalah, iqlab
+- Each has specific phonetic behavior → maps to visual behavior
+- This is the accepted, scholarly, beautiful side of Quranic science
 
-## Al-Fatiha Specific
-- 7 verses, 29 words, 139 letters
-- Abjad sum: computable per verse
-- Verse 4 (مالك يوم الدين) is the structural center
-- Divides into 3+1+3: praise (1-3), pivot (4), prayer (5-7)
-- This 3-1-3 structure → visual symmetry with distinct center
+### Islamic Geometric Patterns
+- Compass-and-ruler construction — real historical mathematics
+- 4/5/6/8/10/12-fold symmetry systems
+- Documented in architectural treatises for 1000+ years
+- THIS is where math meets Islamic art legitimately
 
-## Art Generation Approach
-The math DETERMINES the visual:
-1. Surah's abjad sum → selects from Islamic color palette
-2. Verse count → number of geometric layers
-3. Word pairs/symmetries → bilateral composition elements
-4. 19-relationships → geometric symmetry type
-5. Golden ratio → spiral/proportion framework
-6. Word frequencies → data visualization overlays (subtle HUD-like elements)
+### Golden Ratio in Nature
+- Quran references creation's balance and beauty
+- Surah Ar-Rahman: "He raised the heavens and established the balance"
+- Fibonacci/golden ratio in natural forms — reflecting divine design
+- Safe to use as compositional principle (not as "Quran code")
+
+## Generative Parameters (safe)
+For each surah:
+- `verse_count` → number of layers/rings
+- `meccan_or_medinan` → warm palette (Meccan/early) vs cool (Medinan/later)
+- `position_in_quran` → progression from simple to complex
+- `surah_theme` → visual metaphor (from our theme engine, human-approved)
+- `tajweed_events` → real-time visual reactivity
+- `golden_ratio` → compositional framework (nature-inspired, not numerology)
+
+## What We Won't Do
+- Claim hidden numerical codes
+- Use abjad/gematria for "proofs"
+- Reference Rashad Khalifa or similar controversial figures
+- Assert mathematical "miracles" — the miracle is the MESSAGE
