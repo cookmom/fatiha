@@ -48,6 +48,35 @@ Photoshop-style sidebar exposing the full p5.brush library:
 - Each version shows: agent name, timestamp, brief note
 - Can also "generate more" — asks an agent for 3 new alternatives
 
+### Element Transform Controls
+When an element is selected, a transform gizmo appears:
+- **Move**: drag to reposition
+- **Scale**: pinch or handle-drag to resize (uniform + non-uniform)
+- **Rotate**: two-finger twist or rotation handle
+- **Distort**: corner handles for perspective/skew warp
+- **Spline warp**: overlay bezier control points — drag to bend/curve the stroke
+- **Flow vectors**: apply a vector field that pushes the stroke (like liquify in Photoshop)
+- **Re-color**: change the stroke's color (keeps brush texture)
+- **Re-brush**: swap the brush type (marker → charcoal) while preserving the path
+- **Opacity**: per-element opacity slider
+- **Weight**: adjust stroke weight after the fact
+
+All transforms are non-destructive — stored as transform metadata on the stroke JSON:
+```json
+{
+  "brush": "marker",
+  "color": "#1a3a8a",
+  "points": [...],
+  "transform": {
+    "translate": [dx, dy],
+    "scale": [sx, sy],
+    "rotate": angle,
+    "warp": [[cp1x,cp1y], [cp2x,cp2y], ...],
+    "flowField": "curved|radial|none"
+  }
+}
+```
+
 ### Cross-Version Copy/Paste
 - Select a stroke from Version A
 - Paste into current canvas
