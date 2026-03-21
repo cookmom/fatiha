@@ -19,16 +19,18 @@
       overflow: hidden;
       overscroll-behavior: none;
       height: 100vh;
+      height: 100dvh; /* dynamic viewport height — respects iOS keyboard/chrome */
       width: 100vw;
       background: #16151e;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
       color: #ccc;
       display: flex;
+      padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) env(safe-area-inset-left);
     }
 
     /* ── SIDEBAR ── */
     #sidebar {
-      width: 80px;
+      width: 72px;
       height: 100vh;
       background: #1e1d28;
       border-right: 1px solid #2a2940;
@@ -195,6 +197,22 @@
       border: none;
     }
 
+    /* ── MOBILE (< 430px) ── */
+    @media (max-width: 430px) {
+      #sidebar { width: 56px; }
+      #sidebar .section-label { font-size: 7px; }
+      .brush-btn { width: 40px; height: 28px; font-size: 7px; }
+      .color-swatch { width: 22px; height: 22px; }
+      .slider-row { padding: 0 4px; }
+      .slider-row label { font-size: 8px; }
+      .tool-btn { width: 40px; height: 28px; font-size: 13px; }
+    }
+    @media (max-width: 375px) {
+      #sidebar { width: 48px; }
+      .brush-btn { width: 36px; height: 24px; font-size: 6px; }
+      .color-swatch { width: 18px; height: 18px; }
+    }
+    
     /* ── CANVAS CONTAINER ── */
     #canvas-container {
       flex: 1;
@@ -235,7 +253,8 @@
     #layer-bar {
       position: fixed;
       bottom: 0;
-      left: 80px;
+      bottom: env(safe-area-inset-bottom, 0px);
+      left: 72px;
       right: 0;
       height: 42px;
       background: #1a1928dd;
@@ -532,7 +551,7 @@
 
 const PAPER_W = 1080;
 const PAPER_H = 1920;
-const SIDEBAR_W = 80;
+const SIDEBAR_W = window.innerWidth <= 375 ? 48 : window.innerWidth <= 430 ? 56 : 72;
 const LAYER_BAR_H = 42;
 const LAYER_ORDER = ['watercolor', 'pencil', 'detail'];
 
