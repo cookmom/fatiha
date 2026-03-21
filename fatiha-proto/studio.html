@@ -492,6 +492,9 @@ let pendingPoints = [];
 let isDrawing = false;
 let needsFullRedraw = true;
 let currentStrokeId = 0;
+let brushLineCount = 0;
+const BUFFER_LIMIT = 20000;
+let flattenedBg = null; // saved canvas snapshot for buffer recycling
 
 // ── Layers ──
 const layers = [
@@ -511,6 +514,7 @@ const BRUSHES = [
   { id: 'charcoal', label: 'Charcoal', type: 'default' },
   { id: 'crayon', label: 'Crayon', type: 'default' },
   { id: 'spray', label: 'Spray', type: 'spray' },
+  { id: 'watercolor', label: 'Watercolor', type: 'watercolor' },
 ];
 
 // ── Islamic palette ──
@@ -570,8 +574,17 @@ function computeViewport() {
 function draw() {
   translate(-width / 2, -height / 2);
 
+  // Buffer limit check — flatten when approaching limit
+  if (brushLineCount > BUFFER_LIMIT) {
+    flattenCanvas();
+  }
+
   if (needsFullRedraw) {
     background(242, 234, 218);
+    // Restore flattened background if available
+    if (flattenedBg) {
+      image(flattenedBg, 0, 0, width, height);
+    }
     // Draw paper border
     push();
     noFill();
@@ -596,17 +609,53 @@ function draw() {
     for (let i = 0; i < pendingPoints.length - 1; i++) {
       const a = pendingPoints[i];
       const b = pendingPoints[i + 1];
-      brush.set(a.brush, color(a.color), a.opacity / 255);
-      brush.strokeWeight(a.weight * vScale);
-      brush.line(
-        vOffX + a.x * vScale,
-        vOffY + a.y * vScale,
-        vOffX + b.x * vScale,
-        vOffY + b.y * vScale
-      );
+      drawBrushSegment(a, b);
     }
     pendingPoints = [pendingPoints[pendingPoints.length - 1]];
   }
+}
+
+// Watercolor: draw multiple offset passes for bleed effect
+function drawBrushSegment(a, b) {
+  const sx = vOffX + a.x * vScale;
+  const sy = vOffY + a.y * vScale;
+  const ex = vOffX + b.x * vScale;
+  const ey = vOffY + b.y * vScale;
+
+  if (a.brush === 'watercolor') {
+    const wcOpacity = Math.min(a.opacity / 255, 0.12);
+    const wcWeight = Math.max(a.weight * vScale * 5, 30);
+    // Multiple overlapping passes for bleed/buildup
+    for (let p = 0; p < 3; p++) {
+      const jx = (Math.random() - 0.5) * wcWeight * 0.3;
+      const jy = (Math.random() - 0.5) * wcWeight * 0.3;
+      brush.set('marker', color(a.color), wcOpacity);
+      brush.strokeWeight(wcWeight + (Math.random() - 0.5) * 10);
+      brush.line(sx + jx, sy + jy, ex + jx, ey + jy);
+      brushLineCount++;
+    }
+  } else {
+    brush.set(a.brush, color(a.color), a.opacity / 255);
+    brush.strokeWeight(a.weight * vScale);
+    brush.line(sx, sy, ex, ey);
+    brushLineCount++;
+  }
+}
+
+// Flatten canvas: save current state as image, reset brush buffer
+function flattenCanvas() {
+  // Capture current canvas as p5 image
+  flattenedBg = get();
+  // Clear the brush internal buffer by reloading
+  brush.load();
+  brushLineCount = 0;
+  // Strokes are now baked into flattenedBg; clear stroke array
+  // but keep them in a frozen list for export
+  if (!window._frozenStrokes) window._frozenStrokes = [];
+  window._frozenStrokes.push(...strokes);
+  strokes = [];
+  redoStack = [];
+  needsFullRedraw = true;
 }
 
 function replayStroke(s) {
@@ -615,14 +664,28 @@ function replayStroke(s) {
     const a = s.points[i];
     const b = s.points[i + 1];
     const w = s.weight * (a[2] || 0.5);
-    brush.set(s.brush, color(s.color), s.opacity / 255);
-    brush.strokeWeight(w * vScale);
-    brush.line(
-      vOffX + a[0] * vScale,
-      vOffY + a[1] * vScale,
-      vOffX + b[0] * vScale,
-      vOffY + b[1] * vScale
-    );
+    const sx = vOffX + a[0] * vScale;
+    const sy = vOffY + a[1] * vScale;
+    const ex = vOffX + b[0] * vScale;
+    const ey = vOffY + b[1] * vScale;
+
+    if (s.brush === 'watercolor') {
+      const wcOpacity = Math.min(s.opacity / 255, 0.12);
+      const wcWeight = Math.max(w * vScale * 5, 30);
+      for (let p = 0; p < 3; p++) {
+        const jx = (Math.random() - 0.5) * wcWeight * 0.3;
+        const jy = (Math.random() - 0.5) * wcWeight * 0.3;
+        brush.set('marker', color(s.color), wcOpacity);
+        brush.strokeWeight(wcWeight + (Math.random() - 0.5) * 10);
+        brush.line(sx + jx, sy + jy, ex + jx, ey + jy);
+        brushLineCount++;
+      }
+    } else {
+      brush.set(s.brush, color(s.color), s.opacity / 255);
+      brush.strokeWeight(w * vScale);
+      brush.line(sx, sy, ex, ey);
+      brushLineCount++;
+    }
   }
 }
 
@@ -950,10 +1013,11 @@ function updateSliders() {
 // ══════════════════════════════════════════════════════════════
 
 function openExport() {
+  const allStrokes = [...(window._frozenStrokes || []), ...strokes];
   const data = {
     version: 1,
     canvas: { width: PAPER_W, height: PAPER_H },
-    strokes: strokes,
+    strokes: allStrokes,
     layers: layers,
     exportedAt: new Date().toISOString(),
   };
