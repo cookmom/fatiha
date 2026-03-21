@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Door Variation 4 — DENSE</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@2/lib/p5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.0-beta"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script>
+function setup() {
+  createCanvas(1080, 1920, WEBGL);
+  brush.load();
+  translate(-width / 2, -height / 2);
+  background(242, 234, 218);
+  randomSeed(404);
+  brush.scaleBrushes(2.5);
+  brush.wiggle(2);
+
+  function pencilW() { return random(0.3, 2.5); }
+  function pencilWLight() { return random(0.3, 1.2); }
+  function crayonW() { return random(1.0, 4.0); }
+
+  var W = 1080, H = 1920, cx = W / 2;
+  var doorW = 860, doorH = 1760;
+  var doorX = (W - doorW) / 2, doorY = (H - doorH) / 2;
+  var halfW = doorW / 2;
+
+  var archSpringY = doorY + 500;
+  var centerOffset = halfW * 0.6;
+  var leftArcCx = cx + centerOffset;
+  var rightArcCx = cx - centerOffset;
+  var arcR = halfW + centerOffset;
+  var archPeakY = archSpringY - sqrt(arcR * arcR - centerOffset * centerOffset);
+
+  var PENCIL = "#8a8070";
+  var PENCIL2 = "#a09888";
+
+  brush.noFill(); brush.noHatch();
+
+  // ===== LAYER 1: MORE OVERLAPPING WASHES — 5 washes =====
+  brush.noStroke();
+
+  // Lapis blue — upper left
+  brush.fill("#1040A0", 70);
+  brush.fillBleed(0.55);
+  brush.rect(doorX + 30, doorY + 40, doorW * 0.45, 480);
+
+  // Gold — upper right, overlapping with blue
+  brush.fill("#C88800", 65);
+  brush.fillBleed(0.5);
+  brush.rect(doorX + doorW * 0.35, doorY + 120, doorW * 0.5, 400);
+
+  // Terre verte — mid left
+  brush.fill("#105830", 75);
+  brush.fillBleed(0.55);
+  brush.rect(doorX + 50, archSpringY - 80, doorW * 0.4, 450);
+
+  // Violet — mid right, overlapping green
+  brush.fill("#4010A0", 60);
+  brush.fillBleed(0.5);
+  brush.rect(doorX + doorW * 0.4, archSpringY + 100, doorW * 0.45, 400);
+
+  // Warm vermillion — lower
+  brush.fill("#B01008", 65);
+  brush.fillBleed(0.5);
+  brush.rect(doorX + 60, archSpringY + 500, doorW * 0.55, 480);
+
+  brush.noFill();
+
+  // ===== LAYER 2: PENCIL DOOR — more detail =====
+
+  // Triple frame
+  drawFrameVaried(doorX, archSpringY, doorW, doorY + doorH - archSpringY, PENCIL, 1.0, 2.5);
+  drawFrameVaried(doorX - 10, archSpringY - 6, doorW + 20, doorY + doorH - archSpringY + 10, PENCIL2, 0.5, 1.8);
+  drawFrameVaried(doorX + 12, archSpringY + 8, doorW - 24, doorY + doorH - archSpringY - 16, PENCIL2, 0.3, 1.2);
+
+  // Triple arch
+  drawPointedArch(cx, archSpringY, halfW, leftArcCx, rightArcCx, arcR, PENCIL, 1.4);
+  var ihw = halfW - 25, ico = ihw * 0.6;
+  drawPointedArch(cx, archSpringY, ihw, cx + ico, cx - ico, ihw + ico, PENCIL2, 0.8);
+  var ihw2 = halfW - 50, ico2 = ihw2 * 0.6;
+  drawPointedArch(cx, archSpringY, ihw2, cx + ico2, cx - ico2, ihw2 + ico2, PENCIL2, 0.5);
+
+  // Center divider with double line
+  brush.set("2H", PENCIL, pencilW());
+  var cdTop = archSpringY + 3, cdBot = doorY + doorH - 18;
+  brush.spline([[cx, cdTop, 0.4], [cx, cdTop + (cdBot - cdTop) * 0.3, 1.0], [cx, cdTop + (cdBot - cdTop) * 0.6, 0.5], [cx, cdBot, 0.8]]);
+  brush.set("2H", PENCIL2, pencilWLight());
+  brush.spline([[cx - 6, cdTop, 0.3], [cx - 6, cdTop + (cdBot - cdTop) * 0.5, 0.7], [cx - 6, cdBot, 0.4]]);
+
+  // Panels — triple nested
+  var pY = archSpringY + 18, pBot = doorY + doorH - 25, pH = pBot - pY;
+  var lX = doorX + 16, lW = cx - 14 - lX;
+  var rX = cx + 14, rW = doorX + doorW - 16 - rX;
+  drawFrameVaried(lX, pY, lW, pH, PENCIL, 0.8, 2.5);
+  drawFrameVaried(rX, pY, rW, pH, PENCIL, 0.8, 2.5);
+  drawFrameVaried(lX + 12, pY + 12, lW - 24, pH - 24, PENCIL2, 0.4, 1.5);
+  drawFrameVaried(rX + 12, pY + 12, rW - 24, pH - 24, PENCIL2, 0.4, 1.5);
+  drawFrameVaried(lX + 24, pY + 24, lW - 48, pH - 48, PENCIL2, 0.2, 1.0);
+  drawFrameVaried(rX + 24, pY + 24, rW - 48, pH - 48, PENCIL2, 0.2, 1.0);
+
+  // Tripartite dividers — doubled
+  var mg = 26, iT = pY + mg, iH = pH - 2 * mg;
+  var topH = iH * 0.22, gH = iH * 0.03, midH = iH * 0.50;
+  var d1 = iT + topH, d2 = d1 + gH, d3 = d2 + midH, d4 = d3 + gH;
+  [lX, rX].forEach(function(px, i) {
+    var pw = i === 0 ? lW : rW;
+    [d1, d1 + 4, d2, d3, d3 + 4, d4].forEach(function(dy) {
+      brush.set("2H", PENCIL2, pencilWLight());
+      brush.line(px + 10, dy, px + pw - 10, dy);
+    });
+  });
+
+  // Rosettes — circles with inner detail
+  var lCx = lX + lW / 2, rCx = rX + rW / 2, piW = lW - 2 * mg;
+  var topCY = iT + topH / 2, topR = min(piW / 2, topH / 2) * 0.85;
+  var midCY = d2 + midH / 2, midR = min(piW / 2, midH / 2) * 0.85;
+  var botCY = d4 + topH / 2;
+
+  brush.noFill();
+  // Outer + inner circles for each rosette
+  [lCx, rCx].forEach(function(rcx) {
+    brush.set("2H", PENCIL2, pencilWLight()); brush.circle(rcx, topCY, topR * 2, true);
+    brush.set("2H", PENCIL2, pencilWLight()); brush.circle(rcx, topCY, topR * 1.3, true);
+    brush.set("2H", PENCIL2, pencilWLight()); brush.circle(rcx, midCY, midR * 2, true);
+    brush.set("2H", PENCIL2, pencilWLight()); brush.circle(rcx, midCY, midR * 1.3, true);
+    brush.set("2H", PENCIL2, pencilWLight()); brush.circle(rcx, midCY, midR * 0.7, true);
+    brush.set("2H", PENCIL2, pencilWLight()); brush.circle(rcx, botCY, topR * 2, true);
+    brush.set("2H", PENCIL2, pencilWLight()); brush.circle(rcx, botCY, topR * 1.3, true);
+  });
+
+  // Tympanum — concentric circles
+  var tCY = archPeakY + (archSpringY - archPeakY) * 0.45;
+  var tR = (archSpringY - archPeakY) * 0.15;
+  brush.set("2H", PENCIL2, pencilWLight()); brush.circle(cx, tCY, tR * 2.2, true);
+  brush.set("2H", PENCIL2, pencilWLight()); brush.circle(cx, tCY, tR * 1.6, true);
+  brush.set("2H", PENCIL2, pencilWLight()); brush.circle(cx, tCY, tR * 1.0, true);
+
+  // Cross lines in ALL panels — denser X marks
+  brush.set("2H", PENCIL2, pencilWLight()); brush.line(lX + mg, iT, lX + lW - mg, iT + topH);
+  brush.set("2H", PENCIL2, pencilWLight()); brush.line(lX + lW - mg, iT, lX + mg, iT + topH);
+  brush.set("2H", PENCIL2, pencilWLight()); brush.line(rX + mg, iT, rX + rW - mg, iT + topH);
+  brush.set("2H", PENCIL2, pencilWLight()); brush.line(rX + rW - mg, iT, rX + mg, iT + topH);
+  brush.set("2H", PENCIL2, pencilWLight()); brush.line(lX + mg, d2, lX + lW - mg, d2 + midH);
+  brush.set("2H", PENCIL2, pencilWLight()); brush.line(lX + lW - mg, d2, lX + mg, d2 + midH);
+  brush.set("2H", PENCIL2, pencilWLight()); brush.line(rX + mg, d2, rX + rW - mg, d2 + midH);
+  brush.set("2H", PENCIL2, pencilWLight()); brush.line(rX + rW - mg, d2, rX + mg, d2 + midH);
+  // Bottom panels X
+  brush.set("2H", PENCIL2, pencilWLight()); brush.line(lX + mg, d4, lX + lW - mg, d4 + (pBot - mg - d4));
+  brush.set("2H", PENCIL2, pencilWLight()); brush.line(lX + lW - mg, d4, lX + mg, d4 + (pBot - mg - d4));
+  brush.set("2H", PENCIL2, pencilWLight()); brush.line(rX + mg, d4, rX + rW - mg, d4 + (pBot - mg - d4));
+  brush.set("2H", PENCIL2, pencilWLight()); brush.line(rX + rW - mg, d4, rX + mg, d4 + (pBot - mg - d4));
+
+  // Diamond shapes in mid panels
+  [lCx, rCx].forEach(function(rcx) {
+    brush.set("2H", PENCIL2, pencilWLight());
+    var dw = piW * 0.3, dh = midH * 0.2;
+    brush.line(rcx, midCY - dh, rcx + dw, midCY);
+    brush.line(rcx + dw, midCY, rcx, midCY + dh);
+    brush.line(rcx, midCY + dh, rcx - dw, midCY);
+    brush.line(rcx - dw, midCY, rcx, midCY - dh);
+  });
+
+  // Threshold
+  brush.set("2H", PENCIL, random(1.5, 2.5));
+  brush.line(doorX - 10, doorY + doorH - 6, doorX + doorW + 10, doorY + doorH - 6);
+  brush.set("2H", PENCIL, random(1.0, 2.0));
+  brush.line(doorX - 10, doorY + doorH - 14, doorX + doorW + 10, doorY + doorH - 14);
+
+  // ===== LAYER 3: MORE CRAYON SCRIBBLES =====
+  brush.noFill(); brush.noHatch();
+  brush.wiggle(8);
+
+  brush.set("2B", "#4A7A5A", crayonW());
+  brush.line(cx - 80, archSpringY - 20, cx - 30, archSpringY + 15);
+  brush.set("2B", "#4A7A5A", crayonW());
+  brush.line(cx + 20, archSpringY - 10, cx + 70, archSpringY + 20);
+  brush.set("2B", "#4A7A5A", crayonW());
+  brush.line(doorX + 30, archSpringY + 60, doorX + 90, archSpringY + 40);
+  brush.set("2B", "#4A7EC2", crayonW());
+  brush.line(lCx - 60, d1 - 5, lCx - 10, d1 + 10);
+  brush.set("2B", "#4A7EC2", crayonW());
+  brush.line(rCx + 10, d3 - 8, rCx + 60, d3 + 5);
+  brush.set("2B", "#C9A832", crayonW());
+  brush.line(lX + 20, pY + 10, lX + 70, pY - 5);
+  brush.set("2B", "#C9A832", crayonW());
+  brush.line(rX + rW - 70, pBot - 15, rX + rW - 20, pBot + 5);
+  // Extra crayon marks for density
+  brush.set("2B", "#8040A0", crayonW());
+  brush.line(lCx - 40, botCY - 10, lCx + 40, botCY + 8);
+  brush.set("2B", "#B01008", crayonW());
+  brush.line(rCx - 30, topCY - 8, rCx + 50, topCY + 5);
+  brush.set("2B", "#C9A832", crayonW());
+  brush.line(cx - 20, tCY - 15, cx + 30, tCY + 10);
+
+  brush.wiggle(2);
+
+  // ===== LAYER 4: 5 SECTION FILLS =====
+  brush.noStroke();
+
+  // Violet — left top panel
+  brush.fill("#4010A0", 120);
+  brush.fillBleed(0.4);
+  brush.rect(lX + mg + 5, iT + 5, piW - 10, topH - 10);
+
+  // Vermillion — right mid panel upper
+  brush.fill("#B01008", 110);
+  brush.fillBleed(0.4);
+  brush.rect(rX + mg + 5, d2 + 5, piW - 10, midH * 0.3);
+
+  // Deep teal — tympanum
+  brush.fill("#085868", 130);
+  brush.fillBleed(0.4);
+  brush.circle(cx, tCY, tR * 1.6);
+
+  // Gold — right top panel
+  brush.fill("#C88800", 100);
+  brush.fillBleed(0.35);
+  brush.rect(rX + mg + 5, iT + 5, piW - 10, topH - 10);
+
+  // Terre verte — left bottom panel
+  brush.fill("#105830", 100);
+  brush.fillBleed(0.35);
+  brush.rect(lX + mg + 5, d4 + 5, piW - 10, (pBot - mg - d4) - 10);
+
+  brush.noFill();
+
+  // ===== LAYER 5: MULTIPLE THIN PAINT LINES =====
+  brush.set("marker", "#C9A832", 0.8);
+  brush.line(doorX + 120, archSpringY + 200, doorX + doorW - 200, doorY + doorH - 300);
+  brush.set("marker", "#4A7EC2", 0.7);
+  brush.line(doorX + doorW - 100, archSpringY + 160, doorX + 220, doorY + doorH - 250);
+  brush.set("marker", "#8040A0", 0.6);
+  brush.line(doorX + 180, archSpringY + 100, doorX + doorW - 150, doorY + doorH - 400);
+}
+
+function drawFrameVaried(x, y, w, h, col, wMin, wMax) {
+  brush.set("2H", col, random(wMin, wMax)); brush.line(x, y, x + w, y);
+  brush.set("2H", col, random(wMin, wMax)); brush.line(x + w, y, x + w, y + h);
+  brush.set("2H", col, random(wMin, wMax)); brush.line(x + w, y + h, x, y + h);
+  brush.set("2H", col, random(wMin, wMax)); brush.line(x, y + h, x, y);
+}
+function drawPointedArch(cx, springY, halfW, leftCx, rightCx, R, col, weight) {
+  var steps = 50;
+  for (var i = 0; i < steps; i++) {
+    var t1 = i / steps, t2 = (i + 1) / steps;
+    var pressureMod = 0.4 + 1.6 * sin(PI * t1);
+    brush.set("2H", col, constrain(weight * pressureMod * random(0.6, 1.4), 0.3, 2.5));
+    var x1 = (cx - halfW) + halfW * t1, x2 = (cx - halfW) + halfW * t2;
+    var dx1 = x1 - leftCx, dx2 = x2 - leftCx;
+    var y1 = springY - sqrt(max(0, R * R - dx1 * dx1));
+    var y2 = springY - sqrt(max(0, R * R - dx2 * dx2));
+    brush.line(x1, y1, x2, y2);
+  }
+  for (var i = 0; i < steps; i++) {
+    var t1 = i / steps, t2 = (i + 1) / steps;
+    var pressureMod = 0.4 + 1.6 * sin(PI * t1);
+    brush.set("2H", col, constrain(weight * pressureMod * random(0.6, 1.4), 0.3, 2.5));
+    var x1 = cx + halfW * t1, x2 = cx + halfW * t2;
+    var dx1 = x1 - rightCx, dx2 = x2 - rightCx;
+    var y1 = springY - sqrt(max(0, R * R - dx1 * dx1));
+    var y2 = springY - sqrt(max(0, R * R - dx2 * dx2));
+    brush.line(x1, y1, x2, y2);
+  }
+}
+</script>
+</body>
+</html>
