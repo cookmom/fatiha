@@ -40,37 +40,23 @@ function setup() {
 
   brush.noFill(); brush.noHatch();
 
-  // ===== LAYER 1: WATERCOLOR WASHES (M9 — BOLD, RICH, SATURATED) =====
+  // ===== LAYER 1: WATERCOLOR WASHES (M10 — gentle, 3 washes, 30-40% bare paper) =====
   brush.noStroke();
 
-  // Lapis blue wash — upper left, DEEP RICH blue
-  brush.fill("#1040A0", 200);
-  brush.fillBleed(0.75);
-  brush.rect(doorX - 100, doorY - 40, doorW * 0.7, 700);
-
-  // Vermillion wash — upper right, FIRE RED
-  brush.fill("#B81808", 180);
-  brush.fillBleed(0.7);
-  brush.rect(cx - 50, doorY + 20, doorW * 0.6 + 80, 640);
-
-  // Gold wash — mid-left, RICH GOLD
-  brush.fill("#C88800", 170);
-  brush.fillBleed(0.7);
-  brush.rect(doorX - 20, archSpringY - 100, doorW * 0.65, 550);
-
-  // Terre verte wash — bottom, DEEP GREEN
-  brush.fill("#105830", 160);
+  // Lapis blue wash — upper area, soft
+  brush.fill("#1040A0", 75);
   brush.fillBleed(0.6);
-  brush.rect(doorX + 20, archSpringY + 400, doorW * 0.7, 700);
+  brush.rect(doorX + 40, doorY + 60, doorW * 0.55, 550);
 
-  // Second pass — pooled pigment for depth
-  brush.fill("#0830A0", 150);
-  brush.fillBleed(0.5);
-  brush.rect(doorX + 40, doorY + 80, doorW * 0.35, 400);
+  // Gold wash — mid band, warm glow
+  brush.fill("#C88800", 70);
+  brush.fillBleed(0.55);
+  brush.rect(doorX + 80, archSpringY - 50, doorW * 0.5, 400);
 
-  brush.fill("#C07000", 140);
-  brush.fillBleed(0.45);
-  brush.rect(cx - 100, archSpringY + 50, doorW * 0.4, 350);
+  // Terre verte wash — lower area
+  brush.fill("#105830", 80);
+  brush.fillBleed(0.55);
+  brush.rect(doorX + 60, archSpringY + 450, doorW * 0.55, 550);
 
   brush.noFill();
 
@@ -171,42 +157,22 @@ function setup() {
 
   brush.wiggle(2); // reset
 
-  // ===== LAYER 4: SMALL WATERCOLOR FILLS — THE JEWELS (most opaque!) =====
+  // ===== LAYER 4: SECTION FILLS — 3 jewel spots at medium opacity =====
   brush.noStroke();
 
-  // DENSE violet — left top panel, pooled thick pigment
-  brush.fill("#4010A0", 230);
-  brush.fillBleed(0.55);
+  // Violet — left top panel, medium pigment
+  brush.fill("#4010A0", 120);
+  brush.fillBleed(0.4);
   brush.rect(lX + mg + 5, iT + 5, piW - 10, topH - 10);
 
-  // FIRE vermillion — right top panel
-  brush.fill("#B01008", 220);
-  brush.fillBleed(0.5);
-  brush.rect(rX + mg + 5, iT + 5, piW - 10, topH - 10);
-
-  // DEEP lapis — left mid panel
-  brush.fill("#0830A0", 240);
-  brush.fillBleed(0.5);
-  brush.rect(lX + mg + 5, d2 + 5, piW - 10, midH * 0.4);
-
-  // Warm orange-gold — right mid panel
-  brush.fill("#C06008", 200);
-  brush.fillBleed(0.5);
+  // Vermillion — right mid panel
+  brush.fill("#B01008", 110);
+  brush.fillBleed(0.4);
   brush.rect(rX + mg + 5, d2 + 5, piW - 10, midH * 0.3);
 
-  // Deep emerald — left bottom section
-  brush.fill("#085028", 210);
-  brush.fillBleed(0.45);
-  brush.rect(lX + mg + 5, d4 + 5, piW - 10, topH - 10);
-
-  // Rich gold — right bottom section
-  brush.fill("#B88000", 220);
-  brush.fillBleed(0.5);
-  brush.rect(rX + mg + 5, d4 + 5, piW - 10, topH - 10);
-
-  // Deep teal — tympanum, GLOWING
-  brush.fill("#085868", 200);
-  brush.fillBleed(0.45);
+  // Deep teal — tympanum
+  brush.fill("#085868", 130);
+  brush.fillBleed(0.4);
   brush.circle(cx, tCY, tR * 1.6);
 
   brush.noFill();
