@@ -1,0 +1,1385 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+  <title>fatiha.studio</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      background: #16151e;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+      color: #ccc;
+      display: flex;
+    }
+
+    /* ── SIDEBAR ── */
+    #sidebar {
+      width: 80px;
+      height: 100vh;
+      background: #1e1d28;
+      border-right: 1px solid #2a2940;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px 0 8px;
+      gap: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      z-index: 100;
+      flex-shrink: 0;
+      scrollbar-width: none;
+    }
+    #sidebar::-webkit-scrollbar { display: none; }
+
+    .sb-section {
+      width: 100%;
+      padding: 6px 8px;
+      border-bottom: 1px solid #2a2940;
+    }
+    .sb-label {
+      font-size: 8px;
+      color: #484860;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      text-align: center;
+      margin-bottom: 5px;
+    }
+
+    /* Tool buttons */
+    .tool-btn {
+      width: 52px;
+      height: 36px;
+      background: #27263a;
+      border: 1px solid #353450;
+      border-radius: 7px;
+      color: #888;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 3px auto;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .tool-btn:hover { background: #32314a; }
+    .tool-btn.active {
+      background: #1e4060;
+      border-color: #3a7aaa;
+      color: #aaccee;
+    }
+
+    /* Brush buttons */
+    .brush-btn {
+      width: 60px;
+      height: 30px;
+      background: #27263a;
+      border: 1px solid #353450;
+      border-radius: 6px;
+      color: #999;
+      font-size: 10px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 2px auto;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+      letter-spacing: 0.3px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .brush-btn:hover { background: #32314a; }
+    .brush-btn.active {
+      background: #2a3c2a;
+      border-color: #4a8a4a;
+      color: #aaeaaa;
+    }
+
+    /* Color preview */
+    .color-preview-wrap {
+      display: flex;
+      justify-content: center;
+      position: relative;
+      margin: 4px 0;
+    }
+    .color-circle {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid #555;
+      cursor: pointer;
+      transition: border-color 0.12s;
+    }
+    .color-circle:hover { border-color: #aaa; }
+    #color-input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+    }
+
+    /* Palette swatches */
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 3px;
+      width: 100%;
+    }
+    .swatch {
+      aspect-ratio: 1;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.08);
+      transition: transform 0.1s, border-color 0.1s;
+    }
+    .swatch:hover { transform: scale(1.15); border-color: rgba(255,255,255,0.3); }
+    .swatch.active { border: 2px solid #fff; transform: scale(1.05); }
+
+    /* Sliders */
+    .slider-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      width: 100%;
+    }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      font-size: 9px;
+    }
+    .slider-row span:first-child { color: #484860; text-transform: uppercase; letter-spacing: 0.4px; }
+    .slider-row span:last-child { color: #6a7aaa; min-width: 22px; text-align: right; }
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 3px;
+      background: #2e2e4a;
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: #7aaccc;
+      cursor: pointer;
+    }
+    input[type=range]::-moz-range-thumb {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: #7aaccc;
+      cursor: pointer;
+      border: none;
+    }
+
+    /* ── CANVAS CONTAINER ── */
+    #canvas-container {
+      flex: 1;
+      height: 100vh;
+      position: relative;
+      overflow: hidden;
+    }
+    #canvas-container canvas {
+      display: block;
+    }
+
+    /* ── TOP TOOLBAR ── */
+    #toolbar {
+      position: fixed;
+      top: 10px;
+      right: 12px;
+      display: flex;
+      gap: 5px;
+      z-index: 200;
+    }
+    .tb-btn {
+      background: #1e1d28cc;
+      backdrop-filter: blur(8px);
+      border: 1px solid #353450;
+      border-radius: 7px;
+      color: #aaa;
+      font-size: 11px;
+      padding: 5px 10px;
+      cursor: pointer;
+      transition: all 0.12s;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .tb-btn:hover { background: #2a2940cc; color: #eee; border-color: #555; }
+    .tb-btn:disabled { opacity: 0.3; cursor: default; }
+
+    /* ── LAYER BAR ── */
+    #layer-bar {
+      position: fixed;
+      bottom: 0;
+      left: 80px;
+      right: 0;
+      height: 42px;
+      background: #1a1928dd;
+      backdrop-filter: blur(8px);
+      border-top: 1px solid #2a2940;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 5px;
+      z-index: 100;
+    }
+    .layer-label {
+      font-size: 10px;
+      color: #484860;
+      margin-right: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .layer-tab {
+      background: #27263a;
+      border: 1px solid #353450;
+      border-radius: 6px;
+      color: #888;
+      font-size: 11px;
+      padding: 4px 14px;
+      cursor: pointer;
+      transition: all 0.12s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      user-select: none;
+    }
+    .layer-tab:hover { background: #32314a; }
+    .layer-tab.active {
+      background: #223040;
+      border-color: #4a7aaa;
+      color: #aacce8;
+    }
+    .layer-eye {
+      font-size: 12px;
+      cursor: pointer;
+      opacity: 0.5;
+      transition: opacity 0.12s;
+    }
+    .layer-eye.visible { opacity: 1; }
+    .stroke-count {
+      margin-left: auto;
+      font-size: 10px;
+      color: #484860;
+    }
+
+    /* ── EXPORT DIALOG ── */
+    #export-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+    }
+    #export-overlay.open { display: flex; }
+    #export-dialog {
+      background: #1e1d28;
+      border: 1px solid #3a3960;
+      border-radius: 12px;
+      padding: 20px;
+      min-width: 360px;
+      max-width: 90vw;
+    }
+    #export-dialog h3 {
+      color: #ccc;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+    #export-dialog textarea {
+      width: 100%;
+      height: 200px;
+      background: #14131e;
+      border: 1px solid #3a3960;
+      border-radius: 6px;
+      color: #7aaccc;
+      font-size: 10px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      padding: 8px;
+      resize: none;
+    }
+    #import-dialog textarea {
+      width: 100%;
+      height: 180px;
+      background: #14131e;
+      border: 1px solid #3a3960;
+      border-radius: 6px;
+      color: #7aaccc;
+      font-size: 10px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      padding: 8px;
+      resize: none;
+      margin-top: 8px;
+    }
+    .dialog-btns {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      justify-content: flex-end;
+    }
+    .dialog-btn {
+      background: #27263a;
+      border: 1px solid #3a3960;
+      border-radius: 6px;
+      color: #aaa;
+      font-size: 12px;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .dialog-btn:hover { background: #32314a; color: #eee; }
+    .dialog-btn.primary {
+      background: #223040;
+      border-color: #4a7aaa;
+      color: #aacce8;
+    }
+    .dialog-btn.primary:hover { background: #2a3c50; }
+
+    /* ── SELECTION INFO ── */
+    #sel-info {
+      position: fixed;
+      top: 50px;
+      right: 12px;
+      background: #1e1d28cc;
+      backdrop-filter: blur(8px);
+      border: 1px solid #3a3960;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 10px;
+      color: #888;
+      display: none;
+      z-index: 150;
+      min-width: 130px;
+    }
+    #sel-info.visible { display: block; }
+    #sel-info .sel-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 3px;
+    }
+    #sel-info .sel-row span:first-child { color: #484860; }
+    #sel-info .sel-row span:last-child { color: #aaa; }
+    #sel-del {
+      margin-top: 6px;
+      width: 100%;
+      background: #3a1a1a;
+      border: 1px solid #5a2a2a;
+      border-radius: 5px;
+      color: #cc8888;
+      font-size: 10px;
+      padding: 4px;
+      cursor: pointer;
+    }
+    #sel-del:hover { background: #4a2020; }
+  </style>
+</head>
+<body>
+
+<!-- ── LEFT SIDEBAR ── -->
+<div id="sidebar">
+
+  <!-- Tools -->
+  <div class="sb-section">
+    <div class="sb-label">Tools</div>
+    <button class="tool-btn active" id="tool-draw" title="Draw" onclick="setTool('draw')">✏️</button>
+    <button class="tool-btn" id="tool-select" title="Select" onclick="setTool('select')">◻</button>
+    <button class="tool-btn" id="tool-eraser" title="Eraser" onclick="setTool('eraser')">⬜</button>
+  </div>
+
+  <!-- Brushes -->
+  <div class="sb-section">
+    <div class="sb-label">Brush</div>
+    <button class="brush-btn active" id="brush-HB" onclick="setBrush('HB')">HB</button>
+    <button class="brush-btn" id="brush-2B" onclick="setBrush('2B')">2B</button>
+    <button class="brush-btn" id="brush-2H" onclick="setBrush('2H')">2H</button>
+    <button class="brush-btn" id="brush-marker" onclick="setBrush('marker')">Marker</button>
+    <button class="brush-btn" id="brush-charcoal" onclick="setBrush('charcoal')">Charcoal</button>
+    <button class="brush-btn" id="brush-pen" onclick="setBrush('pen')">Pen</button>
+    <button class="brush-btn" id="brush-spray" onclick="setBrush('spray')">Spray</button>
+    <button class="brush-btn" id="brush-crayon" onclick="setBrush('crayon')">Crayon</button>
+    <button class="brush-btn" id="brush-rotring" onclick="setBrush('rotring')">Rotring</button>
+  </div>
+
+  <!-- Color -->
+  <div class="sb-section">
+    <div class="sb-label">Color</div>
+    <div class="color-preview-wrap">
+      <div class="color-circle" id="color-preview" onclick="triggerColorPicker()" title="Pick color"></div>
+      <input type="color" id="color-input" value="#1a1a1a" oninput="onColorChange(this.value)">
+    </div>
+    <div class="palette-grid" id="palette-grid"></div>
+  </div>
+
+  <!-- Weight -->
+  <div class="sb-section">
+    <div class="slider-wrap">
+      <div class="slider-row">
+        <span>Weight</span>
+        <span id="weight-val">2</span>
+      </div>
+      <input type="range" id="weight-slider" min="0.5" max="12" step="0.5" value="2"
+             oninput="onWeightChange(this.value)">
+    </div>
+  </div>
+
+  <!-- Opacity -->
+  <div class="sb-section">
+    <div class="slider-wrap">
+      <div class="slider-row">
+        <span>Opacity</span>
+        <span id="opacity-val">200</span>
+      </div>
+      <input type="range" id="opacity-slider" min="10" max="255" value="200"
+             oninput="onOpacityChange(this.value)">
+    </div>
+  </div>
+
+</div>
+
+<!-- ── CANVAS CONTAINER ── -->
+<div id="canvas-container"></div>
+
+<!-- ── TOP TOOLBAR ── -->
+<div id="toolbar">
+  <button class="tb-btn" id="btn-undo" onclick="doUndo()" disabled>↩ Undo</button>
+  <button class="tb-btn" id="btn-redo" onclick="doRedo()" disabled>↪ Redo</button>
+  <button class="tb-btn" onclick="doExport()">↓ Export JSON</button>
+  <button class="tb-btn" onclick="openImport()">↑ Import</button>
+  <button class="tb-btn" onclick="doClear()" style="color:#cc8888">⊗ Clear</button>
+</div>
+
+<!-- ── LAYER BAR ── -->
+<div id="layer-bar">
+  <span class="layer-label">Layers</span>
+  <button class="layer-tab" id="layer-watercolor" onclick="setLayer('watercolor')">
+    <span class="layer-eye visible" id="eye-watercolor" onclick="toggleLayer(event,'watercolor')">◉</span>
+    Watercolor
+  </button>
+  <button class="layer-tab active" id="layer-pencil" onclick="setLayer('pencil')">
+    <span class="layer-eye visible" id="eye-pencil" onclick="toggleLayer(event,'pencil')">◉</span>
+    Pencil
+  </button>
+  <button class="layer-tab" id="layer-detail" onclick="setLayer('detail')">
+    <span class="layer-eye visible" id="eye-detail" onclick="toggleLayer(event,'detail')">◉</span>
+    Detail
+  </button>
+  <span class="stroke-count" id="stroke-count">0 strokes</span>
+</div>
+
+<!-- ── SELECTION INFO ── -->
+<div id="sel-info">
+  <div class="sel-row"><span>Brush</span><span id="si-brush">—</span></div>
+  <div class="sel-row"><span>Layer</span><span id="si-layer">—</span></div>
+  <div class="sel-row"><span>Points</span><span id="si-pts">—</span></div>
+  <button id="sel-del" onclick="deleteSelected()">⊗ Delete stroke</button>
+</div>
+
+<!-- ── EXPORT DIALOG ── -->
+<div id="export-overlay">
+  <div id="export-dialog">
+    <h3>Export Stroke JSON</h3>
+    <textarea id="export-text" readonly></textarea>
+    <div class="dialog-btns">
+      <button class="dialog-btn" onclick="copyExport()">Copy</button>
+      <button class="dialog-btn primary" onclick="downloadExport()">Download</button>
+      <button class="dialog-btn" onclick="closeExport()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── IMPORT DIALOG ── -->
+<div id="import-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;align-items:center;justify-content:center;">
+  <div id="import-dialog" style="background:#1e1d28;border:1px solid #3a3960;border-radius:12px;padding:20px;min-width:360px;max-width:90vw;">
+    <h3 style="color:#ccc;font-size:14px;margin-bottom:4px;">Import Stroke JSON</h3>
+    <textarea id="import-text" placeholder='Paste stroke JSON here…'></textarea>
+    <div class="dialog-btns">
+      <button class="dialog-btn primary" onclick="doImport()">Import</button>
+      <button class="dialog-btn" onclick="closeImport()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+
+const PAPER_W = 1080;
+const PAPER_H = 1920;
+const SIDEBAR_W = 80;
+const LAYER_BAR_H = 42;
+const LAYER_ORDER = ['watercolor', 'pencil', 'detail'];
+
+const ISLAMIC_PALETTE = [
+  { name: 'Lamp Black',  hex: '#1a1a1a' },
+  { name: 'Lapis',       hex: '#1a3a8a' },
+  { name: 'Indigo',      hex: '#2a2a6b' },
+  { name: 'Vermillion',  hex: '#c8302a' },
+  { name: 'Rose',        hex: '#d85c6a' },
+  { name: 'Shell Gold',  hex: '#c5a030' },
+  { name: 'Terre Verte', hex: '#3a6b3c' },
+  { name: 'Raw Umber',   hex: '#6b4a2a' },
+  { name: 'Cream',       hex: '#f2eada' },
+];
+
+const BRUSH_NAMES = ['HB','2B','2H','marker','charcoal','pen','spray','crayon','rotring'];
+
+let appState = {
+  tool: 'draw',
+  brush: 'HB',
+  color: '#1a1a1a',
+  weight: 2,
+  opacity: 200,
+  layer: 'pencil',
+};
+
+let layerVisible = { watercolor: true, pencil: true, detail: true };
+
+let strokes = [];
+let currentStroke = null;
+let undoStack = []; // each entry is a snapshot of strokes array
+let redoStack = [];
+let selectedId = null;
+
+let vScale = 1, vOffX = 0, vOffY = 0;
+let myCanvas = null;
+let _uid = 0;
+function makeId() { return ++_uid; }
+
+let isPointerDown = false;
+let lastPt = null;
+
+// For selection dragging
+let selDragActive = false;
+let selDragStart = null;
+let selOrigTransform = null;
+
+// For transform handles
+let transformHandle = null; // null | 'move' | 'scale-tl' | 'scale-tr' | 'scale-bl' | 'scale-br' | 'rotate'
+let selBBox = null; // bounding box of selected stroke in paper coords
+
+// ═══════════════════════════════════════════════════════════
+// P5 SKETCH
+// ═══════════════════════════════════════════════════════════
+
+function setup() {
+  const cw = windowWidth - SIDEBAR_W;
+  const ch = windowHeight;
+  myCanvas = createCanvas(cw, ch, WEBGL);
+  myCanvas.parent('canvas-container');
+
+  // Compute paper viewport
+  const availH = ch - LAYER_BAR_H;
+  vScale = Math.min(cw / PAPER_W, availH / PAPER_H) * 0.96;
+  vOffX = (cw - PAPER_W * vScale) / 2;
+  vOffY = (availH - PAPER_H * vScale) / 2;
+
+  brush.load();
+
+  // Register custom brushes
+  try {
+    const existing = brush.box();
+    if (!existing.includes('crayon')) {
+      brush.add('crayon', {
+        type: 'default',
+        weight: 1.0,
+        scatter: 0.25,
+        sharpness: 0.45,
+        grain: 5,
+        opacity: 150,
+        spacing: 0.18,
+        pressure: [0.7, 1.15, 0.7],
+        rotate: 'natural'
+      });
+    }
+    if (!existing.includes('rotring')) {
+      brush.add('rotring', {
+        type: 'default',
+        weight: 0.12,
+        scatter: 0.0,
+        sharpness: 0.98,
+        grain: 1,
+        opacity: 245,
+        spacing: 0.03,
+        pressure: [1.0, 1.0, 1.0],
+        rotate: false
+      });
+    }
+  } catch(e) {
+    console.warn('brush.box() unavailable:', e);
+  }
+
+  noLoop();
+  redraw();
+}
+
+function draw() {
+  // WEBGL: center origin → move to top-left
+  translate(-width / 2, -height / 2);
+
+  // Studio dark bg
+  background(22, 21, 30);
+
+  // Paper shadow
+  push();
+  translate(vOffX - 4, vOffY - 4);
+  noStroke();
+  fill(0, 0, 0, 80);
+  rect(4, 4, PAPER_W * vScale, PAPER_H * vScale);
+  pop();
+
+  // Paper area
+  push();
+  translate(vOffX, vOffY);
+  scale(vScale, vScale);
+
+  // Paper cream background
+  noStroke();
+  fill(242, 234, 218);
+  rect(0, 0, PAPER_W, PAPER_H);
+
+  // Render strokes
+  brush.noFill();
+  brush.noHatch();
+
+  for (const layer of LAYER_ORDER) {
+    if (!layerVisible[layer]) continue;
+    for (const s of strokes) {
+      if (s.layer !== layer || s.hidden) continue;
+      renderStroke(s);
+    }
+  }
+
+  // Active stroke being drawn
+  if (currentStroke && currentStroke.points.length >= 2) {
+    renderStroke(currentStroke);
+  }
+
+  // Selection gizmo
+  if (selectedId !== null) {
+    const sel = strokes.find(s => s.id === selectedId);
+    if (sel) drawGizmo(sel);
+  }
+
+  pop();
+}
+
+function renderStroke(s) {
+  const pts = getXformedPts(s);
+  if (!pts || pts.length < 1) return;
+
+  const alphaHex = Math.min(255, Math.max(0, Math.round(s.opacity)))
+    .toString(16).padStart(2, '0');
+  const colorStr = s.color + alphaHex;
+
+  // Validate brush name
+  const bname = BRUSH_NAMES.includes(s.brush) ? s.brush : 'HB';
+
+  try {
+    brush.set(bname, colorStr, s.weight);
+  } catch(e) {
+    brush.set('HB', colorStr, s.weight);
+  }
+
+  if (pts.length === 1) {
+    brush.line(pts[0][0], pts[0][1], pts[0][0] + 1, pts[0][1]);
+  } else if (pts.length === 2) {
+    brush.line(pts[0][0], pts[0][1], pts[1][0], pts[1][1]);
+  } else {
+    brush.spline(pts, 0.4);
+  }
+}
+
+function drawGizmo(s) {
+  const pts = getXformedPts(s);
+  if (!pts || pts.length === 0) return;
+
+  // Compute bounding box
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const p of pts) {
+    x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]);
+    y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]);
+  }
+  const pad = 18 / vScale;
+  x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
+
+  // Store bbox for hit testing
+  selBBox = { x0, y0, x1, y1 };
+
+  // Dashed selection rect (using drawingContext for dashes)
+  noFill();
+  stroke(80, 160, 255, 160);
+  strokeWeight(1.5 / vScale);
+  drawingContext.setLineDash([7 / vScale, 4 / vScale]);
+  rect(x0, y0, x1 - x0, y1 - y0);
+  drawingContext.setLineDash([]);
+
+  // Corner scale handles
+  fill(80, 160, 255, 200);
+  noStroke();
+  const hs = 9 / vScale;
+  const corners = [[x0, y0], [x1, y0], [x0, y1], [x1, y1]];
+  for (const [hx, hy] of corners) {
+    rect(hx - hs / 2, hy - hs / 2, hs, hs);
+  }
+
+  // Rotation handle
+  const mx = (x0 + x1) / 2;
+  const rotY = y0 - 28 / vScale;
+  stroke(80, 160, 255, 100);
+  strokeWeight(1 / vScale);
+  line(mx, y0, mx, rotY);
+  fill(80, 160, 255, 200);
+  noStroke();
+  ellipse(mx, rotY, hs, hs);
+}
+
+// ═══════════════════════════════════════════════════════════
+// TRANSFORMS
+// ═══════════════════════════════════════════════════════════
+
+function getXformedPts(s) {
+  if (!s || !s.points || s.points.length === 0) return [];
+  const t = s.transform || {};
+  const dx = (t.translate || [0, 0])[0];
+  const dy = (t.translate || [0, 0])[1];
+  const sx = (t.scale || [1, 1])[0];
+  const sy = (t.scale || [1, 1])[1];
+  const rot = t.rotate || 0;
+
+  if (dx === 0 && dy === 0 && sx === 1 && sy === 1 && rot === 0) {
+    return s.points.map(p => [p[0], p[1]]);
+  }
+
+  // Centroid
+  let cx = 0, cy = 0;
+  for (const p of s.points) { cx += p[0]; cy += p[1]; }
+  cx /= s.points.length; cy /= s.points.length;
+
+  const cosA = Math.cos(rot), sinA = Math.sin(rot);
+
+  return s.points.map(p => {
+    let x = (p[0] - cx) * sx;
+    let y = (p[1] - cy) * sy;
+    const rx = x * cosA - y * sinA;
+    const ry = x * sinA + y * cosA;
+    return [rx + cx + dx, ry + cy + dy];
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// COORDINATE HELPERS
+// ═══════════════════════════════════════════════════════════
+
+function screenToPaper(sx, sy) {
+  return [(sx - vOffX) / vScale, (sy - vOffY) / vScale];
+}
+
+function inPaper(px, py) {
+  return px >= 0 && px <= PAPER_W && py >= 0 && py <= PAPER_H;
+}
+
+function ptNearStroke(px, py, s, threshold) {
+  const pts = getXformedPts(s);
+  const t2 = threshold * threshold;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const d2 = ptToSegDist2(px, py, pts[i][0], pts[i][1], pts[i+1][0], pts[i+1][1]);
+    if (d2 < t2) return true;
+  }
+  if (pts.length === 1) {
+    const dx = pts[0][0] - px, dy = pts[0][1] - py;
+    if (dx*dx + dy*dy < t2) return true;
+  }
+  return false;
+}
+
+function ptToSegDist2(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const len2 = dx*dx + dy*dy;
+  if (len2 === 0) { const ex = px-ax, ey = py-ay; return ex*ex+ey*ey; }
+  const t = Math.max(0, Math.min(1, ((px-ax)*dx + (py-ay)*dy) / len2));
+  const nx = ax + t*dx - px, ny = ay + t*dy - py;
+  return nx*nx + ny*ny;
+}
+
+function getGizmoHandle(px, py) {
+  if (!selBBox) return null;
+  const hs = 12 / vScale;
+  const { x0, y0, x1, y1 } = selBBox;
+  const mx = (x0 + x1) / 2;
+  const rotY = y0 - 28 / vScale;
+  const handles = [
+    ['rotate',   mx, rotY],
+    ['scale-tl', x0, y0], ['scale-tr', x1, y0],
+    ['scale-bl', x0, y1], ['scale-br', x1, y1],
+  ];
+  for (const [name, hx, hy] of handles) {
+    if (Math.abs(px - hx) < hs && Math.abs(py - hy) < hs) return name;
+  }
+  // Anywhere inside bbox = move
+  if (px > x0 && px < x1 && py > y0 && py < y1) return 'move';
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════
+// INPUT HANDLERS
+// ═══════════════════════════════════════════════════════════
+
+function mousePressed(e) {
+  // Only act on canvas clicks
+  if (e && e.target !== myCanvas.elt) return;
+  const [px, py] = screenToPaper(mouseX, mouseY);
+
+  if (appState.tool === 'draw') {
+    if (!inPaper(px, py)) return;
+    isPointerDown = true;
+    currentStroke = {
+      id: makeId(),
+      brush: appState.brush,
+      color: appState.color,
+      weight: appState.weight,
+      opacity: appState.opacity,
+      layer: appState.layer,
+      points: [[px, py]],
+      transform: { translate: [0,0], scale: [1,1], rotate: 0 },
+      timestamp: Date.now(),
+      hidden: false,
+    };
+    lastPt = [px, py];
+
+  } else if (appState.tool === 'eraser') {
+    if (!inPaper(px, py)) return;
+    eraseAt(px, py);
+
+  } else if (appState.tool === 'select') {
+    if (selectedId !== null) {
+      // Check gizmo handles first
+      const handle = getGizmoHandle(px, py);
+      if (handle) {
+        transformHandle = handle;
+        selDragActive = true;
+        selDragStart = [px, py];
+        const sel = strokes.find(s => s.id === selectedId);
+        if (sel) selOrigTransform = JSON.parse(JSON.stringify(sel.transform));
+        return;
+      }
+    }
+    // Try to select a stroke
+    selectAt(px, py);
+  }
+}
+
+function mouseDragged(e) {
+  if (!isPointerDown && !selDragActive) return;
+  const [px, py] = screenToPaper(mouseX, mouseY);
+
+  if (appState.tool === 'draw' && isPointerDown && currentStroke) {
+    const last = lastPt || currentStroke.points[currentStroke.points.length - 1];
+    const dx = px - last[0], dy = py - last[1];
+    if (dx*dx + dy*dy > 1) { // min distance filter
+      currentStroke.points.push([px, py]);
+      lastPt = [px, py];
+      requestAnimationFrame(() => redraw());
+    }
+
+  } else if (appState.tool === 'eraser' && isPointerDown) {
+    eraseAt(px, py);
+
+  } else if (selDragActive && selectedId !== null) {
+    applyTransformDrag(px, py);
+    redraw();
+  }
+}
+
+function mouseReleased(e) {
+  if (appState.tool === 'draw' && isPointerDown && currentStroke) {
+    if (currentStroke.points.length >= 1) {
+      saveUndoState();
+      strokes.push(currentStroke);
+      updateStrokeCount();
+    }
+    currentStroke = null;
+  }
+  if (selDragActive) {
+    selDragActive = false;
+    transformHandle = null;
+    selDragStart = null;
+    selOrigTransform = null;
+  }
+  isPointerDown = false;
+  lastPt = null;
+  redraw();
+}
+
+// Touch equivalents
+function touchStarted(e) {
+  if (e.touches && e.touches.length > 0) {
+    const t = e.touches[0];
+    const rect = myCanvas.elt.getBoundingClientRect();
+    const sx = t.clientX - rect.left;
+    const sy = t.clientY - rect.top;
+    const [px, py] = screenToPaper(sx, sy);
+
+    if (appState.tool === 'draw') {
+      if (!inPaper(px, py)) return false;
+      isPointerDown = true;
+      currentStroke = {
+        id: makeId(),
+        brush: appState.brush,
+        color: appState.color,
+        weight: appState.weight,
+        opacity: appState.opacity,
+        layer: appState.layer,
+        points: [[px, py]],
+        transform: { translate: [0,0], scale: [1,1], rotate: 0 },
+        timestamp: Date.now(),
+        hidden: false,
+      };
+      lastPt = [px, py];
+    } else if (appState.tool === 'select') {
+      if (selectedId !== null) {
+        const handle = getGizmoHandle(px, py);
+        if (handle) {
+          transformHandle = handle;
+          selDragActive = true;
+          selDragStart = [px, py];
+          const sel = strokes.find(s => s.id === selectedId);
+          if (sel) selOrigTransform = JSON.parse(JSON.stringify(sel.transform));
+          return false;
+        }
+      }
+      selectAt(px, py);
+    }
+  }
+  return false;
+}
+
+function touchMoved(e) {
+  if (e.touches && e.touches.length > 0) {
+    const t = e.touches[0];
+    const rect = myCanvas.elt.getBoundingClientRect();
+    const sx = t.clientX - rect.left;
+    const sy = t.clientY - rect.top;
+    const [px, py] = screenToPaper(sx, sy);
+
+    if (appState.tool === 'draw' && isPointerDown && currentStroke) {
+      const last = lastPt || currentStroke.points[currentStroke.points.length - 1];
+      const dx = px - last[0], dy = py - last[1];
+      if (dx*dx + dy*dy > 1) {
+        currentStroke.points.push([px, py]);
+        lastPt = [px, py];
+        requestAnimationFrame(() => redraw());
+      }
+    } else if (selDragActive && selectedId !== null) {
+      applyTransformDrag(px, py);
+      redraw();
+    }
+  }
+  return false;
+}
+
+function touchEnded(e) {
+  if (appState.tool === 'draw' && isPointerDown && currentStroke) {
+    if (currentStroke.points.length >= 1) {
+      saveUndoState();
+      strokes.push(currentStroke);
+      updateStrokeCount();
+    }
+    currentStroke = null;
+  }
+  if (selDragActive) {
+    selDragActive = false;
+    transformHandle = null;
+    selDragStart = null;
+    selOrigTransform = null;
+  }
+  isPointerDown = false;
+  lastPt = null;
+  redraw();
+  return false;
+}
+
+// Keyboard shortcuts
+function keyPressed() {
+  if (key === 'z' || key === 'Z') {
+    if (keyIsDown(91) || keyIsDown(17)) doUndo(); // Cmd/Ctrl+Z
+  }
+  if (key === 'y' || key === 'Y') {
+    if (keyIsDown(91) || keyIsDown(17)) doRedo(); // Cmd/Ctrl+Y
+  }
+  if (keyCode === DELETE || keyCode === BACKSPACE) {
+    deleteSelected();
+  }
+  if (key === 'Escape') {
+    selectedId = null;
+    selBBox = null;
+    updateSelInfo();
+    redraw();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SELECTION & ERASE
+// ═══════════════════════════════════════════════════════════
+
+function selectAt(px, py) {
+  // Search in reverse order (topmost first)
+  const threshold = 14 / vScale;
+  for (let i = strokes.length - 1; i >= 0; i--) {
+    const s = strokes[i];
+    if (s.hidden || !layerVisible[s.layer]) continue;
+    if (ptNearStroke(px, py, s, threshold)) {
+      selectedId = s.id;
+      updateSelInfo(s);
+      redraw();
+      return;
+    }
+  }
+  // Deselect
+  selectedId = null;
+  selBBox = null;
+  updateSelInfo();
+  redraw();
+}
+
+function eraseAt(px, py) {
+  const threshold = 18 / vScale;
+  const before = strokes.length;
+  strokes = strokes.filter(s => !ptNearStroke(px, py, s, threshold));
+  if (strokes.length !== before) {
+    if (selectedId !== null && !strokes.find(s => s.id === selectedId)) {
+      selectedId = null;
+      selBBox = null;
+      updateSelInfo();
+    }
+    updateStrokeCount();
+    redraw();
+  }
+}
+
+function deleteSelected() {
+  if (selectedId === null) return;
+  saveUndoState();
+  strokes = strokes.filter(s => s.id !== selectedId);
+  selectedId = null;
+  selBBox = null;
+  updateSelInfo();
+  updateStrokeCount();
+  redraw();
+}
+
+// ═══════════════════════════════════════════════════════════
+// TRANSFORMS
+// ═══════════════════════════════════════════════════════════
+
+function applyTransformDrag(px, py) {
+  if (!selDragStart || !selOrigTransform || selectedId === null) return;
+  const sel = strokes.find(s => s.id === selectedId);
+  if (!sel) return;
+
+  const dx = px - selDragStart[0];
+  const dy = py - selDragStart[1];
+
+  if (transformHandle === 'move') {
+    sel.transform.translate = [
+      selOrigTransform.translate[0] + dx,
+      selOrigTransform.translate[1] + dy,
+    ];
+
+  } else if (transformHandle === 'rotate') {
+    // Compute angle from centroid
+    const pts = sel.points;
+    let cx = 0, cy = 0;
+    for (const p of pts) { cx += p[0]; cy += p[1]; }
+    cx /= pts.length; cy /= pts.length;
+    const cx2 = cx + selOrigTransform.translate[0];
+    const cy2 = cy + selOrigTransform.translate[1];
+    const angle0 = Math.atan2(selDragStart[1] - cy2, selDragStart[0] - cx2);
+    const angle1 = Math.atan2(py - cy2, px - cx2);
+    sel.transform.rotate = selOrigTransform.rotate + (angle1 - angle0);
+
+  } else if (transformHandle && transformHandle.startsWith('scale-')) {
+    // Scale relative to opposite corner
+    const { x0, y0, x1, y1 } = selBBox;
+    const origW = x1 - x0, origH = y1 - y0;
+    let factorX = 1, factorY = 1;
+
+    if (transformHandle === 'scale-br') {
+      factorX = Math.max(0.1, (origW + dx) / origW);
+      factorY = Math.max(0.1, (origH + dy) / origH);
+    } else if (transformHandle === 'scale-tl') {
+      factorX = Math.max(0.1, (origW - dx) / origW);
+      factorY = Math.max(0.1, (origH - dy) / origH);
+    } else if (transformHandle === 'scale-tr') {
+      factorX = Math.max(0.1, (origW + dx) / origW);
+      factorY = Math.max(0.1, (origH - dy) / origH);
+    } else if (transformHandle === 'scale-bl') {
+      factorX = Math.max(0.1, (origW - dx) / origW);
+      factorY = Math.max(0.1, (origH + dy) / origH);
+    }
+
+    sel.transform.scale = [
+      selOrigTransform.scale[0] * factorX,
+      selOrigTransform.scale[1] * factorY,
+    ];
+  }
+
+  updateSelInfo(sel);
+}
+
+// ═══════════════════════════════════════════════════════════
+// UNDO / REDO
+// ═══════════════════════════════════════════════════════════
+
+function saveUndoState() {
+  undoStack.push(JSON.parse(JSON.stringify(strokes)));
+  if (undoStack.length > 60) undoStack.shift();
+  redoStack = [];
+  updateUndoButtons();
+}
+
+function doUndo() {
+  if (undoStack.length === 0) return;
+  redoStack.push(JSON.parse(JSON.stringify(strokes)));
+  strokes = undoStack.pop();
+  selectedId = null;
+  selBBox = null;
+  updateSelInfo();
+  updateStrokeCount();
+  updateUndoButtons();
+  redraw();
+}
+
+function doRedo() {
+  if (redoStack.length === 0) return;
+  undoStack.push(JSON.parse(JSON.stringify(strokes)));
+  strokes = redoStack.pop();
+  selectedId = null;
+  selBBox = null;
+  updateSelInfo();
+  updateStrokeCount();
+  updateUndoButtons();
+  redraw();
+}
+
+function doClear() {
+  if (!confirm('Clear all strokes?')) return;
+  saveUndoState();
+  strokes = [];
+  selectedId = null;
+  selBBox = null;
+  currentStroke = null;
+  updateSelInfo();
+  updateStrokeCount();
+  redraw();
+}
+
+function updateUndoButtons() {
+  document.getElementById('btn-undo').disabled = undoStack.length === 0;
+  document.getElementById('btn-redo').disabled = redoStack.length === 0;
+}
+
+// ═══════════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════════
+
+function setTool(t) {
+  appState.tool = t;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('tool-' + t);
+  if (btn) btn.classList.add('active');
+  if (t !== 'select') {
+    selectedId = null;
+    selBBox = null;
+    updateSelInfo();
+    redraw();
+  }
+}
+
+function setBrush(b) {
+  appState.brush = b;
+  document.querySelectorAll('.brush-btn').forEach(btn => btn.classList.remove('active'));
+  const btn = document.getElementById('brush-' + b);
+  if (btn) btn.classList.add('active');
+}
+
+function triggerColorPicker() {
+  const inp = document.getElementById('color-input');
+  inp.style.position = 'fixed';
+  inp.style.opacity = '0';
+  inp.style.pointerEvents = 'auto';
+  inp.style.left = '40px';
+  inp.style.top = '200px';
+  inp.style.width = '1px';
+  inp.style.height = '1px';
+  inp.click();
+  setTimeout(() => { inp.style.pointerEvents = 'none'; }, 100);
+}
+
+function onColorChange(hex) {
+  appState.color = hex;
+  document.getElementById('color-preview').style.background = hex;
+  document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+}
+
+function onWeightChange(v) {
+  appState.weight = parseFloat(v);
+  document.getElementById('weight-val').textContent = parseFloat(v).toFixed(1);
+}
+
+function onOpacityChange(v) {
+  appState.opacity = parseInt(v);
+  document.getElementById('opacity-val').textContent = v;
+}
+
+function setLayer(l) {
+  appState.layer = l;
+  document.querySelectorAll('.layer-tab').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('layer-' + l);
+  if (btn) btn.classList.add('active');
+}
+
+function toggleLayer(e, l) {
+  e.stopPropagation();
+  layerVisible[l] = !layerVisible[l];
+  const eye = document.getElementById('eye-' + l);
+  if (eye) eye.classList.toggle('visible', layerVisible[l]);
+  redraw();
+}
+
+function updateStrokeCount() {
+  document.getElementById('stroke-count').textContent =
+    strokes.length + ' stroke' + (strokes.length !== 1 ? 's' : '');
+}
+
+function updateSelInfo(s) {
+  const el = document.getElementById('sel-info');
+  if (!s) {
+    el.classList.remove('visible');
+    return;
+  }
+  el.classList.add('visible');
+  document.getElementById('si-brush').textContent = s.brush;
+  document.getElementById('si-layer').textContent = s.layer;
+  document.getElementById('si-pts').textContent = s.points.length;
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXPORT / IMPORT
+// ═══════════════════════════════════════════════════════════
+
+function doExport() {
+  const data = { version: 1, canvas: { w: PAPER_W, h: PAPER_H }, strokes };
+  document.getElementById('export-text').value = JSON.stringify(data, null, 2);
+  document.getElementById('export-overlay').classList.add('open');
+}
+
+function copyExport() {
+  const t = document.getElementById('export-text');
+  t.select();
+  document.execCommand('copy');
+  const btn = event.target;
+  btn.textContent = '✓ Copied';
+  setTimeout(() => btn.textContent = 'Copy', 1500);
+}
+
+function downloadExport() {
+  const data = document.getElementById('export-text').value;
+  const blob = new Blob([data], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'fatiha-strokes-' + Date.now() + '.json';
+  a.click();
+}
+
+function closeExport() {
+  document.getElementById('export-overlay').classList.remove('open');
+}
+
+function openImport() {
+  document.getElementById('import-text').value = '';
+  document.getElementById('import-overlay').style.display = 'flex';
+}
+
+function closeImport() {
+  document.getElementById('import-overlay').style.display = 'none';
+}
+
+function doImport() {
+  try {
+    const raw = document.getElementById('import-text').value.trim();
+    const data = JSON.parse(raw);
+    const incoming = data.strokes || data;
+    if (!Array.isArray(incoming)) throw new Error('Expected strokes array');
+    saveUndoState();
+    for (const s of incoming) {
+      if (!s.id) s.id = makeId();
+      if (!s.transform) s.transform = { translate: [0,0], scale: [1,1], rotate: 0 };
+      if (!s.layer) s.layer = 'pencil';
+      strokes.push(s);
+    }
+    updateStrokeCount();
+    closeImport();
+    redraw();
+  } catch(e) {
+    alert('Import failed: ' + e.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT PALETTE UI
+// ═══════════════════════════════════════════════════════════
+
+function initPalette() {
+  const grid = document.getElementById('palette-grid');
+  for (const { name, hex } of ISLAMIC_PALETTE) {
+    const sw = document.createElement('div');
+    sw.className = 'swatch';
+    sw.style.background = hex;
+    sw.title = name;
+    sw.dataset.hex = hex;
+    sw.onclick = () => {
+      appState.color = hex;
+      document.getElementById('color-preview').style.background = hex;
+      document.getElementById('color-input').value = hex;
+      document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+      sw.classList.add('active');
+    };
+    grid.appendChild(sw);
+  }
+}
+
+// Init color preview
+document.getElementById('color-preview').style.background = appState.color;
+document.getElementById('color-input').value = appState.color;
+initPalette();
+updateUndoButtons();
+
+// Set lamp black swatch as active on load
+setTimeout(() => {
+  const first = document.querySelector('.swatch');
+  if (first) first.classList.add('active');
+}, 50);
+
+</script>
+</body>
+</html>
