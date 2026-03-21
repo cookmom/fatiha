@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html><head>
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.0-beta"></script>
+</head><body><script>
+function setup() {
+  createCanvas(400, 400, WEBGL);
+  brush.load();
+  translate(-width/2, -height/2);
+  background(240);
+  brush.set("charcoal", "#333", 1);
+  brush.line(50, 50, 350, 350);
+  console.log("DONE OK");
+}
+</script></body></html>

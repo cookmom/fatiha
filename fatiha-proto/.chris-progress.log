@@ -1,0 +1,63 @@
+M1: 2026-03-20 — Pencil sketch + bold watercolor washes, first pass
+  Watercolor bleeds gorgeous but pencil completely invisible under paint.
+  Paint opacity too high (100-120).
+
+M2: 2026-03-20 — Reduced paint opacity (65-75), added pencil redraw on top
+  Pencil lines ghosting through watercolor. Arch/sides/center visible.
+  But geometric detail lines (horizontals, diamond, X) still invisible.
+  Pencil still too faint overall.
+
+M3: 2026-03-20 — Stronger pencil redraw (#555 at 2.0), all geometric lines on top
+  LOOKS GOOD. Door structure reads clearly through paint.
+  Pointed arch, center divider, horizontal thirds, X-pattern, diamond all visible.
+  Paint bold and colorful — lapis blue top, vermillion right, gold center, terre verte bottom.
+  Watercolor bleeds are organic and beautiful.
+  Pencil is a whisper, paint is the main event. Concept working.
+
+QC:
+  [x] Cream paper
+  [x] All marks p5.brush
+  [x] Hand-drawn look
+  [x] Would show to Tawfeeq — yes, the simplicity is compelling
+
+M4: 2026-03-20 — Abstract gestural paint, first pass (too dense)
+  Replaced door-shaped watercolor rects with edge-to-edge diagonal sweeps,
+  horizontal drags, vertical drops. Energy is right but TOO MANY strokes —
+  pencil door completely buried. Gold 2B brush made weird dotty marks.
+  Washes too opaque. NEEDS FIX.
+
+M5: 2026-03-20 — Refined: fewer strokes, thinner, lower wash opacity, stronger pencil
+  LOOKS GOOD. Pencil door reads clearly through abstract paint.
+  6 gestural marker strokes (lapis diagonal, vermillion diagonal, gold horizontal,
+  terre verte horizontal, lapis vertical, gold vertical) — none follow door geometry.
+  3 soft washes (opacity 25-30) add depth without obscuring.
+  Pencil redraw at #333/3.0 weight punches through paint.
+  Abstract expressionism over architectural sketch — concept landing.
+
+QC:
+  [x] Cream paper
+  [x] All marks p5.brush
+  [x] Hand-drawn look
+  [x] Would show to Tawfeeq — yes, pencil whisper + paint shout
+
+M6: 2026-03-20 — M3 base + crayon scribbles + section fills + accent lines
+  Built on M3 approach (watercolor washes behind, pencil door on top).
+  Added 3 new layers:
+  1. CRAYON SCRIBBLES (2B brush, wiggle=12): loopy connected multi-segment
+     strokes in terre verte, raw sienna, ochre, dusty rose. 10+ scribble
+     clusters scattered across arch, panels, bottom. Organic, childlike energy.
+  2. WATERCOLOR FILLS in enclosed sections: lapis blue in left top panel,
+     vermillion in right mid panel, gold circle in tympanum, terre verte in
+     left bottom panel. fillBleed 0.7-0.85 so paint spills over pencil lines.
+  3. THIN ACCENT LINES (marker brush, weight 1.0-1.5): gold diagonal,
+     lapis diagonal crossing it, sienna horizontal. Delicate — 1/4 of M5 weight.
+  LOOKS GOOD. Pencil door reads clearly. Scribbles add spontaneous energy.
+  Section fills give focused color pops. Accent lines add subtle dynamism.
+  Iterated 3 times (m6a→m6b→m6c→m6): boosted scribble weight/connectivity,
+  tuned accent line weights, made scribble function draw connected multi-segment paths.
+
+QC:
+  [x] Cream paper
+  [x] All marks p5.brush
+  [x] Hand-drawn look — scribbles feel genuinely hand-drawn
+  [x] Would show to Tawfeeq — yes, layered complexity with spontaneous feel

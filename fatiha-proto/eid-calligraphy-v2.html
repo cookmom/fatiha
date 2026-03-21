@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<!-- بسم الله الرحمن الرحيم -->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>عيد مبارك — Thuluth Calligraphy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@700&family=Amiri:wght@700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/p5@2/lib/p5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.0-beta"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mixbox@2.0.0/mixbox.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #f5f0e8; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script>
+// ============================================================
+// TYLER HOBBS WATERCOLOR ENGINE
+// ============================================================
+let wcGfx;
+
+function gaussRand(mean, std) {
+  const u1 = Math.random(), u2 = Math.random();
+  return mean + std * Math.sqrt(-2 * Math.log(u1 || 0.001)) * Math.cos(2 * Math.PI * u2);
+}
+
+function deformOnce(poly, variances) {
+  const result = [], newVars = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], c = poly[(i + 1) % poly.length];
+    result.push([a[0], a[1]]);
+    const v = variances ? variances[i] : 0.15;
+    const bx = (a[0] + c[0]) / 2, by = (a[1] + c[1]) / 2;
+    const dx = c[0] - a[0], dy = c[1] - a[1];
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if (len < 0.5) { result.push([bx, by]); newVars.push(v, v); continue; }
+    const nx = -dy/len, ny = dx/len;
+    const offset = gaussRand(0, v * len);
+    result.push([bx + nx * offset, by + ny * offset]);
+    newVars.push(v * (0.6 + Math.random() * 0.6), v * (0.6 + Math.random() * 0.6));
+  }
+  return { poly: result, variances: newVars };
+}
+
+function deformN(poly, n, baseVariance) {
+  let p = poly.map(pt => [pt[0], pt[1]]);
+  let vars = poly.map(() => baseVariance);
+  for (let i = 0; i < n; i++) {
+    const res = deformOnce(p, vars);
+    p = res.poly; vars = res.variances;
+  }
+  return p;
+}
+
+function watercolorFill(polygon, r, g, b, layers, alpha, variance) {
+  const basePoly = deformN(polygon, 5, variance || 0.15);
+  const ctx = wcGfx.drawingContext;
+  for (let i = 0; i < layers; i++) {
+    const layerPoly = deformN(basePoly, 4, (variance || 0.15) * 0.75);
+    ctx.save();
+    ctx.globalAlpha = alpha / 255;
+    const jr = Math.max(0, Math.min(255, Math.round(r + gaussRand(0, 8))));
+    const jg = Math.max(0, Math.min(255, Math.round(g + gaussRand(0, 7))));
+    const jb = Math.max(0, Math.min(255, Math.round(b + gaussRand(0, 6))));
+    ctx.fillStyle = `rgb(${jr},${jg},${jb})`;
+    ctx.beginPath();
+    ctx.moveTo(layerPoly[0][0], layerPoly[0][1]);
+    for (let j = 1; j < layerPoly.length; j++) {
+      ctx.lineTo(layerPoly[j][0], layerPoly[j][1]);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ============================================================
+// OTTOMAN GARDEN SHAPES
+// ============================================================
+
+// Oval petal polygon — closed ellipse shape (from ottoman-skill-test rosePetal)
+function rosePetal(px, py, angle, len, w) {
+  const pts = [], steps = 24;
+  const ca = Math.cos(angle), sa = Math.sin(angle), nx = -sa, ny = ca;
+  for (let s = 0; s <= steps; s++) {
+    const t = s / steps;
+    const theta = t * Math.PI * 2;
+    const along = Math.cos(theta) * len * 0.5;
+    const across = Math.sin(theta) * w * 0.6;
+    pts.push([
+      px + ca * (along + len * 0.5) + nx * across,
+      py + sa * (along + len * 0.5) + ny * across
+    ]);
+  }
+  return pts;
+}
+
+function ottomanRose(cx, cy, size, palette) {
+  // Soft watercolor wash behind the rose — bleed onto paper
+  const washPoly = [];
+  for (let s = 0; s < 16; s++) {
+    const a = (s / 16) * TWO_PI;
+    washPoly.push([cx + Math.cos(a) * size * 0.7, cy + Math.sin(a) * size * 0.7]);
+  }
+  watercolorFill(washPoly, ...palette.outer, 20, 5, 0.25);
+
+  const rings = [
+    { n: 7, dist: size * 0.38, len: size * 0.78, w: size * 0.72, color: palette.outer, layers: 55, alpha: 11, variance: 0.22 },
+    { n: 8, dist: size * 0.20, len: size * 0.55, w: size * 0.55, color: palette.mid,   layers: 50, alpha: 12, variance: 0.19 },
+    { n: 6, dist: size * 0.09, len: size * 0.36, w: size * 0.38, color: palette.inner, layers: 42, alpha: 14, variance: 0.16 },
+    { n: 5, dist: size * 0.04, len: size * 0.20, w: size * 0.22, color: palette.center, layers: 32, alpha: 17, variance: 0.14 },
+  ];
+  for (const ring of rings) {
+    for (let i = 0; i < ring.n; i++) {
+      const a = (i / ring.n) * TWO_PI + gaussRand(0, 0.18);
+      const px = cx + Math.cos(a) * ring.dist;
+      const py = cy + Math.sin(a) * ring.dist;
+      const ta = a + gaussRand(0, 0.15);
+      const petal = rosePetal(px, py, ta, ring.len, ring.w);
+      watercolorFill(petal, ...ring.color, ring.layers, ring.alpha, ring.variance);
+    }
+  }
+  // Golden center dots
+  for (let i = 0; i < 25; i++) {
+    const ga = Math.random() * TWO_PI;
+    const gd = Math.random() * size * 0.14;
+    const gx = cx + Math.cos(ga) * gd;
+    const gy = cy + Math.sin(ga) * gd;
+    const dotSize = 2 + Math.random() * 5;
+    const dot = [];
+    for (let s = 0; s < 8; s++) {
+      const sa2 = (s / 8) * TWO_PI;
+      dot.push([gx + Math.cos(sa2) * dotSize, gy + Math.sin(sa2) * dotSize]);
+    }
+    watercolorFill(dot, 218, 185, 78, 12, 22, 0.10);
+  }
+}
+
+function sazLeaf(cx, cy, angle, length, maxWidth, r, g, b) {
+  const poly = [];
+  const steps = 20;
+  const ca = cos(angle), sa = sin(angle);
+  const nx = -sa, ny = ca;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const w = sin(t * PI) * maxWidth * (0.5 + 0.5 * sin(t * PI * 0.8));
+    const sCurve = sin(t * PI * 1.2) * maxWidth * 0.18;
+    poly.push([
+      cx + ca * t * length + nx * (w + sCurve),
+      cy + sa * t * length + ny * (w + sCurve)
+    ]);
+  }
+  for (let i = steps; i >= 0; i--) {
+    const t = i / steps;
+    const w = sin(t * PI) * maxWidth * 0.35;
+    const sCurve = sin(t * PI * 1.2) * maxWidth * 0.12;
+    poly.push([
+      cx + ca * t * length - nx * (w - sCurve),
+      cy + sa * t * length - ny * (w - sCurve)
+    ]);
+  }
+  // Soft bleed wash behind leaf
+  watercolorFill(poly, r, g, b, 15, 5, 0.25);
+  // Main leaf fill
+  watercolorFill(poly, r, g, b, 42, 11, 0.17);
+  // Dark central vein via narrow polygon
+  const vein = [];
+  for (let i = 0; i <= 10; i++) {
+    const t = i / 10;
+    vein.push([cx + ca * t * length * 0.92 + nx * 1.5, cy + sa * t * length * 0.92 + ny * 1.5]);
+  }
+  for (let i = 10; i >= 0; i--) {
+    const t = i / 10;
+    vein.push([cx + ca * t * length * 0.92 - nx * 1.5, cy + sa * t * length * 0.92 - ny * 1.5]);
+  }
+  watercolorFill(vein, Math.max(0, r - 20), Math.max(0, g - 30), Math.max(0, b - 20), 8, 18, 0.10);
+}
+
+function roseBud(cx, cy, angle, size, r, g, b) {
+  // Small 2-ring rose using oval petals
+  const rings = [
+    { n: 5, dist: size * 0.25, len: size * 0.6, w: size * 0.5 },
+    { n: 4, dist: size * 0.08, len: size * 0.35, w: size * 0.3 },
+  ];
+  // Soft wash
+  const wash = [];
+  for (let s = 0; s < 10; s++) {
+    const a = (s / 10) * TWO_PI;
+    wash.push([cx + Math.cos(a) * size * 0.5, cy + Math.sin(a) * size * 0.5]);
+  }
+  watercolorFill(wash, r, g, b, 12, 5, 0.22);
+  for (const ring of rings) {
+    for (let i = 0; i < ring.n; i++) {
+      const a = (i / ring.n) * TWO_PI + gaussRand(0, 0.2);
+      const px = cx + Math.cos(a) * ring.dist;
+      const py = cy + Math.sin(a) * ring.dist;
+      const petal = rosePetal(px, py, a + gaussRand(0, 0.15), ring.len, ring.w);
+      watercolorFill(petal, r, g, b, 30, 11, 0.18);
+    }
+  }
+  // Tiny gold center
+  for (let i = 0; i < 6; i++) {
+    const ga = Math.random() * TWO_PI;
+    const gd = Math.random() * size * 0.08;
+    const gx = cx + Math.cos(ga) * gd;
+    const gy = cy + Math.sin(ga) * gd;
+    const dot = [];
+    for (let s = 0; s < 6; s++) {
+      const sa2 = (s / 6) * TWO_PI;
+      dot.push([gx + Math.cos(sa2) * 2.5, gy + Math.sin(sa2) * 2.5]);
+    }
+    watercolorFill(dot, 218, 185, 78, 8, 20, 0.08);
+  }
+}
+
+// Ottoman Tulip — flame-shaped petals, no stem (wreath context)
+function ottomanTulip(cx, cy, size, baseAngle) {
+  baseAngle = baseAngle || -Math.PI / 2;
+  // Wash behind
+  const wash = [];
+  for (let s = 0; s < 12; s++) {
+    const a = (s / 12) * Math.PI * 2;
+    wash.push([cx + Math.cos(a) * size * 0.55, cy + Math.sin(a) * size * 0.55]);
+  }
+  watercolorFill(wash, 210, 65, 30, 15, 5, 0.22);
+
+  // Tulip flame petal polygon
+  function tulipPetal(bx, by, angle, len, w, curv) {
+    const pts = [], n = 28;
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      let ww;
+      if (t < 0.05) ww = t / 0.05 * 0.1;
+      else if (t < 0.25) ww = 0.1 + (t - 0.05) / 0.2 * 0.9;
+      else if (t < 0.55) ww = 1.0 - (t - 0.25) * 0.15;
+      else if (t < 0.85) ww = (1.0 - (t - 0.25) * 0.15) * (1 - (t - 0.55) / 0.3 * 0.3);
+      else ww = Math.max(0, Math.cos((t - 0.85) / 0.15 * Math.PI * 0.5) * 0.4);
+      const along = t * len;
+      const across = ww * w * 0.5;
+      const sCurve = Math.sin(t * Math.PI * 1.3) * curv * len * 0.06;
+      pts.push([
+        bx + along * Math.cos(angle) - (across + sCurve) * Math.sin(angle),
+        by + along * Math.sin(angle) + (across + sCurve) * Math.cos(angle)
+      ]);
+    }
+    for (let i = n; i >= 0; i--) {
+      const t = i / n;
+      let ww;
+      if (t < 0.05) ww = t / 0.05 * 0.1;
+      else if (t < 0.25) ww = 0.1 + (t - 0.05) / 0.2 * 0.9;
+      else if (t < 0.55) ww = 1.0 - (t - 0.25) * 0.15;
+      else if (t < 0.85) ww = (1.0 - (t - 0.25) * 0.15) * (1 - (t - 0.55) / 0.3 * 0.3);
+      else ww = Math.max(0, Math.cos((t - 0.85) / 0.15 * Math.PI * 0.5) * 0.4);
+      const along = t * len;
+      const across = -ww * w * 0.5;
+      const sCurve = Math.sin(t * Math.PI * 1.3) * curv * len * 0.06;
+      pts.push([
+        bx + along * Math.cos(angle) - (across + sCurve) * Math.sin(angle),
+        by + along * Math.sin(angle) + (across + sCurve) * Math.cos(angle)
+      ]);
+    }
+    return pts;
+  }
+
+  // 4 outer petals — red/orange flame
+  const petalAngles = [-0.35, -0.12, 0.12, 0.35];
+  for (let i = 0; i < 4; i++) {
+    const a = baseAngle + petalAngles[i] + gaussRand(0, 0.05);
+    const dist = 4 + Math.abs(petalAngles[i]) * 10;
+    const bx = cx + Math.cos(a + Math.PI / 2) * dist * 0.3;
+    const by = cy;
+    const isOuter = (i === 0 || i === 3);
+    const pLen = size * (isOuter ? 0.85 : 0.95);
+    const pWid = size * (isOuter ? 0.55 : 0.48);
+    const r = isOuter ? 210 : 230, g = isOuter ? 65 : 85, b = isOuter ? 20 : 25;
+    const petal = tulipPetal(bx, by, a, pLen, pWid, gaussRand(0.5, 0.3) * (i < 2 ? 1 : -1));
+    watercolorFill(petal, r, g, b, 45, 12, 0.16);
+  }
+  // 2 inner golden petals
+  for (let i = 0; i < 2; i++) {
+    const a = baseAngle + (i === 0 ? -0.06 : 0.06);
+    const petal = tulipPetal(cx + gaussRand(0, 1), cy, a, size * 0.6, size * 0.22, gaussRand(0.3, 0.2));
+    watercolorFill(petal, 240, 180, 40, 25, 10, 0.12);
+  }
+}
+
+// Blue Hyacinth — cluster of bell-shaped florets
+function blueHyacinth(cx, cy, size) {
+  // Wash
+  const wash = [];
+  for (let s = 0; s < 12; s++) {
+    const a = (s / 12) * Math.PI * 2;
+    wash.push([cx + Math.cos(a) * size * 0.6, cy + Math.sin(a) * size * 0.6]);
+  }
+  watercolorFill(wash, 40, 60, 160, 15, 5, 0.25);
+
+  // Bell floret shape
+  function hyacinthBell(bx, by, angle, len, w) {
+    const pts = [], n = 24;
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      let ww;
+      if (t < 0.15) ww = 0.3 + t / 0.15 * 0.15;
+      else if (t < 0.5) ww = 0.45 + (t - 0.15) / 0.35 * 0.1;
+      else if (t < 0.75) ww = 0.55 + (t - 0.5) / 0.25 * 0.45;
+      else ww = 1.0 - (t - 0.75) / 0.25 * 0.15;
+      const along = t * len;
+      const across = ww * w * 0.5;
+      pts.push([
+        bx + along * Math.cos(angle) - across * Math.sin(angle),
+        by + along * Math.sin(angle) + across * Math.cos(angle)
+      ]);
+    }
+    for (let i = n; i >= 0; i--) {
+      const t = i / n;
+      let ww;
+      if (t < 0.15) ww = 0.3 + t / 0.15 * 0.15;
+      else if (t < 0.5) ww = 0.45 + (t - 0.15) / 0.35 * 0.1;
+      else if (t < 0.75) ww = 0.55 + (t - 0.5) / 0.25 * 0.45;
+      else ww = 1.0 - (t - 0.75) / 0.25 * 0.15;
+      const along = t * len;
+      const across = -ww * w * 0.5;
+      pts.push([
+        bx + along * Math.cos(angle) - across * Math.sin(angle),
+        by + along * Math.sin(angle) + across * Math.cos(angle)
+      ]);
+    }
+    return pts;
+  }
+
+  // Dense cluster of bell florets in a conical spike
+  const numRows = 8;
+  for (let i = 0; i < numRows; i++) {
+    const t = i / (numRows - 1);
+    const fy = cy - t * size * 0.9;
+    const bellScale = 0.7 + 0.3 * (1 - t * 0.3);
+    const bellLen = size * 0.32 * bellScale;
+    const bellWid = size * 0.14 * bellScale;
+    const bellsInRow = (i < 1 || i > numRows - 2) ? 2 : 3;
+    for (let j = 0; j < bellsInRow; j++) {
+      const spread = (j - (bellsInRow - 1) / 2) * (0.5 + gaussRand(0, 0.08));
+      const bellAngle = Math.PI / 2 + spread;
+      const fx = cx + Math.cos(bellAngle) * 5 + gaussRand(0, 1.5);
+      const bell = hyacinthBell(fx, fy, bellAngle, bellLen, bellWid);
+      const bVar = Math.round(gaussRand(0, 10));
+      watercolorFill(bell, 40 + bVar, 60 + bVar, 150 + bVar, 40, 13, 0.10);
+    }
+  }
+}
+
+// White Jasmine — 5 star-shaped petals + yellow center
+function whiteJasmine(cx, cy, size) {
+  // Soft wash
+  const wash = [];
+  for (let s = 0; s < 10; s++) {
+    const a = (s / 10) * Math.PI * 2;
+    wash.push([cx + Math.cos(a) * size * 0.5, cy + Math.sin(a) * size * 0.5]);
+  }
+  watercolorFill(wash, 245, 240, 232, 12, 4, 0.20);
+
+  const numPetals = 5;
+  // Outer petals
+  for (let i = 0; i < numPetals; i++) {
+    const a = (i / numPetals) * Math.PI * 2 - Math.PI / 2 + gaussRand(0, 0.08);
+    const bx = cx + Math.cos(a) * size * 0.06;
+    const by = cy + Math.sin(a) * size * 0.06;
+    const petal = rosePetal(bx, by, a, size * 0.42, size * 0.22);
+    watercolorFill(petal, 245, 240, 235, 50, 11, 0.09);
+  }
+  // Inner petals (offset)
+  for (let i = 0; i < numPetals; i++) {
+    const a = (i / numPetals) * Math.PI * 2 - Math.PI / 2 + Math.PI / numPetals + gaussRand(0, 0.08);
+    const bx = cx + Math.cos(a) * size * 0.04;
+    const by = cy + Math.sin(a) * size * 0.04;
+    const petal = rosePetal(bx, by, a, size * 0.32, size * 0.18);
+    watercolorFill(petal, 240, 236, 228, 40, 12, 0.08);
+  }
+  // Yellow center
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2 + gaussRand(0, 0.5);
+    const petal = rosePetal(cx + gaussRand(0, 1), cy + gaussRand(0, 1), a, size * 0.12, size * 0.10);
+    watercolorFill(petal, 220, 190, 80, 20, 15, 0.06);
+  }
+}
+
+// Penç Filler — small 5-petal rosette
+function pencFiller(cx, cy, size) {
+  const wash = [];
+  for (let s = 0; s < 8; s++) {
+    const a = (s / 8) * Math.PI * 2;
+    wash.push([cx + Math.cos(a) * size * 0.4, cy + Math.sin(a) * size * 0.4]);
+  }
+  watercolorFill(wash, 200, 50, 75, 10, 4, 0.18);
+
+  const numPetals = 5;
+  for (let i = 0; i < numPetals; i++) {
+    const a = (i / numPetals) * Math.PI * 2 - Math.PI / 2 + gaussRand(0, 0.1);
+    const bx = cx + Math.cos(a) * 3;
+    const by = cy + Math.sin(a) * 3;
+    const petal = rosePetal(bx, by, a, size * 0.38, size * 0.28);
+    watercolorFill(petal, 200, 50, 75, 35, 12, 0.09);
+  }
+  // Dark center
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2 + gaussRand(0, 0.5);
+    const petal = rosePetal(cx + gaussRand(0, 1), cy + gaussRand(0, 1), a, size * 0.10, size * 0.08);
+    watercolorFill(petal, 140, 25, 45, 18, 14, 0.07);
+  }
+}
+
+function varyHex(hexStr, amount) {
+  let r = parseInt(hexStr.slice(1,3), 16);
+  let g = parseInt(hexStr.slice(3,5), 16);
+  let b = parseInt(hexStr.slice(5,7), 16);
+  let s = randomGaussian(0, amount || 8);
+  r = constrain(Math.round(r + s), 0, 255);
+  g = constrain(Math.round(g + s * 0.5), 0, 255);
+  b = constrain(Math.round(b + s * 0.7), 0, 255);
+  return '#' + [r,g,b].map(c => c.toString(16).padStart(2,'0')).join('');
+}
+
+// ============================================================
+
+function setup() {
+  createCanvas(1080, 1920, WEBGL);
+  brush.load();
+  translate(-width / 2, -height / 2);
+  randomSeed(271828);
+
+  const GREEN_DARK  = '#2d4a2d';
+  const GREEN_MID   = '#3d5a3a';
+  const GREEN_LIGHT = '#6a8a65';
+  const GOLD        = '#c4a94e';
+  const GOLD_PALE   = '#dcc06a';
+  const CREAM       = '#f5f0e8';
+  const CREAM_MID   = '#e8dfd0';
+  const CREAM_DK    = '#d4c9b5';
+
+  const cx = width / 2;
+
+  // ═══════════════════════════════════════════════════
+  //  PAPER BACKGROUND
+  // ═══════════════════════════════════════════════════
+  background(CREAM);
+
+  brush.noStroke();
+  brush.fill(CREAM_MID, 20);
+  brush.fillBleed(0.3, "out");
+  brush.fillTexture(0.3, 0.15);
+  brush.circle(cx, height * 0.44, 550);
+  brush.noFill();
+
+  // ═══════════════════════════════════════════════════
+  //  OTTOMAN GARDEN WREATH (watercolor on 2D buffer)
+  // ═══════════════════════════════════════════════════
+  wcGfx = createGraphics(width, height);
+  wcGfx.clear(); // transparent — watercolor paint floats on textured paper
+
+  // Crimson rose palette
+  const CRIMSON_PAL = {
+    outer: [196, 30, 58],
+    mid:   [215, 60, 90],
+    inner: [145, 26, 42],
+    center: [100, 18, 30]
+  };
+  // Pink bud palette
+  const PINK_PAL = { outer: [220, 140, 160], mid: [210, 120, 140], inner: [190, 90, 120], center: [170, 70, 100] };
+
+  // Wreath positions — oval frame around text
+  // Text occupies roughly cx ± 300, y: 0.28-0.60
+  const rosePositions = [
+    [cx - 300, height * 0.20, 90],   // top-left
+    [cx + 300, height * 0.20, 82],   // top-right
+    [cx,       height * 0.13, 95],   // top-center (hero)
+    [cx - 400, height * 0.35, 75],   // upper-left
+    [cx + 400, height * 0.35, 72],   // upper-right
+    [cx - 420, height * 0.50, 78],   // mid-left
+    [cx + 420, height * 0.50, 74],   // mid-right
+    [cx - 340, height * 0.64, 85],   // lower-left
+    [cx + 340, height * 0.64, 82],   // lower-right
+    [cx,       height * 0.72, 92],   // bottom-center (hero)
+    [cx - 160, height * 0.70, 68],   // bottom inner-left
+    [cx + 160, height * 0.70, 70],   // bottom inner-right
+  ];
+
+  for (const [rx, ry, sz] of rosePositions) {
+    ottomanRose(rx, ry, sz, CRIMSON_PAL);
+  }
+
+  // Saz leaves between roses, pointing along the wreath arc
+  const leafPositions = [
+    // Top arc
+    [cx - 160, height * 0.12, -0.6, 150, 38],
+    [cx + 160, height * 0.12,  0.6, 150, 38],
+    [cx - 380, height * 0.26, -1.1, 140, 35],
+    [cx + 380, height * 0.26,  1.1, 140, 35],
+    // Sides
+    [cx - 450, height * 0.42, -1.6, 130, 32],
+    [cx + 450, height * 0.42,  1.6, 130, 32],
+    [cx - 440, height * 0.58, -2.0, 125, 30],
+    [cx + 440, height * 0.58,  2.0, 125, 30],
+    // Bottom arc
+    [cx - 260, height * 0.68,  2.4, 140, 35],
+    [cx + 260, height * 0.68, -2.4, 140, 35],
+    [cx - 80,  height * 0.74,  2.8, 130, 32],
+    [cx + 80,  height * 0.74, -2.8, 130, 32],
+    // Near top roses
+    [cx - 350, height * 0.16, -0.2, 110, 28],
+    [cx + 350, height * 0.16,  0.2, 110, 28],
+  ];
+
+  for (let li = 0; li < leafPositions.length; li++) {
+    const [lx, ly, la, ll, lw] = leafPositions[li];
+    // Alternate between dark forest and sage green
+    if (li % 3 === 0) sazLeaf(lx, ly, la, ll, lw, 26, 74, 26);
+    else if (li % 3 === 1) sazLeaf(lx, ly, la, ll, lw, 42, 110, 48);
+    else sazLeaf(lx, ly, la, ll, lw, 56, 130, 62);
+  }
+
+  // Small pink buds scattered along wreath
+  const budPositions = [
+    [cx - 220, height * 0.16, -0.4, 38],
+    [cx + 220, height * 0.16,  0.4, 38],
+    [cx - 460, height * 0.38, -1.4, 32],
+    [cx + 460, height * 0.38,  1.4, 32],
+    [cx - 460, height * 0.48, -1.8, 30],
+    [cx + 460, height * 0.48,  1.8, 30],
+    [cx - 380, height * 0.60,  2.6, 34],
+    [cx + 380, height * 0.60, -2.6, 34],
+    [cx - 120, height * 0.73,  2.2, 30],
+    [cx + 120, height * 0.73, -2.2, 30],
+    [cx,       height * 0.11, -HALF_PI, 34],
+    [cx - 200, height * 0.71,  2.5, 28],
+    [cx + 200, height * 0.71, -2.5, 28],
+  ];
+
+  for (const [bx, by, ba, bs] of budPositions) {
+    roseBud(bx, by, ba, bs, 220, 140, 160);
+  }
+
+  // Add a few smaller accent roses for fullness
+  const smallRosePositions = [
+    [cx - 180, height * 0.25, 45],
+    [cx + 180, height * 0.25, 45],
+    [cx - 460, height * 0.44, 40],
+    [cx + 460, height * 0.44, 40],
+  ];
+  const PINK_ROSE_PAL = {
+    outer: [215, 130, 150],
+    mid:   [200, 110, 130],
+    inner: [180, 80, 110],
+    center: [160, 60, 90]
+  };
+  for (const [rx, ry, sz] of smallRosePositions) {
+    ottomanRose(rx, ry, sz, PINK_ROSE_PAL);
+  }
+
+  // Ottoman Tulips — pink/red flame shapes
+  const tulipPositions = [
+    [cx - 350, height * 0.28, 90, -PI/2 - 0.2],  // upper-left
+    [cx + 350, height * 0.28, 85, -PI/2 + 0.2],  // upper-right
+    [cx - 200, height * 0.68, 80, -PI/2 + 0.3],  // lower-left
+  ];
+  for (const [tx, ty, sz, ta] of tulipPositions) {
+    ottomanTulip(tx, ty, sz, ta);
+  }
+
+  // Blue Hyacinths — color contrast
+  const hyacinthPositions = [
+    [cx - 450, height * 0.44, 80],  // mid-left
+    [cx + 450, height * 0.56, 75],  // mid-right
+  ];
+  for (const [hx, hy, sz] of hyacinthPositions) {
+    blueHyacinth(hx, hy, sz);
+  }
+
+  // White Jasmine — delicate fillers
+  const jasminePositions = [
+    [cx - 250, height * 0.18, 42],
+    [cx + 250, height * 0.18, 40],
+    [cx - 150, height * 0.66, 38],
+    [cx + 150, height * 0.66, 38],
+    [cx,       height * 0.76, 40],
+  ];
+  for (const [jx, jy, sz] of jasminePositions) {
+    whiteJasmine(jx, jy, sz);
+  }
+
+  // Penç Fillers — tiny rosettes between large flowers
+  const pencPositions = [
+    [cx - 380, height * 0.30, 22],
+    [cx + 380, height * 0.30, 20],
+    [cx - 480, height * 0.46, 18],
+    [cx + 480, height * 0.46, 18],
+    [cx - 300, height * 0.62, 20],
+    [cx + 300, height * 0.62, 20],
+    [cx - 100, height * 0.72, 18],
+    [cx + 100, height * 0.72, 18],
+  ];
+  for (const [px, py, sz] of pencPositions) {
+    pencFiller(px, py, sz);
+  }
+
+  // Composite watercolor buffer onto WEBGL canvas
+  image(wcGfx, 0, 0);
+
+  // ═══════════════════════════════════════════════════
+  //  RENDER ARABIC TEXT — 2D offscreen canvas with font
+  // ═══════════════════════════════════════════════════
+
+  // Create a 2D buffer for text rendering
+  const textBuf = createGraphics(width, height);
+  textBuf.pixelDensity(1);
+  textBuf.clear();
+
+  // Render text — matching reference two-tone green
+  textBuf.textAlign(CENTER, CENTER);
+  textBuf.textFont('Aref Ruqaa');
+  textBuf.noStroke();
+
+  // عيد — large and dominant, dark green
+  textBuf.fill(GREEN_DARK);
+  textBuf.textSize(380);
+  textBuf.text('عيد', cx, height * 0.36);
+
+  // مبارك — same dark green as عيد
+  textBuf.fill(GREEN_DARK);
+  textBuf.textSize(260);
+  textBuf.text('مبارك', cx, height * 0.53);
+
+  // Draw the text buffer as an image on WEBGL canvas
+  image(textBuf, 0, 0);
+
+  // ═══════════════════════════════════════════════════
+  //  GOLD DECORATIVE ELEMENTS
+  // ═══════════════════════════════════════════════════
+
+  // ═══════════════════════════════════════════════════
+  //  GOLD POLLEN at rose centers + leaf veins
+  // ═══════════════════════════════════════════════════
+  brush.set("spray", GOLD, 0.6);
+  for (const [rx, ry] of rosePositions) {
+    for (let i = 0; i < 8; i++) {
+      const px = rx + random(-12, 12);
+      const py = ry + random(-12, 12);
+      brush.line(px, py, px + random(-3, 3), py + random(-3, 3));
+    }
+  }
+
+  // Leaf vein lines with brush
+  brush.noFill();
+  for (const [lx, ly, la, ll] of leafPositions) {
+    const ca2 = cos(la), sa2 = sin(la);
+    brush.set("rotring", '#1a4a1a', 0.3);
+    brush.line(lx, ly, lx + ca2 * ll * 0.9, ly + sa2 * ll * 0.9);
+  }
+
+  // ═══════════════════════════════════════════════════
+  //  BORDER
+  // ═══════════════════════════════════════════════════
+  const m = 50;
+  brush.set("rotring", GOLD, 0.7);
+  brush.spline([[m, m, 0.5], [width-m, m, 0.5]], 0.1);
+  brush.spline([[width-m, m, 0.5], [width-m, height-m, 0.5]], 0.1);
+  brush.spline([[width-m, height-m, 0.5], [m, height-m, 0.5]], 0.1);
+  brush.spline([[m, height-m, 0.5], [m, m, 0.5]], 0.1);
+
+  const m2 = m + 12;
+  brush.set("rotring", GOLD_PALE, 0.35);
+  brush.spline([[m2, m2, 0.3], [width-m2, m2, 0.3]], 0.1);
+  brush.spline([[width-m2, m2, 0.3], [width-m2, height-m2, 0.3]], 0.1);
+  brush.spline([[width-m2, height-m2, 0.3], [m2, height-m2, 0.3]], 0.1);
+  brush.spline([[m2, height-m2, 0.3], [m2, m2, 0.3]], 0.1);
+
+  // Ornamental divider between عيد and مبارك
+  const divY = height * 0.45;
+  brush.set("rotring", GOLD, 0.8);
+  brush.spline([
+    [cx - 140, divY, 0.4], [cx - 35, divY - 10, 0.7],
+    [cx, divY, 0.8], [cx + 35, divY + 10, 0.7],
+    [cx + 140, divY, 0.4]
+  ], 0.6);
+  brush.spline([
+    [cx - 140, divY, 0.4], [cx - 35, divY + 10, 0.7],
+    [cx, divY, 0.8], [cx + 35, divY - 10, 0.7],
+    [cx + 140, divY, 0.4]
+  ], 0.6);
+  // Center dot on divider
+  brush.set("marker", GOLD, 5);
+  brush.line(cx, divY, cx + 0.3, divY + 0.3);
+  brush.line(cx - 80, divY, cx - 79.7, divY + 0.3);
+  brush.line(cx + 80, divY, cx + 80.3, divY + 0.3);
+
+  // Gold dust
+  brush.set("spray", GOLD, 0.1);
+  for (let i = 0; i < 10; i++) {
+    const gx = random(m * 2, width - m * 2);
+    const gy = random(m * 2, height - m * 2);
+    brush.line(gx, gy, gx + random(3, 6), gy + random(-1.5, 1.5));
+  }
+}
+</script>
+</body>
+</html>

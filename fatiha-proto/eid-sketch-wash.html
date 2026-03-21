@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<!-- بسم الله الرحمن الرحيم -->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Geometric Sketch + Watercolor Wash</title>
+  <script src="p5.min.js"></script>
+  <script src="p5.brush.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script>
+const W = 1080, H = 1920;
+
+function setup() {
+  createCanvas(W, H, WEBGL);
+  brush.load();
+  translate(-W / 2, -H / 2);
+
+  randomSeed(7331);
+  noiseSeed(7331);
+
+  // Cream paper
+  background(242, 234, 218);
+
+  brush.scaleBrushes(1.8);
+
+  // Custom crayon brush
+  brush.add("crayon", {
+    type: "default",
+    weight: 3,
+    scatter: 1.8,
+    sharpness: 0.15,
+    grain: 25,
+    opacity: 100,
+    spacing: 0.25,
+    pressure: [0.7, 1.3, 0.5],
+    rotate: "natural",
+  });
+
+  // ============================================================
+  // LAYER 1: PENCIL + CRAYON GEOMETRIC UNDER-DRAWING
+  // ============================================================
+
+  // --- 12-fold rosette (upper center) ---
+  const cx1 = W * 0.48, cy1 = H * 0.28;
+  const R1 = 280;
+
+  brush.noFill();
+  brush.noHatch();
+
+  // 2H pencil: construction circles
+  brush.set("2H", "#9a9a9a", 0.2);
+  brush.circle(cx1, cy1, R1, true);
+  brush.circle(cx1, cy1, R1 * 0.618, true);
+
+  // 12 radial lines
+  brush.set("2H", "#a0a0a0", 0.15);
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * TWO_PI;
+    brush.line(
+      cx1 + R1 * 0.2 * cos(a), cy1 + R1 * 0.2 * sin(a),
+      cx1 + R1 * 1.08 * cos(a), cy1 + R1 * 1.08 * sin(a)
+    );
+  }
+
+  // HB: rosette petals
+  brush.set("HB", "#5a5a5a", 0.3);
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * TWO_PI;
+    const na = ((i + 1) / 12) * TWO_PI;
+    const mid = (a + na) / 2;
+    brush.spline([
+      [cx1 + R1 * 0.618 * cos(a), cy1 + R1 * 0.618 * sin(a)],
+      [cx1 + R1 * 0.95 * cos(mid), cy1 + R1 * 0.95 * sin(mid)],
+      [cx1 + R1 * 0.618 * cos(na), cy1 + R1 * 0.618 * sin(na)]
+    ], 0.65);
+  }
+
+  // HB: inner star
+  brush.set("2H", "#7a6a5a", 0.18);
+  for (let i = 0; i < 6; i++) {
+    const a1 = (i * 2 / 12) * TWO_PI;
+    const a2 = (((i * 2) + 5) % 12 / 12) * TWO_PI;
+    brush.line(
+      cx1 + R1 * 0.45 * cos(a1), cy1 + R1 * 0.45 * sin(a1),
+      cx1 + R1 * 0.45 * cos(a2), cy1 + R1 * 0.45 * sin(a2)
+    );
+  }
+
+  // Crayon: accent dots at outer spoke tips
+  brush.set("crayon", "#4a6a4a", 0.4);
+  for (let i = 0; i < 6; i++) {
+    const a = (i * 2 / 12) * TWO_PI;
+    const px = cx1 + R1 * cos(a), py = cy1 + R1 * sin(a);
+    brush.line(px - 6, py - 6, px + 6, py + 6);
+    brush.line(px + 6, py - 6, px - 6, py + 6);
+  }
+
+  // --- Pentagon + pentagram (left of center) ---
+  const cx2 = W * 0.3, cy2 = H * 0.55;
+  const R2 = 170;
+
+  brush.set("2H", "#9a9a9a", 0.2);
+  const pentPts = [];
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * TWO_PI - HALF_PI;
+    pentPts.push([cx2 + R2 * cos(a), cy2 + R2 * sin(a)]);
+  }
+  for (let i = 0; i < 5; i++) {
+    brush.line(pentPts[i][0], pentPts[i][1], pentPts[(i+1)%5][0], pentPts[(i+1)%5][1]);
+  }
+  // Pentagram diagonals
+  brush.set("HB", "#5a4030", 0.25);
+  for (let i = 0; i < 5; i++) {
+    brush.line(pentPts[i][0], pentPts[i][1], pentPts[(i+2)%5][0], pentPts[(i+2)%5][1]);
+  }
+  // Construction circle
+  brush.set("2H", "#a0a0a0", 0.15);
+  brush.circle(cx2, cy2, R2, true);
+
+  // Crayon accents at vertices
+  brush.set("crayon", "#6a4a2a", 0.4);
+  for (let i = 0; i < 5; i++) {
+    brush.circle(pentPts[i][0], pentPts[i][1], 5, true);
+  }
+
+  // --- Golden spiral (right of center, lower) ---
+  const cx3 = W * 0.72, cy3 = H * 0.58;
+  brush.set("HB", "#5a5a5a", 0.28);
+  const phi = (1 + Math.sqrt(5)) / 2;
+  let spiralPts = [];
+  for (let t = 0; t < 5.5 * Math.PI; t += 0.06) {
+    const r = 6 * Math.pow(phi, t / (2 * Math.PI));
+    if (r > 280) break;
+    spiralPts.push([cx3 + r * cos(t), cy3 + r * sin(t)]);
+  }
+  for (let i = 0; i < spiralPts.length - 1; i += 4) {
+    const seg = spiralPts.slice(i, Math.min(i + 5, spiralPts.length));
+    if (seg.length >= 2) brush.spline(seg, 0.5);
+  }
+
+  // Golden rectangles
+  brush.set("2H", "#a0a0a0", 0.16);
+  let gw = 240, gh = gw / phi;
+  let gx = cx3 - gw / 2, gy = cy3 - gh / 2;
+  for (let i = 0; i < 5; i++) {
+    brush.rect(gx, gy, gw, gh);
+    const ngw = gh, ngh = gw - gh;
+    switch (i % 4) {
+      case 0: gy += gh; break;
+      case 1: gx += ngw; break;
+      case 2: gy -= ngh; break;
+      case 3: gx -= ngw; break;
+    }
+    gw = ngw; gh = ngh;
+    if (gw < 12) break;
+  }
+
+  // --- Hexagonal tiling fragment (upper left) ---
+  const cx5 = W * 0.12, cy5 = H * 0.12;
+  brush.set("2H", "#a0a0a0", 0.16);
+  const hexR = 48;
+  for (let row = -2; row <= 2; row++) {
+    for (let col = -1; col <= 2; col++) {
+      const hx = cx5 + col * hexR * 1.732 + (row % 2 !== 0 ? hexR * 0.866 : 0);
+      const hy = cy5 + row * hexR * 1.5;
+      for (let i = 0; i < 6; i++) {
+        const a1 = (i / 6) * TWO_PI, a2 = ((i + 1) / 6) * TWO_PI;
+        brush.line(hx + hexR * cos(a1), hy + hexR * sin(a1),
+                   hx + hexR * cos(a2), hy + hexR * sin(a2));
+      }
+    }
+  }
+
+  // --- Scattered construction arcs (bottom) ---
+  const cx4 = W * 0.5, cy4 = H * 0.84;
+  brush.set("2H", "#9a9a9a", 0.18);
+  for (let i = 0; i < 6; i++) {
+    const ox = cx4 + random(-220, 220);
+    const oy = cy4 + random(-120, 120);
+    const r = random(50, 150);
+    const sa = random(0, TWO_PI);
+    brush.arc(ox, oy, r, sa, sa + random(PI * 0.4, PI * 1.2));
+  }
+
+  // Crayon triangular accents in lower zone
+  brush.set("crayon", "#4a6a4a", 0.35);
+  for (let i = 0; i < 3; i++) {
+    const tx = random(150, W - 150);
+    const ty = random(H * 0.75, H * 0.9);
+    const s = random(18, 30);
+    brush.line(tx, ty - s, tx - s * 0.866, ty + s * 0.5);
+    brush.line(tx - s * 0.866, ty + s * 0.5, tx + s * 0.866, ty + s * 0.5);
+    brush.line(tx + s * 0.866, ty + s * 0.5, tx, ty - s);
+  }
+
+  // --- Long diagonal construction lines (very faint) ---
+  brush.set("2H", "#b0b0b0", 0.12);
+  brush.line(0, H * 0.08, W, H * 0.52);
+  brush.line(W, H * 0.18, 0, H * 0.62);
+  brush.line(W * 0.5, 0, W * 0.35, H);
+  brush.line(W * 0.15, 0, W * 0.85, H);
+
+  // Crayon: raw umber accent line
+  brush.set("crayon", "#6a4a2a", 0.3);
+  brush.line(W * 0.1, H * 0.4, W * 0.5, H * 0.52);
+
+  // ============================================================
+  // LAYER 2: WATERCOLOR WASHES — pure p5.brush fills
+  // Bold, saturated, deep pigment. Fewer shapes, bigger impact.
+  // ============================================================
+  brush.noStroke();
+
+  // Graduated bleed: outer soft edge → mid transition → dense core
+
+  // WASH 1: DOMINANT — Lapis lazuli
+  brush.fill("#020838", 255);
+  brush.fillBleed(0.55, "out");
+  brush.fillTexture(0.55, 0.4);
+  brush.circle(W * 0.44, H * 0.26, 310, true);
+  brush.fill("#020a42", 255);
+  brush.fillBleed(0.3, "out");
+  brush.fillTexture(0.4, 0.25);
+  brush.circle(W * 0.43, H * 0.25, 250, true);
+  brush.fill("#030c50", 250);
+  brush.fillBleed(0.15);
+  brush.fillTexture(0.3, 0.2);
+  brush.circle(W * 0.43, H * 0.26, 190, true);
+
+  // WASH 2: Vermillion/cinnabar
+  brush.fill("#580400", 255);
+  brush.fillBleed(0.5, "out");
+  brush.fillTexture(0.5, 0.35);
+  brush.circle(W * 0.76, H * 0.48, 240, true);
+  brush.fill("#680600", 250);
+  brush.fillBleed(0.25);
+  brush.fillTexture(0.35, 0.2);
+  brush.circle(W * 0.75, H * 0.47, 180, true);
+
+  // WASH 3: Burnt gold ochre
+  brush.fill("#4a3200", 255);
+  brush.fillBleed(0.45, "out");
+  brush.fillTexture(0.45, 0.3);
+  brush.circle(W * 0.30, H * 0.55, 200, true);
+  brush.fill("#5a3e00", 240);
+  brush.fillBleed(0.2);
+  brush.fillTexture(0.3, 0.2);
+  brush.circle(W * 0.30, H * 0.55, 145, true);
+
+  // WASH 4: Viridian
+  brush.fill("#000e00", 255);
+  brush.fillBleed(0.5, "out");
+  brush.fillTexture(0.5, 0.35);
+  brush.circle(W * 0.18, H * 0.82, 210, true);
+  brush.fill("#001505", 250);
+  brush.fillBleed(0.2);
+  brush.fillTexture(0.3, 0.2);
+  brush.circle(W * 0.19, H * 0.81, 155, true);
+
+  // WASH 5: Crimson rose
+  brush.fill("#200208", 255);
+  brush.fillBleed(0.45, "out");
+  brush.fillTexture(0.45, 0.3);
+  brush.circle(W * 0.75, H * 0.85, 165, true);
+  brush.fill("#30040e", 240);
+  brush.fillBleed(0.18);
+  brush.fillTexture(0.3, 0.2);
+  brush.circle(W * 0.74, H * 0.84, 115, true);
+
+  brush.noFill();
+}
+</script>
+</body>
+</html>
