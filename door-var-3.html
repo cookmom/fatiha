@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Door Variation 3 — MINIMAL</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@2/lib/p5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.0-beta"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script>
+function setup() {
+  createCanvas(1080, 1920, WEBGL);
+  brush.load();
+  translate(-width / 2, -height / 2);
+  background(245, 238, 225);  // slightly warmer/lighter cream
+  randomSeed(303);
+  brush.scaleBrushes(2.5);
+  brush.wiggle(2);
+
+  function pencilWLight() { return random(0.2, 0.8); }
+
+  var W = 1080, H = 1920, cx = W / 2;
+  var doorW = 860, doorH = 1760;
+  var doorX = (W - doorW) / 2, doorY = (H - doorH) / 2;
+  var halfW = doorW / 2;
+
+  var archSpringY = doorY + 500;
+  var centerOffset = halfW * 0.6;
+  var leftArcCx = cx + centerOffset;
+  var rightArcCx = cx - centerOffset;
+  var arcR = halfW + centerOffset;
+  var archPeakY = archSpringY - sqrt(arcR * arcR - centerOffset * centerOffset);
+
+  // Very faint pencil — ghostly whisper
+  var PENCIL = "#c0b8a8";
+  var PENCIL2 = "#d0c8b8";
+
+  brush.noFill(); brush.noHatch();
+
+  // ===== PENCIL DOOR — extremely light, maximum paper showing =====
+
+  // Outer frame — very faint single line
+  drawFrameVaried(doorX, archSpringY, doorW, doorY + doorH - archSpringY, PENCIL, 0.3, 1.2);
+
+  // Pointed arch — main only, very light
+  drawPointedArch(cx, archSpringY, halfW, leftArcCx, rightArcCx, arcR, PENCIL, 0.6);
+
+  // Center divider — whisper
+  brush.set("2H", PENCIL2, pencilWLight());
+  var cdTop = archSpringY + 3, cdBot = doorY + doorH - 18;
+  brush.line(cx, cdTop, cx, cdBot);
+
+  // Panels — just outer rectangles, very faint
+  var pY = archSpringY + 18, pBot = doorY + doorH - 25, pH = pBot - pY;
+  var lX = doorX + 16, lW = cx - 14 - lX;
+  var rX = cx + 14, rW = doorX + doorW - 16 - rX;
+  drawFrameVaried(lX, pY, lW, pH, PENCIL2, 0.2, 0.8);
+  drawFrameVaried(rX, pY, rW, pH, PENCIL2, 0.2, 0.8);
+
+  // Dividers — minimal, just 2 lines
+  var mg = 26, iT = pY + mg, iH = pH - 2 * mg;
+  var topH = iH * 0.22, gH = iH * 0.03, midH = iH * 0.50;
+  var d1 = iT + topH, d2 = d1 + gH, d3 = d2 + midH;
+  [lX, rX].forEach(function(px, i) {
+    var pw = i === 0 ? lW : rW;
+    [d1, d3].forEach(function(dy) {
+      brush.set("2H", PENCIL2, pencilWLight());
+      brush.line(px + 10, dy, px + pw - 10, dy);
+    });
+  });
+
+  // Tympanum — single ghost circle
+  var tCY = archPeakY + (archSpringY - archPeakY) * 0.45;
+  var tR = (archSpringY - archPeakY) * 0.15;
+  brush.set("2H", PENCIL2, pencilWLight()); brush.circle(cx, tCY, tR * 2, true);
+
+  // Threshold
+  brush.set("2H", PENCIL, random(0.8, 1.5));
+  brush.line(doorX - 10, doorY + doorH - 6, doorX + doorW + 10, doorY + doorH - 6);
+
+  // ===== ONLY 2 SMALL WATERCOLOR TOUCHES =====
+  brush.noStroke();
+
+  // Touch 1: Small lapis spot in tympanum
+  brush.fill("#1040A0", 60);
+  brush.fillBleed(0.5);
+  brush.circle(cx, tCY, tR * 1.2);
+
+  // Touch 2: Small gold spot on left panel mid-area
+  var lCx = lX + lW / 2;
+  var midCY = d2 + midH / 2;
+  brush.fill("#C88800", 55);
+  brush.fillBleed(0.45);
+  brush.circle(lCx, midCY, 60);
+
+  brush.noFill();
+}
+
+function drawFrameVaried(x, y, w, h, col, wMin, wMax) {
+  brush.set("2H", col, random(wMin, wMax)); brush.line(x, y, x + w, y);
+  brush.set("2H", col, random(wMin, wMax)); brush.line(x + w, y, x + w, y + h);
+  brush.set("2H", col, random(wMin, wMax)); brush.line(x + w, y + h, x, y + h);
+  brush.set("2H", col, random(wMin, wMax)); brush.line(x, y + h, x, y);
+}
+function drawPointedArch(cx, springY, halfW, leftCx, rightCx, R, col, weight) {
+  var steps = 50;
+  for (var i = 0; i < steps; i++) {
+    var t1 = i / steps, t2 = (i + 1) / steps;
+    var pressureMod = 0.4 + 1.6 * sin(PI * t1);
+    brush.set("2H", col, constrain(weight * pressureMod * random(0.6, 1.4), 0.2, 1.5));
+    var x1 = (cx - halfW) + halfW * t1, x2 = (cx - halfW) + halfW * t2;
+    var dx1 = x1 - leftCx, dx2 = x2 - leftCx;
+    var y1 = springY - sqrt(max(0, R * R - dx1 * dx1));
+    var y2 = springY - sqrt(max(0, R * R - dx2 * dx2));
+    brush.line(x1, y1, x2, y2);
+  }
+  for (var i = 0; i < steps; i++) {
+    var t1 = i / steps, t2 = (i + 1) / steps;
+    var pressureMod = 0.4 + 1.6 * sin(PI * t1);
+    brush.set("2H", col, constrain(weight * pressureMod * random(0.6, 1.4), 0.2, 1.5));
+    var x1 = cx + halfW * t1, x2 = cx + halfW * t2;
+    var dx1 = x1 - rightCx, dx2 = x2 - rightCx;
+    var y1 = springY - sqrt(max(0, R * R - dx1 * dx1));
+    var y2 = springY - sqrt(max(0, R * R - dx2 * dx2));
+    brush.line(x1, y1, x2, y2);
+  }
+}
+</script>
+</body>
+</html>
