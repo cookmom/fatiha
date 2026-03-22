@@ -476,7 +476,7 @@ const PAPER_H = 1920;
 let vScale = 1, vOffX = 0, vOffY = 0;
 
 // ── App state ──
-const state = {
+window.state = {
   tool: 'draw',
   brush: 'HB',
   color: '#1a1a1a',
@@ -495,6 +495,7 @@ let currentStrokeId = 0;
 let brushLineCount = 0;
 const BUFFER_LIMIT = 20000;
 let flattenedBg = null; // saved canvas snapshot for buffer recycling
+let wcPreviewPoints = []; // watercolor preview stroke points
 
 // ── Layers ──
 const layers = [
@@ -550,26 +551,14 @@ function setup() {
   background(242, 234, 218);
   brush.load();
 
-  // Watercolor brushes at different opacity levels (slider selects between them)
-  const wcOpacities = [10, 20, 40, 60, 80, 120, 160, 200, 240];
-  for (const op of wcOpacities) {
-    brush.add('wc_' + op, {
-      type: 'marker',
-      weight: 1,
-      opacity: op,
-      spacing: 2,
-      scatter: 1.5,
-      pressure: [0.2, 0.7, 0.2],
-    });
-  }
-  // Also keep a single 'watercolor' alias at medium opacity
-  brush.add('watercolor', {
+  // Watercolor preview brush — lightweight marker for live preview
+  brush.add('wc_preview', {
     type: 'marker',
-    weight: 1,
-    opacity: 60,
-    spacing: 2,
-    scatter: 1.5,
-    pressure: [0.2, 0.7, 0.2],
+    weight: 4,
+    vibration: 0.05,
+    opacity: 15,
+    spacing: 0.5,
+    pressure: [0.3, 0.7, 0.3],
   });
 
   pixelDensity(1);
@@ -646,25 +635,10 @@ function drawBrushSegment(a, b) {
   const ey = vOffY + b.y * vScale;
 
   if (a.brush === 'watercolor') {
-    // Watercolor: multiple overlapping soft spray passes
-    // Size slider = spread width, Opacity slider = color density
+    // Watercolor preview: lightweight marker while drawing
     const userWeight = a.weight * vScale;
-    const userOp = (a.opacity || 128) / 255;
-    const spread = Math.max(userWeight * 3, 20);
-    
-    // Watercolor = layered markers at decreasing size + increasing transparency
-    // Outermost: wide, very transparent (the bleed edge)
-    brush.set('marker', a.color, spread * 1.0);
-    brush.line(sx, sy, ex, ey);
-    brushLineCount++;
-    
-    // Middle: medium width
-    brush.set('marker', a.color, spread * 0.65);
-    brush.line(sx, sy, ex, ey);
-    brushLineCount++;
-    
-    // Core: narrower, more opaque
-    brush.set('marker', a.color, spread * 0.35);
+    const wcWeight = Math.max(userWeight * 1.5, 8);
+    brush.set('wc_preview', a.color, wcWeight);
     brush.line(sx, sy, ex, ey);
     brushLineCount++;
   } else {
@@ -693,6 +667,13 @@ function flattenCanvas() {
 
 function replayStroke(s) {
   if (!s.points || s.points.length < 2) return;
+
+  // Watercolor strokes: replay as filled polygon
+  if (s.brush === 'watercolor') {
+    renderWatercolorPolygon(s.points, s.color, s.weight, s.opacity);
+    return;
+  }
+
   for (let i = 0; i < s.points.length - 1; i++) {
     const a = s.points[i];
     const b = s.points[i + 1];
@@ -701,19 +682,10 @@ function replayStroke(s) {
     const sy = vOffY + a[1] * vScale;
     const ex = vOffX + b[0] * vScale;
     const ey = vOffY + b[1] * vScale;
-
-    if (s.brush === 'watercolor') {
-      // Replay watercolor using same algorithm as live drawing
-      drawBrushSegment(
-        {x: a[0], y: a[1], brush: 'watercolor', color: s.color, weight: w},
-        {x: b[0], y: b[1]}
-      );
-    } else {
-      // Hex string color, weight as 3rd param
-      brush.set(s.brush, s.color, w * vScale);
-      brush.line(sx, sy, ex, ey);
-      brushLineCount++;
-    }
+    // Hex string color, weight as 3rd param
+    brush.set(s.brush, s.color, w * vScale);
+    brush.line(sx, sy, ex, ey);
+    brushLineCount++;
   }
 }
 
@@ -783,6 +755,162 @@ function onPointerUp(e) {
   if (!isDrawing) return;
   isDrawing = false;
   pendingPoints = [];
+
+  // Watercolor: convert stroke to filled polygon on release, then full redraw to clear preview
+  const current = strokes[strokes.length - 1];
+  if (current && current.brush === 'watercolor' && current.points.length >= 2) {
+    needsFullRedraw = true; // clear preview dots, replay as polygon fill
+  }
+}
+
+// Convert stroke points to a thick polygon and render with watercolor fill
+function renderWatercolorPolygon(points, color, weight, opacity) {
+  if (points.length < 2) return;
+
+  // Resample to evenly-spaced points, then smooth
+  const minSpacing = 8; // paper-space pixels between samples
+  const resampled = resamplePoints(points, minSpacing);
+  if (resampled.length < 2) return;
+  const smoothed = smoothPoints(smoothPoints(resampled, 3), 2);
+
+  // Build thick polygon from stroke path
+  const halfW = Math.max(weight * vScale * 2.5, 16);
+  const poly = strokeToPolygon(smoothed, halfW);
+  if (poly.length < 3) return;
+
+  // Map opacity (0-255) to bleed amount (more opacity = less bleed, more bleed = wetter wash)
+  const bleedAmount = 0.05 + (1 - opacity / 255) * 0.45;
+  const fillOpacity = Math.max(60, Math.min(opacity * 0.52, 125));
+
+  brush.noStroke();
+  brush.fill(color, fillOpacity);
+  brush.fillBleed(bleedAmount, "out");
+  brush.fillTexture(0.5, 0.4);
+  brush.polygon(poly);
+  brush.noFill();
+  brushLineCount += 20; // each fill is ~20 internal layers
+}
+
+// Resample points to evenly-spaced intervals
+function resamplePoints(points, spacing) {
+  if (points.length < 2) return points;
+  const result = [points[0]];
+  let accumulated = 0;
+
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i][0] - points[i-1][0];
+    const dy = points[i][1] - points[i-1][1];
+    const segLen = Math.sqrt(dx * dx + dy * dy);
+    accumulated += segLen;
+
+    if (accumulated >= spacing) {
+      result.push(points[i]);
+      accumulated = 0;
+    }
+  }
+
+  // Always include the last point
+  const last = points[points.length - 1];
+  const prev = result[result.length - 1];
+  if (last[0] !== prev[0] || last[1] !== prev[1]) {
+    result.push(last);
+  }
+  return result;
+}
+
+// Smooth points with moving average
+function smoothPoints(points, windowSize) {
+  if (points.length <= windowSize) return points;
+  const result = [];
+  for (let i = 0; i < points.length; i++) {
+    let sx = 0, sy = 0, sp = 0, count = 0;
+    for (let j = Math.max(0, i - windowSize); j <= Math.min(points.length - 1, i + windowSize); j++) {
+      sx += points[j][0];
+      sy += points[j][1];
+      sp += (points[j][2] || 0.5);
+      count++;
+    }
+    result.push([sx / count, sy / count, sp / count]);
+  }
+  return result;
+}
+
+// Convert a stroke path (array of [x,y,pressure]) to a thick closed polygon
+function strokeToPolygon(points, halfWidth) {
+  const left = [];
+  const right = [];
+
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    const pressure = p[2] || 0.5;
+    const hw = halfWidth * (0.4 + pressure * 0.6);
+
+    // Calculate tangent direction using neighbors
+    let dx, dy;
+    if (i === 0) {
+      dx = points[1][0] - points[0][0];
+      dy = points[1][1] - points[0][1];
+    } else if (i === points.length - 1) {
+      dx = points[i][0] - points[i - 1][0];
+      dy = points[i][1] - points[i - 1][1];
+    } else {
+      // Use wider neighborhood for smoother normals
+      const lookBack = Math.max(0, i - 2);
+      const lookAhead = Math.min(points.length - 1, i + 2);
+      dx = points[lookAhead][0] - points[lookBack][0];
+      dy = points[lookAhead][1] - points[lookBack][1];
+    }
+
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+
+    const sx = vOffX + p[0] * vScale;
+    const sy = vOffY + p[1] * vScale;
+
+    left.push([sx + nx * hw, sy + ny * hw]);
+    right.push([sx - nx * hw, sy - ny * hw]);
+  }
+
+  // Add rounded caps at start and end
+  const addCap = (center, nx, ny, hw, arr) => {
+    const steps = 5;
+    for (let s = 0; s <= steps; s++) {
+      const angle = Math.PI * s / steps;
+      const cx = center[0] + (nx * Math.cos(angle) - ny * Math.sin(angle)) * hw;
+      const cy = center[1] + (ny * Math.cos(angle) + nx * Math.sin(angle)) * hw;
+      arr.push([cx, cy]);
+    }
+  };
+
+  // Start cap (connects right-reversed end to left start)
+  const p0 = points[0];
+  const s0x = vOffX + p0[0] * vScale;
+  const s0y = vOffY + p0[1] * vScale;
+  let dx0 = points[1][0] - points[0][0];
+  let dy0 = points[1][1] - points[0][1];
+  let len0 = Math.sqrt(dx0 * dx0 + dy0 * dy0) || 1;
+  const nx0 = -dy0 / len0;
+  const ny0 = dx0 / len0;
+  const hw0 = halfWidth * (0.4 + (p0[2] || 0.5) * 0.6);
+  const startCap = [];
+  addCap([s0x, s0y], -nx0, -ny0, hw0, startCap);
+
+  // End cap
+  const pN = points[points.length - 1];
+  const sNx = vOffX + pN[0] * vScale;
+  const sNy = vOffY + pN[1] * vScale;
+  let dxN = points[points.length - 1][0] - points[Math.max(0, points.length - 2)][0];
+  let dyN = points[points.length - 1][1] - points[Math.max(0, points.length - 2)][1];
+  let lenN = Math.sqrt(dxN * dxN + dyN * dyN) || 1;
+  const nxN = -dyN / lenN;
+  const nyN = dxN / lenN;
+  const hwN = halfWidth * (0.4 + (pN[2] || 0.5) * 0.6);
+  const endCap = [];
+  addCap([sNx, sNy], nxN, nyN, hwN, endCap);
+
+  right.reverse();
+  return [...startCap, ...left, ...endCap, ...right];
 }
 
 // ══════════════════════════════════════════════════════════════
