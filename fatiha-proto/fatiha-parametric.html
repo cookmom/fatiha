@@ -1,573 +1,396 @@
+<!-- بسم الله الرحمن الرحيم -->
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>Fatiha — Parametric Audio-Reactive Door</title>
-  <script src="https://cdn.jsdelivr.net/npm/p5@2/lib/p5.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.0-beta"></script>
-  <style>
-    html, body { margin: 0; padding: 0; overflow: hidden; background: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; }
-    canvas { display: block; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fatiha — Parametric Door</title>
+<style>
+  * { margin: 0; padding: 0; }
+  body { background: #0a0a10; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh; }
+  canvas { display: block; max-width: 100vw; max-height: 100vh; }
+  #tap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 10; cursor: pointer; }
+  #tap span { color: rgba(255,255,255,0.4); font: 16px Georgia, serif; }
+</style>
 </head>
 <body>
+<div id="tap"><span>tap to begin</span></div>
+<canvas id="c"></canvas>
 <script>
-// ═══════════════════════════════════════════════════════════════
-// FATIHA PARAMETRIC — DOOR PAINTING + LIGHTING MODULATION
-// The painting is on the wall. The lighting changes. The painting doesn't.
-// ═══════════════════════════════════════════════════════════════
+const W = 1080, H = 1920;
+const canvas = document.getElementById('c');
+canvas.width = W; canvas.height = H;
+const ctx = canvas.getContext('2d');
 
-// ===== TAJWEED EVENTS =====
-var TAJWEED_EVENTS = [
-  {t:0.35, rule:'madd'}, {t:0.55, rule:'madd'}, {t:1.05, rule:'madd'},
-  {t:1.35, rule:'madd'}, {t:2.15, rule:'madd'}, {t:2.65, rule:'madd'},
-  {t:3.15, rule:'madd'}, {t:3.95, rule:'madd'}, {t:4.35, rule:'madd'},
-  {t:4.75, rule:'madd'}, {t:5.15, rule:'madd'},
-  {t:0.45, rule:'ghunna'}, {t:1.15, rule:'ghunna'}, {t:2.25, rule:'ghunna'},
-  {t:3.25, rule:'ghunna'}, {t:4.05, rule:'ghunna'}, {t:4.85, rule:'ghunna'},
-  {t:1.25, rule:'idgham'}, {t:2.35, rule:'idgham'}, {t:3.35, rule:'idgham'},
-  {t:0.95, rule:'ikhfa'}, {t:2.85, rule:'ikhfa'}, {t:4.55, rule:'ikhfa'},
-  {t:0.08, rule:'qalqalah'}, {t:1.55, rule:'qalqalah'}, {t:3.08, rule:'qalqalah'}
-].sort(function(a,b){ return a.t - b.t; });
-
-var WORDS = [
-  {start:0.00, end:0.75, label:'bismi'},
-  {start:0.75, end:1.50, label:'allah'},
-  {start:1.50, end:3.00, label:'ar-rahman'},
-  {start:3.00, end:5.50, label:'ar-raheem'}
+// Tajweed events (Bismillah timing)
+const TAJWEED = [
+  {t:0.05, rule:'start'},
+  {t:0.35, rule:'madd'}, {t:0.45, rule:'ghunna'},
+  {t:0.55, rule:'madd'}, {t:0.95, rule:'ikhfa'},
+  {t:1.05, rule:'madd'}, {t:1.15, rule:'ghunna'}, {t:1.25, rule:'idgham'},
+  {t:1.35, rule:'madd'},
+  {t:2.15, rule:'madd'}, {t:2.25, rule:'ghunna'}, {t:2.35, rule:'idgham'},
+  {t:2.65, rule:'madd'}, {t:2.85, rule:'ikhfa'},
+  {t:3.15, rule:'madd'}, {t:3.25, rule:'ghunna'}, {t:3.35, rule:'idgham'},
+  {t:3.95, rule:'madd'}, {t:4.05, rule:'ghunna'},
+  {t:4.35, rule:'madd'}, {t:4.55, rule:'ikhfa'},
+  {t:4.75, rule:'madd'}, {t:4.85, rule:'ghunna'},
+  {t:5.15, rule:'madd'}, {t:5.50, rule:'end'}
 ];
 
-// ===== GLOBALS =====
-var doorImg = null;
-var doorCaptured = false;
-var audioCtx, analyser, audioSource, audioStartTime = 0;
-var timeData, freqData;
-var audioReady = false, audioEnded = false;
-var animStart = 0;
+// Audio
+let audioCtx, analyser, audioBuffer, audioSource, audioStartTime = 0;
+let isPlaying = false;
+let freqData, timeData;
 
-var sAmp = 0, sBass = 0, sTreble = 0, sPitch = 0.5;
-var tajweedState = { madd: 0, ghunna: 0, idgham: 0, ikhfa: 0, qalqalah: 0 };
-var wordsRevealed = 0;
-
-var DX = 110, DW = 860, DY = 80, DH = 1760;
-var CX = 540, SPRING_Y = 580;
-
-var WASH_ZONES = [
-  {x: 150, y: 140, w: 473, h: 550, color: [16, 64, 160]},
-  {x: 190, y: 530, w: 430, h: 400, color: [200, 136, 0]},
-  {x: 170, y: 1030, w: 473, h: 550, color: [16, 88, 48]}
-];
-
-var particles = [];
-
-function setup() {
-  createCanvas(1080, 1920, WEBGL);
-  setAttributes('preserveDrawingBuffer', true);
-  brush.load();
-  pixelDensity(1);
-  frameRate(30);
-  randomSeed(42);
-
-  // Render the M10 door painting
-  renderDoor();
-
-  // Init gold dust particles
-  for (var i = 0; i < 50; i++) {
-    particles.push({
-      x: random(-440, 440), y: random(-960, 960),
-      sz: random(1.5, 4), spd: random(0.2, 0.8),
-      alpha: random(15, 40), drift: random(-0.15, 0.15),
-      phase: random(TWO_PI)
-    });
-  }
-
-  animStart = millis();
-  window._setupDone = true;
-  console.log('Setup complete — door rendered');
-  initAudio();
+// Load bismillah.mp3
+async function loadAudio() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 256;
+  analyser.smoothingTimeConstant = 0.8;
+  freqData = new Uint8Array(analyser.frequencyBinCount);
+  timeData = new Uint8Array(analyser.fftSize);
+  
+  const resp = await fetch('bismillah.mp3');
+  const buf = await resp.arrayBuffer();
+  audioBuffer = await audioCtx.decodeAudioData(buf);
 }
 
-// ===== M10 DOOR PAINTING (rendered once in setup) =====
-function renderDoor() {
-  push();
-  translate(-width / 2, -height / 2);
-  background(242, 234, 218);
-  brush.scaleBrushes(2.5);
-  brush.wiggle(2);
-
-  function pencilW() { return random(0.3, 2.5); }
-  function pencilWLight() { return random(0.3, 1.2); }
-  function crayonW() { return random(1.0, 4.0); }
-
-  var W = 1080, H = 1920, cx = W / 2;
-  var doorW = 860, doorH = 1760;
-  var doorX = (W - doorW) / 2, doorY = (H - doorH) / 2;
-  var halfW = doorW / 2;
-
-  var archSpringY = doorY + 500;
-  var centerOffset = halfW * 0.6;
-  var leftArcCx = cx + centerOffset;
-  var rightArcCx = cx - centerOffset;
-  var arcR = halfW + centerOffset;
-  var archPeakY = archSpringY - sqrt(arcR * arcR - centerOffset * centerOffset);
-
-  var PENCIL = "#9a9080", PENCIL2 = "#b0a898";
-  brush.noFill(); brush.noHatch();
-
-  // LAYER 1: WATERCOLOR WASHES
-  brush.noStroke();
-  brush.fill("#1040A0", 75); brush.fillBleed(0.6);
-  brush.rect(doorX + 40, doorY + 60, doorW * 0.55, 550);
-  brush.fill("#C88800", 70); brush.fillBleed(0.55);
-  brush.rect(doorX + 80, archSpringY - 50, doorW * 0.5, 400);
-  brush.fill("#105830", 80); brush.fillBleed(0.55);
-  brush.rect(doorX + 60, archSpringY + 450, doorW * 0.55, 550);
-  brush.noFill();
-
-  // LAYER 2: PENCIL DOOR
-  drawFrameVaried(doorX, archSpringY, doorW, doorY + doorH - archSpringY, PENCIL, 0.8, 2.5);
-  drawFrameVaried(doorX - 10, archSpringY - 6, doorW + 20, doorY + doorH - archSpringY + 10, PENCIL2, 0.3, 1.5);
-  drawPointedArch(cx, archSpringY, halfW, leftArcCx, rightArcCx, arcR, PENCIL, 1.2);
-  var ihw = halfW - 30, ico = ihw * 0.6;
-  drawPointedArch(cx, archSpringY, ihw, cx + ico, cx - ico, ihw + ico, PENCIL2, 0.7);
-
-  brush.set("2H", PENCIL, pencilW());
-  var cdTop = archSpringY + 3, cdBot = doorY + doorH - 18;
-  brush.spline([[cx, cdTop, 0.4], [cx, cdTop + (cdBot - cdTop) * 0.3, 1.0], [cx, cdTop + (cdBot - cdTop) * 0.6, 0.5], [cx, cdBot, 0.8]]);
-
-  var pY = archSpringY + 18, pBot = doorY + doorH - 25, pH = pBot - pY;
-  var lX = doorX + 16, lW = cx - 14 - lX;
-  var rX = cx + 14, rW = doorX + doorW - 16 - rX;
-  drawFrameVaried(lX, pY, lW, pH, PENCIL, 0.6, 2.2);
-  drawFrameVaried(rX, pY, rW, pH, PENCIL, 0.6, 2.2);
-  drawFrameVaried(lX + 14, pY + 14, lW - 28, pH - 28, PENCIL2, 0.3, 1.2);
-  drawFrameVaried(rX + 14, pY + 14, rW - 28, pH - 28, PENCIL2, 0.3, 1.2);
-
-  var mg = 26, iT = pY + mg, iH = pH - 2 * mg;
-  var topH = iH * 0.22, gH = iH * 0.03, midH = iH * 0.50;
-  var d1 = iT + topH, d2 = d1 + gH, d3 = d2 + midH, d4 = d3 + gH;
-  [lX, rX].forEach(function(px, i) {
-    var pw = i === 0 ? lW : rW;
-    [d1, d2, d3, d4].forEach(function(dy) {
-      brush.set("2H", PENCIL2, pencilWLight());
-      brush.line(px + 10, dy, px + pw - 10, dy);
-    });
-  });
-
-  var lCx = lX + lW / 2, rCx = rX + rW / 2, piW = lW - 2 * mg;
-  var topCY = iT + topH / 2, topR = min(piW / 2, topH / 2) * 0.85;
-  var midCY = d2 + midH / 2, midR = min(piW / 2, midH / 2) * 0.85;
-  var botCY = d4 + topH / 2;
-
-  brush.noFill();
-  brush.set("2H", PENCIL2, pencilWLight()); brush.circle(lCx, topCY, topR * 2, true);
-  brush.set("2H", PENCIL2, pencilWLight()); brush.circle(rCx, topCY, topR * 2, true);
-  brush.set("2H", PENCIL2, pencilWLight()); brush.circle(lCx, midCY, midR * 2, true);
-  brush.set("2H", PENCIL2, pencilWLight()); brush.circle(rCx, midCY, midR * 2, true);
-  brush.set("2H", PENCIL2, pencilWLight()); brush.circle(lCx, botCY, topR * 2, true);
-  brush.set("2H", PENCIL2, pencilWLight()); brush.circle(rCx, botCY, topR * 2, true);
-
-  var tCY = archPeakY + (archSpringY - archPeakY) * 0.45;
-  var tR = (archSpringY - archPeakY) * 0.15;
-  brush.set("2H", PENCIL2, pencilWLight()); brush.circle(cx, tCY, tR * 2, true);
-
-  brush.set("2H", PENCIL2, pencilWLight()); brush.line(lX + mg, iT, lX + lW - mg, iT + topH);
-  brush.set("2H", PENCIL2, pencilWLight()); brush.line(lX + lW - mg, iT, lX + mg, iT + topH);
-  brush.set("2H", PENCIL2, pencilWLight()); brush.line(rX + mg, iT, rX + rW - mg, iT + topH);
-  brush.set("2H", PENCIL2, pencilWLight()); brush.line(rX + rW - mg, iT, rX + mg, iT + topH);
-  brush.set("2H", PENCIL2, pencilWLight()); brush.line(lX + mg, d2, lX + lW - mg, d2 + midH);
-  brush.set("2H", PENCIL2, pencilWLight()); brush.line(lX + lW - mg, d2, lX + mg, d2 + midH);
-  brush.set("2H", PENCIL2, pencilWLight()); brush.line(rX + mg, d2, rX + rW - mg, d2 + midH);
-  brush.set("2H", PENCIL2, pencilWLight()); brush.line(rX + rW - mg, d2, rX + mg, d2 + midH);
-
-  brush.set("2H", PENCIL, random(1.5, 2.5));
-  brush.line(doorX - 10, doorY + doorH - 6, doorX + doorW + 10, doorY + doorH - 6);
-
-  // LAYER 3: CRAYON SCRIBBLES
-  brush.noFill(); brush.noHatch(); brush.wiggle(8);
-  brush.set("2B", "#4A7A5A", crayonW()); brush.line(cx - 80, archSpringY - 20, cx - 30, archSpringY + 15);
-  brush.set("2B", "#4A7A5A", crayonW()); brush.line(cx + 20, archSpringY - 10, cx + 70, archSpringY + 20);
-  brush.set("2B", "#4A7A5A", crayonW()); brush.line(doorX + 30, archSpringY + 60, doorX + 90, archSpringY + 40);
-  brush.set("2B", "#4A7EC2", crayonW()); brush.line(lCx - 60, d1 - 5, lCx - 10, d1 + 10);
-  brush.set("2B", "#4A7EC2", crayonW()); brush.line(rCx + 10, d3 - 8, rCx + 60, d3 + 5);
-  brush.set("2B", "#C9A832", crayonW()); brush.line(lX + 20, pY + 10, lX + 70, pY - 5);
-  brush.set("2B", "#C9A832", crayonW()); brush.line(rX + rW - 70, pBot - 15, rX + rW - 20, pBot + 5);
-  brush.wiggle(2);
-
-  // LAYER 4: SECTION FILLS
-  brush.noStroke();
-  brush.fill("#4010A0", 120); brush.fillBleed(0.4);
-  brush.rect(lX + mg + 5, iT + 5, piW - 10, topH - 10);
-  brush.fill("#B01008", 110); brush.fillBleed(0.4);
-  brush.rect(rX + mg + 5, d2 + 5, piW - 10, midH * 0.3);
-  brush.fill("#085868", 130); brush.fillBleed(0.4);
-  brush.circle(cx, tCY, tR * 1.6);
-  brush.noFill();
-
-  // LAYER 5: THIN PAINT LINES
-  brush.set("marker", "#C9A832", 0.8);
-  brush.line(doorX + 120, archSpringY + 200, doorX + doorW - 200, doorY + doorH - 300);
-  brush.set("marker", "#4A7EC2", 0.7);
-  brush.line(doorX + doorW - 100, archSpringY + 160, doorX + 220, doorY + doorH - 250);
-
-  pop();
-}
-
-// ===== AUDIO =====
-async function initAudio() {
-  try {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 512;
-    analyser.smoothingTimeConstant = 0.7;
-    var response = await fetch('bismillah.mp3');
-    var buf = await response.arrayBuffer();
-    var audioBuffer = await audioCtx.decodeAudioData(buf);
-    audioSource = audioCtx.createBufferSource();
-    audioSource.buffer = audioBuffer;
-    audioSource.connect(analyser);
-    analyser.connect(audioCtx.destination);
-    timeData = new Uint8Array(analyser.frequencyBinCount);
-    freqData = new Uint8Array(analyser.frequencyBinCount);
-    audioSource.onended = function() { audioEnded = true; };
-    audioSource.start(0);
-    audioStartTime = audioCtx.currentTime;
-    audioReady = true;
-    animStart = millis();
-    console.log('Audio started');
-  } catch (e) {
-    console.log('Audio fallback:', e.message);
-  }
+function startAudio() {
+  if (isPlaying) return;
+  audioSource = audioCtx.createBufferSource();
+  audioSource.buffer = audioBuffer;
+  audioSource.connect(analyser);
+  analyser.connect(audioCtx.destination);
+  audioSource.start(0);
+  audioStartTime = audioCtx.currentTime;
+  isPlaying = true;
+  audioSource.onended = () => { isPlaying = false; };
 }
 
 function getAudioTime() {
-  if (audioReady && audioCtx) return audioCtx.currentTime - audioStartTime;
-  return (millis() - animStart) / 1000;
+  if (!isPlaying) return -1;
+  return audioCtx.currentTime - audioStartTime;
 }
 
-function getAudioParams() {
-  if (audioReady && analyser && !audioEnded) {
-    analyser.getByteTimeDomainData(timeData);
-    analyser.getByteFrequencyData(freqData);
-    var ampSum = 0;
-    for (var i = 0; i < timeData.length; i++) ampSum += abs(timeData[i] - 128);
-    var amplitude = ampSum / (timeData.length * 128.0);
-    var bassSum = 0;
-    for (var i = 0; i < 8; i++) bassSum += freqData[i];
-    var bass = bassSum / (8 * 255.0);
-    var trebleSum = 0, tStart = floor(freqData.length * 0.75);
-    for (var i = tStart; i < freqData.length; i++) trebleSum += freqData[i];
-    var treble = trebleSum / ((freqData.length - tStart) * 255.0);
-    var wSum = 0, fSum = 0;
-    for (var i = 0; i < freqData.length; i++) { wSum += freqData[i] * i; fSum += freqData[i]; }
-    var centroid = fSum > 0 ? wSum / fSum / freqData.length : 0.5;
-    return { amplitude: amplitude, bass: bass, treble: treble, pitch: centroid };
-  }
-  // Simulated
-  var t = (millis() - animStart) / 1000;
-  if (!audioEnded) {
-    var a = 0.4 + 0.25 * abs(sin(t * 2.5)) + 0.15 * abs(sin(t * 6.3)) + 0.1 * abs(sin(t * 11.7));
-    a *= ss(0, 0.5, t);
-    if (t > 6) a *= ss(7, 6, t);
-    return {
-      amplitude: constrain(a, 0.2, 0.95),
-      bass: constrain(0.4 + 0.3 * abs(sin(t * 3.0)), 0, 1),
-      treble: constrain(0.25 + 0.2 * abs(sin(t * 5.0)), 0, 1),
-      pitch: constrain(0.3 + 0.4 * abs(sin(t * 3.8)), 0, 1)
-    };
-  }
-  return {
-    amplitude: 0.2 + 0.15 * abs(sin(t * 2.5)),
-    bass: 0.25 + 0.2 * abs(sin(t * 2.0)),
-    treble: 0.15 + 0.12 * abs(sin(t * 3.5)),
-    pitch: 0.4 + 0.25 * sin(t * 1.5)
-  };
+function getAmplitude() {
+  if (!analyser || !isPlaying) return 0;
+  analyser.getByteTimeDomainData(timeData);
+  let sum = 0;
+  for (let i = 0; i < timeData.length; i++) sum += Math.abs(timeData[i] - 128);
+  return sum / timeData.length / 128;
 }
 
-function ss(e0, e1, x) {
-  var t = constrain((x - e0) / (e1 - e0), 0, 1);
-  return t * t * (3 - 2 * t);
+function getBass() {
+  if (!analyser || !isPlaying) return 0;
+  analyser.getByteFrequencyData(freqData);
+  let sum = 0;
+  for (let i = 0; i < 8; i++) sum += freqData[i];
+  return sum / 8 / 255;
 }
 
-function updateTajweedState(audioTime) {
-  var DECAY = 0.88, DURATION = 0.5;
-  tajweedState.madd *= DECAY;
-  tajweedState.ghunna *= DECAY;
-  tajweedState.idgham *= DECAY;
-  tajweedState.ikhfa *= DECAY;
-  tajweedState.qalqalah *= DECAY * 0.8;
-  for (var i = 0; i < TAJWEED_EVENTS.length; i++) {
-    var ev = TAJWEED_EVENTS[i];
-    var dt = audioTime - ev.t;
-    if (dt >= 0 && dt < DURATION) {
-      var intensity = 1.0 - (dt / DURATION);
-      intensity = intensity * intensity;
-      tajweedState[ev.rule] = max(tajweedState[ev.rule], intensity);
+function getTreble() {
+  if (!analyser || !isPlaying) return 0;
+  analyser.getByteFrequencyData(freqData);
+  let sum = 0;
+  const n = freqData.length;
+  for (let i = n - 16; i < n; i++) sum += freqData[i];
+  return sum / 16 / 255;
+}
+
+function getActiveTajweed(t) {
+  // Return active tajweed rules within 0.4s window
+  const active = {};
+  for (const ev of TAJWEED) {
+    const dt = t - ev.t;
+    if (dt >= 0 && dt < 0.4) {
+      const intensity = 1 - dt / 0.4; // fade out
+      active[ev.rule] = Math.max(active[ev.rule] || 0, intensity);
     }
   }
-  wordsRevealed = 0;
-  for (var i = 0; i < WORDS.length; i++) {
-    if (audioTime >= WORDS[i].start) wordsRevealed = i + 1;
+  return active;
+}
+
+// ============================================================
+// BASE PAINTING — draw once, capture as image
+// ============================================================
+let baseImage = null;
+
+function drawBasePainting() {
+  // Cream paper
+  ctx.fillStyle = '#f2eada';
+  ctx.fillRect(0, 0, W, H);
+  
+  const cx = W/2, doorW = 860, doorH = 1760;
+  const doorX = (W - doorW)/2, doorY = (H - doorH)/2;
+  const archSpringY = doorY + 500;
+  
+  // Watercolor washes — simulated with radial gradients + noise
+  function wash(x, y, w, h, color, opacity) {
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    const grd = ctx.createRadialGradient(x+w/2, y+h/2, 0, x+w/2, y+h/2, Math.max(w,h)*0.6);
+    grd.addColorStop(0, color);
+    grd.addColorStop(0.7, color + '80');
+    grd.addColorStop(1, color + '00');
+    ctx.fillStyle = grd;
+    ctx.fillRect(x-20, y-20, w+40, h+40);
+    ctx.restore();
+  }
+  
+  wash(doorX+40, doorY+60, doorW*0.55, 550, '#1040A0', 0.35);
+  wash(doorX+80, archSpringY-50, doorW*0.5, 400, '#C88800', 0.3);
+  wash(doorX+60, archSpringY+450, doorW*0.55, 550, '#105830', 0.35);
+  wash(doorX+doorW*0.3, doorY+200, 300, 300, '#B01008', 0.2);
+  wash(doorX+100, archSpringY+200, 350, 350, '#085868', 0.25);
+  
+  // Pencil door geometry
+  ctx.strokeStyle = '#9a908080';
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  
+  // Outer frame
+  ctx.strokeRect(doorX, archSpringY, doorW, doorY+doorH-archSpringY);
+  
+  // Pointed arch
+  ctx.beginPath();
+  const halfW = doorW/2;
+  const centerOffset = halfW * 0.6;
+  const arcR = halfW + centerOffset;
+  for (let i = 0; i <= 50; i++) {
+    const t = i/50;
+    const x = (cx - halfW) + halfW * t;
+    const dx = x - (cx + centerOffset);
+    const y = archSpringY - Math.sqrt(Math.max(0, arcR*arcR - dx*dx));
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  for (let i = 0; i <= 50; i++) {
+    const t = i/50;
+    const x = cx + halfW * t;
+    const dx = x - (cx - centerOffset);
+    const y = archSpringY - Math.sqrt(Math.max(0, arcR*arcR - dx*dx));
+    ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  
+  // Center divider
+  ctx.beginPath();
+  ctx.moveTo(cx, archSpringY);
+  ctx.lineTo(cx, doorY + doorH);
+  ctx.stroke();
+  
+  // Panel rectangles
+  const panels = [
+    [doorX+16, archSpringY+18, cx-14-doorX-16, doorY+doorH-25-archSpringY-18],
+    [cx+14, archSpringY+18, doorX+doorW-16-cx-14, doorY+doorH-25-archSpringY-18]
+  ];
+  panels.forEach(([x,y,w,h]) => {
+    ctx.strokeRect(x, y, w, h);
+    ctx.strokeRect(x+14, y+14, w-28, h-28);
+  });
+  
+  // Cross lines in panels
+  ctx.strokeStyle = '#b0a89840';
+  ctx.lineWidth = 0.8;
+  panels.forEach(([x,y,w,h]) => {
+    ctx.beginPath(); ctx.moveTo(x+26,y+26); ctx.lineTo(x+w-26,y+h-26); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x+w-26,y+26); ctx.lineTo(x+26,y+h-26); ctx.stroke();
+  });
+  
+  // Rosette circles
+  ctx.strokeStyle = '#b0a89830';
+  panels.forEach(([x,y,w,h]) => {
+    const pcx = x+w/2, pcy = y+h*0.3;
+    ctx.beginPath(); ctx.arc(pcx, pcy, w*0.3, 0, Math.PI*2); ctx.stroke();
+    const pcy2 = y+h*0.7;
+    ctx.beginPath(); ctx.arc(pcx, pcy2, w*0.3, 0, Math.PI*2); ctx.stroke();
+  });
+  
+  // Section fills — jewel spots
+  wash(doorX+42, archSpringY+40, 200, 180, '#4010A0', 0.3);
+  wash(cx+40, archSpringY+400, 200, 200, '#B01008', 0.25);
+  
+  // Thin accent lines
+  ctx.strokeStyle = '#C9A83240';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(doorX+120, archSpringY+200); ctx.lineTo(doorX+doorW-200, doorY+doorH-300); ctx.stroke();
+  ctx.strokeStyle = '#4A7EC240';
+  ctx.beginPath(); ctx.moveTo(doorX+doorW-100, archSpringY+160); ctx.lineTo(doorX+220, doorY+doorH-250); ctx.stroke();
+  
+  // Capture as image
+  baseImage = ctx.getImageData(0, 0, W, H);
+}
+
+// ============================================================
+// ANIMATION LOOP
+// ============================================================
+let frame = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  frame++;
+  
+  const t = getAudioTime();
+  const amp = getAmplitude();
+  const bass = getBass();
+  const treble = getTreble();
+  const taj = getActiveTajweed(Math.max(0, t));
+  
+  // Ambient oscillation (always active)
+  const ambientBreath = 0.5 + 0.5 * Math.sin(frame * 0.03);
+  const ambientSlow = 0.5 + 0.5 * Math.sin(frame * 0.008);
+  
+  // Effective amplitude (audio + ambient)
+  const effectiveAmp = isPlaying ? amp + 0.1 : ambientBreath * 0.3 + 0.05;
+  
+  // Draw base painting
+  ctx.putImageData(baseImage, 0, 0);
+  
+  // === PARAMETRIC OVERLAYS ===
+  
+  // 1. BREATHING SCALE — pulse with amplitude (DRAMATIC)
+  const breathScale = 1.0 + effectiveAmp * 0.25 + Math.sin(frame * 0.04) * 0.03;
+  
+  // 2. COLOR TEMPERATURE — bass=warm, treble=cool (DRAMATIC)
+  const warmth = isPlaying ? bass * 0.8 + 0.1 : ambientSlow * 0.2;
+  const coolness = isPlaying ? treble * 0.6 : ambientBreath * 0.1;
+  
+  // 3. TAJWEED EFFECTS
+  const maddStretch = (taj.madd || 0);
+  const ghunnaBlur = (taj.ghunna || 0);
+  const idghamMerge = (taj.idgham || 0);
+  const ikhfaFade = (taj.ikhfa || 0);
+  
+  // Apply scale breathing via transform
+  ctx.save();
+  ctx.translate(W/2, H/2);
+  ctx.scale(breathScale, breathScale + maddStretch * 0.05);
+  ctx.translate(-W/2, -H/2);
+  ctx.drawImage(canvas, 0, 0); // redraw scaled version on top
+  ctx.restore();
+  
+  // Warm color overlay (bass-reactive)
+  if (warmth > 0.01) {
+    ctx.save();
+    ctx.globalAlpha = warmth * 0.15;
+    ctx.fillStyle = '#c4602020';
+    const grd = ctx.createRadialGradient(W/2, H*0.4, 100, W/2, H*0.4, H*0.5);
+    grd.addColorStop(0, `rgba(196, 96, 32, ${warmth * 0.3})`);
+    grd.addColorStop(1, 'rgba(196, 96, 32, 0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+  
+  // Cool color overlay (treble-reactive)
+  if (coolness > 0.01) {
+    ctx.save();
+    ctx.globalAlpha = coolness * 0.12;
+    const grd = ctx.createRadialGradient(W/2, H*0.5, 100, W/2, H*0.5, H*0.4);
+    grd.addColorStop(0, `rgba(30, 60, 180, ${coolness * 0.25})`);
+    grd.addColorStop(1, 'rgba(30, 60, 180, 0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+  
+  // GHUNNA — soft glow blur (simulated with large semi-transparent circle)
+  if (ghunnaBlur > 0.05) {
+    ctx.save();
+    ctx.globalAlpha = ghunnaBlur * 0.5;
+    const grd = ctx.createRadialGradient(W/2, H*0.4, 0, W/2, H*0.4, H*0.35);
+    grd.addColorStop(0, 'rgba(255, 240, 220, 0.3)');
+    grd.addColorStop(1, 'rgba(255, 240, 220, 0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+  
+  // IDGHAM — two color zones merge (overlay gradient)
+  if (idghamMerge > 0.05) {
+    ctx.save();
+    ctx.globalAlpha = idghamMerge * 0.4;
+    ctx.globalCompositeOperation = 'overlay';
+    const grd = ctx.createLinearGradient(0, 0, W, H);
+    grd.addColorStop(0, '#1a3a8a');
+    grd.addColorStop(1, '#c43020');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+  
+  // IKHFA — fade/translucency (lighten overlay)
+  if (ikhfaFade > 0.05) {
+    ctx.save();
+    ctx.globalAlpha = ikhfaFade * 0.45;
+    ctx.fillStyle = '#f2eada';
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+  
+  // MADD — radial expansion pulse
+  if (maddStretch > 0.05) {
+    ctx.save();
+    ctx.globalAlpha = maddStretch * 0.3;
+    ctx.strokeStyle = '#c4a040';
+    ctx.lineWidth = 2;
+    const r = 100 + maddStretch * 200;
+    ctx.beginPath();
+    ctx.arc(W/2, H*0.4, r, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.restore();
+  }
+  
+  // Breathing vignette — always active, modulated by amplitude
+  const vigAlpha = 0.15 + effectiveAmp * 0.3;
+  ctx.save();
+  const vig = ctx.createRadialGradient(W/2, H*0.45, H*0.25, W/2, H*0.45, H*0.6);
+  vig.addColorStop(0, 'rgba(0,0,0,0)');
+  vig.addColorStop(1, `rgba(10,10,16,${vigAlpha})`);
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+  
+  // Subtle geometric pulse — rotating triangle at tajweed events
+  const anyTajweed = Object.values(taj).some(v => v > 0.1);
+  if (anyTajweed) {
+    ctx.save();
+    ctx.translate(W/2, H*0.4);
+    ctx.rotate(frame * 0.02);
+    ctx.globalAlpha = 0.2;
+    ctx.strokeStyle = '#c4a040';
+    ctx.lineWidth = 1;
+    const r = 150 + effectiveAmp * 100;
+    ctx.beginPath();
+    for (let i = 0; i < 7; i++) {
+      const a = (i/7) * Math.PI * 2;
+      const x = Math.cos(a) * r, y = Math.sin(a) * r;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// DRAW — The painting is on the wall. The light changes.
-// ═══════════════════════════════════════════════════════════════
-function draw() {
-  // Frame 1: capture the door painting as an image
-  if (!doorCaptured) {
-    // Door was rendered in setup — capture it now
-    doorImg = get();
-    doorCaptured = true;
-    console.log('Door captured: ' + doorImg.width + 'x' + doorImg.height);
-    // If capture failed (0x0), we'll re-render next frame
-    if (doorImg.width === 0) {
-      doorCaptured = false;
-      renderDoor();
-    }
-    return;
-  }
-
-  // Safety: if image still empty, keep trying
-  if (!doorImg || doorImg.width === 0) {
-    renderDoor();
-    doorImg = get();
-    console.log('Re-capture: ' + doorImg.width + 'x' + doorImg.height);
-    return;
-  }
-
-  var t = (millis() - animStart) / 1000;
-  var audioTime = getAudioTime();
-  var p = getAudioParams();
-
-  // Smooth audio
-  sAmp = lerp(sAmp, p.amplitude, 0.22);
-  sBass = lerp(sBass, p.bass, 0.15);
-  sTreble = lerp(sTreble, p.treble, 0.18);
-  sPitch = lerp(sPitch, p.pitch, 0.12);
-  updateTajweedState(audioTime);
-
-  // ── CREAM BACKGROUND (the wall) ──
-  background(242, 234, 218);
-
-  // ── THE PAINTING with subtle lighting modulation ──
-  push();
-
-  // Amplitude → very subtle breathing scale
-  var breathScale = 1.0 + sAmp * 0.02;
-
-  // Qalqalah → tiny staccato scale snap
-  var qPulse = 1.0 + tajweedState.qalqalah * 0.04;
-
-  // Madd → slight horizontal elongation
-  var maddX = 1.0 + tajweedState.madd * 0.025;
-  var maddY = 1.0 - tajweedState.madd * 0.008;
-
-  // Gentle sway — like the viewer breathing
-  var sway = sin(t * 1.5) * 0.004 + sAmp * sin(t * 3) * 0.006;
-  rotate(sway);
-
-  // Combined scale
-  scale(breathScale * qPulse * maddX, breathScale * qPulse * maddY);
-
-  // COLOR TEMPERATURE — the "lighting" (warm golden vs cool blue)
-  var warmth = sPitch;
-  var tR = lerp(235, 255, warmth);   // cool: slightly blue-ish → warm: full white-warm
-  var tG = lerp(240, 252, warmth);
-  var tB = lerp(255, 230, warmth);   // cool: blue tint → warm: less blue
-
-  // Ikhfa → the painting becomes slightly translucent (veil of concealment)
-  var doorAlpha = 255 - tajweedState.ikhfa * 50;
-
-  tint(tR, tG, tB, doorAlpha);
-  imageMode(CORNER);
-  image(doorImg, -width / 2, -height / 2, width, height);
-  pop();
-  noTint();
-
-  // ═══════════════════════════════════════════════════════════
-  // SUBTLE OVERLAYS — like light playing on the wall
-  // Total overlay alpha should NEVER exceed ~40 combined
-  // ═══════════════════════════════════════════════════════════
-
-  // Ghunna: soft warm glow near the arch (nasalization = dreamy haze)
-  if (tajweedState.ghunna > 0.05) {
-    push();
-    noStroke();
-    var ga = tajweedState.ghunna * 20;
-    fill(255, 240, 215, ga);
-    ellipse(0, -350, 500 + sin(t * 1.3) * 30, 350 + sin(t * 0.9) * 20);
-    fill(255, 235, 200, ga * 0.5);
-    ellipse(0, 0, 400, 500);
-    pop();
-  }
-
-  // Idgham: wash zones blend — subtle gradient band between zones
-  if (tajweedState.idgham > 0.05) {
-    push();
-    translate(-width / 2, -height / 2);
-    noStroke();
-    var ia = tajweedState.idgham * 18;
-    // Blend band between lapis and gold
-    for (var i = 0; i < 5; i++) {
-      var frac = i / 5;
-      var r = lerp(16, 200, frac);
-      var g = lerp(64, 136, frac);
-      var b = lerp(160, 0, frac);
-      fill(r, g, b, ia * (1 - abs(frac - 0.5) * 2));
-      rect(DX + 60, 650 + i * 20, DW - 120, 20);
-    }
-    pop();
-  }
-
-  // Madd: horizontal stretch accents — thin golden lines extend
-  if (tajweedState.madd > 0.05) {
-    push();
-    translate(-width / 2, -height / 2);
-    stroke(200, 170, 80, tajweedState.madd * 30);
-    strokeWeight(1);
-    noFill();
-    for (var i = 0; i < 3; i++) {
-      var yy = SPRING_Y - 150 + i * 60;
-      var extW = 200 + tajweedState.madd * 250;
-      line(CX - extW / 2, yy, CX + extW / 2, yy);
-    }
-    pop();
-  }
-
-  // Ikhfa: translucent cream veil (concealment)
-  if (tajweedState.ikhfa > 0.05) {
-    push();
-    noStroke();
-    fill(242, 234, 218, tajweedState.ikhfa * 40);
-    rect(-width / 2, -height / 2, width, height);
-    pop();
-  }
-
-  // Qalqalah: expanding ring from door center (bouncing)
-  if (tajweedState.qalqalah > 0.05) {
-    push();
-    noFill();
-    var qa = tajweedState.qalqalah;
-    stroke(200, 180, 120, qa * 50);
-    strokeWeight(1.5 * qa);
-    var ringR = (1 - qa) * 300 + 50;
-    ellipse(0, -150, ringR * 2, ringR * 2.2);
-    // Second ring
-    stroke(200, 180, 120, qa * 25);
-    strokeWeight(1);
-    ellipse(0, -150, ringR * 2.8, ringR * 3.1);
-    pop();
-  }
-
-  // Progressive reveal: subtle glowing accents at word timestamps
-  if (wordsRevealed >= 1) {
-    push(); translate(-width / 2, -height / 2);
-    noStroke();
-    fill(16, 64, 160, 12 + sAmp * 8);
-    ellipse(CX, 280, 120 + sin(t * 1.8) * 15, 100 + sin(t * 1.8) * 10);
-    pop();
-  }
-  if (wordsRevealed >= 2) {
-    push(); translate(-width / 2, -height / 2);
-    noFill();
-    stroke(200, 160, 60, 15 + sAmp * 10);
-    strokeWeight(1.5);
-    beginShape();
-    for (var i = 0; i <= 40; i++) {
-      var frac = i / 40;
-      var angle = PI + frac * PI;
-      vertex(CX + cos(angle) * 350, SPRING_Y - 50 + sin(angle) * 250);
-    }
-    endShape();
-    pop();
-  }
-  if (wordsRevealed >= 3) {
-    push(); translate(-width / 2, -height / 2);
-    noStroke();
-    fill(64, 16, 120, 8 + sAmp * 6);
-    rect(DX + 50, SPRING_Y + 80, DW / 2 - 80, 500);
-    pop();
-  }
-  if (wordsRevealed >= 4) {
-    push(); translate(-width / 2, -height / 2);
-    noStroke();
-    fill(120, 16, 16, 8 + sAmp * 6);
-    rect(CX + 30, SPRING_Y + 80, DW / 2 - 80, 500);
-    // Threshold glow
-    fill(200, 160, 60, 12 + sAmp * 8);
-    rect(DX, DY + DH - 50, DW, 30);
-    pop();
-  }
-
-  // Gold dust particles — very subtle, floating upward
-  push();
-  noStroke();
-  for (var i = 0; i < particles.length; i++) {
-    var pt = particles[i];
-    pt.y -= pt.spd * (0.5 + sAmp * 1.0);
-    pt.x += pt.drift + sin(t * 0.5 + pt.phase) * 0.3;
-    if (pt.y < -height / 2 - 20) {
-      pt.y = height / 2 + random(10, 50);
-      pt.x = random(-440, 440);
-    }
-    var a = pt.alpha * (0.4 + 0.6 * sin(t * 3 + pt.phase * 5));
-    if (a > 1) {
-      fill(220, 195, 110, a);
-      ellipse(pt.x, pt.y, pt.sz, pt.sz);
-    }
-  }
-  pop();
-
-  // Subtle edge vignette — just darkened corners
-  push();
-  noStroke();
-  for (var i = 0; i < 4; i++) {
-    var frac = i / 4;
-    var a = 6 * (1 - frac);
-    if (a < 1) continue;
-    fill(30, 25, 15, a);
-    var inset = frac * 150;
-    rect(-width / 2, -height / 2, width, inset);                 // top
-    rect(-width / 2, height / 2 - inset, width, inset);          // bottom
-    rect(-width / 2, -height / 2 + inset, inset, height - 2 * inset); // left
-    rect(width / 2 - inset, -height / 2 + inset, inset, height - 2 * inset); // right
-  }
-  pop();
+// ============================================================
+// INIT
+// ============================================================
+async function init() {
+  await loadAudio();
+  drawBasePainting();
+  
+  document.getElementById('tap').addEventListener('click', () => {
+    document.getElementById('tap').style.display = 'none';
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    startAudio();
+  });
+  
+  animate();
 }
 
-// ===== INTERACTION =====
-function mousePressed() { if (!audioReady) initAudio(); }
-
-// ===== DOOR GEOMETRY HELPERS =====
-function drawFrameVaried(x, y, w, h, col, wMin, wMax) {
-  brush.set("2H", col, random(wMin, wMax)); brush.line(x, y, x + w, y);
-  brush.set("2H", col, random(wMin, wMax)); brush.line(x + w, y, x + w, y + h);
-  brush.set("2H", col, random(wMin, wMax)); brush.line(x + w, y + h, x, y + h);
-  brush.set("2H", col, random(wMin, wMax)); brush.line(x, y + h, x, y);
-}
-function drawPointedArch(cx, springY, halfW, leftCx, rightCx, R, col, weight) {
-  var steps = 50;
-  for (var i = 0; i < steps; i++) {
-    var t1 = i / steps, t2 = (i + 1) / steps;
-    var pm = 0.4 + 1.6 * sin(PI * t1);
-    brush.set("2H", col, constrain(weight * pm * random(0.6, 1.4), 0.3, 2.5));
-    var x1 = (cx - halfW) + halfW * t1, x2 = (cx - halfW) + halfW * t2;
-    var y1 = springY - sqrt(max(0, R * R - pow(x1 - leftCx, 2)));
-    var y2 = springY - sqrt(max(0, R * R - pow(x2 - leftCx, 2)));
-    brush.line(x1, y1, x2, y2);
-  }
-  for (var i = 0; i < steps; i++) {
-    var t1 = i / steps, t2 = (i + 1) / steps;
-    var pm = 0.4 + 1.6 * sin(PI * t1);
-    brush.set("2H", col, constrain(weight * pm * random(0.6, 1.4), 0.3, 2.5));
-    var x1 = cx + halfW * t1, x2 = cx + halfW * t2;
-    var y1 = springY - sqrt(max(0, R * R - pow(x1 - rightCx, 2)));
-    var y2 = springY - sqrt(max(0, R * R - pow(x2 - rightCx, 2)));
-    brush.line(x1, y1, x2, y2);
-  }
-}
+init();
 </script>
 </body>
 </html>
