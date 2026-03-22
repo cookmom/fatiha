@@ -213,9 +213,9 @@ function draw() {
   smoothBass = lerp(smoothBass, rawBass, lerpRate);
   smoothTreble = lerp(smoothTreble, rawTreble, lerpRate);
 
-  var amp = isPlaying ? smoothAmp : (0.05 + sin(f * 0.00160) * 0.03);
-  var ba = isPlaying ? smoothBass : (0.03 + sin(f * 0.00120) * 0.02);
-  var tr = isPlaying ? smoothTreble : (0.02 + cos(f * 0.00140) * 0.015);
+  var amp = isPlaying ? smoothAmp : (0.05 + sin(f * 0.000160) * 0.03);
+  var ba = isPlaying ? smoothBass : (0.03 + sin(f * 0.000120) * 0.02);
+  var tr = isPlaying ? smoothTreble : (0.02 + cos(f * 0.000140) * 0.015);
   var taj = activeTajweed(Math.max(0, t));
 
   // Seed for consistent-ish per-frame rendering
