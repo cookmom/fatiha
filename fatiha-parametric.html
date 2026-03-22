@@ -17,34 +17,21 @@
 <body>
 <div id="tap"><span>tap to begin</span></div>
 <script>
-// Audio
+// Audio setup
 let audioCtx, analyser, audioBuffer, freqData, timeData;
 let isPlaying = false, audioStartTime = 0;
-let smoothAmp = 0, smoothBass = 0, smoothTreble = 0;
-
-// Tajweed
-const TAJWEED = [
-  {t:0.35,rule:'madd'},{t:0.45,rule:'ghunna'},{t:0.55,rule:'madd'},
-  {t:0.95,rule:'ikhfa'},{t:1.05,rule:'madd'},{t:1.15,rule:'ghunna'},
-  {t:1.25,rule:'idgham'},{t:1.35,rule:'madd'},{t:2.15,rule:'madd'},
-  {t:2.25,rule:'ghunna'},{t:2.35,rule:'idgham'},{t:2.65,rule:'madd'},
-  {t:2.85,rule:'ikhfa'},{t:3.15,rule:'madd'},{t:3.25,rule:'ghunna'},
-  {t:3.95,rule:'madd'},{t:4.05,rule:'ghunna'},{t:4.35,rule:'madd'},
-  {t:4.55,rule:'ikhfa'},{t:4.75,rule:'madd'},{t:4.85,rule:'ghunna'},
-  {t:5.15,rule:'madd'}
-];
+let smoothAmp = 0;
 
 async function loadAudio() {
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   analyser = audioCtx.createAnalyser();
   analyser.fftSize = 256;
-  analyser.smoothingTimeConstant = 0.9;
+  analyser.smoothingTimeConstant = 0.92;
   freqData = new Uint8Array(analyser.frequencyBinCount);
   timeData = new Uint8Array(analyser.fftSize);
   const resp = await fetch('bismillah.mp3');
   audioBuffer = await audioCtx.decodeAudioData(await resp.arrayBuffer());
 }
-
 function startAudio() {
   if (isPlaying) return;
   const src = audioCtx.createBufferSource();
@@ -56,7 +43,6 @@ function startAudio() {
   isPlaying = true;
   src.onended = () => { isPlaying = false; };
 }
-
 function getAmp() {
   if (!isPlaying) return 0;
   analyser.getByteTimeDomainData(timeData);
@@ -64,46 +50,62 @@ function getAmp() {
   for (let i = 0; i < timeData.length; i++) s += Math.abs(timeData[i] - 128);
   return s / timeData.length / 128;
 }
-function getBass() {
-  if (!isPlaying) return 0;
-  analyser.getByteFrequencyData(freqData);
-  let s = 0; for (let i = 0; i < 6; i++) s += freqData[i]; return s / 6 / 255;
-}
-function getTreble() {
-  if (!isPlaying) return 0;
-  analyser.getByteFrequencyData(freqData);
-  let s = 0; for (let i = freqData.length-12; i < freqData.length; i++) s += freqData[i]; return s / 12 / 255;
-}
-function activeTaj(t) {
-  const a = {};
-  for (const e of TAJWEED) {
-    const dt = t - e.t;
-    if (dt >= 0 && dt < 0.8) a[e.rule] = Math.max(a[e.rule]||0, 1 - dt/0.8);
-  }
-  return a;
-}
 
-// p5 sketch
 const W = 1080, H = 1920;
-const cx = W/2, doorW = 820, doorH = 1700;
+const cx = W/2;
+const doorW = 820, doorH = 1700;
 const doorX = (W-doorW)/2, doorY = (H-doorH)/2;
 const archSpringY = doorY + 480;
 const halfDW = doorW/2;
+
+// Phase 1: draw fills ONCE in setup
+// Phase 2: draw strokes in draw() loop — animated with flow fields
+
+let fillsDone = false;
 
 function setup() {
   createCanvas(W, H, WEBGL);
   brush.load();
   frameRate(30);
   
-  // Register a custom evolving flow field
+  // Register evolving flow field
   brush.addField('meditative', function(t, field) {
-    for (let i = 0; i < field.length; i++) {
-      for (let j = 0; j < field[i].length; j++) {
-        field[i][j] = 180 * Math.sin(i * 0.02 + t * 0.3) + 90 * Math.cos(j * 0.015 + t * 0.2);
-      }
-    }
+    for (let i = 0; i < field.length; i++)
+      for (let j = 0; j < field[i].length; j++)
+        field[i][j] = 120 * Math.sin(i * 0.015 + t * 0.5) + 60 * Math.cos(j * 0.01 + t * 0.3);
     return field;
   });
+  
+  translate(-width/2, -height/2);
+  background(242, 234, 218);
+  
+  // === WATERCOLOR FILLS — drawn ONCE, never redrawn ===
+  brush.noStroke();
+  
+  brush.fill('#1040A0', 72);
+  brush.fillBleed(0.5, 'out');
+  brush.fillTexture(0.5, 0.3);
+  brush.rect(doorX + 30, doorY + 50, doorW * 0.55, 520);
+  
+  brush.fill('#C88800', 65);
+  brush.fillBleed(0.45, 'out');
+  brush.rect(doorX + 70, archSpringY - 60, doorW * 0.5, 380);
+  
+  brush.fill('#105830', 75);
+  brush.fillBleed(0.5, 'out');
+  brush.rect(doorX + 50, archSpringY + 430, doorW * 0.55, 520);
+  
+  // Section jewels
+  brush.fill('#4010A0', 115);
+  brush.fillBleed(0.35);
+  brush.rect(doorX + 40, archSpringY + 30, doorW * 0.3, 150);
+  
+  brush.fill('#B01008', 100);
+  brush.fillBleed(0.3);
+  brush.rect(cx + 40, archSpringY + 350, doorW * 0.3, 160);
+  
+  brush.noFill();
+  fillsDone = true;
   
   loadAudio().then(() => {
     document.getElementById('tap').addEventListener('click', () => {
@@ -115,139 +117,141 @@ function setup() {
 }
 
 function draw() {
+  if (!fillsDone) return;
+  
   translate(-width/2, -height/2);
-  background(242, 234, 218);
+  // NO background() call — fills persist, strokes accumulate
   
   const f = frameCount;
-  const t = isPlaying ? audioCtx.currentTime - audioStartTime : -1;
-  
-  // Smooth audio
   const rawAmp = getAmp();
   smoothAmp = lerp(smoothAmp, rawAmp, 0.05);
-  smoothBass = lerp(smoothBass, getBass(), 0.05);
-  smoothTreble = lerp(smoothTreble, getTreble(), 0.05);
+  const amp = isPlaying ? smoothAmp : 0.02 + 0.01 * sin(f * 0.003);
   
-  const amp = isPlaying ? smoothAmp : 0.03 + 0.02 * sin(f * 0.005);
-  const ba = isPlaying ? smoothBass : 0.02 + 0.01 * sin(f * 0.003);
-  const tr = isPlaying ? smoothTreble : 0.01 + 0.005 * cos(f * 0.004);
-  const taj = activeTaj(Math.max(0, t));
-  
-  // Evolve flow field very slowly
+  // Evolve flow field VERY slowly
   brush.field('meditative');
-  brush.refreshField(f * 0.003);
+  brush.refreshField(f * 0.002);
+  brush.wiggle(0.5 + amp);
   
-  // === WATERCOLOR WASHES — few large fills, bleed drifts with audio ===
-  brush.noStroke();
+  // Draw a FEW new strokes per frame — painting builds over time
+  // Only draw ~2-3 strokes per frame for meditative pace
   
-  // Lapis wash — bleed breathes with amplitude
-  const lapisBleed = 0.45 + amp * 0.3 + (taj.ghunna || 0) * 0.2;
-  brush.fill('#1040A0', 70 + amp * 30);
-  brush.fillBleed(lapisBleed, 'out');
-  brush.fillTexture(0.5, 0.3);
-  brush.rect(doorX + 30 + sin(f*0.002)*5, doorY + 50, doorW * 0.55, 520);
-  
-  // Gold wash
-  const goldBleed = 0.4 + ba * 0.3 + (taj.madd || 0) * 0.15;
-  brush.fill('#C88800', 65 + ba * 25);
-  brush.fillBleed(goldBleed, 'out');
-  brush.rect(doorX + 70 + cos(f*0.0015)*4, archSpringY - 60, doorW * 0.5, 380);
-  
-  // Terre verte wash
-  const greenBleed = 0.42 + amp * 0.25 + (taj.ikhfa || 0) * 0.2;
-  brush.fill('#105830', 75 + amp * 20);
-  brush.fillBleed(greenBleed, 'out');
-  brush.rect(doorX + 50 + sin(f*0.0018)*3, archSpringY + 430, doorW * 0.55, 520);
-  
-  brush.noFill();
-  
-  // === PENCIL DOOR STRUCTURE — uses flow field for organic drift ===
-  brush.wiggle(1 + amp * 2);
-  
-  // Door frame
-  brush.set('2H', '#8a8070', 1.0 + amp * 0.5);
-  brush.rect(doorX, archSpringY, doorW, doorY + doorH - archSpringY);
-  
-  // Center divider
-  brush.set('2H', '#8a8070', 0.8 + tr * 0.5);
-  brush.line(cx, archSpringY, cx, doorY + doorH);
-  
-  // Pointed arch — spline for organic shape
-  const archPts = [];
-  for (let i = 0; i <= 20; i++) {
-    const tt = i / 20;
-    const co = halfDW * 0.6;
-    const R = halfDW + co;
-    const x = (cx - halfDW) + halfDW * tt;
-    const dx = x - (cx + co);
-    const y = archSpringY - Math.sqrt(Math.max(0, R*R - dx*dx));
-    archPts.push([x, y, 0.3 + 0.7 * sin(PI * tt)]);
+  if (f < 300) { // ~10 seconds of building
+    const progress = f / 300;
+    
+    // Door frame appears gradually
+    if (f % 10 === 0) {
+      brush.set('2H', '#7a7060', 1.5 + amp * 0.8);
+      // One segment of the door frame per call
+      const seg = (f / 10) % 8;
+      const bot = doorY + doorH;
+      const segs = [
+        [doorX, archSpringY, doorX + doorW, archSpringY], // top
+        [doorX, archSpringY, doorX, bot], // left
+        [doorX + doorW, archSpringY, doorX + doorW, bot], // right
+        [doorX, bot, doorX + doorW, bot], // bottom
+        [cx, archSpringY, cx, bot], // center divider
+      ];
+      if (seg < segs.length) {
+        const s = segs[seg];
+        brush.line(s[0], s[1], s[2], s[3]);
+      }
+    }
+    
+    // Arch segments appear one by one
+    if (f % 5 === 0 && f < 150) {
+      const archSeg = Math.floor(f / 5);
+      const totalSegs = 30;
+      if (archSeg < totalSegs) {
+        const co = halfDW * 0.6;
+        const R = halfDW + co;
+        brush.set('2H', '#9a9080', 0.6 + amp * 0.4);
+        
+        // Left half
+        if (archSeg < totalSegs / 2) {
+          const t1 = archSeg / (totalSegs/2);
+          const t2 = (archSeg + 1) / (totalSegs/2);
+          const x1 = (cx-halfDW) + halfDW * t1;
+          const x2 = (cx-halfDW) + halfDW * t2;
+          const y1 = archSpringY - sqrt(max(0, R*R - (x1-(cx+co))*(x1-(cx+co))));
+          const y2 = archSpringY - sqrt(max(0, R*R - (x2-(cx+co))*(x2-(cx+co))));
+          brush.line(x1, y1, x2, y2);
+        } else {
+          // Right half
+          const idx = archSeg - totalSegs/2;
+          const t1 = idx / (totalSegs/2);
+          const t2 = (idx + 1) / (totalSegs/2);
+          const x1 = cx + halfDW * t1;
+          const x2 = cx + halfDW * t2;
+          const y1 = archSpringY - sqrt(max(0, R*R - (x1-(cx-co))*(x1-(cx-co))));
+          const y2 = archSpringY - sqrt(max(0, R*R - (x2-(cx-co))*(x2-(cx-co))));
+          brush.line(x1, y1, x2, y2);
+        }
+      }
+    }
+    
+    // Panel inner frames appear mid-way
+    if (f > 100 && f % 15 === 0) {
+      const pY = archSpringY + 20, pH = doorY + doorH - 30 - pY;
+      const lX = doorX + 18, lW = cx - 16 - lX;
+      const rX = cx + 16, rW = doorX + doorW - 18 - rX;
+      brush.set('2H', '#a09888', 0.5 + amp * 0.3);
+      const panelSeg = ((f - 100) / 15) % 8;
+      const ps = [
+        [lX, pY, lX+lW, pY], [lX+lW, pY, lX+lW, pY+pH],
+        [lX+lW, pY+pH, lX, pY+pH], [lX, pY+pH, lX, pY],
+        [rX, pY, rX+rW, pY], [rX+rW, pY, rX+rW, pY+pH],
+        [rX+rW, pY+pH, rX, pY+pH], [rX, pY+pH, rX, pY]
+      ];
+      if (panelSeg < ps.length) {
+        const s = ps[panelSeg];
+        brush.line(s[0], s[1], s[2], s[3]);
+      }
+    }
+    
+    // Hatch appears late
+    if (f > 180 && f % 20 === 0 && f < 260) {
+      try {
+        const pY = archSpringY + 20, pH = doorY + doorH - 30 - pY;
+        const lX = doorX + 18, lW = cx - 16 - lX;
+        const hatchAngle = 45 + (sin(f * 0.01) * 10);
+        brush.hatch(14, hatchAngle, {rand: 0.15});
+        brush.hatchStyle('2H', '#b0a890', 0.5);
+        brush.rect(lX + 15, pY + 15, lW - 30, pH * 0.3);
+        brush.noHatch();
+      } catch(e) {}
+    }
+    
+    // Crayon marks appear
+    if (f > 200 && f % 30 === 0 && f < 280) {
+      brush.set('2B', '#4A7A5A', 1.2 + amp);
+      const cx2 = cx + random(-20, 20);
+      brush.line(cx2 - 40, archSpringY - 10 + random(-5,5), cx2 + 40, archSpringY + 10 + random(-5,5));
+    }
+    
+    // Rosettes appear
+    if (f > 150 && f % 25 === 0 && f < 220) {
+      const pY = archSpringY + 20, pH = doorY + doorH - 30 - pY;
+      const lX = doorX + 18, lW = cx - 16 - lX;
+      const rX2 = cx + 16, rW = doorX + doorW - 18 - rX2;
+      brush.set('2H', '#b0a890', 0.4);
+      if (f < 180) brush.circle(lX + lW/2, pY + pH * 0.3, 80);
+      else brush.circle(rX2 + rW/2, pY + pH * 0.7, 80);
+    }
+    
+    // Flow lines — organic, slow, following the field
+    if (f > 60 && f % 8 === 0) {
+      brush.set('2H', '#8a806050', 0.6 + amp * 0.3);
+      const x = random(doorX + 20, doorX + doorW - 20);
+      const y = random(doorY + 20, doorY + doorH - 20);
+      brush.flowLine(x, y, random(60, 150), random(0, TWO_PI));
+    }
   }
-  for (let i = 0; i <= 20; i++) {
-    const tt = i / 20;
-    const co = halfDW * 0.6;
-    const R = halfDW + co;
-    const x = cx + halfDW * tt;
-    const dx = x - (cx - co);
-    const y = archSpringY - Math.sqrt(Math.max(0, R*R - dx*dx));
-    archPts.push([x, y, 0.3 + 0.7 * sin(PI * tt)]);
+  
+  // After building phase: just occasional flow line additions
+  if (f >= 300 && f % 20 === 0) {
+    brush.set('2H', '#b0a89815', 0.2 + amp * 0.1);
+    brush.flowLine(random(doorX, doorX+doorW), random(doorY, doorY+doorH), random(30, 60), random(0, TWO_PI));
   }
-  brush.set('2H', '#8a8070', 1.2);
-  brush.spline(archPts, 0.4);
-  
-  // Panel inner frames
-  const pY = archSpringY + 20, pH = doorY + doorH - 30 - pY;
-  const lX = doorX + 18, lW = cx - 16 - lX;
-  const rX = cx + 16, rW = doorX + doorW - 18 - rX;
-  
-  brush.set('2H', '#a09888', 0.7 + amp * 0.3);
-  brush.rect(lX, pY, lW, pH);
-  brush.rect(rX, pY, rW, pH);
-  
-  // Hatch in panels — angle modulated by noise
-  const hatchAngle = 45 + noise(f * 0.001) * 30 - 15;
-  const hatchDist = 12 + amp * 5;
-  brush.hatch(hatchDist, hatchAngle, {rand: 0.2});
-  brush.hatchStyle('2H', '#b0a890', 0.4 + tr * 0.3);
-  brush.rect(lX + 15, pY + 15, lW - 30, pH * 0.35);
-  brush.noHatch();
-  
-  // Second hatch area — different angle
-  const hatchAngle2 = 135 + noise(f * 0.001 + 100) * 30 - 15;
-  brush.hatch(hatchDist, hatchAngle2, {rand: 0.15});
-  brush.hatchStyle('2H', '#b0a890', 0.35 + ba * 0.3);
-  brush.rect(rX + 15, pY + pH * 0.5, rW - 30, pH * 0.35);
-  brush.noHatch();
-  
-  // Rosettes — radius breathes
-  const roseR = 80 + amp * 15 + sin(f * 0.004) * 5;
-  brush.set('2H', '#b0a890', 0.5);
-  brush.circle(lX + lW/2, pY + pH * 0.3, roseR);
-  brush.circle(rX + rW/2, pY + pH * 0.7, roseR);
-  
-  // Crayon marks — influenced by flow field
-  brush.set('2B', '#4A7A5A', 1.5 + amp);
-  brush.line(cx - 60, archSpringY - 15, cx - 20, archSpringY + 10);
-  brush.set('2B', '#4A7EC2', 1.2 + tr);
-  brush.line(rX + 20, pY + pH * 0.6, rX + 70, pY + pH * 0.6 + 10);
-  brush.set('2B', '#C9A832', 1.0 + ba);
-  brush.line(lX + 15, pY + 8, lX + 60, pY - 3);
-  
-  // Section fill jewels — tajweed-reactive
-  brush.noStroke();
-  const jewelAlpha = 100 + (taj.idgham || 0) * 50;
-  brush.fill('#4010A0', jewelAlpha);
-  brush.fillBleed(0.35 + (taj.idgham || 0) * 0.2);
-  brush.rect(lX + 20, pY + 20, lW - 40, pH * 0.15);
-  
-  const jewelAlpha2 = 90 + (taj.madd || 0) * 40;
-  brush.fill('#B01008', jewelAlpha2);
-  brush.fillBleed(0.3 + (taj.madd || 0) * 0.15);
-  brush.rect(rX + 20, pY + pH * 0.45, rW - 40, pH * 0.15);
-  brush.noFill();
-  
-  // Thin accent lines
-  brush.set('marker', '#C9A83240', 0.6);
-  brush.line(doorX + 100, archSpringY + 180, doorX + doorW - 180, doorY + doorH - 280);
   
   brush.noField();
   brush.wiggle(0);
