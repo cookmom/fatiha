@@ -425,6 +425,42 @@ function draw() {
     }
   }
 
+  // ── STAGE 5: Animated watercolor paint layers (frames 250+) ──
+  // One fill every ~15 frames — each appears and STAYS, layering on top
+  if (f > 250 && f % 15 === 0) {
+    // Islamic palette
+    const palette = [
+      '#0D3B8E',  // lapis
+      '#C0392B',  // vermillion
+      '#B8860B',  // gold
+      '#0E4D2E',  // terre verte
+      '#8B2252',  // rose
+      '#3A0C6E',  // tyrian
+      '#8B1A1A',  // ruby
+    ];
+
+    // Pick color — tajweed events (high amp) bias toward lapis/gold
+    const pick = amp > 0.08
+      ? (random() > 0.5 ? palette[0] : palette[2])
+      : palette[Math.floor(random(0, palette.length))];
+
+    // Audio amplitude modulates opacity: louder = more opaque
+    const opacity = constrain(80 + amp * 400, 80, 140);
+
+    // Larger fills placed within the door area
+    const fillW = random(250, 500);
+    const fillH = random(200, 450);
+    const fillX = doorX + random(-20, doorW - fillW + 20);
+    const fillY = doorY + random(-20, doorH - fillH + 20);
+
+    brush.noStroke();
+    brush.fill(pick, opacity);
+    brush.fillBleed(random(0.35, 0.65), 'out');
+    brush.fillTexture(0.5, 0.25);
+    brush.rect(fillX, fillY, fillW, fillH);
+    brush.noFill();
+  }
+
   brush.noField();
   brush.wiggle(0);
 }
