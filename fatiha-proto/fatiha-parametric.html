@@ -12,55 +12,82 @@
 </head>
 <body>
 <script>
+// ═══════════════════════════════════════════════════════════════
+// FATIHA PARAMETRIC — DOOR PAINTING + LIGHTING MODULATION
+// The painting is on the wall. The lighting changes. The painting doesn't.
+// ═══════════════════════════════════════════════════════════════
+
+// ===== TAJWEED EVENTS =====
+var TAJWEED_EVENTS = [
+  {t:0.35, rule:'madd'}, {t:0.55, rule:'madd'}, {t:1.05, rule:'madd'},
+  {t:1.35, rule:'madd'}, {t:2.15, rule:'madd'}, {t:2.65, rule:'madd'},
+  {t:3.15, rule:'madd'}, {t:3.95, rule:'madd'}, {t:4.35, rule:'madd'},
+  {t:4.75, rule:'madd'}, {t:5.15, rule:'madd'},
+  {t:0.45, rule:'ghunna'}, {t:1.15, rule:'ghunna'}, {t:2.25, rule:'ghunna'},
+  {t:3.25, rule:'ghunna'}, {t:4.05, rule:'ghunna'}, {t:4.85, rule:'ghunna'},
+  {t:1.25, rule:'idgham'}, {t:2.35, rule:'idgham'}, {t:3.35, rule:'idgham'},
+  {t:0.95, rule:'ikhfa'}, {t:2.85, rule:'ikhfa'}, {t:4.55, rule:'ikhfa'},
+  {t:0.08, rule:'qalqalah'}, {t:1.55, rule:'qalqalah'}, {t:3.08, rule:'qalqalah'}
+].sort(function(a,b){ return a.t - b.t; });
+
+var WORDS = [
+  {start:0.00, end:0.75, label:'bismi'},
+  {start:0.75, end:1.50, label:'allah'},
+  {start:1.50, end:3.00, label:'ar-rahman'},
+  {start:3.00, end:5.50, label:'ar-raheem'}
+];
+
 // ===== GLOBALS =====
-var doorImg;
-var audioCtx, analyser, audioSource;
+var doorImg = null;
+var doorCaptured = false;
+var audioCtx, analyser, audioSource, audioStartTime = 0;
 var timeData, freqData;
-var audioReady = false;
+var audioReady = false, audioEnded = false;
 var animStart = 0;
 
-// Smoothed audio
-var sAmp = 0, sFreq = 0.5, sBeat = 0, prevAmp = 0;
+var sAmp = 0, sBass = 0, sTreble = 0, sPitch = 0.5;
+var tajweedState = { madd: 0, ghunna: 0, idgham: 0, ikhfa: 0, qalqalah: 0 };
+var wordsRevealed = 0;
 
-// Particles
-var particles = [];
-
-// Door geometry constants (for overlay drawing)
 var DX = 110, DW = 860, DY = 80, DH = 1760;
 var CX = 540, SPRING_Y = 580;
 
+var WASH_ZONES = [
+  {x: 150, y: 140, w: 473, h: 550, color: [16, 64, 160]},
+  {x: 190, y: 530, w: 430, h: 400, color: [200, 136, 0]},
+  {x: 170, y: 1030, w: 473, h: 550, color: [16, 88, 48]}
+];
+
+var particles = [];
+
 function setup() {
   createCanvas(1080, 1920, WEBGL);
+  setAttributes('preserveDrawingBuffer', true);
   brush.load();
   pixelDensity(1);
   frameRate(30);
   randomSeed(42);
 
-  // Render the static door painting
+  // Render the M10 door painting
   renderDoor();
-  // Capture as reusable image
-  doorImg = get();
 
-  // Init particles
-  for (var i = 0; i < 60; i++) {
+  // Init gold dust particles
+  for (var i = 0; i < 50; i++) {
     particles.push({
-      x: random(-400, 400),
-      y: random(-800, 900),
-      sz: random(1.5, 4),
-      spd: random(0.3, 1.2),
-      alpha: random(15, 55),
-      drift: random(-0.15, 0.15),
+      x: random(-440, 440), y: random(-960, 960),
+      sz: random(1.5, 4), spd: random(0.2, 0.8),
+      alpha: random(15, 40), drift: random(-0.15, 0.15),
       phase: random(TWO_PI)
     });
   }
 
   animStart = millis();
   window._setupDone = true;
-  console.log('Setup complete at', animStart.toFixed(0) + 'ms');
+  console.log('Setup complete — door rendered');
   initAudio();
 }
 
-// ===== RENDER STATIC DOOR (from fatiha-door.html M10) =====
+// ===== M10 DOOR PAINTING (rendered once in setup) =====
 function renderDoor() {
   push();
   translate(-width / 2, -height / 2);
@@ -84,9 +111,7 @@ function renderDoor() {
   var arcR = halfW + centerOffset;
   var archPeakY = archSpringY - sqrt(arcR * arcR - centerOffset * centerOffset);
 
-  var PENCIL = "#9a9080";
-  var PENCIL2 = "#b0a898";
-
+  var PENCIL = "#9a9080", PENCIL2 = "#b0a898";
   brush.noFill(); brush.noHatch();
 
   // LAYER 1: WATERCOLOR WASHES
@@ -102,7 +127,6 @@ function renderDoor() {
   // LAYER 2: PENCIL DOOR
   drawFrameVaried(doorX, archSpringY, doorW, doorY + doorH - archSpringY, PENCIL, 0.8, 2.5);
   drawFrameVaried(doorX - 10, archSpringY - 6, doorW + 20, doorY + doorH - archSpringY + 10, PENCIL2, 0.3, 1.5);
-
   drawPointedArch(cx, archSpringY, halfW, leftArcCx, rightArcCx, arcR, PENCIL, 1.2);
   var ihw = halfW - 30, ico = ihw * 0.6;
   drawPointedArch(cx, archSpringY, ihw, cx + ico, cx - ico, ihw + ico, PENCIL2, 0.7);
@@ -160,8 +184,7 @@ function renderDoor() {
   brush.line(doorX - 10, doorY + doorH - 6, doorX + doorW + 10, doorY + doorH - 6);
 
   // LAYER 3: CRAYON SCRIBBLES
-  brush.noFill(); brush.noHatch();
-  brush.wiggle(8);
+  brush.noFill(); brush.noHatch(); brush.wiggle(8);
   brush.set("2B", "#4A7A5A", crayonW()); brush.line(cx - 80, archSpringY - 20, cx - 30, archSpringY + 15);
   brush.set("2B", "#4A7A5A", crayonW()); brush.line(cx + 20, archSpringY - 10, cx + 70, archSpringY + 20);
   brush.set("2B", "#4A7A5A", crayonW()); brush.line(doorX + 30, archSpringY + 60, doorX + 90, archSpringY + 40);
@@ -196,273 +219,326 @@ async function initAudio() {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 512;
-    analyser.smoothingTimeConstant = 0.82;
-
+    analyser.smoothingTimeConstant = 0.7;
     var response = await fetch('bismillah.mp3');
     var buf = await response.arrayBuffer();
     var audioBuffer = await audioCtx.decodeAudioData(buf);
-
     audioSource = audioCtx.createBufferSource();
     audioSource.buffer = audioBuffer;
     audioSource.connect(analyser);
     analyser.connect(audioCtx.destination);
-
     timeData = new Uint8Array(analyser.frequencyBinCount);
     freqData = new Uint8Array(analyser.frequencyBinCount);
-
+    audioSource.onended = function() { audioEnded = true; };
     audioSource.start(0);
+    audioStartTime = audioCtx.currentTime;
     audioReady = true;
     animStart = millis();
-    console.log('Audio started, duration:', audioBuffer.duration.toFixed(1) + 's');
+    console.log('Audio started');
   } catch (e) {
-    console.log('Audio fallback (simulated):', e.message);
+    console.log('Audio fallback:', e.message);
   }
+}
+
+function getAudioTime() {
+  if (audioReady && audioCtx) return audioCtx.currentTime - audioStartTime;
+  return (millis() - animStart) / 1000;
 }
 
 function getAudioParams() {
-  if (audioReady && analyser) {
+  if (audioReady && analyser && !audioEnded) {
     analyser.getByteTimeDomainData(timeData);
     analyser.getByteFrequencyData(freqData);
-
-    // RMS amplitude
-    var sum = 0;
-    for (var i = 0; i < timeData.length; i++) {
-      var v = (timeData[i] - 128) / 128.0;
-      sum += v * v;
-    }
-    var rms = Math.sqrt(sum / timeData.length);
-
-    // Spectral centroid (normalized 0-1)
-    var wSum = 0, tEnergy = 0;
-    for (var i = 0; i < freqData.length; i++) {
-      wSum += i * freqData[i];
-      tEnergy += freqData[i];
-    }
-    var centroid = tEnergy > 0 ? wSum / (tEnergy * freqData.length) : 0.5;
-
-    return { amplitude: rms, freq: centroid };
+    var ampSum = 0;
+    for (var i = 0; i < timeData.length; i++) ampSum += abs(timeData[i] - 128);
+    var amplitude = ampSum / (timeData.length * 128.0);
+    var bassSum = 0;
+    for (var i = 0; i < 8; i++) bassSum += freqData[i];
+    var bass = bassSum / (8 * 255.0);
+    var trebleSum = 0, tStart = floor(freqData.length * 0.75);
+    for (var i = tStart; i < freqData.length; i++) trebleSum += freqData[i];
+    var treble = trebleSum / ((freqData.length - tStart) * 255.0);
+    var wSum = 0, fSum = 0;
+    for (var i = 0; i < freqData.length; i++) { wSum += freqData[i] * i; fSum += freqData[i]; }
+    var centroid = fSum > 0 ? wSum / fSum / freqData.length : 0.5;
+    return { amplitude: amplitude, bass: bass, treble: treble, pitch: centroid };
   }
-
-  // Simulated audio envelope (voice-like)
+  // Simulated
   var t = (millis() - animStart) / 1000;
-  var a = 0;
-  if (t > 0.5) {
-    a = 0.3 + 0.18 * sin(t * 2.5) + 0.12 * sin(t * 6.3) + 0.07 * sin(t * 11.7);
-    a *= ss(0.5, 1.8, t); // fade in
-    if (t > 5.0) a *= ss(6.0, 5.0, t); // fade out
-    a = constrain(a, 0, 0.75);
+  if (!audioEnded) {
+    var a = 0.4 + 0.25 * abs(sin(t * 2.5)) + 0.15 * abs(sin(t * 6.3)) + 0.1 * abs(sin(t * 11.7));
+    a *= ss(0, 0.5, t);
+    if (t > 6) a *= ss(7, 6, t);
+    return {
+      amplitude: constrain(a, 0.2, 0.95),
+      bass: constrain(0.4 + 0.3 * abs(sin(t * 3.0)), 0, 1),
+      treble: constrain(0.25 + 0.2 * abs(sin(t * 5.0)), 0, 1),
+      pitch: constrain(0.3 + 0.4 * abs(sin(t * 3.8)), 0, 1)
+    };
   }
-  var fc = 0.4 + 0.18 * sin(t * 1.6) + 0.1 * sin(t * 4.1);
-  return { amplitude: a, freq: constrain(fc, 0.1, 0.9) };
+  return {
+    amplitude: 0.2 + 0.15 * abs(sin(t * 2.5)),
+    bass: 0.25 + 0.2 * abs(sin(t * 2.0)),
+    treble: 0.15 + 0.12 * abs(sin(t * 3.5)),
+    pitch: 0.4 + 0.25 * sin(t * 1.5)
+  };
 }
 
-function ss(e0, e1, x) { // smoothstep
+function ss(e0, e1, x) {
   var t = constrain((x - e0) / (e1 - e0), 0, 1);
   return t * t * (3 - 2 * t);
 }
 
-// ===== DRAW LOOP =====
+function updateTajweedState(audioTime) {
+  var DECAY = 0.88, DURATION = 0.5;
+  tajweedState.madd *= DECAY;
+  tajweedState.ghunna *= DECAY;
+  tajweedState.idgham *= DECAY;
+  tajweedState.ikhfa *= DECAY;
+  tajweedState.qalqalah *= DECAY * 0.8;
+  for (var i = 0; i < TAJWEED_EVENTS.length; i++) {
+    var ev = TAJWEED_EVENTS[i];
+    var dt = audioTime - ev.t;
+    if (dt >= 0 && dt < DURATION) {
+      var intensity = 1.0 - (dt / DURATION);
+      intensity = intensity * intensity;
+      tajweedState[ev.rule] = max(tajweedState[ev.rule], intensity);
+    }
+  }
+  wordsRevealed = 0;
+  for (var i = 0; i < WORDS.length; i++) {
+    if (audioTime >= WORDS[i].start) wordsRevealed = i + 1;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DRAW — The painting is on the wall. The light changes.
+// ═══════════════════════════════════════════════════════════════
 function draw() {
-  var elapsed = (millis() - animStart) / 1000;
+  // Frame 1: capture the door painting as an image
+  if (!doorCaptured) {
+    // Door was rendered in setup — capture it now
+    doorImg = get();
+    doorCaptured = true;
+    console.log('Door captured: ' + doorImg.width + 'x' + doorImg.height);
+    // If capture failed (0x0), we'll re-render next frame
+    if (doorImg.width === 0) {
+      doorCaptured = false;
+      renderDoor();
+    }
+    return;
+  }
+
+  // Safety: if image still empty, keep trying
+  if (!doorImg || doorImg.width === 0) {
+    renderDoor();
+    doorImg = get();
+    console.log('Re-capture: ' + doorImg.width + 'x' + doorImg.height);
+    return;
+  }
+
+  var t = (millis() - animStart) / 1000;
+  var audioTime = getAudioTime();
   var p = getAudioParams();
 
-  // Smooth values
-  sAmp = lerp(sAmp, p.amplitude, 0.18);
-  sFreq = lerp(sFreq, p.freq, 0.12);
+  // Smooth audio
+  sAmp = lerp(sAmp, p.amplitude, 0.22);
+  sBass = lerp(sBass, p.bass, 0.15);
+  sTreble = lerp(sTreble, p.treble, 0.18);
+  sPitch = lerp(sPitch, p.pitch, 0.12);
+  updateTajweedState(audioTime);
 
-  // Beat detection
-  if (p.amplitude > prevAmp + 0.05 && p.amplitude > 0.1) sBeat = 1.0;
-  sBeat *= 0.88;
-  prevAmp = lerp(prevAmp, p.amplitude, 0.1);
-
-  // --- ANIMATION PARAMETERS ---
-
-  // Progressive reveal: painting emerges from paper over 7s (full audio)
-  var reveal = ss(0, 7, elapsed);
-
-  // Breathing: scale pulsation driven by audio + gentle autonomous oscillation
-  var autoBreath = sin(elapsed * 1.8) * 0.008; // always-on gentle breathing
-  var breathScale = 1.0 + sAmp * 0.04 + autoBreath;
-
-  // Color warmth: high freq → warm (gold), low freq → cool (lapis)
-  // Also shifts over time for visible change between screenshots
-  var timeWarmth = sin(elapsed * 0.7) * 6;
-  var warmth = map(sFreq, 0.2, 0.8, -15, 20) + timeWarmth;
-
-  // --- RENDER ---
+  // ── CREAM BACKGROUND (the wall) ──
   background(242, 234, 218);
 
-  // Draw door image with strip-based progressive reveal + breathing + color shift
+  // ── THE PAINTING with subtle lighting modulation ──
   push();
-  scale(breathScale);
+
+  // Amplitude → very subtle breathing scale
+  var breathScale = 1.0 + sAmp * 0.02;
+
+  // Qalqalah → tiny staccato scale snap
+  var qPulse = 1.0 + tajweedState.qalqalah * 0.04;
+
+  // Madd → slight horizontal elongation
+  var maddX = 1.0 + tajweedState.madd * 0.025;
+  var maddY = 1.0 - tajweedState.madd * 0.008;
+
+  // Gentle sway — like the viewer breathing
+  var sway = sin(t * 1.5) * 0.004 + sAmp * sin(t * 3) * 0.006;
+  rotate(sway);
+
+  // Combined scale
+  scale(breathScale * qPulse * maddX, breathScale * qPulse * maddY);
+
+  // COLOR TEMPERATURE — the "lighting" (warm golden vs cool blue)
+  var warmth = sPitch;
+  var tR = lerp(235, 255, warmth);   // cool: slightly blue-ish → warm: full white-warm
+  var tG = lerp(240, 252, warmth);
+  var tB = lerp(255, 230, warmth);   // cool: blue tint → warm: less blue
+
+  // Ikhfa → the painting becomes slightly translucent (veil of concealment)
+  var doorAlpha = 255 - tajweedState.ikhfa * 50;
+
+  tint(tR, tG, tB, doorAlpha);
   imageMode(CORNER);
-
-  var numStrips = 24;
-  var stripH = ceil(height / numStrips) + 1;
-
-  for (var i = 0; i < numStrips; i++) {
-    // Top strips reveal first, bottom last — wide stagger for dramatic effect
-    var stripT = i / numStrips;
-    var stripReveal = ss(stripT * 0.85, stripT * 0.85 + 0.2, reveal);
-    if (stripReveal < 0.005) continue;
-
-    var sy = i * (height / numStrips);
-    var r = constrain(255 + warmth, 230, 255);
-    var b = constrain(255 - warmth, 230, 255);
-    tint(r, 252, b, stripReveal * 255);
-    image(doorImg, -width / 2, -height / 2 + sy, width, stripH, 0, sy, width, stripH);
-  }
+  image(doorImg, -width / 2, -height / 2, width, height);
   pop();
-
   noTint();
 
-  // --- OVERLAYS ---
+  // ═══════════════════════════════════════════════════════════
+  // SUBTLE OVERLAYS — like light playing on the wall
+  // Total overlay alpha should NEVER exceed ~40 combined
+  // ═══════════════════════════════════════════════════════════
 
-  // Geometric pulse: arch and frame glow on beats
-  if (sBeat > 0.04 && reveal > 0.25) {
-    drawArchPulse(sBeat * reveal, elapsed);
+  // Ghunna: soft warm glow near the arch (nasalization = dreamy haze)
+  if (tajweedState.ghunna > 0.05) {
+    push();
+    noStroke();
+    var ga = tajweedState.ghunna * 20;
+    fill(255, 240, 215, ga);
+    ellipse(0, -350, 500 + sin(t * 1.3) * 30, 350 + sin(t * 0.9) * 20);
+    fill(255, 235, 200, ga * 0.5);
+    ellipse(0, 0, 400, 500);
+    pop();
   }
 
-  // Ambient glow: warm/cool radiance at painting center
-  if (reveal > 0.1) {
-    drawAmbientGlow(sAmp * reveal, warmth, elapsed);
+  // Idgham: wash zones blend — subtle gradient band between zones
+  if (tajweedState.idgham > 0.05) {
+    push();
+    translate(-width / 2, -height / 2);
+    noStroke();
+    var ia = tajweedState.idgham * 18;
+    // Blend band between lapis and gold
+    for (var i = 0; i < 5; i++) {
+      var frac = i / 5;
+      var r = lerp(16, 200, frac);
+      var g = lerp(64, 136, frac);
+      var b = lerp(160, 0, frac);
+      fill(r, g, b, ia * (1 - abs(frac - 0.5) * 2));
+      rect(DX + 60, 650 + i * 20, DW - 120, 20);
+    }
+    pop();
   }
 
-  // Floating gold particles: dust motes / light
-  if (reveal > 0.15) {
-    drawParticles(sAmp, elapsed, reveal);
+  // Madd: horizontal stretch accents — thin golden lines extend
+  if (tajweedState.madd > 0.05) {
+    push();
+    translate(-width / 2, -height / 2);
+    stroke(200, 170, 80, tajweedState.madd * 30);
+    strokeWeight(1);
+    noFill();
+    for (var i = 0; i < 3; i++) {
+      var yy = SPRING_Y - 150 + i * 60;
+      var extW = 200 + tajweedState.madd * 250;
+      line(CX - extW / 2, yy, CX + extW / 2, yy);
+    }
+    pop();
   }
 
-  // Subtle scan line (progressive reveal marker)
-  if (reveal > 0.01 && reveal < 0.98) {
-    drawRevealEdge(reveal, elapsed);
+  // Ikhfa: translucent cream veil (concealment)
+  if (tajweedState.ikhfa > 0.05) {
+    push();
+    noStroke();
+    fill(242, 234, 218, tajweedState.ikhfa * 40);
+    rect(-width / 2, -height / 2, width, height);
+    pop();
   }
-}
 
-// ===== OVERLAY EFFECTS =====
-
-function drawArchPulse(beat, t) {
-  push();
-  translate(-width / 2, -height / 2);
-  noFill();
-
-  var alpha = beat * 55;
-  var w = 0.8 + beat * 2.5;
-
-  // Gold glow on arch
-  stroke(205, 175, 85, alpha);
-  strokeWeight(w);
-
-  // Pointed arch approximation
-  beginShape();
-  for (var i = 0; i <= 50; i++) {
-    var frac = i / 50;
-    var x = DX + DW * frac;
-    var dx = x - CX;
-    var R = DW * 0.72;
-    var y = SPRING_Y - sqrt(max(0, R * R - dx * dx)) * 0.62;
-    y = max(y, SPRING_Y - 430);
-    vertex(x, y);
+  // Qalqalah: expanding ring from door center (bouncing)
+  if (tajweedState.qalqalah > 0.05) {
+    push();
+    noFill();
+    var qa = tajweedState.qalqalah;
+    stroke(200, 180, 120, qa * 50);
+    strokeWeight(1.5 * qa);
+    var ringR = (1 - qa) * 300 + 50;
+    ellipse(0, -150, ringR * 2, ringR * 2.2);
+    // Second ring
+    stroke(200, 180, 120, qa * 25);
+    strokeWeight(1);
+    ellipse(0, -150, ringR * 2.8, ringR * 3.1);
+    pop();
   }
-  endShape();
 
-  // Frame outline
-  strokeWeight(w * 0.6);
-  stroke(205, 175, 85, alpha * 0.6);
-  rect(DX, SPRING_Y, DW, 1260);
+  // Progressive reveal: subtle glowing accents at word timestamps
+  if (wordsRevealed >= 1) {
+    push(); translate(-width / 2, -height / 2);
+    noStroke();
+    fill(16, 64, 160, 12 + sAmp * 8);
+    ellipse(CX, 280, 120 + sin(t * 1.8) * 15, 100 + sin(t * 1.8) * 10);
+    pop();
+  }
+  if (wordsRevealed >= 2) {
+    push(); translate(-width / 2, -height / 2);
+    noFill();
+    stroke(200, 160, 60, 15 + sAmp * 10);
+    strokeWeight(1.5);
+    beginShape();
+    for (var i = 0; i <= 40; i++) {
+      var frac = i / 40;
+      var angle = PI + frac * PI;
+      vertex(CX + cos(angle) * 350, SPRING_Y - 50 + sin(angle) * 250);
+    }
+    endShape();
+    pop();
+  }
+  if (wordsRevealed >= 3) {
+    push(); translate(-width / 2, -height / 2);
+    noStroke();
+    fill(64, 16, 120, 8 + sAmp * 6);
+    rect(DX + 50, SPRING_Y + 80, DW / 2 - 80, 500);
+    pop();
+  }
+  if (wordsRevealed >= 4) {
+    push(); translate(-width / 2, -height / 2);
+    noStroke();
+    fill(120, 16, 16, 8 + sAmp * 6);
+    rect(CX + 30, SPRING_Y + 80, DW / 2 - 80, 500);
+    // Threshold glow
+    fill(200, 160, 60, 12 + sAmp * 8);
+    rect(DX, DY + DH - 50, DW, 30);
+    pop();
+  }
 
-  // Center divider
-  strokeWeight(w * 0.4);
-  line(CX, SPRING_Y + 18, CX, SPRING_Y + 1240);
-
-  pop();
-}
-
-function drawAmbientGlow(amp, warmth, t) {
+  // Gold dust particles — very subtle, floating upward
   push();
   noStroke();
-
-  // Golden radiance centered on arch — intensifies with amplitude
-  var baseAlpha = 12 + amp * 35;
-  var gr = constrain(225 + warmth, 200, 255);
-  var gb = constrain(180 - warmth * 0.5, 140, 210);
-
-  for (var i = 6; i > 0; i--) {
-    var sz = 200 + i * 180;
-    var a = baseAlpha / (i * 0.6);
-    fill(gr, 210, gb, a);
-    ellipse(0, -250 + sin(t * 0.5) * 40, sz * (1 + sin(t * 0.12) * 0.06), sz * 1.4);
-  }
-
-  // Secondary cool glow at bottom
-  var coolAlpha = 8 + amp * 20;
-  for (var i = 3; i > 0; i--) {
-    var sz2 = 150 + i * 120;
-    fill(150, 180, constrain(220 + warmth * 0.3, 200, 240), coolAlpha / i);
-    ellipse(0, 500, sz2, sz2 * 0.8);
-  }
-  pop();
-}
-
-function drawParticles(amp, t, reveal) {
-  push();
-  noStroke();
-
   for (var i = 0; i < particles.length; i++) {
     var pt = particles[i];
-    pt.y -= pt.spd * (0.5 + amp * 3);
-    pt.x += pt.drift + sin(t * 0.6 + pt.phase) * 0.4;
-
-    if (pt.y < -height / 2 - 30) {
-      pt.y = height / 2 + random(10, 120);
-      pt.x = random(-400, 400);
+    pt.y -= pt.spd * (0.5 + sAmp * 1.0);
+    pt.x += pt.drift + sin(t * 0.5 + pt.phase) * 0.3;
+    if (pt.y < -height / 2 - 20) {
+      pt.y = height / 2 + random(10, 50);
+      pt.x = random(-440, 440);
     }
-
-    var a = pt.alpha * (0.5 + amp * 2.5) * reveal;
-    // Gold / warm white particles with gentle twinkle
-    var twinkle = 0.5 + 0.5 * sin(t * 3 + pt.phase * 7);
-    a *= twinkle;
-    var warmR = 220 + sin(pt.phase + t * 0.3) * 20;
-    fill(warmR, 195, 110, a);
-    var sz = pt.sz * (0.9 + amp * 0.8);
-    ellipse(pt.x, pt.y, sz, sz);
-
-    // Bright core on large particles
-    if (pt.sz > 3 && twinkle > 0.7) {
-      fill(255, 240, 200, a * 0.6);
-      ellipse(pt.x, pt.y, sz * 0.4, sz * 0.4);
+    var a = pt.alpha * (0.4 + 0.6 * sin(t * 3 + pt.phase * 5));
+    if (a > 1) {
+      fill(220, 195, 110, a);
+      ellipse(pt.x, pt.y, pt.sz, pt.sz);
     }
   }
   pop();
-}
 
-function drawRevealEdge(reveal, t) {
-  // Golden light band at the reveal frontier — like light washing down
+  // Subtle edge vignette — just darkened corners
   push();
   noStroke();
-
-  var edgeY = -height / 2 + reveal * height;
-  var edgeAlpha = 30 + 15 * sin(t * 2.5);
-
-  // Wide soft gradient band
-  for (var i = 0; i < 8; i++) {
-    var yOff = (i - 4) * 15;
-    var falloff = 1 - abs(i - 3.5) / 4;
-    var a = edgeAlpha * falloff * falloff;
-    fill(225, 205, 140, a);
-    rect(-width / 2, edgeY + yOff, width, 12);
+  for (var i = 0; i < 4; i++) {
+    var frac = i / 4;
+    var a = 6 * (1 - frac);
+    if (a < 1) continue;
+    fill(30, 25, 15, a);
+    var inset = frac * 150;
+    rect(-width / 2, -height / 2, width, inset);                 // top
+    rect(-width / 2, height / 2 - inset, width, inset);          // bottom
+    rect(-width / 2, -height / 2 + inset, inset, height - 2 * inset); // left
+    rect(width / 2 - inset, -height / 2 + inset, inset, height - 2 * inset); // right
   }
-
-  // Brighter core line
-  fill(240, 220, 160, edgeAlpha * 0.5);
-  rect(-width / 2, edgeY - 2, width, 4);
   pop();
 }
 
 // ===== INTERACTION =====
-function mousePressed() {
-  if (!audioReady) initAudio();
-}
+function mousePressed() { if (!audioReady) initAudio(); }
 
 // ===== DOOR GEOMETRY HELPERS =====
 function drawFrameVaried(x, y, w, h, col, wMin, wMax) {
@@ -475,22 +551,20 @@ function drawPointedArch(cx, springY, halfW, leftCx, rightCx, R, col, weight) {
   var steps = 50;
   for (var i = 0; i < steps; i++) {
     var t1 = i / steps, t2 = (i + 1) / steps;
-    var pressureMod = 0.4 + 1.6 * sin(PI * t1);
-    brush.set("2H", col, constrain(weight * pressureMod * random(0.6, 1.4), 0.3, 2.5));
+    var pm = 0.4 + 1.6 * sin(PI * t1);
+    brush.set("2H", col, constrain(weight * pm * random(0.6, 1.4), 0.3, 2.5));
     var x1 = (cx - halfW) + halfW * t1, x2 = (cx - halfW) + halfW * t2;
-    var dx1 = x1 - leftCx, dx2 = x2 - leftCx;
-    var y1 = springY - sqrt(max(0, R * R - dx1 * dx1));
-    var y2 = springY - sqrt(max(0, R * R - dx2 * dx2));
+    var y1 = springY - sqrt(max(0, R * R - pow(x1 - leftCx, 2)));
+    var y2 = springY - sqrt(max(0, R * R - pow(x2 - leftCx, 2)));
     brush.line(x1, y1, x2, y2);
   }
   for (var i = 0; i < steps; i++) {
     var t1 = i / steps, t2 = (i + 1) / steps;
-    var pressureMod = 0.4 + 1.6 * sin(PI * t1);
-    brush.set("2H", col, constrain(weight * pressureMod * random(0.6, 1.4), 0.3, 2.5));
+    var pm = 0.4 + 1.6 * sin(PI * t1);
+    brush.set("2H", col, constrain(weight * pm * random(0.6, 1.4), 0.3, 2.5));
     var x1 = cx + halfW * t1, x2 = cx + halfW * t2;
-    var dx1 = x1 - rightCx, dx2 = x2 - rightCx;
-    var y1 = springY - sqrt(max(0, R * R - dx1 * dx1));
-    var y2 = springY - sqrt(max(0, R * R - dx2 * dx2));
+    var y1 = springY - sqrt(max(0, R * R - pow(x1 - rightCx, 2)));
+    var y2 = springY - sqrt(max(0, R * R - pow(x2 - rightCx, 2)));
     brush.line(x1, y1, x2, y2);
   }
 }
