@@ -478,24 +478,25 @@ let vScale = 1, vOffX = 0, vOffY = 0;
 // ── App state ──
 window.state = {
   tool: 'draw',
-  brush: 'HB',
-  color: '#1a1a1a',
-  weight: 3,
+  brush: 'watercolor',
+  color: '#2a7a3a',
+  weight: 8,
   opacity: 255,
   layer: 'detail',
 };
 
-let strokes = [];
+window.strokes = [];
 let undoStack = []; // alias for strokes (they're the same)
-let redoStack = [];
+window.redoStack = [];
 let pendingPoints = [];
 let isDrawing = false;
-let needsFullRedraw = true;
+window.needsFullRedraw = true;
 let currentStrokeId = 0;
 let brushLineCount = 0;
 const BUFFER_LIMIT = 20000;
 let flattenedBg = null; // saved canvas snapshot for buffer recycling
 let wcPreviewPoints = []; // watercolor preview stroke points
+let pendingWatercolorRender = null; // stroke to render in next draw() call
 
 // ── Layers ──
 const layers = [
@@ -613,6 +614,15 @@ function draw() {
     }
     needsFullRedraw = false;
     pendingPoints = [];
+    return;
+  }
+
+  // Render pending watercolor polygon inside draw()'s transform context
+  if (pendingWatercolorRender) {
+    const s = pendingWatercolorRender;
+    pendingWatercolorRender = null;
+    // Full redraw clears preview dots then replays all strokes (including this one) as proper polygons
+    needsFullRedraw = true;
     return;
   }
 
@@ -756,10 +766,11 @@ function onPointerUp(e) {
   isDrawing = false;
   pendingPoints = [];
 
-  // Watercolor: convert stroke to filled polygon on release, then full redraw to clear preview
+  // Watercolor: queue for rendering inside draw()'s transform context
   const current = strokes[strokes.length - 1];
   if (current && current.brush === 'watercolor' && current.points.length >= 2) {
-    needsFullRedraw = true; // clear preview dots, replay as polygon fill
+    pendingWatercolorRender = current;
+    // Don't set needsFullRedraw — existing canvas is untouched
   }
 }
 
@@ -773,14 +784,14 @@ function renderWatercolorPolygon(points, color, weight, opacity) {
   if (resampled.length < 2) return;
   const smoothed = smoothPoints(smoothPoints(resampled, 3), 2);
 
-  // Build thick polygon from stroke path
-  const halfW = Math.max(weight * vScale * 2.5, 16);
+  // Build thick polygon from stroke path — weight directly controls width
+  const halfW = weight * vScale * 2.5;
   const poly = strokeToPolygon(smoothed, halfW);
   if (poly.length < 3) return;
 
   // Map opacity (0-255) to bleed amount (more opacity = less bleed, more bleed = wetter wash)
-  const bleedAmount = 0.05 + (1 - opacity / 255) * 0.45;
-  const fillOpacity = Math.max(60, Math.min(opacity * 0.52, 125));
+  const bleedAmount = 0.05 + (1 - opacity / 255) * 0.55;
+  const fillOpacity = Math.max(30, Math.min(opacity * 0.6, 180));
 
   brush.noStroke();
   brush.fill(color, fillOpacity);
@@ -843,7 +854,13 @@ function strokeToPolygon(points, halfWidth) {
   for (let i = 0; i < points.length; i++) {
     const p = points[i];
     const pressure = p[2] || 0.5;
-    const hw = halfWidth * (0.4 + pressure * 0.6);
+    // Taper: first and last few points narrow to a point like a real brushstroke
+    const taperLen = Math.min(6, Math.floor(points.length * 0.25));
+    let taper = 1;
+    if (i < taperLen) taper = (i + 0.3) / taperLen;
+    else if (i > points.length - 1 - taperLen) taper = (points.length - 1 - i + 0.3) / taperLen;
+    taper = Math.max(0.05, Math.min(1, taper));
+    const hw = halfWidth * (0.1 + pressure * 0.9) * taper;
 
     // Calculate tangent direction using neighbors
     let dx, dy;
@@ -872,45 +889,11 @@ function strokeToPolygon(points, halfWidth) {
     right.push([sx - nx * hw, sy - ny * hw]);
   }
 
-  // Add rounded caps at start and end
-  const addCap = (center, nx, ny, hw, arr) => {
-    const steps = 5;
-    for (let s = 0; s <= steps; s++) {
-      const angle = Math.PI * s / steps;
-      const cx = center[0] + (nx * Math.cos(angle) - ny * Math.sin(angle)) * hw;
-      const cy = center[1] + (ny * Math.cos(angle) + nx * Math.sin(angle)) * hw;
-      arr.push([cx, cy]);
-    }
-  };
-
-  // Start cap (connects right-reversed end to left start)
-  const p0 = points[0];
-  const s0x = vOffX + p0[0] * vScale;
-  const s0y = vOffY + p0[1] * vScale;
-  let dx0 = points[1][0] - points[0][0];
-  let dy0 = points[1][1] - points[0][1];
-  let len0 = Math.sqrt(dx0 * dx0 + dy0 * dy0) || 1;
-  const nx0 = -dy0 / len0;
-  const ny0 = dx0 / len0;
-  const hw0 = halfWidth * (0.4 + (p0[2] || 0.5) * 0.6);
-  const startCap = [];
-  addCap([s0x, s0y], -nx0, -ny0, hw0, startCap);
-
-  // End cap
-  const pN = points[points.length - 1];
-  const sNx = vOffX + pN[0] * vScale;
-  const sNy = vOffY + pN[1] * vScale;
-  let dxN = points[points.length - 1][0] - points[Math.max(0, points.length - 2)][0];
-  let dyN = points[points.length - 1][1] - points[Math.max(0, points.length - 2)][1];
-  let lenN = Math.sqrt(dxN * dxN + dyN * dyN) || 1;
-  const nxN = -dyN / lenN;
-  const nyN = dxN / lenN;
-  const hwN = halfWidth * (0.4 + (pN[2] || 0.5) * 0.6);
-  const endCap = [];
-  addCap([sNx, sNy], nxN, nyN, hwN, endCap);
-
+  // Tapered ends: the taper factor already narrows left/right to near-zero
+  // at start and end, so just close the polygon — no rounded caps needed.
+  // The first and last points converge to a sharp tip naturally.
   right.reverse();
-  return [...startCap, ...left, ...endCap, ...right];
+  return [...left, ...right];
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1098,7 +1081,7 @@ function attachUIEvents() {
   });
 
   // Vertical sliders
-  setupVSlider('size-rail', 0.5, 12, state.weight, (v) => {
+  setupVSlider('size-rail', 0.5, 25, state.weight, (v) => {
     state.weight = v;
     document.getElementById('size-val').textContent = v.toFixed(1);
   });
