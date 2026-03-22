@@ -550,15 +550,26 @@ function setup() {
   background(242, 234, 218);
   brush.load();
 
-  // Custom watercolor brush — wide, soft marker with low opacity for layering
+  // Watercolor brushes at different opacity levels (slider selects between them)
+  const wcOpacities = [10, 20, 40, 60, 80, 120, 160, 200, 240];
+  for (const op of wcOpacities) {
+    brush.add('wc_' + op, {
+      type: 'marker',
+      weight: 1,
+      opacity: op,
+      spacing: 2,
+      scatter: 1.5,
+      pressure: [0.2, 0.7, 0.2],
+    });
+  }
+  // Also keep a single 'watercolor' alias at medium opacity
   brush.add('watercolor', {
     type: 'marker',
-    weight: 25,
-    opacity: 30,
-    spacing: 3,
-    scatter: 2,
-    pressure: [0.3, 0.8, 0.3],
-    markerTip: true,
+    weight: 1,
+    opacity: 60,
+    spacing: 2,
+    scatter: 1.5,
+    pressure: [0.2, 0.7, 0.2],
   });
 
   pixelDensity(1);
@@ -635,17 +646,25 @@ function drawBrushSegment(a, b) {
   const ey = vOffY + b.y * vScale;
 
   if (a.brush === 'watercolor') {
-    // Watercolor: use our custom brush — wide, soft, layerable
+    // Watercolor: multiple overlapping soft spray passes
+    // Size slider = spread width, Opacity slider = color density
     const userWeight = a.weight * vScale;
-    const wcWeight = Math.max(userWeight * 3, 15);
-
-    // Core wet stroke via custom watercolor brush
-    brush.set('watercolor', a.color, wcWeight);
+    const userOp = (a.opacity || 128) / 255;
+    const spread = Math.max(userWeight * 3, 20);
+    
+    // Watercolor = layered markers at decreasing size + increasing transparency
+    // Outermost: wide, very transparent (the bleed edge)
+    brush.set('marker', a.color, spread * 1.0);
     brush.line(sx, sy, ex, ey);
     brushLineCount++;
-
-    // Soft bleed halo — wider, spray brush
-    brush.set('spray', a.color, wcWeight * 1.5);
+    
+    // Middle: medium width
+    brush.set('marker', a.color, spread * 0.65);
+    brush.line(sx, sy, ex, ey);
+    brushLineCount++;
+    
+    // Core: narrower, more opaque
+    brush.set('marker', a.color, spread * 0.35);
     brush.line(sx, sy, ex, ey);
     brushLineCount++;
   } else {
