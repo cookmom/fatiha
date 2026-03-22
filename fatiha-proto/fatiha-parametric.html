@@ -4,7 +4,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fatiha — Parametric Door</title>
+<title>Fatiha — Parametric Door (Meditative)</title>
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
 <style>
   * { margin: 0; padding: 0; }
   body { background: #0a0a10; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh; }
@@ -15,19 +17,11 @@
 </head>
 <body>
 <div id="tap"><span>tap to begin</span></div>
-<canvas id="c"></canvas>
 <script>
-const W = 1080, H = 1920;
-const canvas = document.getElementById('c');
-canvas.width = W; canvas.height = H;
-canvas.style.maxWidth = '100vw';
-canvas.style.maxHeight = '100vh';
-const ctx = canvas.getContext('2d');
-
 // ============================================================
 // TAJWEED EVENTS
 // ============================================================
-const TAJWEED = [
+var TAJWEED = [
   {t:0.05,rule:'start'},{t:0.35,rule:'madd'},{t:0.45,rule:'ghunna'},
   {t:0.55,rule:'madd'},{t:0.95,rule:'ikhfa'},{t:1.05,rule:'madd'},
   {t:1.15,rule:'ghunna'},{t:1.25,rule:'idgham'},{t:1.35,rule:'madd'},
@@ -42,347 +36,561 @@ const TAJWEED = [
 // ============================================================
 // AUDIO
 // ============================================================
-let audioCtx, analyser, audioBuffer, freqData, timeData;
-let isPlaying = false, audioStartTime = 0;
+var audioCtx, analyser, audioBuffer, freqData, timeData;
+var isPlaying = false, audioStartTime = 0;
 
-async function loadAudio() {
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 256;
-  analyser.smoothingTimeConstant = 0.85;
-  freqData = new Uint8Array(analyser.frequencyBinCount);
-  timeData = new Uint8Array(analyser.fftSize);
-  const resp = await fetch('bismillah.mp3');
-  audioBuffer = await audioCtx.decodeAudioData(await resp.arrayBuffer());
+function loadAudioAsync() {
+  return new Promise(function(resolve) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.85;
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+    timeData = new Uint8Array(analyser.fftSize);
+    fetch('bismillah.mp3').then(function(r) { return r.arrayBuffer(); }).then(function(buf) {
+      audioCtx.decodeAudioData(buf, function(decoded) {
+        audioBuffer = decoded;
+        resolve();
+      });
+    });
+  });
 }
 
 function startAudio() {
   if (isPlaying) return;
-  const src = audioCtx.createBufferSource();
+  var src = audioCtx.createBufferSource();
   src.buffer = audioBuffer;
   src.connect(analyser);
   analyser.connect(audioCtx.destination);
   src.start(0);
   audioStartTime = audioCtx.currentTime;
   isPlaying = true;
-  src.onended = () => { isPlaying = false; };
+  src.onended = function() { isPlaying = false; };
 }
 
 function audioTime() { return isPlaying ? audioCtx.currentTime - audioStartTime : -1; }
 
-function amplitude() {
+function getAmplitude() {
   if (!isPlaying) return 0;
   analyser.getByteTimeDomainData(timeData);
-  let s = 0;
-  for (let i = 0; i < timeData.length; i++) s += Math.abs(timeData[i] - 128);
+  var s = 0;
+  for (var i = 0; i < timeData.length; i++) s += Math.abs(timeData[i] - 128);
   return s / timeData.length / 128;
 }
 
-function bass() {
+function getBass() {
   if (!isPlaying) return 0;
   analyser.getByteFrequencyData(freqData);
-  let s = 0; for (let i = 0; i < 6; i++) s += freqData[i]; return s / 6 / 255;
+  var s = 0; for (var i = 0; i < 6; i++) s += freqData[i]; return s / 6 / 255;
 }
 
-function treble() {
+function getTreble() {
   if (!isPlaying) return 0;
   analyser.getByteFrequencyData(freqData);
-  let s = 0, n = freqData.length;
-  for (let i = n-12; i < n; i++) s += freqData[i]; return s / 12 / 255;
+  var s = 0, n = freqData.length;
+  for (var i = n - 12; i < n; i++) s += freqData[i]; return s / 12 / 255;
 }
 
 function activeTajweed(t) {
-  const a = {};
-  for (const e of TAJWEED) {
-    const dt = t - e.t;
-    if (dt >= 0 && dt < 0.5) a[e.rule] = Math.max(a[e.rule]||0, 1 - dt/0.5);
+  var a = {};
+  for (var i = 0; i < TAJWEED.length; i++) {
+    var e = TAJWEED[i];
+    var dt = t - e.t;
+    if (dt >= 0 && dt < 2.0) {
+      // Slow swell: lerp up over 1s, decay over 2s
+      var v = dt < 1.0 ? dt / 1.0 : Math.max(0, 1.0 - (dt - 1.0) / 1.0);
+      a[e.rule] = Math.max(a[e.rule] || 0, v);
+    }
   }
   return a;
 }
 
 // ============================================================
-// ELEMENTS — each independently animated
+// GLOBALS
 // ============================================================
-// Each element: { type, draw(ctx, t, amp, bass, treble, taj, frame) }
+var W = 1080, H = 1920;
+var CX = W / 2;
+var doorW = 860, doorH = 1760;
+var doorX = (W - doorW) / 2, doorY = (H - doorH) / 2;
+var halfDW = doorW / 2;
+var archSpringY = doorY + 500;
+var centerOffset = halfDW * 0.6;
+var leftArcCx = CX + centerOffset;
+var rightArcCx = CX - centerOffset;
+var arcR = halfDW + centerOffset;
+var archPeakY = archSpringY - Math.sqrt(arcR * arcR - centerOffset * centerOffset);
 
-const elements = [];
+var PENCIL = "#9a9080";
+var PENCIL2 = "#b0a898";
 
-// Seeded random
-let _s = 42;
-function sr() { _s = (_s * 16807) % 2147483647; return (_s - 1) / 2147483646; }
+// Panel geometry
+var pY, pBot, pH, lX, lW, rX, rW;
+var mg = 26;
+var iT, iH, topH, gH, midH;
+var d1, d2, d3, d4;
+var lCx_val, rCx_val, piW;
+var topCY, topR, midCY, midR, botCY;
+var tCY, tR;
 
-// Door dimensions
-const cx = W/2, doorW = 820, doorH = 1680;
-const doorX = (W-doorW)/2, doorY = (H-doorH)/2;
-const archSpringY = doorY + 480;
-const halfW = doorW/2;
-const co = halfW * 0.6, arcR = halfW + co;
+// Smoothed audio values for gentle transitions
+var smoothAmp = 0, smoothBass = 0, smoothTreble = 0;
 
-// --- WATERCOLOR WASHES (5 independent washes) ---
-function makeWash(x, y, w, h, color, baseAlpha, phaseOffset, tajReact) {
-  return {
-    type: 'wash',
-    draw(ctx, t, amp, ba, tr, taj, frame) {
-      const breath = Math.sin(frame * 0.025 + phaseOffset) * 0.15;
-      const ampMod = amp * 0.4;
-      const tajMod = (taj[tajReact] || 0) * 0.3;
-      const alpha = baseAlpha + breath + ampMod + tajMod;
-      
-      const scaleX = 1 + Math.sin(frame * 0.018 + phaseOffset) * 0.04 + amp * 0.08;
-      const scaleY = 1 + Math.cos(frame * 0.022 + phaseOffset*1.3) * 0.03 + amp * 0.06;
-      
-      const dx = Math.sin(frame * 0.012 + phaseOffset*2) * 8;
-      const dy = Math.cos(frame * 0.015 + phaseOffset*1.7) * 6;
-      
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-      ctx.translate(x + w/2 + dx, y + h/2 + dy);
-      ctx.scale(scaleX, scaleY);
-      ctx.translate(-(x + w/2), -(y + h/2));
-      
-      const grd = ctx.createRadialGradient(x+w/2, y+h/2, 0, x+w/2, y+h/2, Math.max(w,h)*0.55);
-      grd.addColorStop(0, color);
-      grd.addColorStop(0.6, color + 'a0');
-      grd.addColorStop(1, color + '00');
-      ctx.fillStyle = grd;
-      ctx.fillRect(x-30, y-30, w+60, h+60);
-      ctx.restore();
-    }
-  };
-}
+function setup() {
+  createCanvas(W, H, WEBGL);
+  brush.load();
+  frameRate(30);
 
-elements.push(makeWash(doorX+30, doorY+40, doorW*0.55, 520, '#1040A0', 0.32, 0, 'ghunna'));
-elements.push(makeWash(doorX+doorW*0.35, doorY+150, 350, 350, '#B01808', 0.22, 1.5, 'madd'));
-elements.push(makeWash(doorX+70, archSpringY-70, doorW*0.5, 380, '#C88800', 0.28, 3.0, 'idgham'));
-elements.push(makeWash(doorX+50, archSpringY+420, doorW*0.55, 520, '#105830', 0.3, 4.5, 'ikhfa'));
-elements.push(makeWash(doorX+90, archSpringY+180, 320, 300, '#085868', 0.22, 6.0, 'ghunna'));
+  // Compute panel geometry
+  pY = archSpringY + 18;
+  pBot = doorY + doorH - 25;
+  pH = pBot - pY;
+  lX = doorX + 16;
+  lW = CX - 14 - lX;
+  rX = CX + 14;
+  rW = doorX + doorW - 16 - rX;
 
-// --- PENCIL LINES (each line independently animated) ---
-function makeLine(x1, y1, x2, y2, color, baseAlpha, phaseOffset, tajReact) {
-  return {
-    type: 'line',
-    draw(ctx, t, amp, ba, tr, taj, frame) {
-      const alphaBreath = Math.sin(frame * 0.03 + phaseOffset) * 0.15;
-      const tajPulse = (taj[tajReact] || 0) * 0.5;
-      const trebleBright = tr * 0.3;
-      const alpha = baseAlpha + alphaBreath + tajPulse + trebleBright;
-      
-      // Subtle position drift
-      const jx = Math.sin(frame * 0.008 + phaseOffset) * 2;
-      const jy = Math.cos(frame * 0.01 + phaseOffset*1.4) * 1.5;
-      
-      // Width breathing
-      const w = 1.2 + Math.sin(frame * 0.02 + phaseOffset*2) * 0.4 + amp * 1.5;
-      
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-      ctx.strokeStyle = color;
-      ctx.lineWidth = w;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(x1 + jx, y1 + jy);
-      ctx.lineTo(x2 + jx, y2 + jy);
-      ctx.stroke();
-      ctx.restore();
-    }
-  };
-}
+  iT = pY + mg;
+  iH = pH - 2 * mg;
+  topH = iH * 0.22;
+  gH = iH * 0.03;
+  midH = iH * 0.50;
+  d1 = iT + topH;
+  d2 = d1 + gH;
+  d3 = d2 + midH;
+  d4 = d3 + gH;
 
-// Door frame lines
-const bot = doorY + doorH;
-elements.push(makeLine(doorX, archSpringY, doorX+doorW, archSpringY, '#9a9080', 0.4, 0, 'madd'));
-elements.push(makeLine(doorX, archSpringY, doorX, bot, '#9a9080', 0.45, 0.5, 'ghunna'));
-elements.push(makeLine(doorX+doorW, archSpringY, doorX+doorW, bot, '#9a9080', 0.45, 1.0, 'ghunna'));
-elements.push(makeLine(doorX, bot, doorX+doorW, bot, '#9a9080', 0.5, 1.5, 'madd'));
-// Center divider
-elements.push(makeLine(cx, archSpringY, cx, bot, '#9a9080', 0.35, 2.0, 'idgham'));
-// Panel inner frames
-const pY = archSpringY+20, pH = bot-30-pY;
-const lX = doorX+18, lW = cx-16-lX, rX = cx+16, rW = doorX+doorW-18-rX;
-[{x:lX,w:lW},{x:rX,w:rW}].forEach((p, idx) => {
-  elements.push(makeLine(p.x, pY, p.x+p.w, pY, '#b0a898', 0.25, 3+idx, 'madd'));
-  elements.push(makeLine(p.x+p.w, pY, p.x+p.w, pY+pH, '#b0a898', 0.25, 3.5+idx, 'ikhfa'));
-  elements.push(makeLine(p.x+p.w, pY+pH, p.x, pY+pH, '#b0a898', 0.25, 4+idx, 'madd'));
-  elements.push(makeLine(p.x, pY+pH, p.x, pY, '#b0a898', 0.25, 4.5+idx, 'ikhfa'));
-  // Cross lines
-  elements.push(makeLine(p.x+20, pY+20, p.x+p.w-20, pY+pH-20, '#b0a898', 0.12, 5+idx, 'idgham'));
-  elements.push(makeLine(p.x+p.w-20, pY+20, p.x+20, pY+pH-20, '#b0a898', 0.12, 5.5+idx, 'idgham'));
-});
+  lCx_val = lX + lW / 2;
+  rCx_val = rX + rW / 2;
+  piW = lW - 2 * mg;
 
-// --- ARCH (as a series of segments, each independently breathing) ---
-function makeArchSegment(x1, y1, x2, y2, phaseOffset) {
-  return makeLine(x1, y1, x2, y2, '#9a9080', 0.35, phaseOffset, 'madd');
-}
+  topCY = iT + topH / 2;
+  topR = Math.min(piW / 2, topH / 2) * 0.85;
+  midCY = d2 + midH / 2;
+  midR = Math.min(piW / 2, midH / 2) * 0.85;
+  botCY = d4 + topH / 2;
 
-const archSegs = 30;
-for (let i = 0; i < archSegs; i++) {
-  const t1 = i/archSegs, t2 = (i+1)/archSegs;
-  // Left half
-  const lx1 = (cx-halfW)+halfW*t1, lx2 = (cx-halfW)+halfW*t2;
-  const ly1 = archSpringY - Math.sqrt(Math.max(0, arcR*arcR - (lx1-(cx+co))*(lx1-(cx+co))));
-  const ly2 = archSpringY - Math.sqrt(Math.max(0, arcR*arcR - (lx2-(cx+co))*(lx2-(cx+co))));
-  elements.push(makeArchSegment(lx1, ly1, lx2, ly2, i*0.3));
-  // Right half
-  const rx1 = cx+halfW*t1, rx2 = cx+halfW*t2;
-  const ry1 = archSpringY - Math.sqrt(Math.max(0, arcR*arcR - (rx1-(cx-co))*(rx1-(cx-co))));
-  const ry2 = archSpringY - Math.sqrt(Math.max(0, arcR*arcR - (rx2-(cx-co))*(rx2-(cx-co))));
-  elements.push(makeArchSegment(rx1, ry1, rx2, ry2, i*0.3 + 0.15));
-}
+  tCY = archPeakY + (archSpringY - archPeakY) * 0.45;
+  tR = (archSpringY - archPeakY) * 0.15;
 
-// --- CIRCLES (rosettes, independently pulsing) ---
-function makeCircle(x, y, r, color, baseAlpha, phaseOffset, tajReact) {
-  return {
-    type: 'circle',
-    draw(ctx, t, amp, ba, tr, taj, frame) {
-      const breath = Math.sin(frame * 0.02 + phaseOffset) * 0.12;
-      const tajPulse = (taj[tajReact] || 0) * 0.35;
-      const rScale = 1 + Math.sin(frame * 0.015 + phaseOffset*1.3) * 0.08 + amp * 0.15;
-      const alpha = baseAlpha + breath + tajPulse;
-      
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 0.8 + amp * 1.5;
-      ctx.beginPath();
-      ctx.arc(x, y, r * rScale, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
-  };
-}
-
-// Panel rosettes
-[lX+lW/2, rX+rW/2].forEach((pcx, i) => {
-  elements.push(makeCircle(pcx, pY+pH*0.3, Math.min(lW,pH)*0.2, '#b0a898', 0.15, 7+i, 'ghunna'));
-  elements.push(makeCircle(pcx, pY+pH*0.7, Math.min(lW,pH)*0.2, '#b0a898', 0.15, 8+i, 'madd'));
-});
-
-// Tympanum circle
-const tCY = archSpringY - (archSpringY - (archSpringY - Math.sqrt(arcR*arcR - co*co))) * 0.4;
-elements.push(makeCircle(cx, tCY+100, 60, '#b0a898', 0.18, 9, 'idgham'));
-
-// --- CRAYON SCRIBBLES (each independently drifting) ---
-function makeCrayon(x1, y1, x2, y2, color, baseAlpha, phaseOffset, tajReact) {
-  return {
-    type: 'crayon',
-    draw(ctx, t, amp, ba, tr, taj, frame) {
-      const breath = Math.sin(frame * 0.035 + phaseOffset) * 0.2;
-      const tajBoost = (taj[tajReact] || 0) * 0.4;
-      const alpha = baseAlpha + breath + tajBoost + amp * 0.2;
-      
-      const dx = Math.sin(frame * 0.01 + phaseOffset*2.1) * 4;
-      const dy = Math.cos(frame * 0.013 + phaseOffset*1.8) * 3;
-      const w = 2.5 + Math.sin(frame * 0.025 + phaseOffset) * 1.5 + amp * 2;
-      
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-      ctx.strokeStyle = color;
-      ctx.lineWidth = w;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(x1 + dx, y1 + dy);
-      ctx.lineTo(x2 + dx, y2 + dy);
-      ctx.stroke();
-      ctx.restore();
-    }
-  };
-}
-
-elements.push(makeCrayon(cx-80, archSpringY-20, cx-30, archSpringY+15, '#4A7A5A', 0.35, 10, 'ghunna'));
-elements.push(makeCrayon(cx+20, archSpringY-10, cx+70, archSpringY+20, '#4A7A5A', 0.3, 11, 'madd'));
-elements.push(makeCrayon(doorX+30, archSpringY+60, doorX+90, archSpringY+40, '#4A7A5A', 0.3, 12, 'ikhfa'));
-elements.push(makeCrayon(lX+lW/2-60, pY+pH*0.3-5, lX+lW/2-10, pY+pH*0.3+10, '#4A7EC2', 0.25, 13, 'idgham'));
-elements.push(makeCrayon(rX+rW/2+10, pY+pH*0.65-8, rX+rW/2+60, pY+pH*0.65+5, '#4A7EC2', 0.25, 14, 'idgham'));
-elements.push(makeCrayon(lX+20, pY+10, lX+70, pY-5, '#C9A832', 0.25, 15, 'madd'));
-elements.push(makeCrayon(rX+rW-70, pY+pH-15, rX+rW-20, pY+pH+5, '#C9A832', 0.25, 16, 'madd'));
-
-// --- ACCENT LINES (thin, diagonal, breathing) ---
-elements.push(makeLine(doorX+120, archSpringY+200, doorX+doorW-200, bot-300, '#C9A83260', 0.15, 17, 'madd'));
-elements.push(makeLine(doorX+doorW-100, archSpringY+160, doorX+220, bot-250, '#4A7EC260', 0.12, 18, 'ghunna'));
-
-// --- SECTION FILL JEWELS (pulsing independently) ---
-function makeJewel(x, y, w, h, color, baseAlpha, phaseOffset, tajReact) {
-  return {
-    type: 'jewel',
-    draw(ctx, t, amp, ba, tr, taj, frame) {
-      const breath = Math.sin(frame * 0.02 + phaseOffset) * 0.1;
-      const tajGlow = (taj[tajReact] || 0) * 0.35;
-      const alpha = baseAlpha + breath + tajGlow + amp * 0.15;
-      const scale = 1 + Math.sin(frame * 0.018 + phaseOffset*1.5) * 0.06;
-      
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-      ctx.translate(x+w/2, y+h/2);
-      ctx.scale(scale, scale);
-      ctx.translate(-(x+w/2), -(y+h/2));
-      
-      const grd = ctx.createRadialGradient(x+w/2, y+h/2, 0, x+w/2, y+h/2, Math.max(w,h)*0.5);
-      grd.addColorStop(0, color);
-      grd.addColorStop(1, color + '00');
-      ctx.fillStyle = grd;
-      ctx.fillRect(x, y, w, h);
-      ctx.restore();
-    }
-  };
-}
-
-elements.push(makeJewel(lX+26, pY+26, lW-52, pH*0.2, '#4010A0', 0.25, 19, 'ikhfa'));
-elements.push(makeJewel(rX+26, pY+pH*0.4, rW-52, pH*0.25, '#B01008', 0.2, 20, 'madd'));
-
-console.log('Elements:', elements.length);
-
-// ============================================================
-// ANIMATION LOOP
-// ============================================================
-let frame = 0;
-
-function animate() {
-  requestAnimationFrame(animate);
-  frame++;
-  
-  const t = audioTime();
-  const amp = amplitude();
-  const ba = bass();
-  const tr = treble();
-  const taj = activeTajweed(Math.max(0, t));
-  
-  // Ambient when no audio
-  const ambAmp = isPlaying ? amp : (0.08 + Math.sin(frame * 0.02) * 0.05);
-  const ambBass = isPlaying ? ba : (0.05 + Math.sin(frame * 0.015) * 0.03);
-  const ambTreble = isPlaying ? tr : (0.03 + Math.cos(frame * 0.018) * 0.02);
-  
-  // Clear to cream paper
-  ctx.fillStyle = '#f2eada';
-  ctx.fillRect(0, 0, W, H);
-  
-  // Draw EVERY element independently
-  for (const el of elements) {
-    el.draw(ctx, t, ambAmp, ambBass, ambTreble, taj, frame);
-  }
-  
-  // Subtle vignette (also breathing)
-  const vigBreath = 0.08 + ambAmp * 0.1 + Math.sin(frame * 0.01) * 0.03;
-  const vig = ctx.createRadialGradient(W/2, H*0.45, H*0.3, W/2, H*0.45, H*0.6);
-  vig.addColorStop(0, 'rgba(0,0,0,0)');
-  vig.addColorStop(1, `rgba(10,10,16,${vigBreath})`);
-  ctx.fillStyle = vig;
-  ctx.fillRect(0, 0, W, H);
-}
-
-// ============================================================
-// INIT
-// ============================================================
-async function init() {
-  await loadAudio();
-  document.getElementById('tap').addEventListener('click', () => {
-    document.getElementById('tap').style.display = 'none';
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    startAudio();
+  // Load audio
+  loadAudioAsync().then(function() {
+    document.getElementById('tap').addEventListener('click', function() {
+      document.getElementById('tap').style.display = 'none';
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      startAudio();
+    });
   });
-  animate();
 }
 
-init();
+// ============================================================
+// NOISE HELPERS — each element gets a unique noise channel
+// ============================================================
+function slowNoise(seed, speed) {
+  return noise(seed * 20.00000 + frameCount * speed);
+}
+
+// Map noise 0-1 to a range centered on 0
+function noiseBipolar(seed, speed, range) {
+  return (slowNoise(seed, speed) - 0.5) * 2 * range;
+}
+
+// ============================================================
+// DRAW — re-render everything each frame
+// ============================================================
+function draw() {
+  translate(-width / 2, -height / 2);
+  background(242, 234, 218);
+
+  var f = frameCount;
+  var t = audioTime();
+  var rawAmp = getAmplitude();
+  var rawBass = getBass();
+  var rawTreble = getTreble();
+
+  // Smooth audio values for gentle transitions
+  var lerpRate = 0.08;
+  smoothAmp = lerp(smoothAmp, rawAmp, lerpRate);
+  smoothBass = lerp(smoothBass, rawBass, lerpRate);
+  smoothTreble = lerp(smoothTreble, rawTreble, lerpRate);
+
+  var amp = isPlaying ? smoothAmp : (0.05 + sin(f * 0.00160) * 0.03);
+  var ba = isPlaying ? smoothBass : (0.03 + sin(f * 0.00120) * 0.02);
+  var tr = isPlaying ? smoothTreble : (0.02 + cos(f * 0.00140) * 0.015);
+  var taj = activeTajweed(Math.max(0, t));
+
+  // Seed for consistent-ish per-frame rendering
+  randomSeed(f * 7 + 42);
+  noiseSeed(42);
+
+  // ===== LAYER 1: WATERCOLOR WASHES =====
+  drawWashes(f, amp, taj);
+
+  // ===== LAYER 2: HATCH PATTERNS (slowly rotating) =====
+  drawHatches(f, amp, taj);
+
+  // ===== LAYER 3: PENCIL DOOR STRUCTURE =====
+  brush.noFill();
+  brush.noHatch();
+  drawPencilStructure(f, amp, taj);
+
+  // ===== LAYER 4: ARCH =====
+  drawArch(f, amp, taj);
+
+  // ===== LAYER 5: ROSETTE CIRCLES =====
+  drawRosettes(f, amp, taj);
+
+  // ===== LAYER 6: CRAYON SCRIBBLES =====
+  drawCrayons(f, amp, taj);
+
+  // ===== LAYER 7: JEWEL FILLS =====
+  drawJewels(f, amp, taj);
+
+  // ===== LAYER 8: ACCENT PAINT LINES =====
+  drawAccents(f, amp, taj);
+}
+
+// ============================================================
+// LAYER 1: WATERCOLOR WASHES — fillBleed drifts, positions breathe
+// ============================================================
+function drawWashes(f, amp, taj) {
+  brush.noStroke();
+  brush.noHatch();
+
+  // Lapis blue wash — upper area
+  var lapisTaj = (taj.ghunna || 0) * 0.08;
+  var lapisBleed = 0.5 + noiseBipolar(1, 0.005, 0.15) + amp * 0.1 + lapisTaj;
+  var lapisDx = noiseBipolar(1.1, 0.007, 6);
+  var lapisDy = noiseBipolar(1.2, 0.006, 5);
+  var lapisAlpha = 65 + noiseBipolar(1.3, 0.008, 12) + amp * 15;
+  brush.fill("#1040A0", lapisAlpha);
+  brush.fillBleed(constrain(lapisBleed, 0.35, 0.75));
+  brush.rect(doorX + 40 + lapisDx, doorY + 60 + lapisDy, doorW * 0.55, 550);
+
+  // Gold wash — mid band
+  var goldTaj = (taj.idgham || 0) * 0.08;
+  var goldBleed = 0.5 + noiseBipolar(2, 0.006, 0.12) + amp * 0.08 + goldTaj;
+  var goldDx = noiseBipolar(2.1, 0.005, 5);
+  var goldDy = noiseBipolar(2.2, 0.007, 4);
+  var goldAlpha = 60 + noiseBipolar(2.3, 0.009, 10) + amp * 12;
+  brush.fill("#C88800", goldAlpha);
+  brush.fillBleed(constrain(goldBleed, 0.35, 0.7));
+  brush.rect(doorX + 80 + goldDx, archSpringY - 50 + goldDy, doorW * 0.5, 400);
+
+  // Terre verte wash — lower area
+  var verteTaj = (taj.ikhfa || 0) * 0.08;
+  var verteBleed = 0.5 + noiseBipolar(3, 0.005, 0.15) + amp * 0.1 + verteTaj;
+  var verteDx = noiseBipolar(3.1, 0.006, 5);
+  var verteDy = noiseBipolar(3.2, 0.008, 4);
+  var verteAlpha = 70 + noiseBipolar(3.3, 0.007, 12) + amp * 12;
+  brush.fill("#105830", verteAlpha);
+  brush.fillBleed(constrain(verteBleed, 0.35, 0.75));
+  brush.rect(doorX + 60 + verteDx, archSpringY + 450 + verteDy, doorW * 0.55, 550);
+
+  brush.noFill();
+}
+
+// ============================================================
+// LAYER 2: HATCH PATTERNS — slowly rotating angle, breathing distance
+// ============================================================
+function drawHatches(f, amp, taj) {
+  brush.noFill();
+  brush.noStroke();
+
+  // Left panel hatch
+  var hatchAngle1 = noiseBipolar(20, 0.003, 25);
+  var hatchDist1 = 12 + noiseBipolar(20.1, 0.004, 3) + amp * 4;
+  brush.hatchStyle("2H", PENCIL2, 1.5);
+  brush.hatch(hatchDist1, hatchAngle1);
+  brush.rect(lX + mg + 10, d2 + 10, piW - 20, midH * 0.3);
+
+  // Right panel hatch
+  var hatchAngle2 = noiseBipolar(21, 0.004, 20);
+  var hatchDist2 = 14 + noiseBipolar(21.1, 0.003, 3) + amp * 3;
+  brush.hatchStyle("2H", PENCIL2, 1.2);
+  brush.hatch(hatchDist2, hatchAngle2);
+  brush.rect(rX + mg + 10, iT + 10, piW - 20, topH - 20);
+
+  brush.noHatch();
+}
+
+// ============================================================
+// LAYER 3: PENCIL DOOR STRUCTURE
+// ============================================================
+function drawPencilStructure(f, amp, taj) {
+  brush.noFill();
+  brush.noHatch();
+
+  var maddSwell = (taj.madd || 0) * 0.3;
+  var ghunnaSwell = (taj.ghunna || 0) * 0.25;
+
+  // wiggle set low for pencil
+  brush.wiggle(1.5 + amp * 2);
+
+  // OUTER FRAME — each side drifts independently
+  drawBreathingFrame(doorX, archSpringY, doorW, doorY + doorH - archSpringY, PENCIL, 2.0, 4.5, 4, f, amp + maddSwell);
+  drawBreathingFrame(doorX - 10, archSpringY - 6, doorW + 20, doorY + doorH - archSpringY + 10, PENCIL2, 1.0, 3.0, 4.5, f, amp * 0.7);
+
+  // CENTER DIVIDER — spline with breathing
+  var cdDx = noiseBipolar(5, 0.006, 2.5);
+  var cdW = 2.0 + noiseBipolar(5.1, 0.008, 0.8) + amp * 1.0;
+  brush.set("2H", PENCIL, constrain(cdW, 1.0, 4.0));
+  var cdTop = archSpringY + 3, cdBot = doorY + doorH - 18;
+  brush.spline([
+    [CX + cdDx, cdTop, 0.4],
+    [CX + cdDx * 0.8, cdTop + (cdBot - cdTop) * 0.3, 0.8 + amp * 0.5],
+    [CX + cdDx * 1.2, cdTop + (cdBot - cdTop) * 0.6, 0.5],
+    [CX + cdDx * 0.6, cdBot, 0.7 + ghunnaSwell]
+  ]);
+
+  // PANEL FRAMES
+  drawBreathingFrame(lX, pY, lW, pH, PENCIL, 1.5, 3.5, 6, f, amp + maddSwell * 0.5);
+  drawBreathingFrame(rX, pY, rW, pH, PENCIL, 1.5, 3.5, 6.5, f, amp + maddSwell * 0.5);
+  drawBreathingFrame(lX + 14, pY + 14, lW - 28, pH - 28, PENCIL2, 1.0, 2.5, 7, f, amp * 0.5);
+  drawBreathingFrame(rX + 14, pY + 14, rW - 28, pH - 28, PENCIL2, 1.0, 2.5, 7.5, f, amp * 0.5);
+
+  // TRIPARTITE DIVIDERS
+  var panels = [[lX, lW], [rX, rW]];
+  var dividers = [d1, d2, d3, d4];
+  for (var pi = 0; pi < panels.length; pi++) {
+    for (var di = 0; di < dividers.length; di++) {
+      var seed = 8 + pi * 4 + di;
+      var dw = 1.2 + noiseBipolar(seed, 0.007, 0.5);
+      var ddx = noiseBipolar(seed + 0.1, 0.005, 1.5);
+      var ddy = noiseBipolar(seed + 0.2, 0.006, 1.5);
+      brush.set("2H", PENCIL2, constrain(dw, 0.8, 2.5));
+      brush.line(panels[pi][0] + 10 + ddx, dividers[di] + ddy, panels[pi][0] + panels[pi][1] - 10 + ddx, dividers[di] + ddy);
+    }
+  }
+
+  // CROSS LINES in panels — very faint X marks
+  var crossSeed = 16;
+  var crossPairs = [
+    [lX + mg, iT, lX + lW - mg, iT + topH],
+    [lX + lW - mg, iT, lX + mg, iT + topH],
+    [rX + mg, iT, rX + rW - mg, iT + topH],
+    [rX + rW - mg, iT, rX + mg, iT + topH],
+    [lX + mg, d2, lX + lW - mg, d2 + midH],
+    [lX + lW - mg, d2, lX + mg, d2 + midH],
+    [rX + mg, d2, rX + rW - mg, d2 + midH],
+    [rX + rW - mg, d2, rX + mg, d2 + midH]
+  ];
+  for (var ci = 0; ci < crossPairs.length; ci++) {
+    var cs = crossSeed + ci;
+    var cw = 1.0 + noiseBipolar(cs, 0.008, 0.5) + amp * 0.4;
+    var cdxc = noiseBipolar(cs + 0.1, 0.005, 2);
+    var cdyc = noiseBipolar(cs + 0.2, 0.006, 2);
+    brush.set("2H", PENCIL2, constrain(cw, 0.6, 2.2));
+    brush.line(crossPairs[ci][0] + cdxc, crossPairs[ci][1] + cdyc, crossPairs[ci][2] + cdxc, crossPairs[ci][3] + cdyc);
+  }
+
+  // THRESHOLD
+  var thW = 3.0 + noiseBipolar(25, 0.006, 0.8) + amp * 0.6;
+  brush.set("2H", PENCIL, constrain(thW, 2.0, 5.0));
+  brush.line(doorX - 10, doorY + doorH - 6, doorX + doorW + 10, doorY + doorH - 6);
+
+  brush.wiggle(2);
+}
+
+function drawBreathingFrame(x, y, w, h, col, wMin, wMax, seedBase, f, ampMod) {
+  var sides = [
+    [x, y, x + w, y],
+    [x + w, y, x + w, y + h],
+    [x + w, y + h, x, y + h],
+    [x, y + h, x, y]
+  ];
+  for (var si = 0; si < sides.length; si++) {
+    var seed = seedBase + si * 0.25;
+    var sw = wMin + (wMax - wMin) * slowNoise(seed, 0.007) + ampMod * 0.5;
+    var dx = noiseBipolar(seed + 0.1, 0.005, 2.5);
+    var dy = noiseBipolar(seed + 0.2, 0.006, 2.5);
+    brush.set("2H", col, constrain(sw, 1.0, 5.5));
+    brush.line(sides[si][0] + dx, sides[si][1] + dy, sides[si][2] + dx, sides[si][3] + dy);
+  }
+}
+
+// ============================================================
+// LAYER 4: POINTED ARCH — each segment drifts independently
+// ============================================================
+function drawArch(f, amp, taj) {
+  brush.noFill();
+  brush.noHatch();
+  var maddSwell = (taj.madd || 0) * 0.4;
+
+  var steps = 40;
+  // Left half
+  for (var i = 0; i < steps; i++) {
+    var t1 = i / steps, t2 = (i + 1) / steps;
+    var pressureMod = 0.4 + 1.6 * sin(PI * t1);
+    var seed = 30 + i;
+    var sw = constrain(2.5 * pressureMod + noiseBipolar(seed, 0.008, 0.5) + amp * 0.8 + maddSwell * 0.5, 0.8, 5.0);
+    var dx = noiseBipolar(seed + 0.1, 0.005, 3);
+    var dy = noiseBipolar(seed + 0.2, 0.006, 2.5);
+
+    brush.set("2H", PENCIL, sw);
+    var x1 = (CX - halfDW) + halfDW * t1;
+    var x2 = (CX - halfDW) + halfDW * t2;
+    var dy1 = x1 - leftArcCx, dy2 = x2 - leftArcCx;
+    var y1 = archSpringY - sqrt(max(0, arcR * arcR - dy1 * dy1));
+    var y2 = archSpringY - sqrt(max(0, arcR * arcR - dy2 * dy2));
+    brush.line(x1 + dx, y1 + dy, x2 + dx, y2 + dy);
+  }
+
+  // Right half
+  for (var i = 0; i < steps; i++) {
+    var t1 = i / steps, t2 = (i + 1) / steps;
+    var pressureMod = 0.4 + 1.6 * sin(PI * t1);
+    var seed = 70 + i;
+    var sw = constrain(2.5 * pressureMod + noiseBipolar(seed, 0.008, 0.5) + amp * 0.8 + maddSwell * 0.5, 0.8, 5.0);
+    var dx = noiseBipolar(seed + 0.1, 0.005, 3);
+    var dy = noiseBipolar(seed + 0.2, 0.006, 2.5);
+
+    brush.set("2H", PENCIL, sw);
+    var x1 = CX + halfDW * t1;
+    var x2 = CX + halfDW * t2;
+    var dx1 = x1 - rightArcCx, dx2 = x2 - rightArcCx;
+    var y1 = archSpringY - sqrt(max(0, arcR * arcR - dx1 * dx1));
+    var y2 = archSpringY - sqrt(max(0, arcR * arcR - dx2 * dx2));
+    brush.line(x1 + dx, y1 + dy, x2 + dx, y2 + dy);
+  }
+
+  // Inner arch
+  var ihw = halfDW - 30, ico = ihw * 0.6, iR = ihw + ico;
+  for (var i = 0; i < 30; i++) {
+    var t1 = i / 30, t2 = (i + 1) / 30;
+    var seed = 110 + i;
+    var sw = constrain(1.5 + noiseBipolar(seed, 0.007, 0.4) + amp * 0.5, 0.8, 3.0);
+    var dx = noiseBipolar(seed + 0.1, 0.005, 2);
+    var dy = noiseBipolar(seed + 0.2, 0.006, 2);
+    brush.set("2H", PENCIL2, sw);
+    // Left
+    var lx1 = (CX - ihw) + ihw * t1, lx2 = (CX - ihw) + ihw * t2;
+    var ld1 = lx1 - (CX + ico), ld2 = lx2 - (CX + ico);
+    brush.line(lx1 + dx, archSpringY - sqrt(max(0, iR * iR - ld1 * ld1)) + dy,
+               lx2 + dx, archSpringY - sqrt(max(0, iR * iR - ld2 * ld2)) + dy);
+    // Right
+    var rx1 = CX + ihw * t1, rx2 = CX + ihw * t2;
+    var rd1 = rx1 - (CX - ico), rd2 = rx2 - (CX - ico);
+    brush.line(rx1 + dx, archSpringY - sqrt(max(0, iR * iR - rd1 * rd1)) + dy,
+               rx2 + dx, archSpringY - sqrt(max(0, iR * iR - rd2 * rd2)) + dy);
+  }
+}
+
+// ============================================================
+// LAYER 5: ROSETTE CIRCLES — radius pulses gently
+// ============================================================
+function drawRosettes(f, amp, taj) {
+  brush.noFill();
+  brush.noHatch();
+
+  var ghunnaSwell = (taj.ghunna || 0) * 0.1;
+
+  var circles = [
+    [lCx_val, topCY, topR, 140],
+    [rCx_val, topCY, topR, 141],
+    [lCx_val, midCY, midR, 142],
+    [rCx_val, midCY, midR, 143],
+    [lCx_val, botCY, topR, 144],
+    [rCx_val, botCY, topR, 145],
+    [CX, tCY, tR, 146]
+  ];
+
+  for (var ci = 0; ci < circles.length; ci++) {
+    var c = circles[ci];
+    var seed = c[3];
+    var rScale = 1 + noiseBipolar(seed, 0.006, 0.06) + amp * 0.08 + ghunnaSwell;
+    var dx = noiseBipolar(seed + 0.1, 0.005, 2);
+    var dy = noiseBipolar(seed + 0.2, 0.007, 2);
+    var sw = 1.5 + noiseBipolar(seed + 0.3, 0.008, 0.5) + amp * 0.5;
+    brush.set("2H", PENCIL2, constrain(sw, 0.8, 3.0));
+    brush.circle(c[0] + dx, c[1] + dy, c[2] * 2 * rScale, true);
+  }
+}
+
+// ============================================================
+// LAYER 6: CRAYON SCRIBBLES — drift + opacity breathing
+// ============================================================
+function drawCrayons(f, amp, taj) {
+  brush.noFill();
+  brush.noHatch();
+  brush.wiggle(6 + noiseBipolar(150, 0.004, 3));
+
+  var crayons = [
+    [CX - 80, archSpringY - 20, CX - 30, archSpringY + 15, "#4A7A5A", 151, 'ghunna'],
+    [CX + 20, archSpringY - 10, CX + 70, archSpringY + 20, "#4A7A5A", 152, 'madd'],
+    [doorX + 30, archSpringY + 60, doorX + 90, archSpringY + 40, "#4A7A5A", 153, 'ikhfa'],
+    [lCx_val - 60, d1 - 5, lCx_val - 10, d1 + 10, "#4A7EC2", 154, 'idgham'],
+    [rCx_val + 10, d3 - 8, rCx_val + 60, d3 + 5, "#4A7EC2", 155, 'idgham'],
+    [lX + 20, pY + 10, lX + 70, pY - 5, "#C9A832", 156, 'madd'],
+    [rX + rW - 70, pBot - 15, rX + rW - 20, pBot + 5, "#C9A832", 157, 'madd']
+  ];
+
+  for (var ci = 0; ci < crayons.length; ci++) {
+    var c = crayons[ci];
+    var seed = c[5];
+    var tajBoost = (taj[c[6]] || 0) * 0.6;
+    var dx = noiseBipolar(seed, 0.007, 4);
+    var dy = noiseBipolar(seed + 0.1, 0.008, 3);
+    var sw = 3.0 + noiseBipolar(seed + 0.2, 0.006, 1.5) + amp * 2.0 + tajBoost * 0.8;
+    brush.set("2B", c[4], constrain(sw, 2.0, 7.0));
+    brush.line(c[0] + dx, c[1] + dy, c[2] + dx, c[3] + dy);
+  }
+
+  brush.wiggle(2);
+}
+
+// ============================================================
+// LAYER 7: JEWEL FILLS — color temperature shifts
+// ============================================================
+function drawJewels(f, amp, taj) {
+  brush.noStroke();
+  brush.noHatch();
+
+  // Violet — left top panel
+  var vjSeed = 160;
+  var vjAlpha = 100 + noiseBipolar(vjSeed, 0.006, 20) + amp * 15 + (taj.ikhfa || 0) * 25;
+  var vjBleed = 0.35 + noiseBipolar(vjSeed + 0.1, 0.005, 0.08);
+  brush.fill("#4010A0", constrain(vjAlpha, 60, 140));
+  brush.fillBleed(constrain(vjBleed, 0.25, 0.5));
+  brush.rect(lX + mg + 5, iT + 5, piW - 10, topH - 10);
+
+  // Vermillion — right mid panel
+  var vrSeed = 162;
+  var vrAlpha = 90 + noiseBipolar(vrSeed, 0.007, 18) + amp * 12 + (taj.madd || 0) * 20;
+  var vrBleed = 0.35 + noiseBipolar(vrSeed + 0.1, 0.004, 0.07);
+  brush.fill("#B01008", constrain(vrAlpha, 55, 130));
+  brush.fillBleed(constrain(vrBleed, 0.25, 0.5));
+  brush.rect(rX + mg + 5, d2 + 5, piW - 10, midH * 0.3);
+
+  // Deep teal — tympanum
+  var dtSeed = 164;
+  var dtAlpha = 110 + noiseBipolar(dtSeed, 0.005, 20) + amp * 15 + (taj.idgham || 0) * 20;
+  var dtBleed = 0.35 + noiseBipolar(dtSeed + 0.1, 0.006, 0.08);
+  brush.fill("#085868", constrain(dtAlpha, 70, 150));
+  brush.fillBleed(constrain(dtBleed, 0.25, 0.5));
+  brush.circle(CX, tCY, tR * 1.6);
+
+  brush.noFill();
+}
+
+// ============================================================
+// LAYER 8: ACCENT PAINT LINES — thin, barely there
+// ============================================================
+function drawAccents(f, amp, taj) {
+  brush.noFill();
+  brush.noHatch();
+
+  var seed1 = 170;
+  var sw1 = 1.5 + noiseBipolar(seed1, 0.005, 0.5) + amp * 0.5;
+  var dx1 = noiseBipolar(seed1 + 0.1, 0.004, 3);
+  brush.set("marker", "#C9A832", constrain(sw1, 0.8, 3.0));
+  brush.line(doorX + 120 + dx1, archSpringY + 200, doorX + doorW - 200 + dx1, doorY + doorH - 300);
+
+  var seed2 = 172;
+  var sw2 = 1.2 + noiseBipolar(seed2, 0.006, 0.4) + amp * 0.5;
+  var dx2 = noiseBipolar(seed2 + 0.1, 0.005, 3);
+  brush.set("marker", "#4A7EC2", constrain(sw2, 0.6, 2.5));
+  brush.line(doorX + doorW - 100 + dx2, archSpringY + 160, doorX + 220 + dx2, doorY + doorH - 250);
+}
 </script>
 </body>
 </html>
