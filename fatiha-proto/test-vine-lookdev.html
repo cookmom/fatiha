@@ -135,7 +135,7 @@ function buildVinePaths() {
 
   // Leaf positions along vine
   leafPositions = [];
-  for (var i = 8; i < 72; i += 5 + Math.floor(Math.random()*2)) {
+  for (var i = 5; i < 76; i += 3 + Math.floor(Math.random()*2)) {
     var lp = leftVinePath[i], rp = rightVinePath[i];
     var lNext = leftVinePath[Math.min(i+1,79)], rNext = rightVinePath[Math.min(i+1,79)];
     var lAng = Math.atan2(lNext.y-lp.y, lNext.x-lp.x) + (i%2===0 ? -1.2 : 1.2);
@@ -148,7 +148,7 @@ function buildVinePaths() {
 
   // Flower positions along vine
   flowerPositions = [];
-  for (var i = 12; i < 75; i += 8 + Math.floor(Math.random()*4)) {
+  for (var i = 8; i < 78; i += 5 + Math.floor(Math.random()*3)) {
     var lp = leftVinePath[i], rp = rightVinePath[i];
     var lNext = leftVinePath[Math.min(i+1,79)], rNext = rightVinePath[Math.min(i+1,79)];
     var lPerp = Math.atan2(lNext.y-lp.y, lNext.x-lp.x) - Math.PI/2;
@@ -303,31 +303,10 @@ function setup() {
   }
 
   // ============================================
-  // LAYER 3: Leaf pencil outlines + veins
-  // ============================================
-  for (var i = 0; i < allLeaves.length; i++) {
-    var lf = allLeaves[i];
-    brush.set('2H', '#c0b8a8', 0.08);
-    brush.strokeWeight(0.8);
-    brush.polygon(lf.pts);
-    // Vein
-    brush.set('2H', '#a0b0a0', 0.08);
-    var vx = lf.x + Math.cos(lf.angle) * 55 * lf.scale;
-    var vy = lf.y + Math.sin(lf.angle) * 55 * lf.scale;
-    brush.line(lf.x, lf.y, vx, vy);
-  }
+  // LAYER 3: NO leaf pencil outlines — pure watercolor fill only
 
   // ============================================
-  // LAYER 4: Flower petal pencil outlines
-  // ============================================
-  brush.set('2H', '#c0b8a8', 0.08);
-  brush.strokeWeight(0.8);
-  for (var i = 0; i < allFlowers.length; i++) {
-    var fl = allFlowers[i];
-    for (var j = 0; j < fl.petals.length; j++) {
-      brush.polygon(fl.petals[j].pts);
-    }
-  }
+  // LAYER 4: NO flower pencil outlines — pure watercolor fill only
 
   // ============================================
   // LAYER 5: Leaf watercolor fills
