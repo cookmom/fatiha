@@ -158,7 +158,7 @@ function buildVinePaths() {
     var archProximity = i / 75;
     var bottomProximity = Math.max(0, 1 - i / 20); // bigger near bottom too
     var s = 0.45 + Math.max(archProximity, bottomProximity) * 0.25 + Math.random()*0.1;
-    var types = ['rose','rose','star','bud','rose','star','bud','rose'];
+    var types = ['rose','rose','pink','bud','rose','pink','bud','rose'];
     var type = types[i % types.length];
     flowerPositions.push({x:lp.x+Math.cos(lPerp)*off, y:lp.y+Math.sin(lPerp)*off, scale:s, type:type});
     flowerPositions.push({x:rp.x+Math.cos(rPerp)*off, y:rp.y+Math.sin(rPerp)*off, scale:s, type:type});
@@ -171,9 +171,9 @@ function buildVinePaths() {
 function buildRoseData(fcx, fcy, s) {
   var rose = {x: fcx, y: fcy, scale: s, petals: [], centerPts: null};
   var rings = [
-    {count:5, len:50*s, w:18*s, color:'#5a0818', opacity:160},  // outer: deep crimson, wide
-    {count:5, len:36*s, w:14*s, color:'#a02040', opacity:150},  // middle: rose
-    {count:4, len:22*s, w:10*s, color:'#e87090', opacity:140}   // inner: light pink
+    {count:5, len:32*s, w:22*s, color:'#8a1020', opacity:160},  // outer: deep crimson, round
+    {count:5, len:24*s, w:18*s, color:'#c03050', opacity:140},  // middle: rose pink, round
+    {count:4, len:16*s, w:12*s, color:'#e88098', opacity:130}   // inner: light pink, round
   ];
   var baseAngle = Math.random() * Math.PI * 2;
   for (var r = 0; r < rings.length; r++) {
@@ -198,6 +198,24 @@ function buildStarData(fcx, fcy, s) {
   }
   star.centerPts = makePetalPoly(fcx, fcy, Math.random()*Math.PI*2, 10*s, 7*s, 0.3);
   return star;
+}
+
+function buildPinkData(fcx, fcy, s) {
+  var pink = {x: fcx, y: fcy, scale: s, petals: [], centerPts: null};
+  var rings = [
+    {count: 5, len: 18*s, w: 14*s, color: '#d080a0', opacity: 120},
+    {count: 4, len: 12*s, w: 10*s, color: '#e8a0c0', opacity: 130},
+  ];
+  for (var ri = 0; ri < rings.length; ri++) {
+    var ring = rings[ri], angleOff = ri * 0.35;
+    for (var p = 0; p < ring.count; p++) {
+      var angle = (p / ring.count) * Math.PI * 2 + angleOff + (Math.random()-0.5)*0.15;
+      var pts = makePetalPoly(fcx, fcy, angle, ring.len, ring.w, 0.3);
+      pink.petals.push({color: ring.color, opacity: ring.opacity, pts: pts});
+    }
+  }
+  pink.centerPts = makePetalPoly(fcx, fcy, Math.random()*Math.PI*2, 8*s, 6*s, 0.4);
+  return pink;
 }
 
 function buildBudData(fcx, fcy, s) {
@@ -229,6 +247,8 @@ function setup() {
     var fp = flowerPositions[i];
     if (fp.type === 'rose') {
       allFlowers.push(buildRoseData(fp.x, fp.y, fp.scale));
+    } else if (fp.type === 'pink') {
+      allFlowers.push(buildPinkData(fp.x, fp.y, fp.scale));
     } else if (fp.type === 'bud') {
       allFlowers.push(buildBudData(fp.x, fp.y, fp.scale));
     } else {
