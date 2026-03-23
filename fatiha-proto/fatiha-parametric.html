@@ -17,328 +17,150 @@
 <body>
 <div id="tap"><span>tap to begin</span></div>
 <script>
-// ─── Audio ───
-let audioCtx, analyser, audioBuffer, freqData, timeData;
-let isPlaying = false, smoothAmp = 0;
-
+var audioCtx, analyser, audioBuffer, freqData, timeData;
+var isPlaying = false, smoothAmp = 0;
 async function loadAudio() {
   try {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 256;
-    analyser.smoothingTimeConstant = 0.92;
-    freqData = new Uint8Array(analyser.frequencyBinCount);
-    timeData = new Uint8Array(analyser.fftSize);
-    const resp = await fetch('bismillah.mp3');
-    if (!resp.ok) throw new Error('no audio');
+    analyser = audioCtx.createAnalyser(); analyser.fftSize = 256; analyser.smoothingTimeConstant = 0.92;
+    freqData = new Uint8Array(analyser.frequencyBinCount); timeData = new Uint8Array(analyser.fftSize);
+    var resp = await fetch('bismillah.mp3'); if (!resp.ok) throw new Error('no audio');
     audioBuffer = await audioCtx.decodeAudioData(await resp.arrayBuffer());
   } catch(e) { console.warn('Audio unavailable:', e.message); }
 }
 function startAudio() {
   if (isPlaying || !audioBuffer) return;
-  const src = audioCtx.createBufferSource();
-  src.buffer = audioBuffer;
-  src.connect(analyser);
-  analyser.connect(audioCtx.destination);
-  src.start(0);
-  isPlaying = true;
-  src.onended = () => { isPlaying = false; };
+  var src = audioCtx.createBufferSource(); src.buffer = audioBuffer;
+  src.connect(analyser); analyser.connect(audioCtx.destination); src.start(0);
+  isPlaying = true; src.onended = function() { isPlaying = false; };
 }
 function getAmp() {
   if (!isPlaying || !timeData) return 0;
   analyser.getByteTimeDomainData(timeData);
-  let s = 0;
-  for (let i = 0; i < timeData.length; i++) s += Math.abs(timeData[i] - 128);
+  var s = 0; for (var i = 0; i < timeData.length; i++) s += Math.abs(timeData[i] - 128);
   return s / timeData.length / 128;
 }
 
-// ─── Dimensions ───
-const W = 1080, H = 1920;
-const cx = W / 2;
-const doorW = 720, doorH = 1500;
-const doorX = (W - doorW) / 2, doorY = (H - doorH) / 2 + 80;
-const archSpringY = doorY + 380;
-const bot = doorY + doorH;
-const halfDW = doorW / 2;
-const panelTop = archSpringY + 15;
-const panelBot = bot - 15;
-const panelH = panelBot - panelTop;
+var W = 1080, H = 1920, cx = W / 2;
+var doorW = 720, doorH = 1500;
+var doorX = (W - doorW) / 2, doorY = (H - doorH) / 2 + 80;
+var archSpringY = doorY + 380, bot = doorY + doorH, halfDW = doorW / 2;
+var panelTop = archSpringY + 15, panelBot = bot - 15, panelH = panelBot - panelTop;
 
-// Arch geometry helper
 function archY(x) {
-  const co = halfDW * 0.55;
-  const R = halfDW + co;
-  if (x <= cx) {
-    const dx = x - (cx + co);
-    const val = R * R - dx * dx;
-    return val > 0 ? archSpringY - Math.sqrt(val) : archSpringY;
-  } else {
-    const dx = x - (cx - co);
-    const val = R * R - dx * dx;
-    return val > 0 ? archSpringY - Math.sqrt(val) : archSpringY;
+  var co = halfDW * 0.55, R = halfDW + co;
+  if (x <= cx) { var dx = x - (cx + co); var v = R*R - dx*dx; return v > 0 ? archSpringY - Math.sqrt(v) : archSpringY; }
+  else { var dx = x - (cx - co); var v = R*R - dx*dx; return v > 0 ? archSpringY - Math.sqrt(v) : archSpringY; }
+}
+var archPts = [];
+for (var ai = 0; ai <= 40; ai++) { var ax = doorX + (doorW * ai / 40); archPts.push([ax, archY(ax)]); }
+
+function makePetalPoly(bx, by, ang, len, wid, curv) {
+  var pts = [], n = 8, ca = Math.cos(ang), sa = Math.sin(ang);
+  for (var i = 0; i <= n; i++) {
+    var t = i/n, w = Math.sin(t * Math.PI);
+    var along = t * len, across = w * wid * 0.5;
+    var co = curv * Math.sin(t * Math.PI) * len * 0.08;
+    pts.push([bx + along*ca - (across+co)*sa, by + along*sa + (across+co)*ca]);
   }
-}
-
-// Pre-compute arch points
-const archPts = [];
-for (let i = 0; i <= 40; i++) {
-  const x = doorX + (doorW * i / 40);
-  archPts.push([x, archY(x)]);
-}
-
-let fillsDone = false;
-// Track which washes have been drawn (each drawn once, interleaved with pencil)
-let wash1Done = false, wash2Done = false, wash3Done = false;
-
-// ─── Rose petal polygon (almond-shaped) ───
-function petalPoly(px, py, angle, len, w) {
-  const pts = [], steps = 16;
-  const ca = Math.cos(angle), sa = Math.sin(angle), nx = -sa, ny = ca;
-  for (let s = 0; s <= steps; s++) {
-    const t = s / steps;
-    const theta = t * Math.PI * 2;
-    const along = Math.cos(theta) * len * 0.5;
-    const across = Math.sin(theta) * w * 0.6;
-    pts.push([
-      px + ca * (along + len * 0.5) + nx * across,
-      py + sa * (along + len * 0.5) + ny * across
-    ]);
+  for (var i = n; i >= 0; i--) {
+    var t = i/n, w = Math.sin(t * Math.PI);
+    var along = t * len, across = -w * wid * 0.5;
+    var co = curv * Math.sin(t * Math.PI) * len * 0.08;
+    pts.push([bx + along*ca - (across+co)*sa, by + along*sa + (across+co)*ca]);
   }
   return pts;
 }
 
-// ─── Saz leaf polygon ───
-function sazPoly(scx, scy, a, len, w) {
-  const pts = [], steps = 14;
-  const ca = Math.cos(a), sa = Math.sin(a), nx = -sa, ny = ca;
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const wf = Math.sin(t * Math.PI) * w * (0.5 + 0.5 * Math.sin(t * Math.PI * 0.8));
-    const sc = Math.sin(t * Math.PI * 1.2) * w * 0.12;
-    pts.push([scx + ca * t * len + nx * (wf + sc), scy + sa * t * len + ny * (wf + sc)]);
+function makeSazLeafPoly(bx, by, ang, len, wid, curv) {
+  var pts = [], n = 10, ca = Math.cos(ang), sa = Math.sin(ang);
+  for (var i = 0; i <= n; i++) {
+    var t = i/n, w;
+    if (t < 0.15) w = t / 0.15 * 0.4;
+    else if (t < 0.5) w = 0.4 + (t - 0.15) / 0.35 * 0.6;
+    else if (t < 0.85) w = 1.0 - (t - 0.5) * 1.0;
+    else w = Math.max(0, (1 - t) / 0.15 * 0.15);
+    w = Math.max(0, w + 0.05 * Math.sin(t * 6 * Math.PI));
+    var along = t * len, across = w * wid * 0.5;
+    var sc = curv * Math.sin(t * Math.PI * 1.2) * len * 0.06;
+    pts.push([bx + along*ca - (across+sc)*sa, by + along*sa + (across+sc)*ca]);
   }
-  for (let i = steps; i >= 0; i--) {
-    const t = i / steps;
-    const wf = Math.sin(t * Math.PI) * w * 0.3;
-    const sc = Math.sin(t * Math.PI * 1.2) * w * 0.08;
-    pts.push([scx + ca * t * len - nx * (wf - sc), scy + sa * t * len - ny * (wf - sc)]);
+  for (var i = n; i >= 0; i--) {
+    var t = i/n, w;
+    if (t < 0.15) w = t / 0.15 * 0.4;
+    else if (t < 0.5) w = 0.4 + (t - 0.15) / 0.35 * 0.6;
+    else if (t < 0.85) w = 1.0 - (t - 0.5) * 1.0;
+    else w = Math.max(0, (1 - t) / 0.15 * 0.15);
+    w = Math.max(0, w + 0.05 * Math.sin(t * 6 * Math.PI));
+    var along = t * len, across = -w * wid * 0.5;
+    var sc = curv * Math.sin(t * Math.PI * 1.2) * len * 0.06;
+    pts.push([bx + along*ca - (across+sc)*sa, by + along*sa + (across+sc)*ca]);
   }
   return pts;
 }
 
-// ─── Pre-compute flower positions around door frame ───
-const flowerElements = [];
-const roseColors = ['#8B1A2B', '#E83E6C', '#C2284A', '#A02040'];
+var flowerElements = [], flowerIdx = 0;
+var PENCIL_END = 300, FLOWER_START = 60, setupDone = false;
 
-function archAt(t) {
-  const x = doorX + doorW * t;
-  return { x: x, y: archY(x) };
-}
-
-// Roses along arch curve (8 roses)
-const archRoseTs = [0.05, 0.15, 0.28, 0.40, 0.60, 0.72, 0.85, 0.95];
-for (const t of archRoseTs) {
-  const p = archAt(t);
-  flowerElements.push({
-    type: 'rose', x: p.x, y: p.y - 30 - Math.random() * 25,
-    size: 40 + Math.random() * 20,
-    color: roseColors[Math.floor(Math.random() * roseColors.length)]
-  });
-}
-
-// Saz leaves between arch roses
-const archLeafTs = [0.10, 0.22, 0.34, 0.50, 0.66, 0.78, 0.90];
-for (const t of archLeafTs) {
-  const p = archAt(t);
-  flowerElements.push({
-    type: 'saz', x: p.x, y: p.y - 15 - Math.random() * 30,
-    angle: (t < 0.5 ? -1 : 1) * (0.3 + Math.random() * 0.5),
-    len: 35 + Math.random() * 25
-  });
-}
-
-// Buds along arch
-const archBudTs = [0.03, 0.12, 0.20, 0.32, 0.45, 0.55, 0.68, 0.80, 0.88, 0.97];
-for (const t of archBudTs) {
-  const p = archAt(t);
-  flowerElements.push({
-    type: 'bud',
-    x: p.x + (Math.random() - 0.5) * 20,
-    y: p.y - 45 - Math.random() * 25,
-    size: 16 + Math.random() * 12
-  });
-}
-
-// Roses at arch spring points (4 each side)
-for (let i = 0; i < 4; i++) {
-  const yOff = archSpringY - 50 + i * 50;
-  flowerElements.push({
-    type: 'rose', x: doorX - 20 + Math.random() * 25, y: yOff + Math.random() * 20,
-    size: 40 + Math.random() * 20, color: roseColors[i % roseColors.length]
-  });
-  flowerElements.push({
-    type: 'rose', x: doorX + doorW + 20 - Math.random() * 25, y: yOff + Math.random() * 20,
-    size: 40 + Math.random() * 20, color: roseColors[(i + 2) % roseColors.length]
-  });
-}
-
-// Roses along bottom frame
-for (let i = 0; i < 4; i++) {
-  const t = 0.15 + i * 0.23;
-  flowerElements.push({
-    type: 'rose', x: doorX + doorW * t + (Math.random() - 0.5) * 20,
-    y: bot + 15 + Math.random() * 20, size: 40 + Math.random() * 20,
-    color: roseColors[i % roseColors.length]
-  });
-}
-
-// Saz leaves between bottom roses
-for (let i = 0; i < 3; i++) {
-  const t = 0.25 + i * 0.25;
-  flowerElements.push({
-    type: 'saz', x: doorX + doorW * t, y: bot + 10 + Math.random() * 15,
-    angle: -1.5 + Math.random() * 0.3, len: 35 + Math.random() * 20
-  });
-}
-
-// Leaves climbing down both panel edges
-for (let i = 0; i < 10; i++) {
-  const y = archSpringY + 50 + i * 100 + Math.random() * 30;
-  if (y > bot - 30) break;
-  flowerElements.push({
-    type: 'saz', x: doorX - 8 + Math.random() * 16, y: y,
-    angle: -0.4 - Math.random() * 0.6, len: 35 + Math.random() * 25
-  });
-  flowerElements.push({
-    type: 'saz', x: doorX + doorW + 8 - Math.random() * 16, y: y,
-    angle: 0.4 + Math.random() * 0.6, len: 35 + Math.random() * 25
-  });
-}
-
-// Buds along panel edges
-for (let i = 0; i < 6; i++) {
-  const y = archSpringY + 80 + i * 140 + Math.random() * 50;
-  if (y > bot - 60) break;
-  flowerElements.push({ type: 'bud', x: doorX - 12 + Math.random() * 10, y: y, size: 14 + Math.random() * 10 });
-  flowerElements.push({ type: 'bud', x: doorX + doorW + 12 - Math.random() * 10, y: y, size: 14 + Math.random() * 10 });
-}
-
-// Additional roses along left & right verticals
-for (let i = 0; i < 3; i++) {
-  const y = archSpringY + 150 + i * 280 + Math.random() * 40;
-  if (y > bot - 80) break;
-  flowerElements.push({
-    type: 'rose', x: doorX - 15 + Math.random() * 20, y: y,
-    size: 35 + Math.random() * 20, color: roseColors[Math.floor(Math.random() * roseColors.length)]
-  });
-  flowerElements.push({
-    type: 'rose', x: doorX + doorW + 15 - Math.random() * 20, y: y,
-    size: 35 + Math.random() * 20, color: roseColors[Math.floor(Math.random() * roseColors.length)]
-  });
-}
-
-const totalFlowerElements = flowerElements.length;
-
-// ─── Flower drawing with p5.brush fill system ───
-function drawRose(fx, fy, sz) {
-  // 3 rings of almond-petal polygons + gold center
-  const rings = [
-    { n: 5, rFrac: 0.30, pLen: 0.35, pW: 0.38, color: '#FF8E72', opacity: 90 },   // inner
-    { n: 6, rFrac: 0.55, pLen: 0.50, pW: 0.50, color: '#C2284A', opacity: 80 },   // mid
-    { n: 7, rFrac: 0.85, pLen: 0.70, pW: 0.65, color: '#8B1A2B', opacity: 70 },   // outer
+function buildFlowers() {
+  // 3 flowers: top of arch, left side, right side
+  var positions = [
+    {x: cx, y: archPts[20][1] - 20, a: -Math.PI/2, s: 0.9},
+    {x: doorX + 15, y: archSpringY + 300, a: Math.PI*0.3, s: 0.7},
+    {x: doorX + doorW - 15, y: archSpringY + 300, a: Math.PI*0.7, s: 0.7}
   ];
-
-  // Draw outer ring first so inner overlaps on top
-  for (let ri = rings.length - 1; ri >= 0; ri--) {
-    const ring = rings[ri];
-    const ringOffset = ri * 0.3;
-    for (let p = 0; p < ring.n; p++) {
-      const a = (p / ring.n) * Math.PI * 2 + ringOffset;
-      const px = fx + Math.cos(a) * sz * ring.rFrac * 0.35;
-      const py = fy + Math.sin(a) * sz * ring.rFrac * 0.35;
-      const poly = petalPoly(px, py, a, sz * ring.pLen, sz * ring.pW);
-      brush.fill(ring.color, ring.opacity);
-      brush.fillBleed(0.3, 'out');
-      brush.fillTexture(0.5, 0.3);
-      brush.polygon(poly);
-      brush.noFill();
+  var pColors = ['#C0392B','#8B2252','#D4456A'];
+  for (var pi = 0; pi < positions.length; pi++) {
+    var pos = positions[pi], s = pos.s, fcx = pos.x, fcy = pos.y, baseA = pos.a;
+    var pc = pColors[pi];
+    // 3 rings: 4, 5, 5 petals
+    var rings = [{count:4, rad:8*s, pL:14*s, pW:9*s},{count:5, rad:16*s, pL:20*s, pW:12*s},{count:5, rad:26*s, pL:26*s, pW:14*s}];
+    for (var ri = 0; ri < rings.length; ri++) {
+      var ring = rings[ri];
+      for (var p = 0; p < ring.count; p++) {
+        var angle = baseA + (p/ring.count)*Math.PI*2 + (Math.random()-0.5)*0.3;
+        var px = fcx + Math.cos(angle)*ring.rad, py = fcy + Math.sin(angle)*ring.rad;
+        flowerElements.push({color:pc, opacity:80+Math.floor(Math.random()*30), polygon:makePetalPoly(px,py,angle,ring.pL,ring.pW,0.3+Math.random()*0.4)});
+      }
     }
+    // Gold center
+    var ca2 = Math.random()*Math.PI*2;
+    flowerElements.push({color:'#B8860B', opacity:90, polygon:makePetalPoly(fcx, fcy, ca2, 7*s, 5*s, 0.5)});
+    // 1 leaf
+    var la = baseA + Math.PI;
+    flowerElements.push({color:'#0E4D2E', opacity:85, polygon:makeSazLeafPoly(fcx+Math.cos(la)*25*s, fcy+Math.sin(la)*25*s, la+Math.PI, 35*s, 12*s, 0.6)});
   }
-
-  // Gold center
-  const centerPts = [];
-  for (let s = 0; s < 10; s++) {
-    const a = (s / 10) * Math.PI * 2;
-    centerPts.push([fx + Math.cos(a) * sz * 0.08, fy + Math.sin(a) * sz * 0.08]);
-  }
-  brush.fill('#DAB94E', 120);
-  brush.fillBleed(0.2, 'out');
-  brush.fillTexture(0.3, 0.2);
-  brush.polygon(centerPts);
-  brush.noFill();
 }
 
-function drawSaz(fx, fy, angle, len) {
-  const leafW = len * 0.35;
-  const color = Math.random() > 0.5 ? '#4A8A5A' : '#1A4A2E';
-  const poly = sazPoly(fx, fy, angle, len, leafW);
-  brush.fill(color, 80);
-  brush.fillBleed(0.3, 'out');
-  brush.fillTexture(0.5, 0.3);
-  brush.polygon(poly);
-  brush.noFill();
-
-  // Central vein as pencil stroke
-  const ca = Math.cos(angle), sa = Math.sin(angle);
-  brush.set('2H', '#1A4A1A', 0.8);
-  brush.line(fx, fy, fx + ca * len * 0.9, fy + sa * len * 0.9);
+function buildWashes() {
+  // Drawn at scheduled frames
+  return [
+    {frame:1, color:'#0D3B8E', opacity:80, bleed:0.5, x:doorX+20, y:doorY-10, w:doorW-40, h:archSpringY-doorY+80},
+    {frame:8, color:'#B8860B', opacity:70, bleed:0.45, x:doorX+30, y:archSpringY-30, w:doorW-60, h:300},
+    {frame:16, color:'#0E4D2E', opacity:80, bleed:0.5, x:doorX+20, y:archSpringY+350, w:doorW-40, h:panelBot-archSpringY-320},
+    {frame:24, color:'#3A0C6E', opacity:100, bleed:0.35, x:doorX+50, y:panelTop+panelH*0.15, w:halfDW-80, h:panelH*0.25},
+    {frame:32, color:'#8B1A1A', opacity:90, bleed:0.3, x:cx+30, y:panelTop+panelH*0.55, w:halfDW-80, h:panelH*0.25}
+  ];
 }
 
-function drawBud(fx, fy, sz) {
-  const budAngle = -Math.PI / 2 + (Math.random() - 0.5) * 0.6;
-  // Two crimson petals
-  for (let i = 0; i < 2; i++) {
-    const a = budAngle + (i - 0.5) * 0.4;
-    const poly = petalPoly(fx, fy, a, sz * 0.8, sz * 0.4);
-    brush.fill(i === 0 ? '#C2284A' : '#E83E6C', 85);
-    brush.fillBleed(0.3, 'out');
-    brush.fillTexture(0.5, 0.3);
-    brush.polygon(poly);
-    brush.noFill();
-  }
-  // Green sepal
-  const sepalA = budAngle + Math.PI;
-  const sepalPoly = sazPoly(fx, fy, sepalA, sz * 0.5, sz * 0.25);
-  brush.fill('#1A4A2E', 80);
-  brush.fillBleed(0.25, 'out');
-  brush.fillTexture(0.4, 0.2);
-  brush.polygon(sepalPoly);
-  brush.noFill();
-}
+var washSchedule, washIdx = 0;
 
-// ─── Setup ───
 function setup() {
-  createCanvas(W, H, WEBGL);
-  brush.load();
-  frameRate(30);
-
-  // Evolving flow field
+  createCanvas(W, H, WEBGL); brush.load(); frameRate(30);
   brush.addField('meditative', function(t, field) {
-    for (let i = 0; i < field.length; i++)
-      for (let j = 0; j < field[i].length; j++)
-        field[i][j] = 100 * Math.sin(i * 0.012 + t * 0.4)
-                     + 50 * Math.cos(j * 0.008 + t * 0.25)
-                     + 30 * Math.sin((i + j) * 0.006 + t * 0.15);
+    for (var i = 0; i < field.length; i++)
+      for (var j = 0; j < field[i].length; j++)
+        field[i][j] = 100*Math.sin(i*0.012+t*0.4)+50*Math.cos(j*0.008+t*0.25)+30*Math.sin((i+j)*0.006+t*0.15);
     return field;
   });
-
-  translate(-width / 2, -height / 2);
+  translate(-width/2, -height/2);
   background(242, 234, 218);
-  fillsDone = true;
-
-  // Audio
-  loadAudio().then(() => {
-    document.getElementById('tap').addEventListener('click', () => {
+  washSchedule = buildWashes();
+  buildFlowers();
+  console.log('Flower elements: '+flowerElements.length+' | Start: '+FLOWER_START);
+  brush.noFill(); setupDone = true;
+  loadAudio().then(function() {
+    document.getElementById('tap').addEventListener('click', function() {
       document.getElementById('tap').style.display = 'none';
       if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
       startAudio();
@@ -346,310 +168,88 @@ function setup() {
   });
 }
 
-// ─── Draw: washes + pencil interleaved, flowers from 20% pencil ───
 function draw() {
-  if (!fillsDone) return;
-  translate(-width / 2, -height / 2);
-
-  const f = frameCount;
-  const rawAmp = getAmp();
+  if (!setupDone) return;
+  translate(-width/2, -height/2);
+  var f = frameCount, rawAmp = getAmp();
   smoothAmp = lerp(smoothAmp, rawAmp, 0.05);
-  const amp = isPlaying ? smoothAmp : 0.015 + 0.008 * sin(f * 0.003);
+  var amp = isPlaying ? smoothAmp : 0.015 + 0.008 * sin(f * 0.003);
+  brush.field('meditative'); brush.refreshField(f * 0.0015); brush.wiggle(0.3 + amp * 2);
 
-  // Evolve flow field
-  brush.field('meditative');
-  brush.refreshField(f * 0.0015);
-  brush.wiggle(0.3 + amp * 2);
-
-  // ── INTERLEAVED WASHES (each drawn ONCE, mixed with pencil) ──
-
-  // Wash 1: Deep lapis blue — frames 1-50 (while door frame draws)
-  if (!wash1Done && f >= 1 && f <= 50) {
-    wash1Done = true;
-    brush.noStroke();
-    brush.fill('#0D3B8E', 80);
-    brush.fillBleed(0.5, 'out');
-    brush.fillTexture(0.5, 0.25);
-    brush.rect(doorX + 20, doorY - 10, doorW - 40, archSpringY - doorY + 80);
-    brush.noFill();
+  // WASHES at scheduled frames
+  if (washIdx < washSchedule.length && f >= washSchedule[washIdx].frame) {
+    var wash = washSchedule[washIdx];
+    brush.noStroke(); brush.fill(wash.color, wash.opacity);
+    brush.fillBleed(wash.bleed, 'out'); brush.fillTexture(0.5, 0.25);
+    brush.rect(wash.x, wash.y, wash.w, wash.h); brush.noFill(); washIdx++;
   }
 
-  // Wash 2: Gold wash — frames 20-100 (while arch draws)
-  if (!wash2Done && f >= 20) {
-    wash2Done = true;
-    brush.noStroke();
-    brush.fill('#B8860B', 70);
-    brush.fillBleed(0.45, 'out');
-    brush.fillTexture(0.4, 0.2);
-    brush.rect(doorX + 30, archSpringY - 30, doorW - 60, 300);
-    brush.noFill();
-  }
-
-  // Wash 3: Deep terre verte — frames 50-150 (while panels draw)
-  if (!wash3Done && f >= 50) {
-    wash3Done = true;
-    brush.noStroke();
-    brush.fill('#0E4D2E', 80);
-    brush.fillBleed(0.5, 'out');
-    brush.fillTexture(0.5, 0.25);
-    brush.rect(doorX + 20, archSpringY + 350, doorW - 40, panelBot - archSpringY - 320);
-    brush.noFill();
-  }
-
-  // ── PENCIL LINES: Door frame outline (frames 1-120) ──
+  // PENCIL STAGE 1 (1-120)
   if (f <= 120) {
-    // Left vertical
-    if (f >= 1 && f <= 30) {
-      const t = (f - 1) / 29;
-      const y1 = lerp(archSpringY, bot, t);
-      const y2 = lerp(archSpringY, bot, min(1, t + 0.04));
-      brush.set('HB', '#2A2215', 3.5 + amp * 3);
-      brush.line(doorX, y1, doorX, y2);
-    }
+    if (f>=1&&f<=30){var t=(f-1)/29; brush.set('HB','#2A2215',3.5+amp*3); brush.line(doorX,lerp(archSpringY,bot,t),doorX,lerp(archSpringY,bot,min(1,t+0.04)));}
+    if (f>=10&&f<=40){var t=(f-10)/29; brush.set('HB','#2A2215',3.5+amp*3); brush.line(doorX+doorW,lerp(archSpringY,bot,t),doorX+doorW,lerp(archSpringY,bot,min(1,t+0.04)));}
+    if (f>=20&&f<=45){var t=(f-20)/24; brush.set('HB','#2A2215',3.5+amp*3); brush.line(lerp(doorX,doorX+doorW,t),bot,lerp(doorX,doorX+doorW,min(1,t+0.05)),bot);}
+    if (f>=30&&f<=70){var idx=Math.floor(((f-30)/40)*20); if(idx<20&&idx>=0){brush.set('HB','#3A3020',3.0+amp*2); brush.line(archPts[idx][0],archPts[idx][1],archPts[idx+1][0],archPts[idx+1][1]);}}
+    if (f>=50&&f<=90){var idx=20+Math.floor(((f-50)/40)*20); if(idx<40&&idx>=20){brush.set('HB','#3A3020',3.0+amp*2); brush.line(archPts[idx][0],archPts[idx][1],archPts[idx+1][0],archPts[idx+1][1]);}}
+    if (f>=70&&f<=100){var t=(f-70)/29; brush.set('HB','#2A2215',3.0+amp*2); brush.line(cx,lerp(panelTop,panelBot,t),cx,lerp(panelTop,panelBot,min(1,t+0.04)));}
+    if (f>=85&&f<=105){var t=(f-85)/19; brush.set('HB','#3A3020',2.5+amp*2); brush.line(lerp(doorX,doorX+doorW,t),archSpringY,lerp(doorX,doorX+doorW,min(1,t+0.06)),archSpringY);}
+  }
 
-    // Right vertical
-    if (f >= 10 && f <= 40) {
-      const t = (f - 10) / 29;
-      const y1 = lerp(archSpringY, bot, t);
-      const y2 = lerp(archSpringY, bot, min(1, t + 0.04));
-      brush.set('HB', '#2A2215', 3.5 + amp * 3);
-      brush.line(doorX + doorW, y1, doorX + doorW, y2);
+  // PENCIL STAGE 2 (80-200)
+  if (f>=80&&f<=200) {
+    var lx=doorX+25,lw=cx-25-lx,rx=cx+25,rw=doorX+doorW-25-rx,py=panelTop+20,ph=panelH-40;
+    if (f>=80&&f<=130&&f%2===0){var seg=Math.floor((f-80)/2)%25; brush.set('2B','#3A3525',2.0+amp*2);
+      if(seg<7)brush.line(lx+lw*(seg/6),py,lx+lw*((seg+1)/6),py);
+      else if(seg<13){var s=(seg-7)/5;brush.line(lx+lw,py+ph*s,lx+lw,py+ph*(s+1/5));}
+      else if(seg<19){var s=(seg-13)/5;brush.line(lx+lw*(1-s),py+ph,lx+lw*(1-s-1/5),py+ph);}
+      else{var s=(seg-19)/5;brush.line(lx,py+ph*(1-s),lx,py+ph*(1-s-1/5));}
     }
-
-    // Bottom horizontal
-    if (f >= 20 && f <= 45) {
-      const t = (f - 20) / 24;
-      const x1 = lerp(doorX, doorX + doorW, t);
-      const x2 = lerp(doorX, doorX + doorW, min(1, t + 0.05));
-      brush.set('HB', '#2A2215', 3.5 + amp * 3);
-      brush.line(x1, bot, x2, bot);
+    if (f>=100&&f<=150&&f%2===0){var seg=Math.floor((f-100)/2)%25; brush.set('2B','#3A3525',2.0+amp*2);
+      if(seg<7)brush.line(rx+rw*(seg/6),py,rx+rw*((seg+1)/6),py);
+      else if(seg<13){var s=(seg-7)/5;brush.line(rx+rw,py+ph*s,rx+rw,py+ph*(s+1/5));}
+      else if(seg<19){var s=(seg-13)/5;brush.line(rx+rw*(1-s),py+ph,rx+rw*(1-s-1/5),py+ph);}
+      else{var s=(seg-19)/5;brush.line(rx,py+ph*(1-s),rx,py+ph*(1-s-1/5));}
     }
-
-    // Arch — left half
-    if (f >= 30 && f <= 70) {
-      const idx = Math.floor(((f - 30) / 40) * 20);
-      if (idx < 20 && idx >= 0) {
-        brush.set('HB', '#3A3020', 3.0 + amp * 2);
-        brush.line(archPts[idx][0], archPts[idx][1], archPts[idx + 1][0], archPts[idx + 1][1]);
-      }
+    if (f>=140&&f<=180&&f%5===0){brush.set('2B','#4A4535',1.5+amp);var which=Math.floor((f-140)/5);
+      if(which<4){var yOff=py+ph*0.2+(which*ph*0.2),xMid=lx+lw/2;brush.line(xMid-30,yOff-20,xMid+30,yOff+20);brush.line(xMid+30,yOff-20,xMid-30,yOff+20);}
+      else{var idx2=which-4,yOff=py+ph*0.2+(idx2*ph*0.2),xMid=rx+rw/2;brush.line(xMid-30,yOff-20,xMid+30,yOff+20);brush.line(xMid+30,yOff-20,xMid-30,yOff+20);}
     }
-
-    // Arch — right half
-    if (f >= 50 && f <= 90) {
-      const idx = 20 + Math.floor(((f - 50) / 40) * 20);
-      if (idx < 40 && idx >= 20) {
-        brush.set('HB', '#3A3020', 3.0 + amp * 2);
-        brush.line(archPts[idx][0], archPts[idx][1], archPts[idx + 1][0], archPts[idx + 1][1]);
-      }
-    }
-
-    // Center divider
-    if (f >= 70 && f <= 100) {
-      const t = (f - 70) / 29;
-      const y1 = lerp(panelTop, panelBot, t);
-      const y2 = lerp(panelTop, panelBot, min(1, t + 0.04));
-      brush.set('HB', '#2A2215', 3.0 + amp * 2);
-      brush.line(cx, y1, cx, y2);
-    }
-
-    // Spring line
-    if (f >= 85 && f <= 105) {
-      const t = (f - 85) / 19;
-      const x1 = lerp(doorX, doorX + doorW, t);
-      const x2 = lerp(doorX, doorX + doorW, min(1, t + 0.06));
-      brush.set('HB', '#3A3020', 2.5 + amp * 2);
-      brush.line(x1, archSpringY, x2, archSpringY);
+    if (f>=160&&f<=200&&f%8===0){var which=Math.floor((f-160)/8);brush.set('HB','#3A3525',1.8+amp);
+      if(which===0)brush.line(lx,py+ph/3,lx+lw,py+ph/3);if(which===1)brush.line(lx,py+ph*2/3,lx+lw,py+ph*2/3);
+      if(which===2)brush.line(rx,py+ph/3,rx+rw,py+ph/3);if(which===3)brush.line(rx,py+ph*2/3,rx+rw,py+ph*2/3);
+      if(which===4)brush.line(lx,py+ph/2,lx+lw,py+ph/2);if(which===5)brush.line(rx,py+ph/2,rx+rw,py+ph/2);
     }
   }
 
-  // ── Panel inner frames (frames 80-200) ──
-  if (f >= 80 && f <= 200) {
-    const lx = doorX + 25, lw = cx - 25 - lx;
-    const rx = cx + 25, rw = doorX + doorW - 25 - rx;
-    const py = panelTop + 20, ph = panelH - 40;
-
-    // Left panel frame
-    if (f >= 80 && f <= 130 && f % 2 === 0) {
-      const seg = Math.floor((f - 80) / 2) % 25;
-      brush.set('2B', '#3A3525', 2.0 + amp * 2);
-      if (seg < 7) {
-        brush.line(lx + lw * (seg / 6), py, lx + lw * ((seg + 1) / 6), py);
-      } else if (seg < 13) {
-        const s = (seg - 7) / 5;
-        brush.line(lx + lw, py + ph * s, lx + lw, py + ph * (s + 1/5));
-      } else if (seg < 19) {
-        const s = (seg - 13) / 5;
-        brush.line(lx + lw * (1 - s), py + ph, lx + lw * (1 - s - 1/5), py + ph);
-      } else {
-        const s = (seg - 19) / 5;
-        brush.line(lx, py + ph * (1 - s), lx, py + ph * (1 - s - 1/5));
-      }
-    }
-
-    // Right panel frame
-    if (f >= 100 && f <= 150 && f % 2 === 0) {
-      const seg = Math.floor((f - 100) / 2) % 25;
-      brush.set('2B', '#3A3525', 2.0 + amp * 2);
-      if (seg < 7) {
-        brush.line(rx + rw * (seg / 6), py, rx + rw * ((seg + 1) / 6), py);
-      } else if (seg < 13) {
-        const s = (seg - 7) / 5;
-        brush.line(rx + rw, py + ph * s, rx + rw, py + ph * (s + 1/5));
-      } else if (seg < 19) {
-        const s = (seg - 13) / 5;
-        brush.line(rx + rw * (1 - s), py + ph, rx + rw * (1 - s - 1/5), py + ph);
-      } else {
-        const s = (seg - 19) / 5;
-        brush.line(rx, py + ph * (1 - s), rx, py + ph * (1 - s - 1/5));
-      }
-    }
-
-    // Cross marks in panels
-    if (f >= 140 && f <= 180 && f % 5 === 0) {
-      brush.set('2B', '#4A4535', 1.5 + amp);
-      const which = Math.floor((f - 140) / 5);
-      if (which < 4) {
-        const yOff = py + ph * 0.2 + (which * ph * 0.2);
-        const xMid = lx + lw / 2;
-        brush.line(xMid - 30, yOff - 20, xMid + 30, yOff + 20);
-        brush.line(xMid + 30, yOff - 20, xMid - 30, yOff + 20);
-      } else {
-        const idx = which - 4;
-        const yOff = py + ph * 0.2 + (idx * ph * 0.2);
-        const xMid = rx + rw / 2;
-        brush.line(xMid - 30, yOff - 20, xMid + 30, yOff + 20);
-        brush.line(xMid + 30, yOff - 20, xMid - 30, yOff + 20);
-      }
-    }
-
-    // Horizontal division lines
-    if (f >= 160 && f <= 200 && f % 8 === 0) {
-      const which = Math.floor((f - 160) / 8);
-      brush.set('HB', '#3A3525', 1.8 + amp);
-      if (which === 0) brush.line(lx, py + ph / 3, lx + lw, py + ph / 3);
-      if (which === 1) brush.line(lx, py + ph * 2 / 3, lx + lw, py + ph * 2 / 3);
-      if (which === 2) brush.line(rx, py + ph / 3, rx + rw, py + ph / 3);
-      if (which === 3) brush.line(rx, py + ph * 2 / 3, rx + rw, py + ph * 2 / 3);
-      if (which === 4) brush.line(lx, py + ph / 2, lx + lw, py + ph / 2);
-      if (which === 5) brush.line(rx, py + ph / 2, rx + rw, py + ph / 2);
-    }
+  // PENCIL STAGE 3 (150-280) — reduced flow lines
+  if (f>=150&&f<=280) {
+    var lx=doorX+25,lw=cx-25-lx,rx=cx+25,rw=doorX+doorW-25-rx,py=panelTop+20,ph=panelH-40;
+    if (f>=150&&f<=180&&f%10===0){try{brush.hatch(12,45+sin(f*0.02)*8,{rand:0.1});brush.hatchStyle('2H','#5A5040',0.8);brush.rect(lx+10,py+10,lw-20,ph/3-10);brush.noHatch();}catch(e){}}
+    if (f>=180&&f<=210&&f%10===0){try{brush.hatch(14,-30+sin(f*0.015)*5,{rand:0.12});brush.hatchStyle('2H','#5A5040',0.8);brush.rect(rx+10,py+ph*2/3+5,rw-20,ph/3-10);brush.noHatch();}catch(e){}}
+    if (f>=180&&f%5===0){brush.set('charcoal','#2A2215',1.5+amp*2);brush.flowLine(doorX+40+random(0,doorW-80),panelTop+40+random(0,panelH-80),random(40,80),random(0,TWO_PI));}
   }
 
-  // ── Hatch and texture (frames 150-280) ──
-  if (f >= 150 && f <= 280) {
-    const lx = doorX + 25, lw = cx - 25 - lx;
-    const rx = cx + 25, rw = doorX + doorW - 25 - rx;
-    const py = panelTop + 20, ph = panelH - 40;
-
-    if (f >= 150 && f <= 180 && f % 10 === 0) {
-      try {
-        brush.hatch(12, 45 + sin(f * 0.02) * 8, { rand: 0.1 });
-        brush.hatchStyle('2H', '#5A5040', 0.8);
-        brush.rect(lx + 10, py + 10, lw - 20, ph / 3 - 10);
-        brush.noHatch();
-      } catch(e) {}
-    }
-
-    if (f >= 180 && f <= 210 && f % 10 === 0) {
-      try {
-        brush.hatch(14, -30 + sin(f * 0.015) * 5, { rand: 0.12 });
-        brush.hatchStyle('2H', '#5A5040', 0.8);
-        brush.rect(rx + 10, py + ph * 2 / 3 + 5, rw - 20, ph / 3 - 10);
-        brush.noHatch();
-      } catch(e) {}
-    }
-
-    if (f >= 180 && f % 3 === 0) {
-      const margin = 40;
-      const fx = doorX + margin + random(0, doorW - 2 * margin);
-      const fy = panelTop + margin + random(0, panelH - 2 * margin);
-      brush.set('charcoal', '#2A2215', 1.5 + amp * 2);
-      brush.flowLine(fx, fy, random(40, 120), random(0, TWO_PI));
-    }
-
-    if (f >= 220 && f <= 260 && f % 8 === 0) {
-      const idx = Math.floor(random(0, archPts.length - 1));
-      const pt = archPts[idx];
-      brush.set('2B', '#1A3A6A', 2.5 + amp * 2);
-      brush.line(pt[0] - 15, pt[1] + random(-8, 8), pt[0] + 15, pt[1] + random(-8, 8));
-    }
+  // PENCIL STAGE 4 (200-300)
+  if (f>=200&&f<=PENCIL_END) {
+    var lx=doorX+25,lw=cx-25-lx,rx=cx+25,rw=doorX+doorW-25-rx,py=panelTop+20,ph=panelH-40;
+    if (f>=200&&f<=240&&f%6===0){var which=Math.floor((f-200)/6);brush.set('HB','#4A3A20',1.5+amp);if(which<3)brush.circle(lx+lw/2,py+ph/2,30+which*25);else brush.circle(rx+rw/2,py+ph/2,30+(which-3)*25);}
+    if (f>=240&&f<=280&&f%4===0){var which=Math.floor((f-240)/4);brush.set('2H','#5A4A30',1.2+amp);var angle=(which%8)*(TWO_PI/8);if(which<8)brush.line(lx+lw/2,py+ph/2,lx+lw/2+cos(angle)*55,py+ph/2+sin(angle)*55);if(which>=8&&which<16)brush.line(rx+rw/2,py+ph/2,rx+rw/2+cos(angle)*55,py+ph/2+sin(angle)*55);}
   }
 
-  // ── Rosettes and detail (frames 200-360) ──
-  if (f >= 200 && f <= 360) {
-    const lx = doorX + 25, lw = cx - 25 - lx;
-    const rx = cx + 25, rw = doorX + doorW - 25 - rx;
-    const py = panelTop + 20, ph = panelH - 40;
-
-    if (f >= 200 && f <= 240 && f % 6 === 0) {
-      const which = Math.floor((f - 200) / 6);
-      brush.set('HB', '#4A3A20', 1.5 + amp);
-      if (which < 3) {
-        brush.circle(lx + lw / 2, py + ph / 2, 30 + which * 25);
-      } else {
-        brush.circle(rx + rw / 2, py + ph / 2, 30 + (which - 3) * 25);
-      }
-    }
-
-    if (f >= 240 && f <= 280 && f % 4 === 0) {
-      const which = Math.floor((f - 240) / 4);
-      brush.set('2H', '#5A4A30', 1.2 + amp);
-      const angle = (which % 8) * (TWO_PI / 8);
-      const r = 55;
-      if (which < 8) {
-        const rcx2 = lx + lw / 2, rcy = py + ph / 2;
-        brush.line(rcx2, rcy, rcx2 + cos(angle) * r, rcy + sin(angle) * r);
-      }
-      if (which >= 8 && which < 16) {
-        const rcx2 = rx + rw / 2, rcy = py + ph / 2;
-        brush.line(rcx2, rcy, rcx2 + cos(angle) * r, rcy + sin(angle) * r);
-      }
-    }
-
-    if (f >= 260 && f % 2 === 0) {
-      const margin = 30;
-      const fx = doorX + margin + random(0, doorW - 2 * margin);
-      const fy = doorY + margin + random(0, doorH - 2 * margin);
-      brush.set('charcoal', '#1A1510', 1.0 + amp * 1.5);
-      brush.flowLine(fx, fy, random(30, 80), random(0, TWO_PI));
-    }
-
-    if (f >= 280 && f <= 320 && f % 4 === 0) {
-      const idx = Math.floor(((f - 280) / 40) * 40);
-      if (idx < 40 && idx >= 0) {
-        brush.set('2B', '#1A1510', 2.0 + amp);
-        brush.line(archPts[idx][0], archPts[idx][1], archPts[idx + 1][0], archPts[idx + 1][1]);
-      }
-    }
-
-    if (f >= 320 && f % 3 === 0) {
-      brush.set('2H', '#3A3020', 0.8 + amp * 0.5);
-      const fx = doorX + 20 + random(0, doorW - 40);
-      const fy = doorY + 20 + random(0, doorH - 40);
-      brush.flowLine(fx, fy, random(20, 50), random(0, TWO_PI));
-    }
+  // FLOWERS: brush.polygon() with petal-shaped polygons
+  // 1 element per frame to avoid OOM in software rendering
+  if (f >= FLOWER_START && flowerIdx < flowerElements.length) {
+    var el = flowerElements[flowerIdx];
+    brush.noStroke();
+    brush.fill(el.color, el.opacity);
+    brush.fillBleed(0.3);
+    brush.fillTexture(0.5, 0.3);
+    brush.polygon(el.polygon);
+    brush.noFill();
+    flowerIdx++;
   }
 
-  // ── FLOWERS: start at ~20% pencil (f > 60), one element every 4 frames ──
-  if (f > 60) {
-    const flowerIdx = Math.floor((f - 61) / 4);
-    if (flowerIdx >= 0 && flowerIdx < totalFlowerElements) {
-      const el = flowerElements[flowerIdx];
-      brush.noField();
-      brush.wiggle(0.15);
-
-      if (el.type === 'rose') {
-        drawRose(el.x, el.y, el.size);
-      } else if (el.type === 'saz') {
-        drawSaz(el.x, el.y, el.angle, el.len);
-      } else if (el.type === 'bud') {
-        drawBud(el.x, el.y, el.size);
-      }
-    }
-  }
-
-  brush.noField();
-  brush.wiggle(0);
+  brush.noField(); brush.wiggle(0);
 }
 </script>
 </body>

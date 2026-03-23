@@ -1,0 +1,159 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+<style>* { margin:0; } body { background:#f2eada; }</style>
+</head>
+<body>
+<script>
+function setup() {
+  createCanvas(1080, 1920, WEBGL);
+  brush.load();
+  translate(-width/2, -height/2);
+  background(242, 234, 218);
+
+  // Petal polygon — almond shape
+  function petal(cx, cy, angle, len, w) {
+    const pts = [];
+    const steps = 12;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const r = w * sin(PI * t);
+      const along = len * t;
+      pts.push([cx + cos(angle)*along - sin(angle)*r, cy + sin(angle)*along + cos(angle)*r]);
+    }
+    for (let i = steps; i >= 0; i--) {
+      const t = i / steps;
+      const r = -w * sin(PI * t);
+      const along = len * t;
+      pts.push([cx + cos(angle)*along - sin(angle)*r, cy + sin(angle)*along + cos(angle)*r]);
+    }
+    return pts;
+  }
+
+  // Saz leaf polygon
+  function sazLeaf(cx, cy, angle, len, w) {
+    const pts = [];
+    const steps = 14;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const profile = sin(PI * t) * pow(1 - t, 0.3); // tapered
+      const r = w * profile;
+      const along = len * t;
+      pts.push([cx + cos(angle)*along - sin(angle)*r, cy + sin(angle)*along + cos(angle)*r]);
+    }
+    for (let i = steps; i >= 0; i--) {
+      const t = i / steps;
+      const profile = sin(PI * t) * pow(1 - t, 0.3);
+      const r = -w * profile;
+      const along = len * t;
+      pts.push([cx + cos(angle)*along - sin(angle)*r, cy + sin(angle)*along + cos(angle)*r]);
+    }
+    return pts;
+  }
+
+  // === TEST: Rose with overlapping petals from center, stroke outline, "in" bleed ===
+  
+  // Rose 1 — Crimson, 3 rings, petals START at center (no gap)
+  function drawRose(cx, cy, scale) {
+    const rings = [
+      { count: 5, petalLen: 45*scale, petalW: 14*scale, color: '#6a1020', opacity: 100 },
+      { count: 5, petalLen: 35*scale, petalW: 12*scale, color: '#a02040', opacity: 110 },
+      { count: 4, petalLen: 25*scale, petalW: 10*scale, color: '#e06080', opacity: 120 },
+    ];
+    
+    // PASS 1: All pencil outlines first (bottom layer)
+    const allPetals = [];
+    for (let r = 0; r < rings.length; r++) {
+      const ring = rings[r];
+      const angleOffset = r * 0.3;
+      for (let p = 0; p < ring.count; p++) {
+        const angle = (p / ring.count) * TWO_PI + angleOffset + random(-0.1, 0.1);
+        const pts = petal(cx, cy, angle, ring.petalLen, ring.petalW);
+        allPetals.push({ pts, color: ring.color, opacity: ring.opacity });
+        
+        // Light pencil sketch
+        brush.set('2H', '#c0b8a8', 0.08);
+        brush.polygon(pts);
+      }
+    }
+    
+    // PASS 2: All watercolor fills on top
+    for (const p of allPetals) {
+      brush.noStroke();
+      brush.fill(p.color, p.opacity);
+      brush.fillBleed(0.35, 'in');
+      brush.fillTexture(0.45, 0.3);
+      brush.polygon(p.pts);
+      brush.noFill();
+    }
+    
+    // Gold center on top of everything
+    brush.fill('#c4a040', 170);
+    brush.fillBleed(0.15, 'out');
+    brush.circle(cx, cy, 16 * scale);
+    brush.noFill();
+  }
+  
+  // Draw several roses at different sizes
+  drawRose(300, 400, 1.2);
+  drawRose(750, 350, 1.0);
+  drawRose(540, 700, 1.5);
+  drawRose(200, 900, 0.8);
+  drawRose(800, 850, 1.1);
+  
+  // Saz leaves between roses
+  // Collect all leaf data, draw pencil first then fills
+  const leafData = [];
+  function drawLeaf(cx, cy, angle, scale) {
+    const pts = sazLeaf(cx, cy, angle, 70*scale, 18*scale);
+    leafData.push({ cx, cy, angle, scale, pts });
+    // Pencil outline (bottom layer)
+    brush.set('2H', '#b0a890', 0.08);
+    brush.polygon(pts);
+    // Vein (pencil layer)
+    brush.set('2H', '#a0b0a0', 0.08);
+    brush.line(cx, cy, cx + cos(angle)*55*scale, cy + sin(angle)*55*scale);
+  }
+  
+  drawLeaf(480, 500, -0.8, 1.0);
+  drawLeaf(620, 550, 0.5, 0.9);
+  drawLeaf(350, 650, -0.3, 1.1);
+  drawLeaf(700, 600, 2.5, 0.8);
+  drawLeaf(450, 850, -1.2, 1.0);
+  drawLeaf(650, 800, 0.8, 0.9);
+  
+  // Small buds
+  function drawBud(cx, cy, angle, scale) {
+    for (let i = 0; i < 3; i++) {
+      const a = angle + (i - 1) * 0.4;
+      const pts = petal(cx, cy, a, 20*scale, 7*scale);
+      brush.noStroke();
+      brush.fill('#c04060', 90);
+      brush.fillBleed(0.25, 'in');
+      brush.polygon(pts);
+    }
+    brush.noFill();
+  }
+  
+  drawBud(400, 300, -HALF_PI, 1.0);
+  drawBud(650, 280, -HALF_PI, 0.8);
+  drawBud(250, 750, -0.5, 0.9);
+  drawBud(850, 700, -2.0, 0.7);
+  
+  // PASS 3: Leaf watercolor fills ON TOP of all pencil
+  for (const lf of leafData) {
+    brush.noStroke();
+    brush.fill('#1a4a2e', 100);
+    brush.fillBleed(0.3, 'in');
+    brush.fillTexture(0.4, 0.25);
+    brush.polygon(lf.pts);
+    brush.noFill();
+  }
+}
+</script>
+</body>
+</html>
