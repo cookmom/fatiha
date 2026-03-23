@@ -326,6 +326,16 @@
 - Maps each Islamic concept to clock implementation
 - Key unmapped feature: **Friday mode** (hidden hour of du'a acceptance)
 
+## Key Lessons (Week of Mar 14–20)
+- **API key billing crisis (Mar 18)**: Chris spawns were hitting Anthropic API directly ($53/hr). Fixed → `anthropic:default` = OAuth/Max plan. RULE: Never spawn subagents without verifying auth method.
+- **Slug font rendering (Eric Lengyel)**: Patent → public domain (MIT). GPU-native Bézier font rendering in GLSL. New creative anchor: Quranic verses embedded IN the fatiha garden — calligraphy IS the vine.
+- **fatiha.brush custom WebGL engine built (Mar 15)**: 1,951 lines, instanced quad renderer, 7 brush tips, grain texture, ring buffer (131K+ stamps), audio-reactive, 25K+ stamps at 60fps.
+- **Tyler Hobbs watercolor integration**: Recursive polygon deformation (midpoint displacement), 30-80 low-opacity layers = watercolor. Progressive "watching paint dry" — elements start crisp then bleed outward over lifetime. Tagged `fatiha-watercolor-favorite`.
+- **Tawfeeq principle (Mar 15)**: "Sharp geometry + natural media = best of both." Stamp has sharp jaggy edges; watercolor + Mixbox handle the natural feeling.
+- **Ottoman rose mastery**: penç (bird's eye), hatâyî (side view), goncagül (bud). Three-shade technique, tahrir outlines, saz leaves. Chris (Opus) doing surgical flower commits. Tawfeeq ❤️ saz leaves.
+- **QC rule hardened**: Always test LIVE deployed URL, not just local. Never rubber-stamp Chris output without seeing it yourself first.
+- **Handoff system**: `.handoff.md` in fatiha-proto persists Chris context between sessions — no more re-explaining from scratch.
+
 ## Key Lessons (Week of Mar 7–13)
 - **GPS real-device parity** — never ship a GPS/device feature without testing on actual phone. Synthetic-only validation ≠ real device flow.
 - **`?compass` breaks ES module loading** — clockRays never appears. Always load clean, toggle features via JS after load.

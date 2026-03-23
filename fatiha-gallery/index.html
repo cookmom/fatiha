@@ -81,13 +81,45 @@
     margin-top: 8px;
   }
   
-  /* Lightbox */
+  /* Lightbox / Annotation Mode */
   .lightbox {
     display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.95);
-    z-index: 100; align-items: center; justify-content: center; cursor: pointer;
+    z-index: 100; flex-direction: column; align-items: center; justify-content: center;
   }
   .lightbox.open { display: flex; }
-  .lightbox img { max-width: 95vw; max-height: 95vh; object-fit: contain; }
+  .lightbox .annotate-container {
+    position: relative; max-width: 95vw; max-height: 85vh;
+  }
+  .lightbox img { max-width: 100%; max-height: 85vh; object-fit: contain; display: block; }
+  .lightbox canvas {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    cursor: crosshair;
+  }
+  .annotate-toolbar {
+    display: flex; gap: 6px; padding: 8px 10px; align-items: center;
+    overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap;
+    order: 2; /* move below image on mobile */
+  }
+  @media (max-width: 768px) {
+    .lightbox { flex-direction: column; }
+    .annotate-toolbar { font-size: 11px; padding: 6px; gap: 4px; }
+    .annotate-toolbar button { padding: 5px 8px; font-size: 11px; }
+    .annotate-container { order: 1; }
+  }
+  .annotate-toolbar button {
+    background: rgba(200,168,76,0.2); color: #c8a84c; border: 1px solid rgba(200,168,76,0.4);
+    padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;
+  }
+  .annotate-toolbar button.active { background: rgba(200,168,76,0.5); }
+  .annotate-toolbar input[type="color"] {
+    width: 32px; height: 28px; border: none; cursor: pointer; border-radius: 4px;
+  }
+  .annotate-toolbar input[type="range"] { width: 80px; }
+  .annotate-toolbar .label { color: rgba(232,224,208,0.5); font-size: 11px; }
+  .annotate-toolbar input[type="text"] {
+    background: #1a1a22; border: 1px solid rgba(200,168,76,0.3); color: #e8e0d0;
+    padding: 4px 8px; border-radius: 4px; font-size: 12px; width: 200px;
+  }
   
   /* Auto score badge */
   .auto-score {
@@ -103,6 +135,22 @@
   .surah-header .theme { font-size: 13px; color: rgba(232,224,208,0.4); margin-top: 6px; }
   
   .empty { text-align: center; padding: 60px; color: rgba(232,224,208,0.3); }
+  
+  /* Chat thread */
+  .chat-thread { margin-top: 10px; border-top: 1px solid rgba(200,168,76,0.1); padding-top: 8px; }
+  .messages { max-height: 200px; overflow-y: auto; }
+  .msg {
+    padding: 6px 10px; margin: 4px 0; border-radius: 8px; font-size: 12px;
+    max-width: 90%; word-wrap: break-word;
+  }
+  .msg.human { background: rgba(200,168,76,0.15); color: #e8e0d0; margin-left: auto; text-align: right; }
+  .msg.builder { background: rgba(30,60,30,0.3); color: #a0d0a0; }
+  .msg.critic { background: rgba(60,30,30,0.3); color: #d0a0a0; }
+  .msg.chef { background: rgba(30,30,60,0.3); color: #a0a0d0; }
+  .msg .sender { font-size: 10px; opacity: 0.6; margin-bottom: 2px; }
+  .msg .time { font-size: 9px; opacity: 0.4; float: right; }
+  .msg .ref-link { color: #c8a84c; text-decoration: underline; font-size: 11px; }
+  .msg .ref-thumb { max-width: 80px; max-height: 60px; border-radius: 4px; margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -111,6 +159,15 @@
   <h1>fatiha.app</h1>
   <p>Generative Islamic Art — Gallery & Feedback</p>
 </header>
+
+<!-- Sticky Progress Dashboard -->
+<div id="dashboard" style="position:sticky;top:0;z-index:50;background:#12121a;border-bottom:1px solid rgba(200,168,76,0.2);padding:10px 20px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;font-size:12px;">
+  <div>📊 <span style="color:#c8a84c;" id="iterCount">0</span> iterations</div>
+  <div>🎯 Surah: <span style="color:#c8a84c;">1/114 — Al-Fatiha</span></div>
+  <div>🔄 Loop: <span style="color:#4a8a5a;" id="loopStatus">idle</span></div>
+  <div>⭐ Avg rating: <span style="color:#c8a84c;" id="avgRating">—</span></div>
+  <div>💰 Tokens: <span style="color:#4a8a5a;">$0 (OAuth/local)</span></div>
+</div>
 
 <div class="filters">
   <select id="surahFilter">
@@ -126,8 +183,25 @@
 
 <div id="gallery" class="gallery"></div>
 
-<div id="lightbox" class="lightbox" onclick="this.classList.remove('open')">
-  <img id="lightboxImg" src="">
+<div id="lightbox" class="lightbox">
+  <div class="annotate-toolbar">
+    <button onclick="setTool('draw')" id="toolDraw" class="active">✏️ Draw</button>
+    <button onclick="setTool('arrow')" id="toolArrow">➡️ Arrow</button>
+    <button onclick="setTool('text')" id="toolText">💬 Text</button>
+    <button onclick="setTool('circle')" id="toolCircle">⭕ Circle</button>
+    <input type="color" id="penColor" value="#ff3333" title="Color">
+    <span class="label">Size:</span>
+    <input type="range" id="penSize" min="2" max="12" value="4">
+    <input type="text" id="annotateText" placeholder="Type annotation text..." style="display:none">
+    <button onclick="undoAnnotation()">↩️ Undo</button>
+    <button onclick="clearAnnotations()">🗑️ Clear</button>
+    <button onclick="saveAnnotation()">💾 Save</button>
+    <button onclick="closeLightbox()" style="margin-left:auto;">✕ Close</button>
+  </div>
+  <div class="annotate-container">
+    <img id="lightboxImg" src="">
+    <canvas id="annotateCanvas"></canvas>
+  </div>
 </div>
 
 <script>
@@ -148,6 +222,17 @@ async function loadIterations() {
     iterations = [];
   }
   renderGallery();
+  seedAgentNotes();
+  renderAllThreads();
+  updateDashboard();
+}
+
+function updateDashboard() {
+  document.getElementById('iterCount').textContent = iterations.length;
+  const ratings = JSON.parse(localStorage.getItem('ratings') || '{}');
+  const scores = Object.values(ratings).filter(v => v > 0);
+  document.getElementById('avgRating').textContent = scores.length ? 
+    (scores.reduce((a,b) => a+b, 0) / scores.length).toFixed(1) + ' (' + scores.length + ' rated)' : '—';
 }
 
 function renderGallery() {
@@ -170,7 +255,7 @@ function renderGallery() {
   gallery.innerHTML = sorted.map((it, idx) => `
     <div class="card">
       <div style="position:relative">
-        <img src="${it.image}" alt="${it.title}" onclick="openLightbox('${it.image}')">
+        <img src="${it.image}" alt="${it.title}" onclick="openLightbox('${it.image}', '${it.id||idx}')">
         ${it.autoScore ? `<span class="auto-score">⚡${it.autoScore}</span>` : ''}
       </div>
       <div class="card-info">
@@ -179,6 +264,13 @@ function renderGallery() {
         <span class="tag">v${it.version || idx+1}</span>
         <div class="title">${it.title || 'Iteration ' + (idx+1)}</div>
         <div class="meta">${it.created || ''} · ${it.generator || 'Chris/Opus'}</div>
+        
+        ${it.builderNotes ? `<div style="margin-top:8px;padding:8px;background:rgba(30,60,30,0.2);border-radius:6px;font-size:11px;">
+          <span style="color:#4a8a5a;">🔨 Builder:</span> ${it.builderNotes}
+        </div>` : ''}
+        ${it.criticNotes ? `<div style="margin-top:4px;padding:8px;background:rgba(60,30,30,0.2);border-radius:6px;font-size:11px;">
+          <span style="color:#c8684c;">👁 Critic:</span> ${it.criticNotes}
+        </div>` : ''}
         
         <div class="rating" data-id="${it.id || idx}">
           ${[1,2,3,4,5].map(s => `
@@ -190,24 +282,222 @@ function renderGallery() {
           `).join('')}
         </div>
         
-        <div class="feedback">
-          <textarea placeholder="Notes (e.g. 'less brown, more pressure variation')" 
-                    id="notes-${it.id||idx}"></textarea>
-          <div class="ref-input">
-            <input type="text" placeholder="Reference URL" id="ref-${it.id||idx}">
-            <label for="refimg-${it.id||idx}">📎 Ref Image</label>
-            <input type="file" id="refimg-${it.id||idx}" accept="image/*">
+        <!-- Chat thread -->
+        <div class="chat-thread" id="thread-${it.id||idx}">
+          <div class="messages" id="msgs-${it.id||idx}"></div>
+          <div style="display:flex;gap:4px;margin-top:6px;">
+            <input type="text" placeholder="Ask about this iteration..." 
+                   id="chatInput-${it.id||idx}" style="flex:1;background:#1a1a22;border:1px solid rgba(200,168,76,0.2);color:#e8e0d0;padding:6px 10px;border-radius:6px;font-size:12px;"
+                   onkeydown="if(event.key==='Enter')sendChat('${it.id||idx}')">
+            <button onclick="sendChat('${it.id||idx}')" style="background:#c8a84c;color:#0d0d12;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;">Send</button>
           </div>
-          <button onclick="submitFeedback('${it.id||idx}')">Submit Feedback</button>
+          <div class="ref-input" style="margin-top:6px;display:flex;gap:6px;">
+            <input type="text" placeholder="Drop reference URL" id="ref-${it.id||idx}" style="flex:1;background:#1a1a22;border:1px solid rgba(200,168,76,0.2);color:#e8e0d0;padding:4px 8px;border-radius:4px;font-size:11px;">
+            <label for="refimg-${it.id||idx}" style="background:rgba(200,168,76,0.15);color:#c8a84c;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;white-space:nowrap;">📎 Ref</label>
+            <input type="file" id="refimg-${it.id||idx}" accept="image/*" style="display:none" onchange="attachRef('${it.id||idx}', this)">
+          </div>
         </div>
       </div>
     </div>
   `).join('');
 }
 
-function openLightbox(src) {
-  document.getElementById('lightboxImg').src = src;
+// ============================================================
+// ANNOTATION SYSTEM
+// ============================================================
+let currentTool = 'draw';
+let isDrawing = false;
+let drawHistory = [];
+let currentPath = [];
+let currentImageId = null;
+let startX, startY;
+
+function openLightbox(src, id) {
+  currentImageId = id;
+  const img = document.getElementById('lightboxImg');
+  img.src = src;
   document.getElementById('lightbox').classList.add('open');
+  
+  img.onload = () => {
+    const canvas = document.getElementById('annotateCanvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    
+    // Load existing annotations
+    const saved = JSON.parse(localStorage.getItem('annotations') || '{}');
+    if (saved[id]) {
+      const savedImg = new Image();
+      savedImg.onload = () => {
+        canvas.getContext('2d').drawImage(savedImg, 0, 0);
+      };
+      savedImg.src = saved[id];
+    }
+  };
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+}
+
+function setTool(tool) {
+  currentTool = tool;
+  document.querySelectorAll('.annotate-toolbar button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tool' + tool.charAt(0).toUpperCase() + tool.slice(1)).classList.add('active');
+  document.getElementById('annotateText').style.display = tool === 'text' ? 'block' : 'none';
+}
+
+// Canvas drawing handlers
+document.addEventListener('DOMContentLoaded', () => {
+  const canvas = document.getElementById('annotateCanvas');
+  
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+  }
+  
+  function startDraw(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    isDrawing = true;
+    const pos = getPos(e);
+    startX = pos.x; startY = pos.y;
+    currentPath = [pos];
+    
+    if (currentTool === 'text') {
+      const text = document.getElementById('annotateText').value;
+      if (text) {
+        const ctx = canvas.getContext('2d');
+        ctx.font = 'bold 24px Georgia';
+        ctx.fillStyle = document.getElementById('penColor').value;
+        ctx.fillText(text, pos.x, pos.y);
+        drawHistory.push(canvas.toDataURL());
+      }
+      isDrawing = false;
+    }
+  }
+  
+  function moveDraw(e) {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const pos = getPos(e);
+    const ctx = canvas.getContext('2d');
+    const color = document.getElementById('penColor').value;
+    const size = parseInt(document.getElementById('penSize').value);
+    
+    if (currentTool === 'draw') {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = size;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      const prev = currentPath[currentPath.length - 1];
+      ctx.beginPath();
+      ctx.moveTo(prev.x, prev.y);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+      currentPath.push(pos);
+    }
+  }
+  
+  function endDraw(e) {
+    if (!isDrawing) return;
+    isDrawing = false;
+    const ctx = canvas.getContext('2d');
+    const color = document.getElementById('penColor').value;
+    const size = parseInt(document.getElementById('penSize').value);
+    const pos = e.changedTouches ? 
+      { x: (e.changedTouches[0].clientX - canvas.getBoundingClientRect().left) * (canvas.width / canvas.getBoundingClientRect().width),
+        y: (e.changedTouches[0].clientY - canvas.getBoundingClientRect().top) * (canvas.height / canvas.getBoundingClientRect().height) } :
+      getPos(e);
+    
+    if (currentTool === 'arrow') {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = size;
+      ctx.lineCap = 'round';
+      // Shaft
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+      // Arrowhead
+      const angle = Math.atan2(pos.y - startY, pos.x - startX);
+      const headLen = size * 5;
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+      ctx.lineTo(pos.x - headLen * Math.cos(angle - 0.4), pos.y - headLen * Math.sin(angle - 0.4));
+      ctx.moveTo(pos.x, pos.y);
+      ctx.lineTo(pos.x - headLen * Math.cos(angle + 0.4), pos.y - headLen * Math.sin(angle + 0.4));
+      ctx.stroke();
+    }
+    
+    if (currentTool === 'circle') {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = size;
+      const rx = Math.abs(pos.x - startX);
+      const ry = Math.abs(pos.y - startY);
+      const cx = (startX + pos.x) / 2;
+      const cy = (startY + pos.y) / 2;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx/2, ry/2, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    
+    drawHistory.push(canvas.toDataURL());
+  }
+  
+  canvas.addEventListener('mousedown', startDraw);
+  canvas.addEventListener('mousemove', moveDraw);
+  canvas.addEventListener('mouseup', endDraw);
+  canvas.addEventListener('touchstart', startDraw, {passive: false});
+  canvas.addEventListener('touchmove', moveDraw, {passive: false});
+  canvas.addEventListener('touchend', endDraw);
+});
+
+function undoAnnotation() {
+  drawHistory.pop();
+  const canvas = document.getElementById('annotateCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (drawHistory.length > 0) {
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img, 0, 0);
+    img.src = drawHistory[drawHistory.length - 1];
+  }
+}
+
+function clearAnnotations() {
+  const canvas = document.getElementById('annotateCanvas');
+  canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+  drawHistory = [];
+}
+
+function saveAnnotation() {
+  const canvas = document.getElementById('annotateCanvas');
+  const dataUrl = canvas.toDataURL('image/png');
+  
+  // Save to localStorage
+  const annotations = JSON.parse(localStorage.getItem('annotations') || '{}');
+  annotations[currentImageId] = dataUrl;
+  localStorage.setItem('annotations', JSON.stringify(annotations));
+  
+  // Also save as downloadable image (composited)
+  const img = document.getElementById('lightboxImg');
+  const composite = document.createElement('canvas');
+  composite.width = img.naturalWidth;
+  composite.height = img.naturalHeight;
+  const ctx = composite.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  ctx.drawImage(canvas, 0, 0);
+  
+  const link = document.createElement('a');
+  link.download = (currentImageId || 'annotated') + '-feedback.png';
+  link.href = composite.toDataURL('image/png');
+  link.click();
+  
+  alert('Annotation saved! Downloaded as ' + link.download);
 }
 
 function rate(id, score) {
@@ -223,27 +513,115 @@ function rate(id, score) {
   console.log(`Rated ${id}: ${score} stars`);
 }
 
-function submitFeedback(id) {
-  const notes = document.getElementById(`notes-${id}`).value;
-  const ref = document.getElementById(`ref-${id}`).value;
+// ============================================================
+// CHAT THREAD SYSTEM
+// ============================================================
+function getThreadMessages(id) {
+  const threads = JSON.parse(localStorage.getItem('threads') || '{}');
+  return threads[id] || [];
+}
+
+function saveThreadMessage(id, msg) {
+  const threads = JSON.parse(localStorage.getItem('threads') || '{}');
+  if (!threads[id]) threads[id] = [];
+  threads[id].push(msg);
+  localStorage.setItem('threads', JSON.stringify(threads));
+}
+
+function renderThread(id) {
+  const msgs = getThreadMessages(id);
+  const container = document.getElementById(`msgs-${id}`);
+  if (!container) return;
   
-  const feedback = JSON.parse(localStorage.getItem('feedback') || '{}');
-  feedback[id] = { notes, ref, timestamp: new Date().toISOString() };
-  localStorage.setItem('feedback', JSON.stringify(feedback));
+  container.innerHTML = msgs.map(m => `
+    <div class="msg ${m.role}">
+      <div class="sender">${m.role === 'human' ? '👤 You' : m.role === 'builder' ? '🔨 Builder' : m.role === 'critic' ? '👁 Critic' : '🍳 Chef'}</div>
+      ${m.text}
+      ${m.ref ? `<br><a class="ref-link" href="${m.ref}" target="_blank">📎 ${m.ref.substring(0,40)}...</a>` : ''}
+      ${m.refImage ? `<br><img class="ref-thumb" src="${m.refImage}">` : ''}
+      <span class="time">${new Date(m.time).toLocaleTimeString()}</span>
+    </div>
+  `).join('');
   
-  // Clear inputs
-  document.getElementById(`notes-${id}`).value = '';
-  document.getElementById(`ref-${id}`).value = '';
+  container.scrollTop = container.scrollHeight;
+}
+
+function sendChat(id) {
+  const input = document.getElementById(`chatInput-${id}`);
+  const refInput = document.getElementById(`ref-${id}`);
+  const text = input.value.trim();
+  if (!text) return;
   
-  console.log(`Feedback for ${id}:`, { notes, ref });
-  alert('Feedback saved! Will feed into next generation.');
+  const msg = {
+    role: 'human',
+    text: text,
+    ref: refInput.value.trim() || null,
+    refImage: null,
+    time: new Date().toISOString()
+  };
+  
+  saveThreadMessage(id, msg);
+  renderThread(id);
+  
+  input.value = '';
+  refInput.value = '';
+}
+
+function attachRef(id, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const msg = {
+      role: 'human',
+      text: '📎 Reference image attached',
+      ref: null,
+      refImage: e.target.result,
+      time: new Date().toISOString()
+    };
+    saveThreadMessage(id, msg);
+    renderThread(id);
+  };
+  reader.readAsDataURL(file);
+}
+
+// Render existing threads on gallery load
+function renderAllThreads() {
+  const threads = JSON.parse(localStorage.getItem('threads') || '{}');
+  for (const id of Object.keys(threads)) {
+    renderThread(id);
+  }
+}
+
+// Also seed builder/critic notes as initial messages
+function seedAgentNotes() {
+  for (const it of iterations) {
+    const msgs = getThreadMessages(it.id);
+    if (msgs.length > 0) continue; // already seeded
+    
+    if (it.builderNotes) {
+      saveThreadMessage(it.id, {
+        role: 'builder', text: it.builderNotes, ref: null, refImage: null,
+        time: it.created || new Date().toISOString()
+      });
+    }
+    if (it.criticNotes) {
+      saveThreadMessage(it.id, {
+        role: 'critic', text: it.criticNotes, ref: null, refImage: null,
+        time: it.created || new Date().toISOString()
+      });
+    }
+  }
 }
 
 // Filters
 document.getElementById('surahFilter').addEventListener('change', renderGallery);
 document.getElementById('sortBy').addEventListener('change', renderGallery);
 
-loadIterations();
+loadIterations().then(() => {
+  seedAgentNotes();
+  renderAllThreads();
+});
 </script>
 </body>
 </html>

@@ -1,38 +1,69 @@
 # Reinforcement Log
 
-## 2026-03-14 (08:03 AM)
-1. **Log actual computed values BEFORE claiming any visual change works** — Sin #7 + Lesson 38 were both written TODAY for exactly this; `console.log(curvePoints[0])` or equivalent before ANY spatial assertion; numbers don't lie, screenshots do; one log = four blind renders avoided.
-2. **Commit after EVERY meaningful change — no exceptions** — Lesson 39 from this morning: iterated v4→v10 without a single commit, Tawfeeq asked to restore v4 and it was gone; local commits cost nothing, lost work costs hours and trust; `git commit` before starting the NEXT iteration.
-3. **Read render-playbook.md before EVERY render** — still the top recurring offense across the last 48h; timezone emulation, `_forceTimeMin` freezes second hand, X max is 1080×1920; it's all documented; no excuses for skipping it.
+## 2026-03-22 04:03 PM PT
+1. **COMMIT EVERY ITERATION** — `git commit` after every meaningful change, especially on fatiha.app per-element animation work. `git checkout`/`restore` on uncommitted work = unforgivable. (Lesson 39, Rule 0g)
+2. **LOG NUMBERS BEFORE SCREENSHOTTING** — Spatial/visual claims require `console.log` of actual computed coordinates FIRST. Never eyeball and ship — one log beats four blind renders. (Lesson 38, Sin #7)
+3. **AESTHETIC QC IS MANDATORY** — Before sending ANY visual to Tawfeeq, ask "is this beautiful? Would this stop someone scrolling?" Technical render ≠ visual pass. Fix it first, then send. (Lesson 39)
 
-## 2026-03-14 (04:03 AM)
-1. **Log actual values before claiming it works** — PREFLIGHT Sin #7 was added TODAY because of Lesson 38; before ANY spatial/visual claim, `console.log` the computed coordinates/values and verify numerically; screenshots lie, numbers don't; one log > four blind renders.
-2. **Read render-playbook.md before EVERY render** — still the top recurring offense across days; no exceptions, no matter how "simple" the render seems; it has timezone rules, `_forceTimeMin` freeze, X resolution (1080×1920) — all the rules you keep forgetting.
-3. **QC yourself completely before Tawfeeq sees anything** — full loop: GPU Chrome → console check → look at screenshot with your own eyes → verify it matches the EXACT brief in words; never send until YOU are satisfied; "push?" before QC is forbidden.
+---
 
-## 2026-03-14 (00:03 AM)
-1. **Read render-playbook.md before EVERY render** — still the #1 offense; lessons 34-37 all from yesterday; timezone, `_forceTimeMin` freezes seconds, platform resolution (1080×1920 for X) — all documented; no excuses for skipping it.
-2. **QC yourself before Tawfeeq tests — zero exceptions** — full visual loop (GPU Chrome → screenshot → look with your own eyes) must complete before any message; Lesson 33 was yesterday; if you can't render, say so; "go check" is never acceptable.
-3. **Research before iterating — stop guessing** — when something fails, STOP; spawn a subagent to research the correct approach; present plan; get approval; then execute; six blind guesses burn time, trust, and Tawfeeq's patience.
+## 2026-03-22 12:03 PM PT
+1. **COMMIT EVERY ITERATION** — `git commit` after every meaningful change, especially on fatiha.app per-element animation work. `git checkout`/`restore` on uncommitted work = unforgivable. (Lesson 39, Rule 0g)
+2. **LOG NUMBERS BEFORE SCREENSHOTTING** — Spatial/visual claims require `console.log` of actual computed coordinates FIRST. Never eyeball and ship — one log beats four blind renders. (Lesson 38, Sin #7)
+3. **AESTHETIC QC IS MANDATORY** — Before sending ANY visual to Tawfeeq, ask "is this beautiful? Would this stop someone scrolling?" Technical render ≠ visual pass. Fix it first, then send. (Lesson 39)
 
-## 2026-03-13 (20:03 PM)
-1. **Read render-playbook.md before EVERY render** — still the top offense; lessons 34-37 all from today; playbook has timezone rules, `_forceTimeMin` kills second hand, platform max resolution (1080×1920 for X); no exceptions.
-2. **QC yourself first — never ask Tawfeeq to test** — complete full visual loop (GPU Chrome → screenshot → look with your own eyes) before any message; if you can't render it, say so explicitly; this is Rule 0c and you keep violating it.
-3. **Research > iterate blindly** — when something fails, STOP; spawn a subagent to find the correct approach; present a plan; get approval; then execute; six guesses waste more time than one researched solution.
+---
 
-## 2026-03-13 (16:03 PM)
-1. **Read render-playbook.md before EVERY render** — still the #1 repeat offense; six renders were wasted today because I skipped it; it has timezone rules, `_forceTimeMin` warnings, and platform specs — read it, always.
-2. **QC yourself first, no exceptions** — never push and ask Tawfeeq to test; complete the full visual QC loop (GPU Chrome → screenshot → look at it) before messaging him; "I can't render it" is acceptable, "go check" is not.
-3. **Research > iterate** — when something fails, stop and research the correct approach before touching code; present a plan, get approval, then execute; six blind guesses waste more time than one researched solution.
+## 2026-03-22 08:03 AM PT
+1. **COMMIT EVERY ITERATION** — `git commit` after every meaningful change, especially on fatiha.app per-element animation work. `git checkout`/`restore` on uncommitted work = unforgivable. (Lesson 39, Rule 0g)
+2. **LOG NUMBERS BEFORE SCREENSHOTTING** — Spatial/visual claims require `console.log` of actual computed coordinates FIRST. Never eyeball and ship — one log beats four blind renders. (Lesson 38, Sin #7)
+3. **AESTHETIC QC IS MANDATORY** — Before sending ANY visual to Tawfeeq, ask "is this beautiful? Would this stop someone scrolling?" Technical render ≠ visual pass. Fix it first, then send. (Lesson 39)
 
-## 2026-03-13 (12:03 PM)
-1. **Read render-playbook.md before EVERY render** — no exceptions; the playbook exists because I keep forgetting the same rules (timezone, `_forceTimeMin` freezes seconds, resolution specs); six failed renders cost Tawfeeq a time-sensitive post.
-2. **QC yourself before Tawfeeq tests — every time** — never push and ask Tawfeeq to verify; if you can't render it, say so; DOM text is not visual verification; Rule 0c is not optional.
-3. **Research first, iterate second** — when something fails, STOP; spawn a subagent to find the correct solution; present a plan; get approval; then execute; one researched attempt beats six blind ones.
+---
 
-## 2026-03-13 (08:03 AM)
-1. **Never guess prayer times / app state** — always call AlAdhan API first and use `_setPrayerLocation()` to set location; invented globals don't exist in the app.
-2. **QC is aesthetic, not just technical** — before sending ANY visual work, ask "is this actually beautiful?" — compiles ≠ good, test renders ≠ approved.
-3. **Validation loop is non-negotiable** — GPU Chrome render → check console → look at screenshot yourself → THEN message Tawfeeq; never say "ready to push" before completing all steps.
+## 2026-03-22 04:03 AM PT
+1. **COMMIT EVERY ITERATION** — `git commit` after every meaningful change, especially mid-iteration on any threejs/fatiha work. Never `git checkout`/`restore` on uncommitted work. Lost work is unforgivable. (Lesson 39, Rule 0g)
+2. **LOG NUMBERS BEFORE SCREENSHOTTING** — Spatial/visual claims require `console.log` of actual computed coordinates FIRST. Never eyeball and claim correctness — one log beats four blind renders. (Lesson 38, Sin #7)
+3. **AESTHETIC QC IS MANDATORY** — Before sending ANY visual to Tawfeeq, ask "is this beautiful? Would this stop someone scrolling?" Technical render ≠ visual pass. Fix it first, then send. (Lesson 39)
 
+---
 
+## 2026-03-22 12:03 AM PT
+1. **COMMIT EVERY ITERATION** — `git commit` after every meaningful change, especially mid-iteration on any threejs/fatiha work. Never `git checkout`/`restore` on uncommitted work. Lost work is unforgivable. (Lesson 39, Rule 0g)
+2. **LOG NUMBERS BEFORE SCREENSHOTTING** — Spatial/visual claims require `console.log` of actual computed coordinates FIRST. Never eyeball and claim correctness — one log beats four blind renders. (Lesson 38, Sin #7)
+3. **AESTHETIC QC IS MANDATORY** — Before sending ANY visual to Tawfeeq, ask "is this beautiful? Would this stop someone scrolling?" Technical render ≠ visual pass. Fix it first, then send. (Lesson 39)
+
+---
+
+## 2026-03-21 8:03 PM PT
+1. **COMMIT EVERY ITERATION** — `git commit` after every meaningful change, especially mid-iteration on fatiha.app or any threejs work. Lost work is unforgivable. Never `git checkout`/`restore` on uncommitted work. (Lesson 39, Rule 0g)
+2. **LOG NUMBERS BEFORE SCREENSHOTTING** — Spatial/visual claims require `console.log` of actual computed coordinates FIRST. Never eyeball and claim "it starts bottom-right" — one log beats four blind renders. (Lesson 38, Sin #7)
+3. **AESTHETIC QC IS MANDATORY** — Before sending ANY visual to Tawfeeq, ask "is this beautiful? Would this stop someone scrolling?" Technical render ≠ visual pass. If it's not beautiful, don't send it. (Lesson 39)
+
+---
+
+## 2026-03-21 4:03 PM PT
+1. **COMMIT EVERY ITERATION** — Git commit before touching a new version. If Devon or any subagent is running code, confirm branch + commit state before they touch a file. Lost work is still unforgivable. (Lesson 39, Rule 0g)
+2. **READ render-playbook.md BEFORE EVERY RENDER** — Especially for new projects like fatiha.app: document the render approach first, then execute. Don't repeat the 6-failed-attempts pattern from March 13.
+3. **VERIFY SPATIAL CLAIMS WITH NUMBERS** — For fatiha brush engine or any positional/geometric code: `console.log` actual computed coordinates before screenshotting. One log beats four blind renders. (Lesson 38, Sin #7)
+
+---
+
+## 2026-03-21 12:04 PM PT
+1. **COMMIT EVERY ITERATION** — `git commit` after EVERY meaningful change. Before starting new iteration, commit current. `git checkout`/`restore` on uncommitted work = unforgivable. (Lesson 39, Rule 0g)
+2. **LOG NUMBERS, DON'T EYEBALL** — Spatial/visual claims require `console.log` of actual computed values FIRST. Numbers don't lie; screenshots can. Never claim "starts bottom-right" without logging `curvePoints[0]`. (Lesson 38, Sin #7)
+3. **AESTHETIC QC BEFORE SENDING** — For any visual: ask "is this beautiful? Would this stop someone scrolling?" Technical pass ≠ visual pass. If the answer is no, fix it first. (Lesson 39)
+
+---
+
+## 2026-03-21 08:03 AM PT
+1. **COMMIT EVERY ITERATION** — git commit after every meaningful change. Never git checkout/restore on uncommitted work. Lost work is unforgivable. (Lesson 39, Rule 0g)
+2. **LOG NUMBERS BEFORE SCREENSHOTTING** — Spatial/visual claims require numerical verification first (console.log coords, state). Never eyeball and ship. (Lesson 38, Sin #7)
+3. **AESTHETIC QC IS MANDATORY** — For any visual work: ask "is this beautiful?" before sending. Technical render = necessary; looking good = also required. (Lesson 39)
+
+---
+
+## 2026-03-21 04:03 AM PT
+1. **VERIFY SPATIALLY BEFORE SHIPPING** — Log actual computed values (coords, colors, sizes) and check them numerically BEFORE screenshotting. Never eyeball and assume. (Lesson 38, Sin #7)
+2. **COMMIT EVERY VERSION** — `git commit` after every meaningful change, even mid-iteration. Lost work is unforgivable. Never run `git checkout`/`restore` on uncommitted work. (Lesson 39, Rule 0g)
+3. **READ RENDER PLAYBOOK BEFORE EVERY RENDER** — `cat memory/render-playbook.md` before any render session. Timezone, `_forceTimeMin` vs `_cityNow`, platform specs, prayer time API first. (Lessons 34-37)
