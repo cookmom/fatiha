@@ -1,0 +1,537 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!-- VINE WREATH IN FULL PAINTING CONTEXT — static setup() only -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Vine Full Context — Fatiha</title>
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+<style>
+  * { margin: 0; padding: 0; }
+  body { background: #f2eada; overflow: hidden; }
+</style>
+</head>
+<body>
+<script>
+var W = 1080, H = 1920, cx = W / 2;
+var doorW = 720, doorH = 1500;
+var doorX = (W - doorW) / 2, doorY = (H - doorH) / 2 + 80;
+var archSpringY = doorY + 380, bot = doorY + doorH, halfDW = doorW / 2;
+var panelTop = archSpringY + 15, panelBot = bot - 15, panelH = panelBot - panelTop;
+
+function archY(x) {
+  var co = halfDW * 0.55, R = halfDW + co;
+  if (x <= cx) { var dx = x - (cx + co); var v = R*R - dx*dx; return v > 0 ? archSpringY - Math.sqrt(v) : archSpringY; }
+  else { var dx = x - (cx - co); var v = R*R - dx*dx; return v > 0 ? archSpringY - Math.sqrt(v) : archSpringY; }
+}
+var archPts = [];
+for (var ai = 0; ai <= 40; ai++) { var ax = doorX + (doorW * ai / 40); archPts.push([ax, archY(ax)]); }
+
+// --- Polygon builders ---
+function makePetalPoly(bx, by, ang, len, wid, curv) {
+  var pts = [], n = 8, ca = Math.cos(ang), sa = Math.sin(ang);
+  for (var i = 0; i <= n; i++) {
+    var t = i/n, w = Math.sin(t * Math.PI);
+    var along = t * len, across = w * wid * 0.5;
+    var co = curv * Math.sin(t * Math.PI) * len * 0.08;
+    pts.push([bx + along*ca - (across+co)*sa, by + along*sa + (across+co)*ca]);
+  }
+  for (var i = n; i >= 0; i--) {
+    var t = i/n, w = Math.sin(t * Math.PI);
+    var along = t * len, across = -w * wid * 0.5;
+    var co = curv * Math.sin(t * Math.PI) * len * 0.08;
+    pts.push([bx + along*ca - (across+co)*sa, by + along*sa + (across+co)*ca]);
+  }
+  return pts;
+}
+
+function makeSazLeafPoly(bx, by, ang, len, wid, curv) {
+  var pts = [], n = 10, ca = Math.cos(ang), sa = Math.sin(ang);
+  for (var i = 0; i <= n; i++) {
+    var t = i/n, w;
+    if (t < 0.15) w = t / 0.15 * 0.4;
+    else if (t < 0.5) w = 0.4 + (t - 0.15) / 0.35 * 0.6;
+    else if (t < 0.85) w = 1.0 - (t - 0.5) * 1.0;
+    else w = Math.max(0, (1 - t) / 0.15 * 0.15);
+    w = Math.max(0, w + 0.05 * Math.sin(t * 6 * Math.PI));
+    var along = t * len, across = w * wid * 0.5;
+    var sc = curv * Math.sin(t * Math.PI * 1.2) * len * 0.06;
+    pts.push([bx + along*ca - (across+sc)*sa, by + along*sa + (across+sc)*ca]);
+  }
+  for (var i = n; i >= 0; i--) {
+    var t = i/n, w;
+    if (t < 0.15) w = t / 0.15 * 0.4;
+    else if (t < 0.5) w = 0.4 + (t - 0.15) / 0.35 * 0.6;
+    else if (t < 0.85) w = 1.0 - (t - 0.5) * 1.0;
+    else w = Math.max(0, (1 - t) / 0.15 * 0.15);
+    w = Math.max(0, w + 0.05 * Math.sin(t * 6 * Math.PI));
+    var along = t * len, across = -w * wid * 0.5;
+    var sc = curv * Math.sin(t * Math.PI * 1.2) * len * 0.06;
+    pts.push([bx + along*ca - (across+sc)*sa, by + along*sa + (across+sc)*ca]);
+  }
+  return pts;
+}
+
+function samplePathEvenly(pts, n) {
+  var dists = [0];
+  for (var i = 1; i < pts.length; i++) {
+    var dx = pts[i][0] - pts[i-1][0], dy = pts[i][1] - pts[i-1][1];
+    dists.push(dists[i-1] + Math.sqrt(dx*dx + dy*dy));
+  }
+  var total = dists[dists.length - 1], result = [];
+  for (var si = 0; si < n; si++) {
+    var target = (si / Math.max(1, n - 1)) * total, seg = 0;
+    for (var j = 1; j < dists.length; j++) { if (dists[j] >= target) { seg = j - 1; break; } }
+    if (seg >= pts.length - 1) seg = pts.length - 2;
+    var segLen = dists[seg+1] - dists[seg];
+    var t = segLen > 0 ? (target - dists[seg]) / segLen : 0;
+    result.push({x: pts[seg][0] + t * (pts[seg+1][0] - pts[seg][0]), y: pts[seg][1] + t * (pts[seg+1][1] - pts[seg][1])});
+  }
+  return result;
+}
+
+// --- Build vine paths (from v10 lookdev) ---
+var leftVinePath = [], rightVinePath = [];
+var leafPositions = [], flowerPositions = [];
+
+function buildVinePaths() {
+  var leftRaw = [], rightRaw = [];
+  var m = 35;
+  var dcy = (archPts[20][1] + panelBot) / 2;
+
+  for (var i = 0; i <= 6; i++) {
+    var t = i / 6;
+    leftRaw.push([cx*(1-t) + (doorX+m)*t, panelBot - 4*Math.sin(t*Math.PI)]);
+    rightRaw.push([cx*(1-t) + (doorX+doorW-m)*t, panelBot - 4*Math.sin(t*Math.PI)]);
+  }
+
+  for (var i = 1; i <= 20; i++) {
+    var t = i/20, y = panelBot*(1-t) + archSpringY*t;
+    var wobble = Math.sin(t * 5.5 + 0.5) * 30;
+    leftRaw.push([doorX + wobble, y]);
+    rightRaw.push([doorX + doorW - wobble, y]);
+  }
+
+  for (var i = 1; i <= 20; i++) {
+    var ax = archPts[i][0], ay = archPts[i][1];
+    var dx = cx - ax, dy = dcy - ay, d = Math.sqrt(dx*dx+dy*dy);
+    if (d > 0) leftRaw.push([ax + dx/d*m, ay + dy/d*m]);
+    else leftRaw.push([ax, ay + m]);
+  }
+  for (var i = 39; i >= 20; i--) {
+    var ax = archPts[i][0], ay = archPts[i][1];
+    var dx = cx - ax, dy = dcy - ay, d = Math.sqrt(dx*dx+dy*dy);
+    if (d > 0) rightRaw.push([ax + dx/d*m, ay + dy/d*m]);
+    else rightRaw.push([ax, ay + m]);
+  }
+
+  leftVinePath = samplePathEvenly(leftRaw, 80);
+  rightVinePath = samplePathEvenly(rightRaw, 80);
+
+  // Dense leaves — 3 per vine point per side
+  leafPositions = [];
+  for (var i = 2; i < 79; i += 2) {
+    var lp = leftVinePath[i], rp = rightVinePath[i];
+    var lNext = leftVinePath[Math.min(i+1,79)], rNext = rightVinePath[Math.min(i+1,79)];
+    var lAng = Math.atan2(lNext.y-lp.y, lNext.x-lp.x);
+    var rAng = Math.atan2(rNext.y-rp.y, rNext.x-rp.x);
+    for (var li = 0; li < 3; li++) {
+      var angOff = (li - 1) * 1.0 + (Math.random()-0.5)*0.8;
+      var s = 0.5 + Math.random()*0.4;
+      var jx = (Math.random()-0.5)*12, jy = (Math.random()-0.5)*12;
+      leafPositions.push({x:lp.x+jx, y:lp.y+jy, angle:lAng + angOff, scale:s});
+      leafPositions.push({x:rp.x+jx, y:rp.y+jy, angle:rAng - angOff, scale:s});
+    }
+  }
+
+  // Flowers — 3 rows (inner/middle/outer)
+  flowerPositions = [];
+  for (var i = 3; i < 78; i += 2) {
+    var lp = leftVinePath[i], rp = rightVinePath[i];
+    var lNext = leftVinePath[Math.min(i+1,79)], rNext = rightVinePath[Math.min(i+1,79)];
+    var lPerp = Math.atan2(lNext.y-lp.y, lNext.x-lp.x) - Math.PI/2;
+    var rPerp = Math.atan2(rNext.y-rp.y, rNext.x-rp.x) + Math.PI/2;
+
+    var types = ['rose','rose','rose','pink','rose','pink','rose','bud'];
+    var type = types[i % types.length];
+    var jx, jy, s, angJ;
+
+    angJ = (Math.random()-0.5)*0.8;
+    var offOuter = 25 + Math.random()*20;
+    s = 1.0 + Math.random()*0.3;
+    jx = (Math.random()-0.5)*12; jy = (Math.random()-0.5)*12;
+    flowerPositions.push({x:lp.x+Math.cos(lPerp+angJ)*offOuter+jx, y:lp.y+Math.sin(lPerp+angJ)*offOuter+jy, scale:s, type:type});
+    flowerPositions.push({x:rp.x+Math.cos(rPerp-angJ)*offOuter+jx, y:rp.y+Math.sin(rPerp-angJ)*offOuter+jy, scale:s, type:type});
+
+    if (i % 3 !== 2) {
+      s = 0.8 + Math.random()*0.3;
+      var type2 = Math.random() < 0.5 ? 'pink' : (Math.random() < 0.7 ? 'rose' : 'bud');
+      jx = (Math.random()-0.5)*10; jy = (Math.random()-0.5)*10;
+      flowerPositions.push({x:lp.x+jx, y:lp.y+jy, scale:s, type:type2});
+      flowerPositions.push({x:rp.x+jx, y:rp.y+jy, scale:s, type:type2});
+    }
+
+    if (i % 4 !== 3) {
+      s = 0.7 + Math.random()*0.25;
+      var type3 = Math.random() < 0.4 ? 'pink' : (Math.random() < 0.5 ? 'rose' : 'bud');
+      var offInner = 5 + Math.random()*12;
+      jx = (Math.random()-0.5)*8; jy = (Math.random()-0.5)*8;
+      flowerPositions.push({x:lp.x-Math.cos(lPerp)*offInner+jx, y:lp.y-Math.sin(lPerp)*offInner+jy, scale:s, type:type3});
+      flowerPositions.push({x:rp.x-Math.cos(rPerp)*offInner+jx, y:rp.y-Math.sin(rPerp)*offInner+jy, scale:s, type:type3});
+    }
+  }
+
+  console.log('Vine: '+leftVinePath.length+' pts | Leaves: '+leafPositions.length+' | Flowers: '+flowerPositions.length);
+}
+
+// --- Flower builders (LOWERED OPACITY: 80-110 range for transparency) ---
+function buildRoseData(fcx, fcy, s) {
+  var rose = {x: fcx, y: fcy, scale: s, petals: [], centerPts: null};
+  var rings = [
+    {count:7, len:52*s, w:36*s, color:'#8a1020', opacity:110},   // outer: was 170
+    {count:6, len:40*s, w:28*s, color:'#c03050', opacity:95},    // middle: was 150
+    {count:4, len:28*s, w:20*s, color:'#e88098', opacity:85}     // inner: was 140
+  ];
+  var baseAngle = Math.random() * Math.PI * 2;
+  for (var r = 0; r < rings.length; r++) {
+    var ring = rings[r], angleOff = r * 0.3 + baseAngle;
+    for (var p = 0; p < ring.count; p++) {
+      var angle = (p / ring.count) * Math.PI * 2 + angleOff + (Math.random()-0.5)*0.15;
+      var pts = makePetalPoly(fcx, fcy, angle, ring.len, ring.w, 0.3);
+      rose.petals.push({color: ring.color, opacity: ring.opacity, pts: pts});
+    }
+  }
+  rose.centerPts = makePetalPoly(fcx, fcy, Math.random()*Math.PI*2, 16*s, 12*s, 0.4);
+  return rose;
+}
+
+function buildStarData(fcx, fcy, s) {
+  var star = {x: fcx, y: fcy, scale: s, petals: [], centerPts: null};
+  var n = 6 + Math.floor(Math.random()*3), baseAngle = Math.random()*Math.PI*2;
+  for (var p = 0; p < n; p++) {
+    var angle = (p/n)*Math.PI*2 + baseAngle + (Math.random()-0.5)*0.1;
+    var pts = makePetalPoly(fcx, fcy, angle, 28*s, 10*s, 0.3);
+    star.petals.push({color:'#c04060', opacity:80, pts: pts});  // was 120
+  }
+  star.centerPts = makePetalPoly(fcx, fcy, Math.random()*Math.PI*2, 10*s, 7*s, 0.3);
+  return star;
+}
+
+function buildPinkData(fcx, fcy, s) {
+  var pink = {x: fcx, y: fcy, scale: s, petals: [], centerPts: null};
+  var rings = [
+    {count: 6, len: 26*s, w: 18*s, color: '#d060a0', opacity: 80},   // was 130
+    {count: 5, len: 18*s, w: 14*s, color: '#e890b8', opacity: 88},   // was 140
+    {count: 3, len: 12*s, w: 9*s, color: '#f0b0d0', opacity: 80},    // was 130
+  ];
+  for (var ri = 0; ri < rings.length; ri++) {
+    var ring = rings[ri], angleOff = ri * 0.35;
+    for (var p = 0; p < ring.count; p++) {
+      var angle = (p / ring.count) * Math.PI * 2 + angleOff + (Math.random()-0.5)*0.15;
+      var pts = makePetalPoly(fcx, fcy, angle, ring.len, ring.w, 0.3);
+      pink.petals.push({color: ring.color, opacity: ring.opacity, pts: pts});
+    }
+  }
+  pink.centerPts = makePetalPoly(fcx, fcy, Math.random()*Math.PI*2, 8*s, 6*s, 0.4);
+  return pink;
+}
+
+function buildBudData(fcx, fcy, s) {
+  var bud = {x: fcx, y: fcy, scale: s, petals: [], centerPts: null};
+  var baseAngle = Math.random()*Math.PI*2;
+  for (var p = 0; p < 3; p++) {
+    var angle = baseAngle + (p - 1) * 0.5;
+    var pts = makePetalPoly(fcx, fcy, angle, 16*s, 6*s, 0.4);
+    bud.petals.push({color: p===1 ? '#d06080' : '#8a2040', opacity: 80 + p*10, pts: pts});  // was 110+p*15
+  }
+  bud.centerPts = null;
+  return bud;
+}
+
+// --- p5 setup (static, full painting context) ---
+function setup() {
+  createCanvas(W, H, WEBGL);
+  brush.load();
+  translate(-width/2, -height/2);
+  background(242, 234, 218);
+
+  randomSeed(42);
+  buildVinePaths();
+
+  // Pre-build all flower geometry
+  var allFlowers = [];
+  for (var i = 0; i < flowerPositions.length; i++) {
+    var fp = flowerPositions[i];
+    if (fp.type === 'rose') allFlowers.push(buildRoseData(fp.x, fp.y, fp.scale));
+    else if (fp.type === 'pink') allFlowers.push(buildPinkData(fp.x, fp.y, fp.scale));
+    else if (fp.type === 'bud') allFlowers.push(buildBudData(fp.x, fp.y, fp.scale));
+    else allFlowers.push(buildStarData(fp.x, fp.y, fp.scale));
+  }
+  // Crown cluster at arch peak
+  var peakX = archPts[20][0], peakY = archPts[20][1] + 25;
+  allFlowers.push(buildRoseData(peakX, peakY, 1.3));
+  allFlowers.push(buildRoseData(peakX - 30, peakY + 10, 1.0));
+  allFlowers.push(buildRoseData(peakX + 30, peakY + 10, 1.0));
+  allFlowers.push(buildPinkData(peakX - 15, peakY - 15, 0.8));
+  allFlowers.push(buildPinkData(peakX + 15, peakY - 15, 0.8));
+  allFlowers.push(buildRoseData(archPts[15][0] + 15, archPts[15][1] + 20, 0.95));
+  allFlowers.push(buildRoseData(archPts[25][0] - 15, archPts[25][1] + 20, 0.95));
+  allFlowers.push(buildPinkData(archPts[12][0] + 10, archPts[12][1] + 15, 0.8));
+  allFlowers.push(buildPinkData(archPts[28][0] - 10, archPts[28][1] + 15, 0.8));
+  // Bottom center cluster
+  allFlowers.push(buildRoseData(cx - 25, panelBot + 5, 1.0));
+  allFlowers.push(buildRoseData(cx + 25, panelBot + 5, 1.0));
+  allFlowers.push(buildRoseData(cx, panelBot + 15, 0.9));
+  allFlowers.push(buildPinkData(cx - 40, panelBot - 5, 0.7));
+  allFlowers.push(buildPinkData(cx + 40, panelBot - 5, 0.7));
+  allFlowers.push(buildBudData(cx - 55, panelBot + 10, 0.6));
+  allFlowers.push(buildBudData(cx + 55, panelBot + 10, 0.6));
+  // Bottom corners
+  allFlowers.push(buildRoseData(doorX + 15, panelBot - 20, 0.9));
+  allFlowers.push(buildRoseData(doorX + doorW - 15, panelBot - 20, 0.9));
+  allFlowers.push(buildPinkData(doorX + 30, panelBot + 10, 0.75));
+  allFlowers.push(buildPinkData(doorX + doorW - 30, panelBot + 10, 0.75));
+  allFlowers.push(buildRoseData(doorX + 5, panelBot + 15, 0.8));
+  allFlowers.push(buildRoseData(doorX + doorW - 5, panelBot + 15, 0.8));
+  // Mid-jamb extras
+  var midJamb = (archSpringY + panelBot) / 2;
+  allFlowers.push(buildRoseData(doorX - 15, midJamb, 0.85));
+  allFlowers.push(buildRoseData(doorX + doorW + 15, midJamb, 0.85));
+  allFlowers.push(buildPinkData(doorX - 10, midJamb - 80, 0.7));
+  allFlowers.push(buildPinkData(doorX + doorW + 10, midJamb - 80, 0.7));
+  allFlowers.push(buildPinkData(doorX - 10, midJamb + 80, 0.7));
+  allFlowers.push(buildPinkData(doorX + doorW + 10, midJamb + 80, 0.7));
+
+  // Pre-build all leaf geometry
+  var allLeaves = [];
+  for (var i = 0; i < leafPositions.length; i++) {
+    var lf = leafPositions[i];
+    allLeaves.push({
+      x: lf.x, y: lf.y, angle: lf.angle, scale: lf.scale,
+      pts: makeSazLeafPoly(lf.x, lf.y, lf.angle, 130*lf.scale, 35*lf.scale, 0.5)
+    });
+  }
+
+  // ============================================
+  // LAYER 1: Watercolor washes (lapis blue, gold, green + accent)
+  // From approved v8 parametric base
+  // ============================================
+  brush.noStroke();
+
+  // Lapis blue — arch/tympanum area
+  brush.fill('#0D3B8E', 80);
+  brush.fillBleed(0.5, 'out');
+  brush.fillTexture(0.5, 0.25);
+  brush.rect(doorX+20, doorY-10, doorW-40, archSpringY-doorY+80);
+  brush.noFill();
+
+  // Gold — upper panels
+  brush.fill('#B8860B', 70);
+  brush.fillBleed(0.45, 'out');
+  brush.fillTexture(0.5, 0.25);
+  brush.rect(doorX+30, archSpringY-30, doorW-60, 300);
+  brush.noFill();
+
+  // Green — lower panels
+  brush.fill('#0E4D2E', 80);
+  brush.fillBleed(0.5, 'out');
+  brush.fillTexture(0.5, 0.25);
+  brush.rect(doorX+20, archSpringY+350, doorW-40, panelBot-archSpringY-320);
+  brush.noFill();
+
+  // Purple accent — left panel
+  brush.fill('#3A0C6E', 100);
+  brush.fillBleed(0.35, 'out');
+  brush.fillTexture(0.5, 0.25);
+  brush.rect(doorX+50, panelTop+panelH*0.15, halfDW-80, panelH*0.25);
+  brush.noFill();
+
+  // Red accent — right panel
+  brush.fill('#8B1A1A', 90);
+  brush.fillBleed(0.3, 'out');
+  brush.fillTexture(0.5, 0.25);
+  brush.rect(cx+30, panelTop+panelH*0.55, halfDW-80, panelH*0.25);
+  brush.noFill();
+
+  // ============================================
+  // LAYER 2: Pencil door structure
+  // ============================================
+
+  // --- Door frame outline ---
+  brush.set('HB', '#2A2215', 3.5);
+  brush.strokeWeight(3.5);
+  // Left jamb
+  brush.line(doorX, archSpringY, doorX, bot);
+  // Right jamb
+  brush.line(doorX + doorW, archSpringY, doorX + doorW, bot);
+  // Bottom
+  brush.line(doorX, bot, doorX + doorW, bot);
+  // Pointed arch
+  brush.set('HB', '#3A3020', 3.0);
+  for (var i = 0; i < 40; i++) {
+    brush.line(archPts[i][0], archPts[i][1], archPts[i+1][0], archPts[i+1][1]);
+  }
+  // Center divider
+  brush.set('HB', '#2A2215', 3.0);
+  brush.line(cx, archSpringY, cx, bot);
+  // Spring line
+  brush.set('HB', '#3A3020', 2.5);
+  brush.line(doorX, archSpringY, doorX + doorW, archSpringY);
+
+  // --- Panel frames ---
+  var pi = 25;
+  var lx = doorX + pi, lw = cx - pi - lx;
+  var rx = cx + pi, rw = doorX + doorW - pi - rx;
+  var py = panelTop + 20, ph = panelH - 40;
+
+  brush.set('2B', '#3A3525', 2.0);
+  // Left panel frame
+  brush.line(lx, py, lx + lw, py);
+  brush.line(lx, py + ph, lx + lw, py + ph);
+  brush.line(lx, py, lx, py + ph);
+  brush.line(lx + lw, py, lx + lw, py + ph);
+  // Right panel frame
+  brush.line(rx, py, rx + rw, py);
+  brush.line(rx, py + ph, rx + rw, py + ph);
+  brush.line(rx, py, rx, py + ph);
+  brush.line(rx + rw, py, rx + rw, py + ph);
+
+  // --- Cross-hatch marks in panels ---
+  brush.set('2B', '#4A4535', 1.5);
+  for (var ci = 0; ci < 4; ci++) {
+    var yOff = py + ph*0.2 + ci*ph*0.2, xMid = lx + lw/2;
+    brush.line(xMid-30, yOff-20, xMid+30, yOff+20);
+    brush.line(xMid+30, yOff-20, xMid-30, yOff+20);
+  }
+  for (var ci = 0; ci < 4; ci++) {
+    var yOff = py + ph*0.2 + ci*ph*0.2, xMid = rx + rw/2;
+    brush.line(xMid-30, yOff-20, xMid+30, yOff+20);
+    brush.line(xMid+30, yOff-20, xMid-30, yOff+20);
+  }
+
+  // --- Horizontal dividers ---
+  brush.set('HB', '#3A3525', 1.8);
+  brush.line(lx, py+ph/3, lx+lw, py+ph/3);
+  brush.line(lx, py+ph*2/3, lx+lw, py+ph*2/3);
+  brush.line(rx, py+ph/3, rx+rw, py+ph/3);
+  brush.line(rx, py+ph*2/3, rx+rw, py+ph*2/3);
+  brush.line(lx, py+ph/2, lx+lw, py+ph/2);
+  brush.line(rx, py+ph/2, rx+rw, py+ph/2);
+
+  // --- Rosette circles ---
+  brush.set('HB', '#4A3A20', 1.5);
+  brush.circle(lx+lw/2, py+ph/2, 30);
+  brush.circle(lx+lw/2, py+ph/2, 55);
+  brush.circle(lx+lw/2, py+ph/2, 80);
+  brush.circle(rx+rw/2, py+ph/2, 30);
+  brush.circle(rx+rw/2, py+ph/2, 55);
+  brush.circle(rx+rw/2, py+ph/2, 80);
+
+  // --- Rosette radial lines ---
+  brush.set('2H', '#5A4A30', 1.2);
+  for (var ri = 0; ri < 8; ri++) {
+    var angle = ri * (Math.PI*2/8);
+    brush.line(lx+lw/2, py+ph/2, lx+lw/2+Math.cos(angle)*55, py+ph/2+Math.sin(angle)*55);
+    brush.line(rx+rw/2, py+ph/2, rx+rw/2+Math.cos(angle)*55, py+ph/2+Math.sin(angle)*55);
+  }
+
+  // --- Hatch fills ---
+  try {
+    brush.hatch(12, 45, {rand:0.1});
+    brush.hatchStyle('2H', '#5A5040', 0.8);
+    brush.rect(lx+10, py+10, lw-20, ph/3-10);
+    brush.noHatch();
+  } catch(e) {}
+  try {
+    brush.hatch(14, -30, {rand:0.12});
+    brush.hatchStyle('2H', '#5A5040', 0.8);
+    brush.rect(rx+10, py+ph*2/3+5, rw-20, ph/3-10);
+    brush.noHatch();
+  } catch(e) {}
+
+  // ============================================
+  // LAYER 3: Vine pencil lines (green)
+  // ============================================
+  brush.set('2H', '#5a8a50', 0.2);
+  brush.strokeWeight(2.2);
+  for (var i = 0; i < leftVinePath.length - 1; i++) {
+    brush.line(leftVinePath[i].x, leftVinePath[i].y, leftVinePath[i+1].x, leftVinePath[i+1].y);
+  }
+  for (var i = 0; i < rightVinePath.length - 1; i++) {
+    brush.line(rightVinePath[i].x, rightVinePath[i].y, rightVinePath[i+1].x, rightVinePath[i+1].y);
+  }
+  // Secondary vine offset
+  brush.set('2H', '#7a9a70', 0.12);
+  brush.strokeWeight(1.2);
+  for (var i = 0; i < leftVinePath.length - 1; i++) {
+    brush.line(leftVinePath[i].x+2, leftVinePath[i].y+1, leftVinePath[i+1].x+2, leftVinePath[i+1].y+1);
+  }
+  for (var i = 0; i < rightVinePath.length - 1; i++) {
+    brush.line(rightVinePath[i].x-2, rightVinePath[i].y+1, rightVinePath[i+1].x-2, rightVinePath[i+1].y+1);
+  }
+
+  // ============================================
+  // LAYER 4: Leaf watercolor fills (transparent — washes show through)
+  // ============================================
+  brush.noStroke();
+  for (var i = 0; i < allLeaves.length; i++) {
+    brush.fill('#0e4a22', 100);  // was 160
+    brush.fillBleed(0.3, 'in');
+    brush.fillTexture(0.35, 0.2);
+    brush.polygon(allLeaves[i].pts);
+  }
+  brush.noFill();
+
+  // ============================================
+  // LAYER 5: Flower watercolor fills (TRANSPARENT — 80-110 opacity)
+  // ============================================
+  brush.noStroke();
+  for (var i = 0; i < allFlowers.length; i++) {
+    var fl = allFlowers[i];
+    for (var j = fl.petals.length - 1; j >= 0; j--) {
+      var p = fl.petals[j];
+      brush.fill(p.color, p.opacity);
+      brush.fillBleed(0.35, 'in');
+      brush.fillTexture(0.45, 0.3);
+      brush.polygon(p.pts);
+    }
+  }
+  brush.noFill();
+
+  // ============================================
+  // LAYER 6: Gold centers
+  // ============================================
+  brush.noStroke();
+  for (var i = 0; i < allFlowers.length; i++) {
+    var fl = allFlowers[i];
+    brush.fill('#c4a040', 150);  // was 200
+    brush.fillBleed(0.2, 'out');
+    brush.fillTexture(0.3, 0.2);
+    if (fl.centerPts) brush.polygon(fl.centerPts);
+  }
+  brush.noFill();
+
+  // ============================================
+  // LAYER 7: Front accent leaves over flowers
+  // ============================================
+  brush.noStroke();
+  for (var i = 0; i < allLeaves.length; i += 3) {
+    var lf = allLeaves[i];
+    var frontScale = lf.scale * 0.7;
+    var frontPts = makeSazLeafPoly(lf.x, lf.y, lf.angle + 0.15, 100*frontScale, 26*frontScale, 0.4);
+    brush.fill('#1a6030', 95);  // was 150
+    brush.fillBleed(0.25, 'in');
+    brush.fillTexture(0.35, 0.2);
+    brush.polygon(frontPts);
+  }
+  brush.noFill();
+
+  noLoop();
+  console.log('FULL CONTEXT DONE — leaves: ' + allLeaves.length + ', flowers: ' + allFlowers.length);
+}
+
+function draw() {}
+</script>
+</body>
+</html>
