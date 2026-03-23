@@ -133,35 +133,61 @@ function buildVinePaths() {
   leftVinePath = samplePathEvenly(leftRaw, 80);
   rightVinePath = samplePathEvenly(rightRaw, 80);
 
-  // Leaf positions along vine
+  // Leaf positions — VERY DENSE, RANDOM ANGLES for natural look
   leafPositions = [];
-  for (var i = 5; i < 76; i += 3 + Math.floor(Math.random()*2)) {
+  for (var i = 2; i < 79; i += 2) {
     var lp = leftVinePath[i], rp = rightVinePath[i];
     var lNext = leftVinePath[Math.min(i+1,79)], rNext = rightVinePath[Math.min(i+1,79)];
-    var lAng = Math.atan2(lNext.y-lp.y, lNext.x-lp.x) + (i%2===0 ? -1.2 : 1.2);
-    var rAng = Math.atan2(rNext.y-rp.y, rNext.x-rp.x) + (i%2===0 ? 1.2 : -1.2);
-    var s = 0.45 + Math.random()*0.25;
-    // Leaves attach FROM the vine point (stem base at vine)
-    leafPositions.push({x:lp.x, y:lp.y, angle:lAng, scale:s});
-    leafPositions.push({x:rp.x, y:rp.y, angle:rAng, scale:s});
+    var lAng = Math.atan2(lNext.y-lp.y, lNext.x-lp.x);
+    var rAng = Math.atan2(rNext.y-rp.y, rNext.x-rp.x);
+    // 3 leaves per vine point per side, random angles
+    for (var li = 0; li < 3; li++) {
+      var angOff = (li - 1) * 1.0 + (Math.random()-0.5)*0.8;
+      var s = 0.5 + Math.random()*0.4;
+      var jx = (Math.random()-0.5)*12, jy = (Math.random()-0.5)*12;
+      leafPositions.push({x:lp.x+jx, y:lp.y+jy, angle:lAng + angOff, scale:s});
+      leafPositions.push({x:rp.x+jx, y:rp.y+jy, angle:rAng - angOff, scale:s});
+    }
   }
 
-  // Flower positions along vine
+  // Flower positions — 3 ROWS (inner/middle/outer) for ultra-thick wreath
   flowerPositions = [];
-  for (var i = 8; i < 78; i += 5 + Math.floor(Math.random()*3)) {
+  for (var i = 3; i < 78; i += 2) {
     var lp = leftVinePath[i], rp = rightVinePath[i];
     var lNext = leftVinePath[Math.min(i+1,79)], rNext = rightVinePath[Math.min(i+1,79)];
     var lPerp = Math.atan2(lNext.y-lp.y, lNext.x-lp.x) - Math.PI/2;
     var rPerp = Math.atan2(rNext.y-rp.y, rNext.x-rp.x) + Math.PI/2;
-    var off = 5 + Math.random()*10;
-    // Bigger flowers near arch (higher i = closer to arch peak) and at bottom
-    var archProximity = i / 75;
-    var bottomProximity = Math.max(0, 1 - i / 20); // bigger near bottom too
-    var s = 0.45 + Math.max(archProximity, bottomProximity) * 0.25 + Math.random()*0.1;
-    var types = ['rose','rose','pink','bud','rose','pink','bud','rose'];
+
+    var types = ['rose','rose','rose','pink','rose','pink','rose','bud'];
     var type = types[i % types.length];
-    flowerPositions.push({x:lp.x+Math.cos(lPerp)*off, y:lp.y+Math.sin(lPerp)*off, scale:s, type:type});
-    flowerPositions.push({x:rp.x+Math.cos(rPerp)*off, y:rp.y+Math.sin(rPerp)*off, scale:s, type:type});
+    var jx, jy, s, angJ;
+
+    // OUTER ROW: big flowers far from vine
+    angJ = (Math.random()-0.5)*0.8;
+    var offOuter = 25 + Math.random()*20;
+    s = 1.0 + Math.random()*0.3;
+    jx = (Math.random()-0.5)*12; jy = (Math.random()-0.5)*12;
+    flowerPositions.push({x:lp.x+Math.cos(lPerp+angJ)*offOuter+jx, y:lp.y+Math.sin(lPerp+angJ)*offOuter+jy, scale:s, type:type});
+    flowerPositions.push({x:rp.x+Math.cos(rPerp-angJ)*offOuter+jx, y:rp.y+Math.sin(rPerp-angJ)*offOuter+jy, scale:s, type:type});
+
+    // MIDDLE ROW: on the vine itself
+    if (i % 3 !== 2) {
+      s = 0.8 + Math.random()*0.3;
+      var type2 = Math.random() < 0.5 ? 'pink' : (Math.random() < 0.7 ? 'rose' : 'bud');
+      jx = (Math.random()-0.5)*10; jy = (Math.random()-0.5)*10;
+      flowerPositions.push({x:lp.x+jx, y:lp.y+jy, scale:s, type:type2});
+      flowerPositions.push({x:rp.x+jx, y:rp.y+jy, scale:s, type:type2});
+    }
+
+    // INNER ROW: toward door center — tight offset to stay on frame
+    if (i % 4 !== 3) {
+      s = 0.7 + Math.random()*0.25;
+      var type3 = Math.random() < 0.4 ? 'pink' : (Math.random() < 0.5 ? 'rose' : 'bud');
+      var offInner = 5 + Math.random()*12;
+      jx = (Math.random()-0.5)*8; jy = (Math.random()-0.5)*8;
+      flowerPositions.push({x:lp.x-Math.cos(lPerp)*offInner+jx, y:lp.y-Math.sin(lPerp)*offInner+jy, scale:s, type:type3});
+      flowerPositions.push({x:rp.x-Math.cos(rPerp)*offInner+jx, y:rp.y-Math.sin(rPerp)*offInner+jy, scale:s, type:type3});
+    }
   }
 
   console.log('Vine: '+leftVinePath.length+' pts | Leaves: '+leafPositions.length+' | Flowers: '+flowerPositions.length);
@@ -171,9 +197,9 @@ function buildVinePaths() {
 function buildRoseData(fcx, fcy, s) {
   var rose = {x: fcx, y: fcy, scale: s, petals: [], centerPts: null};
   var rings = [
-    {count:5, len:32*s, w:22*s, color:'#8a1020', opacity:160},  // outer: deep crimson, round
-    {count:5, len:24*s, w:18*s, color:'#c03050', opacity:140},  // middle: rose pink, round
-    {count:4, len:16*s, w:12*s, color:'#e88098', opacity:130}   // inner: light pink, round
+    {count:7, len:52*s, w:36*s, color:'#8a1020', opacity:170},  // outer: deep crimson, lush
+    {count:6, len:40*s, w:28*s, color:'#c03050', opacity:150},  // middle: rose pink
+    {count:4, len:28*s, w:20*s, color:'#e88098', opacity:140}   // inner: light pink
   ];
   var baseAngle = Math.random() * Math.PI * 2;
   for (var r = 0; r < rings.length; r++) {
@@ -203,8 +229,9 @@ function buildStarData(fcx, fcy, s) {
 function buildPinkData(fcx, fcy, s) {
   var pink = {x: fcx, y: fcy, scale: s, petals: [], centerPts: null};
   var rings = [
-    {count: 5, len: 18*s, w: 14*s, color: '#d080a0', opacity: 120},
-    {count: 4, len: 12*s, w: 10*s, color: '#e8a0c0', opacity: 130},
+    {count: 6, len: 26*s, w: 18*s, color: '#d060a0', opacity: 130},
+    {count: 5, len: 18*s, w: 14*s, color: '#e890b8', opacity: 140},
+    {count: 3, len: 12*s, w: 9*s, color: '#f0b0d0', opacity: 130},
   ];
   for (var ri = 0; ri < rings.length; ri++) {
     var ring = rings[ri], angleOff = ri * 0.35;
@@ -255,12 +282,41 @@ function setup() {
       allFlowers.push(buildStarData(fp.x, fp.y, fp.scale));
     }
   }
-  // Crown rose at arch peak — the showpiece
+  // Crown cluster at arch peak — massive showpiece
   var peakX = archPts[20][0], peakY = archPts[20][1] + 25;
-  allFlowers.push(buildRoseData(peakX, peakY, 0.8));
-  // Two flanking roses near peak
-  allFlowers.push(buildRoseData(archPts[16][0] + 15, archPts[16][1] + 20, 0.65));
-  allFlowers.push(buildRoseData(archPts[24][0] - 15, archPts[24][1] + 20, 0.65));
+  allFlowers.push(buildRoseData(peakX, peakY, 1.3));
+  allFlowers.push(buildRoseData(peakX - 30, peakY + 10, 1.0));
+  allFlowers.push(buildRoseData(peakX + 30, peakY + 10, 1.0));
+  allFlowers.push(buildPinkData(peakX - 15, peakY - 15, 0.8));
+  allFlowers.push(buildPinkData(peakX + 15, peakY - 15, 0.8));
+  // Flanking roses near peak — large
+  allFlowers.push(buildRoseData(archPts[15][0] + 15, archPts[15][1] + 20, 0.95));
+  allFlowers.push(buildRoseData(archPts[25][0] - 15, archPts[25][1] + 20, 0.95));
+  allFlowers.push(buildPinkData(archPts[12][0] + 10, archPts[12][1] + 15, 0.8));
+  allFlowers.push(buildPinkData(archPts[28][0] - 10, archPts[28][1] + 15, 0.8));
+  // Bottom center cluster — dense
+  allFlowers.push(buildRoseData(cx - 25, panelBot + 5, 1.0));
+  allFlowers.push(buildRoseData(cx + 25, panelBot + 5, 1.0));
+  allFlowers.push(buildRoseData(cx, panelBot + 15, 0.9));
+  allFlowers.push(buildPinkData(cx - 40, panelBot - 5, 0.7));
+  allFlowers.push(buildPinkData(cx + 40, panelBot - 5, 0.7));
+  allFlowers.push(buildBudData(cx - 55, panelBot + 10, 0.6));
+  allFlowers.push(buildBudData(cx + 55, panelBot + 10, 0.6));
+  // Bottom CORNERS — where jambs meet base (often thin spots)
+  allFlowers.push(buildRoseData(doorX + 15, panelBot - 20, 0.9));
+  allFlowers.push(buildRoseData(doorX + doorW - 15, panelBot - 20, 0.9));
+  allFlowers.push(buildPinkData(doorX + 30, panelBot + 10, 0.75));
+  allFlowers.push(buildPinkData(doorX + doorW - 30, panelBot + 10, 0.75));
+  allFlowers.push(buildRoseData(doorX + 5, panelBot + 15, 0.8));
+  allFlowers.push(buildRoseData(doorX + doorW - 5, panelBot + 15, 0.8));
+  // Mid-jamb extra roses (left and right sides)
+  var midJamb = (archSpringY + panelBot) / 2;
+  allFlowers.push(buildRoseData(doorX - 15, midJamb, 0.85));
+  allFlowers.push(buildRoseData(doorX + doorW + 15, midJamb, 0.85));
+  allFlowers.push(buildPinkData(doorX - 10, midJamb - 80, 0.7));
+  allFlowers.push(buildPinkData(doorX + doorW + 10, midJamb - 80, 0.7));
+  allFlowers.push(buildPinkData(doorX - 10, midJamb + 80, 0.7));
+  allFlowers.push(buildPinkData(doorX + doorW + 10, midJamb + 80, 0.7));
 
   // Pre-build all leaf geometry
   var allLeaves = [];
@@ -268,7 +324,7 @@ function setup() {
     var lf = leafPositions[i];
     allLeaves.push({
       x: lf.x, y: lf.y, angle: lf.angle, scale: lf.scale,
-      pts: makeSazLeafPoly(lf.x, lf.y, lf.angle, 95*lf.scale, 24*lf.scale, 0.5)
+      pts: makeSazLeafPoly(lf.x, lf.y, lf.angle, 130*lf.scale, 35*lf.scale, 0.5)
     });
   }
 
@@ -333,7 +389,7 @@ function setup() {
   // ============================================
   brush.noStroke();
   for (var i = 0; i < allLeaves.length; i++) {
-    brush.fill('#1a5a2e', 130);
+    brush.fill('#0e4a22', 160);
     brush.fillBleed(0.3, 'in');
     brush.fillTexture(0.35, 0.2);
     brush.polygon(allLeaves[i].pts);
@@ -369,6 +425,22 @@ function setup() {
     brush.fillBleed(0.2, 'out');
     brush.fillTexture(0.3, 0.2);
     if (fl.centerPts) brush.polygon(fl.centerPts);
+  }
+  brush.noFill();
+
+  // ============================================
+  // LAYER 8: Front accent leaves (drawn OVER flowers for green visibility)
+  // Every 4th leaf gets a smaller front copy
+  // ============================================
+  brush.noStroke();
+  for (var i = 0; i < allLeaves.length; i += 3) {
+    var lf = allLeaves[i];
+    var frontScale = lf.scale * 0.7;
+    var frontPts = makeSazLeafPoly(lf.x, lf.y, lf.angle + 0.15, 100*frontScale, 26*frontScale, 0.4);
+    brush.fill('#1a6030', 150);
+    brush.fillBleed(0.25, 'in');
+    brush.fillTexture(0.35, 0.2);
+    brush.polygon(frontPts);
   }
   brush.noFill();
 
