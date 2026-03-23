@@ -91,6 +91,7 @@ let fillsDone = false;
 
 // ─── Pre-compute flower positions around door frame ───
 const flowerElements = [];
+const roseColors = ['#8B1A2B', '#E83E6C', '#C2284A', '#A02040'];
 
 // Helper: position along arch at parameter t (0=left, 1=right)
 function archAt(t) {
@@ -98,108 +99,162 @@ function archAt(t) {
   return { x: x, y: archY(x) };
 }
 
-// Roses along arch curve (6 roses)
-const archRoseTs = [0.08, 0.22, 0.38, 0.62, 0.78, 0.92];
+// --- Roses along arch curve (8 roses, evenly spaced) ---
+const archRoseTs = [0.05, 0.15, 0.28, 0.40, 0.60, 0.72, 0.85, 0.95];
 for (const t of archRoseTs) {
   const p = archAt(t);
-  // Offset outward from arch (above the curve)
-  const offsetY = -35 - Math.random() * 20;
-  flowerElements.push({ type: 'rose', x: p.x, y: p.y + offsetY, size: 35 + Math.random() * 20 });
-}
-
-// Roses at arch spring points (3 each side)
-for (let i = 0; i < 3; i++) {
-  // Left spring area
+  const offsetY = -30 - Math.random() * 25;
   flowerElements.push({
-    type: 'rose',
-    x: doorX - 15 + Math.random() * 30,
-    y: archSpringY - 40 + i * 55,
-    size: 30 + Math.random() * 18
-  });
-  // Right spring area
-  flowerElements.push({
-    type: 'rose',
-    x: doorX + doorW + 15 - Math.random() * 30,
-    y: archSpringY - 40 + i * 55,
-    size: 30 + Math.random() * 18
+    type: 'rose', x: p.x, y: p.y + offsetY,
+    size: 40 + Math.random() * 20,
+    color: roseColors[Math.floor(Math.random() * roseColors.length)]
   });
 }
 
-// Saz leaves between arch roses
-const sazTs = [0.15, 0.30, 0.50, 0.70, 0.85];
-for (const t of sazTs) {
+// --- Saz leaves between EVERY arch rose ---
+const archLeafTs = [0.10, 0.22, 0.34, 0.50, 0.66, 0.78, 0.90];
+for (const t of archLeafTs) {
   const p = archAt(t);
   flowerElements.push({
-    type: 'saz',
-    x: p.x,
-    y: p.y - 20 - Math.random() * 25,
+    type: 'saz', x: p.x, y: p.y - 15 - Math.random() * 30,
     angle: (t < 0.5 ? -1 : 1) * (0.3 + Math.random() * 0.5),
-    len: 55 + Math.random() * 35
+    len: 35 + Math.random() * 25
   });
 }
 
-// Small buds filling gaps along arch
-const budTs = [0.05, 0.18, 0.35, 0.45, 0.55, 0.65, 0.82, 0.95];
-for (const t of budTs) {
+// --- Buds filling gaps along arch (10 buds) ---
+const archBudTs = [0.03, 0.12, 0.20, 0.32, 0.45, 0.55, 0.68, 0.80, 0.88, 0.97];
+for (const t of archBudTs) {
   const p = archAt(t);
   flowerElements.push({
     type: 'bud',
     x: p.x + (Math.random() - 0.5) * 20,
-    y: p.y - 50 - Math.random() * 20,
-    size: 14 + Math.random() * 10
+    y: p.y - 45 - Math.random() * 25,
+    size: 16 + Math.random() * 12
   });
 }
 
-// Leaves climbing down panel edges
-for (let i = 0; i < 8; i++) {
-  const y = archSpringY + 60 + i * 120 + Math.random() * 40;
-  if (y > bot - 40) break;
+// --- Roses at arch spring points (4 each side = 8 total) ---
+for (let i = 0; i < 4; i++) {
+  const yOff = archSpringY - 50 + i * 50;
+  flowerElements.push({
+    type: 'rose',
+    x: doorX - 20 + Math.random() * 25,
+    y: yOff + Math.random() * 20,
+    size: 40 + Math.random() * 20,
+    color: roseColors[i % roseColors.length]
+  });
+  flowerElements.push({
+    type: 'rose',
+    x: doorX + doorW + 20 - Math.random() * 25,
+    y: yOff + Math.random() * 20,
+    size: 40 + Math.random() * 20,
+    color: roseColors[(i + 2) % roseColors.length]
+  });
+}
+
+// --- Roses along bottom frame (4 roses, evenly spaced) ---
+for (let i = 0; i < 4; i++) {
+  const t = 0.15 + i * 0.23;
+  flowerElements.push({
+    type: 'rose',
+    x: doorX + doorW * t + (Math.random() - 0.5) * 20,
+    y: bot + 15 + Math.random() * 20,
+    size: 40 + Math.random() * 20,
+    color: roseColors[i % roseColors.length]
+  });
+}
+
+// --- Saz leaves between bottom roses ---
+for (let i = 0; i < 3; i++) {
+  const t = 0.25 + i * 0.25;
+  flowerElements.push({
+    type: 'saz',
+    x: doorX + doorW * t,
+    y: bot + 10 + Math.random() * 15,
+    angle: -1.5 + Math.random() * 0.3,
+    len: 35 + Math.random() * 20
+  });
+}
+
+// --- Leaves climbing down BOTH panel edges ---
+for (let i = 0; i < 10; i++) {
+  const y = archSpringY + 50 + i * 100 + Math.random() * 30;
+  if (y > bot - 30) break;
   // Left edge
   flowerElements.push({
     type: 'saz',
-    x: doorX - 5 + Math.random() * 15,
+    x: doorX - 8 + Math.random() * 16,
     y: y,
     angle: -0.4 - Math.random() * 0.6,
-    len: 50 + Math.random() * 30
+    len: 35 + Math.random() * 25
   });
   // Right edge
   flowerElements.push({
     type: 'saz',
-    x: doorX + doorW + 5 - Math.random() * 15,
+    x: doorX + doorW + 8 - Math.random() * 16,
     y: y,
     angle: 0.4 + Math.random() * 0.6,
-    len: 50 + Math.random() * 30
+    len: 35 + Math.random() * 25
   });
 }
 
-// Buds along panel edges
-for (let i = 0; i < 5; i++) {
-  const y = archSpringY + 120 + i * 180 + Math.random() * 60;
-  if (y > bot - 80) break;
-  flowerElements.push({ type: 'bud', x: doorX - 10 + Math.random() * 10, y: y, size: 8 + Math.random() * 6 });
-  flowerElements.push({ type: 'bud', x: doorX + doorW + 10 - Math.random() * 10, y: y, size: 8 + Math.random() * 6 });
+// --- Buds along panel edges (filling gaps) ---
+for (let i = 0; i < 6; i++) {
+  const y = archSpringY + 80 + i * 140 + Math.random() * 50;
+  if (y > bot - 60) break;
+  flowerElements.push({
+    type: 'bud',
+    x: doorX - 12 + Math.random() * 10,
+    y: y, size: 14 + Math.random() * 10
+  });
+  flowerElements.push({
+    type: 'bud',
+    x: doorX + doorW + 12 - Math.random() * 10,
+    y: y, size: 14 + Math.random() * 10
+  });
 }
 
-// Gold center dots for roses (drawn after roses)
-// Total elements count for pacing
+// --- Additional roses along left & right verticals (3 each) ---
+for (let i = 0; i < 3; i++) {
+  const y = archSpringY + 150 + i * 280 + Math.random() * 40;
+  if (y > bot - 80) break;
+  flowerElements.push({
+    type: 'rose',
+    x: doorX - 15 + Math.random() * 20,
+    y: y,
+    size: 35 + Math.random() * 20,
+    color: roseColors[Math.floor(Math.random() * roseColors.length)]
+  });
+  flowerElements.push({
+    type: 'rose',
+    x: doorX + doorW + 15 - Math.random() * 20,
+    y: y,
+    size: 35 + Math.random() * 20,
+    color: roseColors[Math.floor(Math.random() * roseColors.length)]
+  });
+}
+
 const totalFlowerElements = flowerElements.length;
 
 // ─── Flower drawing functions ───
-function drawRose(fx, fy, sz) {
+function drawRose(fx, fy, sz, baseColor) {
   // Watercolor wash base under the rose
-  brush.noStroke();
-  brush.fill('#C2284A', 60);
-  brush.fillBleed(0.3, 'out');
-  brush.fillTexture(0.4, 0.2);
-  brush.rect(fx - sz, fy - sz, sz * 2, sz * 2);
-  brush.noFill();
+  try {
+    brush.noStroke();
+    brush.fill(baseColor || '#C2284A', 60);
+    brush.fillBleed(0.3, 'out');
+    brush.fillTexture(0.4, 0.2);
+    brush.rect(fx - sz, fy - sz, sz * 2, sz * 2);
+    brush.noFill();
+  } catch(e) {}
 
-  const roseColors = ['#8B1A2B', '#A02040', '#C2284A', '#E83E6C'];
+  const ringColors = ['#8B1A2B', '#A02040', '#C2284A', '#E83E6C'];
   // 4 concentric rings of petals — thick, bold strokes
   for (let ring = 0; ring < 4; ring++) {
     const r = sz * (0.25 + ring * 0.25);
     const nPetals = 5 + ring * 3;
-    const col = roseColors[Math.min(ring, roseColors.length - 1)];
+    const col = ringColors[Math.min(ring, ringColors.length - 1)];
     brush.set('marker', col, 4.0 - ring * 0.5);
     for (let p = 0; p < nPetals; p++) {
       const a = (p / nPetals) * TWO_PI + ring * 0.4;
@@ -221,14 +276,16 @@ function drawRose(fx, fy, sz) {
 
 function drawSaz(fx, fy, angle, len) {
   // Watercolor wash under leaf
-  brush.noStroke();
-  brush.fill('#1A4A2E', 50);
-  brush.fillBleed(0.25, 'out');
-  brush.fillTexture(0.3, 0.15);
-  const mx = fx + Math.cos(angle) * len * 0.5;
-  const my = fy + Math.sin(angle) * len * 0.5;
-  brush.rect(mx - len * 0.2, my - len * 0.2, len * 0.4, len * 0.4);
-  brush.noFill();
+  try {
+    brush.noStroke();
+    brush.fill('#1A4A2E', 50);
+    brush.fillBleed(0.25, 'out');
+    brush.fillTexture(0.3, 0.15);
+    const mx = fx + Math.cos(angle) * len * 0.5;
+    const my = fy + Math.sin(angle) * len * 0.5;
+    brush.rect(mx - len * 0.2, my - len * 0.2, len * 0.4, len * 0.4);
+    brush.noFill();
+  } catch(e) {}
 
   // Main leaf spine — thick
   brush.set('2B', '#1A4A2E', 4.0);
@@ -259,14 +316,6 @@ function drawSaz(fx, fy, angle, len) {
 }
 
 function drawBud(fx, fy, sz) {
-  // Watercolor dot under bud
-  brush.noStroke();
-  brush.fill('#E83E6C', 50);
-  brush.fillBleed(0.2, 'out');
-  brush.fillTexture(0.3, 0.15);
-  brush.rect(fx - sz * 0.5, fy - sz * 0.5, sz, sz);
-  brush.noFill();
-
   // Two curved strokes forming a bud shape — thicker
   brush.set('marker', '#C2284A', 3.0);
   brush.line(fx - sz * 0.4, fy + sz * 0.6, fx, fy - sz * 0.6);
@@ -653,19 +702,17 @@ function draw() {
     brush.noFill();
   }
 
-  // ── STAGE 6: Flowers around door frame (frames 360+) ──
-  // One flower element every 7 frames — slow blooming
-  if (f > 360) {
-    const flowerIdx = Math.floor((f - 361) / 7);
+  // ── STAGE 6: Flowers around door frame (frames 200+) ──
+  // One flower element every 4 frames — faster blooming
+  if (f > 200) {
+    const flowerIdx = Math.floor((f - 201) / 4);
     if (flowerIdx < totalFlowerElements) {
-      // Draw all elements up to current index (so they persist via accumulation)
-      // But only draw the NEW one each time to avoid overdraw
       const el = flowerElements[flowerIdx];
       brush.noField(); // flowers drawn without flow field
       brush.wiggle(0.15); // slight organic wobble
 
       if (el.type === 'rose') {
-        drawRose(el.x, el.y, el.size);
+        drawRose(el.x, el.y, el.size, el.color);
       } else if (el.type === 'saz') {
         drawSaz(el.x, el.y, el.angle, el.len);
       } else if (el.type === 'bud') {
