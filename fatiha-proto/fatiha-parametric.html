@@ -100,46 +100,124 @@ function makeSazLeafPoly(bx, by, ang, len, wid, curv) {
 }
 
 var flowerElements = [], flowerIdx = 0;
-var PENCIL_END = 300, FLOWER_START = 60, setupDone = false;
+var flowerGroups = [], flowerGroupIdx = 0;
+// CHANGE 1: washes 30-58, pencil starts 60, flowers start 100, reach peak ~400
+var PENCIL_END = 360, FLOWER_START = 100, FLOWER_INTERVAL = 19;
+var setupDone = false;
 
-function buildFlowers() {
-  // 3 flowers: top of arch, left side, right side
-  var positions = [
-    {x: cx, y: archPts[20][1] - 20, a: -Math.PI/2, s: 0.9},
-    {x: doorX + 15, y: archSpringY + 300, a: Math.PI*0.3, s: 0.7},
-    {x: doorX + doorW - 15, y: archSpringY + 300, a: Math.PI*0.7, s: 0.7}
-  ];
-  var pColors = ['#C0392B','#8B2252','#D4456A'];
-  for (var pi = 0; pi < positions.length; pi++) {
-    var pos = positions[pi], s = pos.s, fcx = pos.x, fcy = pos.y, baseA = pos.a;
-    var pc = pColors[pi];
-    // 3 rings: 4, 5, 5 petals
-    var rings = [{count:4, rad:8*s, pL:14*s, pW:9*s},{count:5, rad:16*s, pL:20*s, pW:12*s},{count:5, rad:26*s, pL:26*s, pW:14*s}];
-    for (var ri = 0; ri < rings.length; ri++) {
-      var ring = rings[ri];
-      for (var p = 0; p < ring.count; p++) {
-        var angle = baseA + (p/ring.count)*Math.PI*2 + (Math.random()-0.5)*0.3;
-        var px = fcx + Math.cos(angle)*ring.rad, py = fcy + Math.sin(angle)*ring.rad;
-        flowerElements.push({color:pc, opacity:80+Math.floor(Math.random()*30), polygon:makePetalPoly(px,py,angle,ring.pL,ring.pW,0.3+Math.random()*0.4)});
-      }
-    }
-    // Gold center
-    var ca2 = Math.random()*Math.PI*2;
-    flowerElements.push({color:'#B8860B', opacity:90, polygon:makePetalPoly(fcx, fcy, ca2, 7*s, 5*s, 0.5)});
-    // 1 leaf
-    var la = baseA + Math.PI;
-    flowerElements.push({color:'#0E4D2E', opacity:85, polygon:makeSazLeafPoly(fcx+Math.cos(la)*25*s, fcy+Math.sin(la)*25*s, la+Math.PI, 35*s, 12*s, 0.6)});
+// CHANGE 2: Growth paths — bottom center splits left+right, climbs frame, meets at peak
+function leftPathPos(t) {
+  // t=0: bottom of left jamb, t~0.65: left spring, t=1: arch peak
+  if (t < 0.65) {
+    var jt = t / 0.65;
+    return {x: doorX - 5, y: bot - jt * (bot - archSpringY)};
+  } else {
+    var at = (t - 0.65) / 0.35;
+    var idx = Math.min(20, Math.floor(at * 20));
+    return {x: archPts[idx][0], y: archPts[idx][1] - 10};
+  }
+}
+function rightPathPos(t) {
+  if (t < 0.65) {
+    var jt = t / 0.65;
+    return {x: doorX + doorW + 5, y: bot - jt * (bot - archSpringY)};
+  } else {
+    var at = (t - 0.65) / 0.35;
+    var idx = Math.max(20, 40 - Math.floor(at * 20));
+    return {x: archPts[idx][0], y: archPts[idx][1] - 10};
   }
 }
 
+function buildRose(px, py, s, cols) {
+  var roseGroup = [];
+  // APPROVED RECIPE: 3 rings (5+5+4), from CENTER (no gap), fillBleed 'in'
+  var rings = [
+    {count:5, len:45*s, w:14*s, color:cols.outer, opacity:100},
+    {count:5, len:35*s, w:12*s, color:cols.mid, opacity:110},
+    {count:4, len:25*s, w:10*s, color:cols.inner, opacity:120},
+  ];
+  for (var r = 0; r < rings.length; r++) {
+    var ring = rings[r], angleOff = r * 0.3;
+    for (var p = 0; p < ring.count; p++) {
+      var angle = (p / ring.count) * Math.PI * 2 + angleOff + (Math.random()-0.5)*0.15;
+      var pts = makePetalPoly(px, py, angle, ring.len, ring.w, 0.3);
+      var el = {color: ring.color, opacity: ring.opacity, polygon: pts, bleedDir: 'in'};
+      flowerElements.push(el);
+      roseGroup.push(el);
+    }
+  }
+  var centerPoly = makePetalPoly(px, py, Math.random()*Math.PI*2, 12*s, 8*s, 0.4);
+  var centerEl = {color:'#c4a040', opacity:170, polygon: centerPoly, bleedDir:'out'};
+  flowerElements.push(centerEl);
+  roseGroup.push(centerEl);
+  return roseGroup;
+}
+
+function buildLeaf(px, py, ang, s) {
+  var pts = makeSazLeafPoly(px, py, ang, 65*s, 16*s, 0.5);
+  var el = {color:'#1a4a2e', opacity:100, polygon:pts, bleedDir:'in'};
+  flowerElements.push(el);
+  return [el];
+}
+
+function buildFlowers() {
+  // Growth path: flowers placed along left+right paths, ordered bottom→top
+  // Interleaved: left→right→left→right climbing the frame
+  var rc1 = {outer:'#6a1020', mid:'#a02040', inner:'#e06080'};
+  var rc2 = {outer:'#7a1828', mid:'#b03050', inner:'#e87090'};
+
+  // 1. Bottom center rose
+  flowerGroups.push(buildRose(cx, bot + 10, 0.9, rc1));
+
+  // 2-3. Bottom leaves splitting left and right
+  flowerGroups.push(buildLeaf(cx - 100, bot + 15, -1.2, 0.75));
+  flowerGroups.push(buildLeaf(cx + 100, bot + 15, Math.PI + 1.2, 0.75));
+
+  // 4-5. Lower roses (t=0.15 — about 1/3 up the jambs)
+  var lp1 = leftPathPos(0.15), rp1 = rightPathPos(0.15);
+  flowerGroups.push(buildRose(lp1.x, lp1.y, 0.7, rc1));
+  flowerGroups.push(buildRose(rp1.x, rp1.y, 0.7, rc2));
+
+  // 6-7. Lower leaves (t=0.3)
+  var ll1 = leftPathPos(0.3), rl1 = rightPathPos(0.3);
+  flowerGroups.push(buildLeaf(ll1.x - 10, ll1.y, -0.5, 0.7));
+  flowerGroups.push(buildLeaf(rl1.x + 10, rl1.y, Math.PI + 0.5, 0.7));
+
+  // 8-9. Mid roses (t=0.45 — about 2/3 up the jambs)
+  var lp2 = leftPathPos(0.45), rp2 = rightPathPos(0.45);
+  flowerGroups.push(buildRose(lp2.x, lp2.y, 0.8, rc2));
+  flowerGroups.push(buildRose(rp2.x, rp2.y, 0.8, rc1));
+
+  // 10-11. Upper leaves (t=0.6 — near arch spring)
+  var ll2 = leftPathPos(0.6), rl2 = rightPathPos(0.6);
+  flowerGroups.push(buildLeaf(ll2.x - 10, ll2.y, -0.3, 0.8));
+  flowerGroups.push(buildLeaf(rl2.x + 10, rl2.y, Math.PI + 0.3, 0.8));
+
+  // 12-13. Arch roses (t=0.8 — climbing the arch)
+  var lp3 = leftPathPos(0.8), rp3 = rightPathPos(0.8);
+  flowerGroups.push(buildRose(lp3.x, lp3.y, 0.85, rc1));
+  flowerGroups.push(buildRose(rp3.x, rp3.y, 0.85, rc2));
+
+  // 14-15. Arch leaves near peak (t=0.92)
+  var ll3 = leftPathPos(0.92), rl3 = rightPathPos(0.92);
+  flowerGroups.push(buildLeaf(ll3.x, ll3.y - 10, -0.8, 0.9));
+  flowerGroups.push(buildLeaf(rl3.x, rl3.y - 10, 0.8, 0.9));
+
+  // 16. Peak rose
+  flowerGroups.push(buildRose(cx, archPts[20][1] - 30, 1.0, rc1));
+
+  // Compute interval: spread 16 groups from FLOWER_START to ~frame 400
+  FLOWER_INTERVAL = Math.max(1, Math.floor((400 - FLOWER_START) / flowerGroups.length));
+}
+
 function buildWashes() {
-  // Drawn at scheduled frames
+  // CHANGE 1: washes start at frame 30, spaced ~7 frames apart (30-58)
   return [
-    {frame:1, color:'#0D3B8E', opacity:80, bleed:0.5, x:doorX+20, y:doorY-10, w:doorW-40, h:archSpringY-doorY+80},
-    {frame:8, color:'#B8860B', opacity:70, bleed:0.45, x:doorX+30, y:archSpringY-30, w:doorW-60, h:300},
-    {frame:16, color:'#0E4D2E', opacity:80, bleed:0.5, x:doorX+20, y:archSpringY+350, w:doorW-40, h:panelBot-archSpringY-320},
-    {frame:24, color:'#3A0C6E', opacity:100, bleed:0.35, x:doorX+50, y:panelTop+panelH*0.15, w:halfDW-80, h:panelH*0.25},
-    {frame:32, color:'#8B1A1A', opacity:90, bleed:0.3, x:cx+30, y:panelTop+panelH*0.55, w:halfDW-80, h:panelH*0.25}
+    {frame:30, color:'#0D3B8E', opacity:80, bleed:0.5, x:doorX+20, y:doorY-10, w:doorW-40, h:archSpringY-doorY+80},
+    {frame:37, color:'#B8860B', opacity:70, bleed:0.45, x:doorX+30, y:archSpringY-30, w:doorW-60, h:300},
+    {frame:44, color:'#0E4D2E', opacity:80, bleed:0.5, x:doorX+20, y:archSpringY+350, w:doorW-40, h:panelBot-archSpringY-320},
+    {frame:51, color:'#3A0C6E', opacity:100, bleed:0.35, x:doorX+50, y:panelTop+panelH*0.15, w:halfDW-80, h:panelH*0.25},
+    {frame:58, color:'#8B1A1A', opacity:90, bleed:0.3, x:cx+30, y:panelTop+panelH*0.55, w:halfDW-80, h:panelH*0.25}
   ];
 }
 
@@ -157,7 +235,7 @@ function setup() {
   background(242, 234, 218);
   washSchedule = buildWashes();
   buildFlowers();
-  console.log('Flower elements: '+flowerElements.length+' | Start: '+FLOWER_START);
+  console.log('Flower groups: '+flowerGroups.length+' | Interval: '+FLOWER_INTERVAL+' | Start: '+FLOWER_START+' | End: '+(FLOWER_START+flowerGroups.length*FLOWER_INTERVAL));
   brush.noFill(); setupDone = true;
   loadAudio().then(function() {
     document.getElementById('tap').addEventListener('click', function() {
@@ -176,7 +254,7 @@ function draw() {
   var amp = isPlaying ? smoothAmp : 0.015 + 0.008 * sin(f * 0.003);
   brush.field('meditative'); brush.refreshField(f * 0.0015); brush.wiggle(0.3 + amp * 2);
 
-  // WASHES at scheduled frames
+  // CHANGE 1: Frames 1-29 = blank cream paper. Washes fade in from frame 30.
   if (washIdx < washSchedule.length && f >= washSchedule[washIdx].frame) {
     var wash = washSchedule[washIdx];
     brush.noStroke(); brush.fill(wash.color, wash.opacity);
@@ -184,69 +262,84 @@ function draw() {
     brush.rect(wash.x, wash.y, wash.w, wash.h); brush.noFill(); washIdx++;
   }
 
-  // PENCIL STAGE 1 (1-120)
-  if (f <= 120) {
-    if (f>=1&&f<=30){var t=(f-1)/29; brush.set('HB','#2A2215',3.5+amp*3); brush.line(doorX,lerp(archSpringY,bot,t),doorX,lerp(archSpringY,bot,min(1,t+0.04)));}
-    if (f>=10&&f<=40){var t=(f-10)/29; brush.set('HB','#2A2215',3.5+amp*3); brush.line(doorX+doorW,lerp(archSpringY,bot,t),doorX+doorW,lerp(archSpringY,bot,min(1,t+0.04)));}
-    if (f>=20&&f<=45){var t=(f-20)/24; brush.set('HB','#2A2215',3.5+amp*3); brush.line(lerp(doorX,doorX+doorW,t),bot,lerp(doorX,doorX+doorW,min(1,t+0.05)),bot);}
-    if (f>=30&&f<=70){var idx=Math.floor(((f-30)/40)*20); if(idx<20&&idx>=0){brush.set('HB','#3A3020',3.0+amp*2); brush.line(archPts[idx][0],archPts[idx][1],archPts[idx+1][0],archPts[idx+1][1]);}}
-    if (f>=50&&f<=90){var idx=20+Math.floor(((f-50)/40)*20); if(idx<40&&idx>=20){brush.set('HB','#3A3020',3.0+amp*2); brush.line(archPts[idx][0],archPts[idx][1],archPts[idx+1][0],archPts[idx+1][1]);}}
-    if (f>=70&&f<=100){var t=(f-70)/29; brush.set('HB','#2A2215',3.0+amp*2); brush.line(cx,lerp(panelTop,panelBot,t),cx,lerp(panelTop,panelBot,min(1,t+0.04)));}
-    if (f>=85&&f<=105){var t=(f-85)/19; brush.set('HB','#3A3020',2.5+amp*2); brush.line(lerp(doorX,doorX+doorW,t),archSpringY,lerp(doorX,doorX+doorW,min(1,t+0.06)),archSpringY);}
+  // PENCIL STAGE 1 (60-180) — shifted +59 from original
+  if (f >= 60 && f <= 180) {
+    var PO = 59; // pencil offset
+    if (f>=1+PO&&f<=30+PO){var t=(f-1-PO)/29; brush.set('HB','#2A2215',3.5+amp*3); brush.line(doorX,lerp(archSpringY,bot,t),doorX,lerp(archSpringY,bot,min(1,t+0.04)));}
+    if (f>=10+PO&&f<=40+PO){var t=(f-10-PO)/29; brush.set('HB','#2A2215',3.5+amp*3); brush.line(doorX+doorW,lerp(archSpringY,bot,t),doorX+doorW,lerp(archSpringY,bot,min(1,t+0.04)));}
+    if (f>=20+PO&&f<=45+PO){var t=(f-20-PO)/24; brush.set('HB','#2A2215',3.5+amp*3); brush.line(lerp(doorX,doorX+doorW,t),bot,lerp(doorX,doorX+doorW,min(1,t+0.05)),bot);}
+    if (f>=30+PO&&f<=70+PO){var idx=Math.floor(((f-30-PO)/40)*20); if(idx<20&&idx>=0){brush.set('HB','#3A3020',3.0+amp*2); brush.line(archPts[idx][0],archPts[idx][1],archPts[idx+1][0],archPts[idx+1][1]);}}
+    if (f>=50+PO&&f<=90+PO){var idx=20+Math.floor(((f-50-PO)/40)*20); if(idx<40&&idx>=20){brush.set('HB','#3A3020',3.0+amp*2); brush.line(archPts[idx][0],archPts[idx][1],archPts[idx+1][0],archPts[idx+1][1]);}}
+    if (f>=70+PO&&f<=100+PO){var t=(f-70-PO)/29; brush.set('HB','#2A2215',3.0+amp*2); brush.line(cx,lerp(panelTop,panelBot,t),cx,lerp(panelTop,panelBot,min(1,t+0.04)));}
+    if (f>=85+PO&&f<=105+PO){var t=(f-85-PO)/19; brush.set('HB','#3A3020',2.5+amp*2); brush.line(lerp(doorX,doorX+doorW,t),archSpringY,lerp(doorX,doorX+doorW,min(1,t+0.06)),archSpringY);}
   }
 
-  // PENCIL STAGE 2 (80-200)
-  if (f>=80&&f<=200) {
+  // PENCIL STAGE 2 (140-260)
+  if (f>=140&&f<=260) {
+    var PO = 59;
     var lx=doorX+25,lw=cx-25-lx,rx=cx+25,rw=doorX+doorW-25-rx,py=panelTop+20,ph=panelH-40;
-    if (f>=80&&f<=130&&f%2===0){var seg=Math.floor((f-80)/2)%25; brush.set('2B','#3A3525',2.0+amp*2);
+    if (f>=80+PO&&f<=130+PO&&f%2===0){var seg=Math.floor((f-80-PO)/2)%25; brush.set('2B','#3A3525',2.0+amp*2);
       if(seg<7)brush.line(lx+lw*(seg/6),py,lx+lw*((seg+1)/6),py);
       else if(seg<13){var s=(seg-7)/5;brush.line(lx+lw,py+ph*s,lx+lw,py+ph*(s+1/5));}
       else if(seg<19){var s=(seg-13)/5;brush.line(lx+lw*(1-s),py+ph,lx+lw*(1-s-1/5),py+ph);}
       else{var s=(seg-19)/5;brush.line(lx,py+ph*(1-s),lx,py+ph*(1-s-1/5));}
     }
-    if (f>=100&&f<=150&&f%2===0){var seg=Math.floor((f-100)/2)%25; brush.set('2B','#3A3525',2.0+amp*2);
+    if (f>=100+PO&&f<=150+PO&&f%2===0){var seg=Math.floor((f-100-PO)/2)%25; brush.set('2B','#3A3525',2.0+amp*2);
       if(seg<7)brush.line(rx+rw*(seg/6),py,rx+rw*((seg+1)/6),py);
       else if(seg<13){var s=(seg-7)/5;brush.line(rx+rw,py+ph*s,rx+rw,py+ph*(s+1/5));}
       else if(seg<19){var s=(seg-13)/5;brush.line(rx+rw*(1-s),py+ph,rx+rw*(1-s-1/5),py+ph);}
       else{var s=(seg-19)/5;brush.line(rx,py+ph*(1-s),rx,py+ph*(1-s-1/5));}
     }
-    if (f>=140&&f<=180&&f%5===0){brush.set('2B','#4A4535',1.5+amp);var which=Math.floor((f-140)/5);
+    if (f>=140+PO&&f<=180+PO&&f%5===0){brush.set('2B','#4A4535',1.5+amp);var which=Math.floor((f-140-PO)/5);
       if(which<4){var yOff=py+ph*0.2+(which*ph*0.2),xMid=lx+lw/2;brush.line(xMid-30,yOff-20,xMid+30,yOff+20);brush.line(xMid+30,yOff-20,xMid-30,yOff+20);}
       else{var idx2=which-4,yOff=py+ph*0.2+(idx2*ph*0.2),xMid=rx+rw/2;brush.line(xMid-30,yOff-20,xMid+30,yOff+20);brush.line(xMid+30,yOff-20,xMid-30,yOff+20);}
     }
-    if (f>=160&&f<=200&&f%8===0){var which=Math.floor((f-160)/8);brush.set('HB','#3A3525',1.8+amp);
+    if (f>=160+PO&&f<=200+PO&&f%8===0){var which=Math.floor((f-160-PO)/8);brush.set('HB','#3A3525',1.8+amp);
       if(which===0)brush.line(lx,py+ph/3,lx+lw,py+ph/3);if(which===1)brush.line(lx,py+ph*2/3,lx+lw,py+ph*2/3);
       if(which===2)brush.line(rx,py+ph/3,rx+rw,py+ph/3);if(which===3)brush.line(rx,py+ph*2/3,rx+rw,py+ph*2/3);
       if(which===4)brush.line(lx,py+ph/2,lx+lw,py+ph/2);if(which===5)brush.line(rx,py+ph/2,rx+rw,py+ph/2);
     }
   }
 
-  // PENCIL STAGE 3 (150-280) — reduced flow lines
-  if (f>=150&&f<=280) {
+  // PENCIL STAGE 3 (210-340) — reduced flow lines
+  if (f>=210&&f<=340) {
+    var PO = 59;
     var lx=doorX+25,lw=cx-25-lx,rx=cx+25,rw=doorX+doorW-25-rx,py=panelTop+20,ph=panelH-40;
-    if (f>=150&&f<=180&&f%10===0){try{brush.hatch(12,45+sin(f*0.02)*8,{rand:0.1});brush.hatchStyle('2H','#5A5040',0.8);brush.rect(lx+10,py+10,lw-20,ph/3-10);brush.noHatch();}catch(e){}}
-    if (f>=180&&f<=210&&f%10===0){try{brush.hatch(14,-30+sin(f*0.015)*5,{rand:0.12});brush.hatchStyle('2H','#5A5040',0.8);brush.rect(rx+10,py+ph*2/3+5,rw-20,ph/3-10);brush.noHatch();}catch(e){}}
-    if (f>=180&&f%5===0){brush.set('charcoal','#2A2215',1.5+amp*2);brush.flowLine(doorX+40+random(0,doorW-80),panelTop+40+random(0,panelH-80),random(40,80),random(0,TWO_PI));}
+    if (f>=150+PO&&f<=180+PO&&f%10===0){try{brush.hatch(12,45+sin(f*0.02)*8,{rand:0.1});brush.hatchStyle('2H','#5A5040',0.8);brush.rect(lx+10,py+10,lw-20,ph/3-10);brush.noHatch();}catch(e){}}
+    if (f>=180+PO&&f<=210+PO&&f%10===0){try{brush.hatch(14,-30+sin(f*0.015)*5,{rand:0.12});brush.hatchStyle('2H','#5A5040',0.8);brush.rect(rx+10,py+ph*2/3+5,rw-20,ph/3-10);brush.noHatch();}catch(e){}}
+    if (f>=180+PO&&f%5===0){brush.set('charcoal','#2A2215',1.5+amp*2);brush.flowLine(doorX+40+random(0,doorW-80),panelTop+40+random(0,panelH-80),random(40,80),random(0,TWO_PI));}
   }
 
-  // PENCIL STAGE 4 (200-300)
-  if (f>=200&&f<=PENCIL_END) {
+  // PENCIL STAGE 4 (260-360)
+  if (f>=260&&f<=PENCIL_END) {
+    var PO = 59;
     var lx=doorX+25,lw=cx-25-lx,rx=cx+25,rw=doorX+doorW-25-rx,py=panelTop+20,ph=panelH-40;
-    if (f>=200&&f<=240&&f%6===0){var which=Math.floor((f-200)/6);brush.set('HB','#4A3A20',1.5+amp);if(which<3)brush.circle(lx+lw/2,py+ph/2,30+which*25);else brush.circle(rx+rw/2,py+ph/2,30+(which-3)*25);}
-    if (f>=240&&f<=280&&f%4===0){var which=Math.floor((f-240)/4);brush.set('2H','#5A4A30',1.2+amp);var angle=(which%8)*(TWO_PI/8);if(which<8)brush.line(lx+lw/2,py+ph/2,lx+lw/2+cos(angle)*55,py+ph/2+sin(angle)*55);if(which>=8&&which<16)brush.line(rx+rw/2,py+ph/2,rx+rw/2+cos(angle)*55,py+ph/2+sin(angle)*55);}
+    if (f>=200+PO&&f<=240+PO&&f%6===0){var which=Math.floor((f-200-PO)/6);brush.set('HB','#4A3A20',1.5+amp);if(which<3)brush.circle(lx+lw/2,py+ph/2,30+which*25);else brush.circle(rx+rw/2,py+ph/2,30+(which-3)*25);}
+    if (f>=240+PO&&f<=280+PO&&f%4===0){var which=Math.floor((f-240-PO)/4);brush.set('2H','#5A4A30',1.2+amp);var angle=(which%8)*(TWO_PI/8);if(which<8)brush.line(lx+lw/2,py+ph/2,lx+lw/2+cos(angle)*55,py+ph/2+sin(angle)*55);if(which>=8&&which<16)brush.line(rx+rw/2,py+ph/2,rx+rw/2+cos(angle)*55,py+ph/2+sin(angle)*55);}
   }
 
-  // FLOWERS: brush.polygon() with petal-shaped polygons
-  // 1 element per frame to avoid OOM in software rendering
-  if (f >= FLOWER_START && flowerIdx < flowerElements.length) {
-    var el = flowerElements[flowerIdx];
-    brush.noStroke();
-    brush.fill(el.color, el.opacity);
-    brush.fillBleed(0.3);
-    brush.fillTexture(0.5, 0.3);
-    brush.polygon(el.polygon);
-    brush.noFill();
-    flowerIdx++;
+  // FLOWERS: one group per FLOWER_INTERVAL frames, growing along path bottom→top
+  if (f >= FLOWER_START && flowerGroupIdx < flowerGroups.length) {
+    var nextFrame = FLOWER_START + flowerGroupIdx * FLOWER_INTERVAL;
+    if (f >= nextFrame) {
+      var group = flowerGroups[flowerGroupIdx];
+      // Pass 1: all pencil outlines
+      for (var gi = 0; gi < group.length; gi++) {
+        brush.set('2H', '#c0b8a8', 0.08);
+        brush.polygon(group[gi].polygon);
+      }
+      // Pass 2: all watercolor fills
+      for (var gi = 0; gi < group.length; gi++) {
+        var el = group[gi];
+        brush.noStroke();
+        brush.fill(el.color, el.opacity);
+        brush.fillBleed(0.35, el.bleedDir || 'in');
+        brush.fillTexture(0.45, 0.3);
+        brush.polygon(el.polygon);
+        brush.noFill();
+      }
+      flowerGroupIdx++;
+    }
   }
 
   brush.noField(); brush.wiggle(0);
