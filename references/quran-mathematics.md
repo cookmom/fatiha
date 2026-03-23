@@ -89,3 +89,11 @@ For each surah:
 - Verse structure → generative tree branching
 - Breath pattern → locus curve animation
 - All overlaid as semi-transparent layers on the p5.brush painting
+
+## Animation Architecture (Proven Pattern)
+- p5.brush fills in setup() = stable watercolor base (no flicker)
+- p5.brush strokes in draw() WITHOUT background() = accumulative painting
+- Painting builds itself: washes → pencil → paint layers → flowers
+- Each phase adds on top of previous (no redraw)
+- Flow fields evolve with brush.refreshField(frameCount * 0.002)
+- Flower positions pre-computed along door frame edges

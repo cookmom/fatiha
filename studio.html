@@ -139,6 +139,15 @@
     .brush-btn.active { border-color: #5588cc; background: rgba(85,136,204,0.08); }
     .brush-btn:active { background: rgba(0,0,0,0.08); }
 
+    /* ── Advanced brush controls ── */
+    .bp-section { margin-top: 16px; border-top: 1px solid rgba(0,0,0,0.08); padding-top: 12px; }
+    .bp-section h4 { font-size: 12px; font-weight: 600; margin-bottom: 8px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+    .bp-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .bp-row label { font-size: 11px; color: #666; min-width: 50px; }
+    .bp-row select, .bp-row input[type="range"] { flex: 1; font-size: 11px; }
+    .bp-row select { padding: 4px 6px; border: 1px solid #ddd; border-radius: 6px; background: #fff; color: #333; }
+    .bp-row .bp-val { font-size: 10px; color: #888; min-width: 24px; text-align: right; font-variant-numeric: tabular-nums; }
+
     /* ── COLOR PANEL (floating disc) ── */
     #color-panel {
       position: fixed;
@@ -392,6 +401,57 @@
       <button class="bp-close" id="bp-close-btn">✕</button>
     </div>
     <div class="brush-grid" id="brush-grid"></div>
+
+    <!-- Draw Mode -->
+    <div class="bp-section">
+      <h4>Draw Mode</h4>
+      <div class="bp-row">
+        <label>Mode</label>
+        <select id="bp-draw-mode">
+          <option value="normal">Normal</option>
+          <option value="spline">Spline (smooth)</option>
+          <option value="hatch">Hatch Fill</option>
+        </select>
+      </div>
+      <div class="bp-row" id="bp-spline-row" style="display:none">
+        <label>Curve</label>
+        <input type="range" id="bp-spline-curve" min="0" max="100" value="50">
+        <span class="bp-val" id="bp-spline-val">0.5</span>
+      </div>
+      <div class="bp-row" id="bp-hatch-dist-row" style="display:none">
+        <label>Dist</label>
+        <input type="range" id="bp-hatch-dist" min="2" max="40" value="8">
+        <span class="bp-val" id="bp-hatch-dist-val">8</span>
+      </div>
+      <div class="bp-row" id="bp-hatch-angle-row" style="display:none">
+        <label>Angle</label>
+        <input type="range" id="bp-hatch-angle" min="0" max="180" value="45">
+        <span class="bp-val" id="bp-hatch-angle-val">45°</span>
+      </div>
+    </div>
+
+    <!-- Vector Field -->
+    <div class="bp-section">
+      <h4>Vector Field</h4>
+      <div class="bp-row">
+        <label>Field</label>
+        <select id="bp-field">
+          <option value="none">None</option>
+          <option value="hand">Hand</option>
+          <option value="curved">Curved</option>
+          <option value="zigzag">Zigzag</option>
+          <option value="waves">Waves</option>
+          <option value="seabed">Seabed</option>
+          <option value="spiral">Spiral</option>
+          <option value="columns">Columns</option>
+        </select>
+      </div>
+      <div class="bp-row">
+        <label>Wiggle</label>
+        <input type="range" id="bp-wiggle" min="0" max="10" value="0">
+        <span class="bp-val" id="bp-wiggle-val">0</span>
+      </div>
+    </div>
   </div>
 
   <!-- Color panel -->
@@ -483,6 +543,12 @@ window.state = {
   weight: 8,
   opacity: 255,
   layer: 'detail',
+  drawMode: 'normal',   // 'normal', 'spline', 'hatch'
+  vectorField: 'none',  // 'none', 'hand', 'curved', 'zigzag', 'waves', 'seabed', 'spiral', 'columns'
+  wiggle: 0,            // 0 = off, 1-10 = jitter intensity
+  splineCurvature: 0.5, // 0-1 for spline mode
+  hatchDist: 8,         // distance between hatch lines
+  hatchAngle: 45,       // angle of hatch lines
 };
 
 window.strokes = [];
@@ -505,16 +571,16 @@ const layers = [
   { id: 'watercolor', name: 'Watercolor', visible: true },
 ];
 
-// ── Brush definitions ──
+// ── Brush definitions (all p5.brush built-ins + watercolor) ──
 const BRUSHES = [
   { id: '2H', label: '2H', type: 'default' },
   { id: 'HB', label: 'HB', type: 'default' },
   { id: '2B', label: '2B', type: 'default' },
+  { id: 'cpencil', label: 'C.Pencil', type: 'default' },
   { id: 'pen', label: 'Pen', type: 'default' },
   { id: 'rotring', label: 'Rotring', type: 'default' },
   { id: 'marker', label: 'Marker', type: 'marker' },
   { id: 'charcoal', label: 'Charcoal', type: 'default' },
-  { id: 'crayon', label: 'Crayon', type: 'default' },
   { id: 'spray', label: 'Spray', type: 'spray' },
   { id: 'watercolor', label: 'Watercolor', type: 'watercolor' },
 ];
@@ -546,13 +612,21 @@ let timelineMarkers = [];
 //  p5.js setup & draw
 // ══════════════════════════════════════════════════════════════
 
+let _webglOk = false;
+
 function setup() {
-  const c = createCanvas(windowWidth, windowHeight, WEBGL);
+  let c;
+  // Catch async p5.brush rejections (headless Chrome without GPU)
+  window.addEventListener('unhandledrejection', (e) => {
+    if (e.reason && /webgl|WEBGL/i.test(String(e.reason))) {
+      e.preventDefault();
+    }
+  });
+
+  c = createCanvas(windowWidth, windowHeight, WEBGL);
   c.parent('canvas-container');
   background(242, 234, 218);
   brush.load();
-
-  // Watercolor preview brush — lightweight marker for live preview
   brush.add('wc_preview', {
     type: 'marker',
     weight: 4,
@@ -561,12 +635,13 @@ function setup() {
     spacing: 0.5,
     pressure: [0.3, 0.7, 0.3],
   });
-
+  _webglOk = true;
   pixelDensity(1);
   frameRate(60);
+
   computeViewport();
   buildUI();
-  attachPointerEvents(c.elt);
+  if (c && c.elt) attachPointerEvents(c.elt);
   needsFullRedraw = true;
 }
 
@@ -585,6 +660,7 @@ function computeViewport() {
 }
 
 function draw() {
+  if (!_webglOk) return;
   translate(-width / 2, -height / 2);
 
   // Buffer limit check — flatten when approaching limit
@@ -651,8 +727,13 @@ function drawBrushSegment(a, b) {
     brush.set('wc_preview', a.color, wcWeight);
     brush.line(sx, sy, ex, ey);
     brushLineCount++;
+  } else if (state.drawMode === 'spline' || state.drawMode === 'hatch') {
+    // Spline/hatch: show lightweight preview, final render on pointer up
+    brush.set(a.brush, a.color, a.weight * vScale * 0.3);
+    brush.line(sx, sy, ex, ey);
+    brushLineCount++;
   } else {
-    // All other brushes — hex string color, weight as 3rd param
+    // Normal mode — direct brush lines
     brush.set(a.brush, a.color, a.weight * vScale);
     brush.line(sx, sy, ex, ey);
     brushLineCount++;
@@ -684,6 +765,62 @@ function replayStroke(s) {
     return;
   }
 
+  // Set up vector field if stroke had one
+  if (s.vectorField && s.vectorField !== 'none') {
+    brush.field(s.vectorField);
+  } else {
+    brush.noField();
+  }
+
+  // Apply wiggle
+  if (s.wiggle && s.wiggle > 0) {
+    brush.wiggle(s.wiggle);
+  }
+
+  const mode = s.drawMode || 'normal';
+
+  // Spline mode: render as smooth spline curve
+  if (mode === 'spline') {
+    const splinePoints = s.points.map(p => {
+      const sx = vOffX + p[0] * vScale;
+      const sy = vOffY + p[1] * vScale;
+      return [sx, sy, p[2] || 0.5];
+    });
+    // Subsample for performance — spline works best with fewer control points
+    const step = Math.max(1, Math.floor(splinePoints.length / 30));
+    const controlPts = [];
+    for (let i = 0; i < splinePoints.length; i += step) {
+      controlPts.push(splinePoints[i]);
+    }
+    // Always include last point
+    const last = splinePoints[splinePoints.length - 1];
+    if (controlPts[controlPts.length - 1] !== last) controlPts.push(last);
+
+    brush.set(s.brush, s.color, s.weight * vScale);
+    brush.spline(controlPts, s.splineCurvature || 0.5);
+    brushLineCount += controlPts.length;
+    brush.noField();
+    return;
+  }
+
+  // Hatch mode: fill the stroke polygon with hatching
+  if (mode === 'hatch') {
+    const halfW = s.weight * vScale * 2;
+    const smoothed = smoothPoints(resamplePoints(s.points, 8), 2);
+    const poly = strokeToPolygon(smoothed, halfW);
+    if (poly.length >= 3) {
+      brush.noFill();
+      brush.hatchStyle(s.brush, s.color, s.weight * vScale * 0.5);
+      brush.hatch(s.hatchDist || 8, s.hatchAngle || 45);
+      brush.polygon(poly);
+      brush.noHatch();
+      brushLineCount += 30;
+    }
+    brush.noField();
+    return;
+  }
+
+  // Normal mode: segment-by-segment lines
   for (let i = 0; i < s.points.length - 1; i++) {
     const a = s.points[i];
     const b = s.points[i + 1];
@@ -692,11 +829,13 @@ function replayStroke(s) {
     const sy = vOffY + a[1] * vScale;
     const ex = vOffX + b[0] * vScale;
     const ey = vOffY + b[1] * vScale;
-    // Hex string color, weight as 3rd param
     brush.set(s.brush, s.color, w * vScale);
     brush.line(sx, sy, ex, ey);
     brushLineCount++;
   }
+
+  // Clean up field/wiggle
+  brush.noField();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -728,6 +867,12 @@ function onPointerDown(e) {
     weight: state.weight,
     opacity: state.opacity,
     layer: state.layer,
+    drawMode: state.drawMode,
+    vectorField: state.vectorField,
+    wiggle: state.wiggle,
+    splineCurvature: state.splineCurvature,
+    hatchDist: state.hatchDist,
+    hatchAngle: state.hatchAngle,
     points: [[px, py, pressure]],
     timestamp: Date.now(),
     hidden: false,
@@ -766,11 +911,18 @@ function onPointerUp(e) {
   isDrawing = false;
   pendingPoints = [];
 
-  // Watercolor: queue for rendering inside draw()'s transform context
   const current = strokes[strokes.length - 1];
-  if (current && current.brush === 'watercolor' && current.points.length >= 2) {
+  if (!current || current.points.length < 2) return;
+
+  // Watercolor: queue for rendering inside draw()'s transform context
+  if (current.brush === 'watercolor') {
     pendingWatercolorRender = current;
-    // Don't set needsFullRedraw — existing canvas is untouched
+    return;
+  }
+
+  // Spline and hatch modes need full redraw to render properly
+  if (current.drawMode === 'spline' || current.drawMode === 'hatch') {
+    needsFullRedraw = true;
   }
 }
 
@@ -1088,6 +1240,38 @@ function attachUIEvents() {
   setupVSlider('opacity-rail', 0, 255, state.opacity, (v) => {
     state.opacity = Math.round(v);
     document.getElementById('opacity-val').textContent = Math.round(v);
+  });
+
+  // Advanced brush controls
+  document.getElementById('bp-draw-mode').addEventListener('change', (e) => {
+    state.drawMode = e.target.value;
+    document.getElementById('bp-spline-row').style.display = e.target.value === 'spline' ? 'flex' : 'none';
+    document.getElementById('bp-hatch-dist-row').style.display = e.target.value === 'hatch' ? 'flex' : 'none';
+    document.getElementById('bp-hatch-angle-row').style.display = e.target.value === 'hatch' ? 'flex' : 'none';
+  });
+  document.getElementById('bp-spline-curve').addEventListener('input', (e) => {
+    state.splineCurvature = +e.target.value / 100;
+    document.getElementById('bp-spline-val').textContent = state.splineCurvature.toFixed(1);
+  });
+  document.getElementById('bp-hatch-dist').addEventListener('input', (e) => {
+    state.hatchDist = +e.target.value;
+    document.getElementById('bp-hatch-dist-val').textContent = state.hatchDist;
+  });
+  document.getElementById('bp-hatch-angle').addEventListener('input', (e) => {
+    state.hatchAngle = +e.target.value;
+    document.getElementById('bp-hatch-angle-val').textContent = state.hatchAngle + '°';
+  });
+  document.getElementById('bp-field').addEventListener('change', (e) => {
+    state.vectorField = e.target.value;
+    if (e.target.value === 'none') {
+      brush.noField();
+    } else {
+      brush.field(e.target.value);
+    }
+  });
+  document.getElementById('bp-wiggle').addEventListener('input', (e) => {
+    state.wiggle = +e.target.value;
+    document.getElementById('bp-wiggle-val').textContent = state.wiggle;
   });
 
   // Keyboard shortcuts

@@ -1,0 +1,729 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fatiha — Meditative Door</title>
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+<style>
+  * { margin: 0; padding: 0; }
+  body { background: #f2eada; overflow: hidden; }
+  #tap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 10; cursor: pointer; }
+  #tap span { color: rgba(100,90,70,0.4); font: 16px Georgia, serif; }
+</style>
+</head>
+<body>
+<div id="tap"><span>tap to begin</span></div>
+<script>
+// ─── Audio ───
+let audioCtx, analyser, audioBuffer, freqData, timeData;
+let isPlaying = false, smoothAmp = 0;
+
+async function loadAudio() {
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.92;
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+    timeData = new Uint8Array(analyser.fftSize);
+    const resp = await fetch('bismillah.mp3');
+    if (!resp.ok) throw new Error('no audio');
+    audioBuffer = await audioCtx.decodeAudioData(await resp.arrayBuffer());
+  } catch(e) { console.warn('Audio unavailable:', e.message); }
+}
+function startAudio() {
+  if (isPlaying || !audioBuffer) return;
+  const src = audioCtx.createBufferSource();
+  src.buffer = audioBuffer;
+  src.connect(analyser);
+  analyser.connect(audioCtx.destination);
+  src.start(0);
+  isPlaying = true;
+  src.onended = () => { isPlaying = false; };
+}
+function getAmp() {
+  if (!isPlaying || !timeData) return 0;
+  analyser.getByteTimeDomainData(timeData);
+  let s = 0;
+  for (let i = 0; i < timeData.length; i++) s += Math.abs(timeData[i] - 128);
+  return s / timeData.length / 128;
+}
+
+// ─── Dimensions ───
+const W = 1080, H = 1920;
+const cx = W / 2;
+const doorW = 720, doorH = 1500;
+const doorX = (W - doorW) / 2, doorY = (H - doorH) / 2 + 80;
+const archSpringY = doorY + 380;
+const bot = doorY + doorH;
+const halfDW = doorW / 2;
+const panelTop = archSpringY + 15;
+const panelBot = bot - 15;
+const panelH = panelBot - panelTop;
+
+// Arch geometry helper
+function archY(x) {
+  // Pointed (ogee-ish) arch using two circles
+  const co = halfDW * 0.55;
+  const R = halfDW + co;
+  if (x <= cx) {
+    const dx = x - (cx + co);
+    const val = R * R - dx * dx;
+    return val > 0 ? archSpringY - Math.sqrt(val) : archSpringY;
+  } else {
+    const dx = x - (cx - co);
+    const val = R * R - dx * dx;
+    return val > 0 ? archSpringY - Math.sqrt(val) : archSpringY;
+  }
+}
+
+// Pre-compute arch points
+const archPts = [];
+for (let i = 0; i <= 40; i++) {
+  const x = doorX + (doorW * i / 40);
+  archPts.push([x, archY(x)]);
+}
+
+let fillsDone = false;
+
+// ─── Pre-compute flower positions around door frame ───
+const flowerElements = [];
+const roseColors = ['#8B1A2B', '#E83E6C', '#C2284A', '#A02040'];
+
+// Helper: position along arch at parameter t (0=left, 1=right)
+function archAt(t) {
+  const x = doorX + doorW * t;
+  return { x: x, y: archY(x) };
+}
+
+// --- Roses along arch curve (8 roses, evenly spaced) ---
+const archRoseTs = [0.05, 0.15, 0.28, 0.40, 0.60, 0.72, 0.85, 0.95];
+for (const t of archRoseTs) {
+  const p = archAt(t);
+  const offsetY = -30 - Math.random() * 25;
+  flowerElements.push({
+    type: 'rose', x: p.x, y: p.y + offsetY,
+    size: 40 + Math.random() * 20,
+    color: roseColors[Math.floor(Math.random() * roseColors.length)]
+  });
+}
+
+// --- Saz leaves between EVERY arch rose ---
+const archLeafTs = [0.10, 0.22, 0.34, 0.50, 0.66, 0.78, 0.90];
+for (const t of archLeafTs) {
+  const p = archAt(t);
+  flowerElements.push({
+    type: 'saz', x: p.x, y: p.y - 15 - Math.random() * 30,
+    angle: (t < 0.5 ? -1 : 1) * (0.3 + Math.random() * 0.5),
+    len: 35 + Math.random() * 25
+  });
+}
+
+// --- Buds filling gaps along arch (10 buds) ---
+const archBudTs = [0.03, 0.12, 0.20, 0.32, 0.45, 0.55, 0.68, 0.80, 0.88, 0.97];
+for (const t of archBudTs) {
+  const p = archAt(t);
+  flowerElements.push({
+    type: 'bud',
+    x: p.x + (Math.random() - 0.5) * 20,
+    y: p.y - 45 - Math.random() * 25,
+    size: 16 + Math.random() * 12
+  });
+}
+
+// --- Roses at arch spring points (4 each side = 8 total) ---
+for (let i = 0; i < 4; i++) {
+  const yOff = archSpringY - 50 + i * 50;
+  flowerElements.push({
+    type: 'rose',
+    x: doorX - 20 + Math.random() * 25,
+    y: yOff + Math.random() * 20,
+    size: 40 + Math.random() * 20,
+    color: roseColors[i % roseColors.length]
+  });
+  flowerElements.push({
+    type: 'rose',
+    x: doorX + doorW + 20 - Math.random() * 25,
+    y: yOff + Math.random() * 20,
+    size: 40 + Math.random() * 20,
+    color: roseColors[(i + 2) % roseColors.length]
+  });
+}
+
+// --- Roses along bottom frame (4 roses, evenly spaced) ---
+for (let i = 0; i < 4; i++) {
+  const t = 0.15 + i * 0.23;
+  flowerElements.push({
+    type: 'rose',
+    x: doorX + doorW * t + (Math.random() - 0.5) * 20,
+    y: bot + 15 + Math.random() * 20,
+    size: 40 + Math.random() * 20,
+    color: roseColors[i % roseColors.length]
+  });
+}
+
+// --- Saz leaves between bottom roses ---
+for (let i = 0; i < 3; i++) {
+  const t = 0.25 + i * 0.25;
+  flowerElements.push({
+    type: 'saz',
+    x: doorX + doorW * t,
+    y: bot + 10 + Math.random() * 15,
+    angle: -1.5 + Math.random() * 0.3,
+    len: 35 + Math.random() * 20
+  });
+}
+
+// --- Leaves climbing down BOTH panel edges ---
+for (let i = 0; i < 10; i++) {
+  const y = archSpringY + 50 + i * 100 + Math.random() * 30;
+  if (y > bot - 30) break;
+  // Left edge
+  flowerElements.push({
+    type: 'saz',
+    x: doorX - 8 + Math.random() * 16,
+    y: y,
+    angle: -0.4 - Math.random() * 0.6,
+    len: 35 + Math.random() * 25
+  });
+  // Right edge
+  flowerElements.push({
+    type: 'saz',
+    x: doorX + doorW + 8 - Math.random() * 16,
+    y: y,
+    angle: 0.4 + Math.random() * 0.6,
+    len: 35 + Math.random() * 25
+  });
+}
+
+// --- Buds along panel edges (filling gaps) ---
+for (let i = 0; i < 6; i++) {
+  const y = archSpringY + 80 + i * 140 + Math.random() * 50;
+  if (y > bot - 60) break;
+  flowerElements.push({
+    type: 'bud',
+    x: doorX - 12 + Math.random() * 10,
+    y: y, size: 14 + Math.random() * 10
+  });
+  flowerElements.push({
+    type: 'bud',
+    x: doorX + doorW + 12 - Math.random() * 10,
+    y: y, size: 14 + Math.random() * 10
+  });
+}
+
+// --- Additional roses along left & right verticals (3 each) ---
+for (let i = 0; i < 3; i++) {
+  const y = archSpringY + 150 + i * 280 + Math.random() * 40;
+  if (y > bot - 80) break;
+  flowerElements.push({
+    type: 'rose',
+    x: doorX - 15 + Math.random() * 20,
+    y: y,
+    size: 35 + Math.random() * 20,
+    color: roseColors[Math.floor(Math.random() * roseColors.length)]
+  });
+  flowerElements.push({
+    type: 'rose',
+    x: doorX + doorW + 15 - Math.random() * 20,
+    y: y,
+    size: 35 + Math.random() * 20,
+    color: roseColors[Math.floor(Math.random() * roseColors.length)]
+  });
+}
+
+const totalFlowerElements = flowerElements.length;
+
+// ─── Flower drawing functions ───
+function drawRose(fx, fy, sz, baseColor) {
+  // Watercolor wash base under the rose
+  try {
+    brush.noStroke();
+    brush.fill(baseColor || '#C2284A', 60);
+    brush.fillBleed(0.3, 'out');
+    brush.fillTexture(0.4, 0.2);
+    brush.rect(fx - sz, fy - sz, sz * 2, sz * 2);
+    brush.noFill();
+  } catch(e) {}
+
+  const ringColors = ['#8B1A2B', '#A02040', '#C2284A', '#E83E6C'];
+  // 4 concentric rings of petals — thick, bold strokes
+  for (let ring = 0; ring < 4; ring++) {
+    const r = sz * (0.25 + ring * 0.25);
+    const nPetals = 5 + ring * 3;
+    const col = ringColors[Math.min(ring, ringColors.length - 1)];
+    brush.set('marker', col, 4.0 - ring * 0.5);
+    for (let p = 0; p < nPetals; p++) {
+      const a = (p / nPetals) * TWO_PI + ring * 0.4;
+      const px1 = fx + Math.cos(a) * r * 0.2;
+      const py1 = fy + Math.sin(a) * r * 0.2;
+      const px2 = fx + Math.cos(a) * r;
+      const py2 = fy + Math.sin(a) * r;
+      brush.line(px1, py1, px2, py2);
+    }
+  }
+  // Gold center — larger cross
+  brush.set('marker', '#C4A44E', 4.5);
+  brush.line(fx - 4, fy, fx + 4, fy);
+  brush.line(fx, fy - 4, fx, fy + 4);
+  // Extra gold dot
+  brush.set('marker', '#D4B44E', 3.0);
+  brush.line(fx - 2, fy - 2, fx + 2, fy + 2);
+}
+
+function drawSaz(fx, fy, angle, len) {
+  // Watercolor wash under leaf
+  try {
+    brush.noStroke();
+    brush.fill('#1A4A2E', 50);
+    brush.fillBleed(0.25, 'out');
+    brush.fillTexture(0.3, 0.15);
+    const mx = fx + Math.cos(angle) * len * 0.5;
+    const my = fy + Math.sin(angle) * len * 0.5;
+    brush.rect(mx - len * 0.2, my - len * 0.2, len * 0.4, len * 0.4);
+    brush.noFill();
+  } catch(e) {}
+
+  // Main leaf spine — thick
+  brush.set('2B', '#1A4A2E', 4.0);
+  const ex = fx + Math.cos(angle) * len;
+  const ey = fy + Math.sin(angle) * len;
+  brush.line(fx, fy, ex, ey);
+
+  // Leaf body — two curved edges, thicker
+  const mid1x = fx + Math.cos(angle) * len * 0.4 + Math.cos(angle + 1.2) * len * 0.3;
+  const mid1y = fy + Math.sin(angle) * len * 0.4 + Math.sin(angle + 1.2) * len * 0.3;
+  brush.set('2B', '#4A8A5A', 3.0);
+  brush.line(fx, fy, mid1x, mid1y);
+  brush.line(mid1x, mid1y, ex, ey);
+
+  const mid2x = fx + Math.cos(angle) * len * 0.4 + Math.cos(angle - 1.2) * len * 0.25;
+  const mid2y = fy + Math.sin(angle) * len * 0.4 + Math.sin(angle - 1.2) * len * 0.25;
+  brush.set('2B', '#2A6A3E', 2.5);
+  brush.line(fx, fy, mid2x, mid2y);
+  brush.line(mid2x, mid2y, ex, ey);
+
+  // Leaf veins — fine lines
+  brush.set('2H', '#1A4A2E', 1.2);
+  for (let v = 0.3; v <= 0.7; v += 0.2) {
+    const vx = fx + Math.cos(angle) * len * v;
+    const vy = fy + Math.sin(angle) * len * v;
+    brush.line(vx, vy, vx + Math.cos(angle + 1.0) * len * 0.12, vy + Math.sin(angle + 1.0) * len * 0.12);
+  }
+}
+
+function drawBud(fx, fy, sz) {
+  // Two curved strokes forming a bud shape — thicker
+  brush.set('marker', '#C2284A', 3.0);
+  brush.line(fx - sz * 0.4, fy + sz * 0.6, fx, fy - sz * 0.6);
+  brush.line(fx + sz * 0.4, fy + sz * 0.6, fx, fy - sz * 0.6);
+  // Inner petal
+  brush.set('marker', '#E83E6C', 2.0);
+  brush.line(fx - sz * 0.15, fy + sz * 0.3, fx, fy - sz * 0.4);
+  brush.line(fx + sz * 0.15, fy + sz * 0.3, fx, fy - sz * 0.4);
+  // Calyx
+  brush.set('2B', '#1A4A2E', 2.5);
+  brush.line(fx - sz * 0.3, fy + sz * 0.6, fx, fy + sz);
+  brush.line(fx + sz * 0.3, fy + sz * 0.6, fx, fy + sz);
+}
+
+// ─── Setup: draw fills ONCE ───
+function setup() {
+  createCanvas(W, H, WEBGL);
+  brush.load();
+  frameRate(30);
+
+  // Evolving flow field
+  brush.addField('meditative', function(t, field) {
+    for (let i = 0; i < field.length; i++)
+      for (let j = 0; j < field[i].length; j++)
+        field[i][j] = 100 * Math.sin(i * 0.012 + t * 0.4)
+                     + 50 * Math.cos(j * 0.008 + t * 0.25)
+                     + 30 * Math.sin((i + j) * 0.006 + t * 0.15);
+    return field;
+  });
+
+  translate(-width / 2, -height / 2);
+  background(242, 234, 218);
+
+  // ── Watercolor fills (drawn ONCE) ──
+  brush.noStroke();
+
+  // Deep lapis blue wash — upper arch area
+  brush.fill('#0D3B8E', 80);
+  brush.fillBleed(0.5, 'out');
+  brush.fillTexture(0.5, 0.25);
+  brush.rect(doorX + 20, doorY - 10, doorW - 40, archSpringY - doorY + 80);
+
+  // Gold wash — middle band
+  brush.fill('#B8860B', 70);
+  brush.fillBleed(0.45, 'out');
+  brush.fillTexture(0.4, 0.2);
+  brush.rect(doorX + 30, archSpringY - 30, doorW - 60, 300);
+
+  // Deep terre verte — lower panels
+  brush.fill('#0E4D2E', 80);
+  brush.fillBleed(0.5, 'out');
+  brush.fillTexture(0.5, 0.25);
+  brush.rect(doorX + 20, archSpringY + 350, doorW - 40, panelBot - archSpringY - 320);
+
+  // Jewel accent — left panel center
+  brush.fill('#3A0C6E', 100);
+  brush.fillBleed(0.35, 'out');
+  brush.fillTexture(0.3, 0.15);
+  brush.rect(doorX + 50, panelTop + panelH * 0.15, halfDW - 80, panelH * 0.25);
+
+  // Ruby accent — right panel lower
+  brush.fill('#8B1A1A', 90);
+  brush.fillBleed(0.3, 'out');
+  brush.fillTexture(0.3, 0.15);
+  brush.rect(cx + 30, panelTop + panelH * 0.55, halfDW - 80, panelH * 0.25);
+
+  brush.noFill();
+  fillsDone = true;
+
+  // Audio
+  loadAudio().then(() => {
+    document.getElementById('tap').addEventListener('click', () => {
+      document.getElementById('tap').style.display = 'none';
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      startAudio();
+    });
+  });
+}
+
+// ─── Draw: strokes accumulate frame by frame ───
+function draw() {
+  if (!fillsDone) return;
+  translate(-width / 2, -height / 2);
+  // NO background() — fills persist, strokes accumulate
+
+  const f = frameCount;
+  const rawAmp = getAmp();
+  smoothAmp = lerp(smoothAmp, rawAmp, 0.05);
+  const amp = isPlaying ? smoothAmp : 0.015 + 0.008 * sin(f * 0.003);
+
+  // Evolve flow field very slowly
+  brush.field('meditative');
+  brush.refreshField(f * 0.0015);
+  brush.wiggle(0.3 + amp * 2);
+
+  // ── STAGE 1: Door frame outline (frames 1-120) ──
+  if (f <= 120) {
+    const progress = f / 120;
+
+    // Outer door frame — left vertical
+    if (f >= 1 && f <= 30) {
+      const t = (f - 1) / 29;
+      const y1 = lerp(archSpringY, bot, t);
+      const y2 = lerp(archSpringY, bot, min(1, t + 0.04));
+      brush.set('HB', '#2A2215', 3.5 + amp * 3);
+      brush.line(doorX, y1, doorX, y2);
+    }
+
+    // Right vertical
+    if (f >= 10 && f <= 40) {
+      const t = (f - 10) / 29;
+      const y1 = lerp(archSpringY, bot, t);
+      const y2 = lerp(archSpringY, bot, min(1, t + 0.04));
+      brush.set('HB', '#2A2215', 3.5 + amp * 3);
+      brush.line(doorX + doorW, y1, doorX + doorW, y2);
+    }
+
+    // Bottom horizontal
+    if (f >= 20 && f <= 45) {
+      const t = (f - 20) / 24;
+      const x1 = lerp(doorX, doorX + doorW, t);
+      const x2 = lerp(doorX, doorX + doorW, min(1, t + 0.05));
+      brush.set('HB', '#2A2215', 3.5 + amp * 3);
+      brush.line(x1, bot, x2, bot);
+    }
+
+    // Arch — left half
+    if (f >= 30 && f <= 70) {
+      const idx = Math.floor(((f - 30) / 40) * 20);
+      if (idx < 20 && idx >= 0) {
+        brush.set('HB', '#3A3020', 3.0 + amp * 2);
+        brush.line(archPts[idx][0], archPts[idx][1], archPts[idx + 1][0], archPts[idx + 1][1]);
+      }
+    }
+
+    // Arch — right half
+    if (f >= 50 && f <= 90) {
+      const idx = 20 + Math.floor(((f - 50) / 40) * 20);
+      if (idx < 40 && idx >= 20) {
+        brush.set('HB', '#3A3020', 3.0 + amp * 2);
+        brush.line(archPts[idx][0], archPts[idx][1], archPts[idx + 1][0], archPts[idx + 1][1]);
+      }
+    }
+
+    // Center divider
+    if (f >= 70 && f <= 100) {
+      const t = (f - 70) / 29;
+      const y1 = lerp(panelTop, panelBot, t);
+      const y2 = lerp(panelTop, panelBot, min(1, t + 0.04));
+      brush.set('HB', '#2A2215', 3.0 + amp * 2);
+      brush.line(cx, y1, cx, y2);
+    }
+
+    // Spring line (horizontal at arch spring)
+    if (f >= 85 && f <= 105) {
+      const t = (f - 85) / 19;
+      const x1 = lerp(doorX, doorX + doorW, t);
+      const x2 = lerp(doorX, doorX + doorW, min(1, t + 0.06));
+      brush.set('HB', '#3A3020', 2.5 + amp * 2);
+      brush.line(x1, archSpringY, x2, archSpringY);
+    }
+  }
+
+  // ── STAGE 2: Panel inner frames (frames 80-200) ──
+  if (f >= 80 && f <= 200) {
+    const lx = doorX + 25, lw = cx - 25 - lx;
+    const rx = cx + 25, rw = doorX + doorW - 25 - rx;
+    const py = panelTop + 20, ph = panelH - 40;
+
+    // Left panel frame
+    if (f >= 80 && f <= 130 && f % 2 === 0) {
+      const seg = Math.floor((f - 80) / 2) % 25;
+      const t = seg / 24;
+      brush.set('2B', '#3A3525', 2.0 + amp * 2);
+      if (seg < 7) { // top
+        brush.line(lx + lw * (seg / 6), py, lx + lw * ((seg + 1) / 6), py);
+      } else if (seg < 13) { // right
+        const s = (seg - 7) / 5;
+        brush.line(lx + lw, py + ph * s, lx + lw, py + ph * (s + 1/5));
+      } else if (seg < 19) { // bottom
+        const s = (seg - 13) / 5;
+        brush.line(lx + lw * (1 - s), py + ph, lx + lw * (1 - s - 1/5), py + ph);
+      } else { // left
+        const s = (seg - 19) / 5;
+        brush.line(lx, py + ph * (1 - s), lx, py + ph * (1 - s - 1/5));
+      }
+    }
+
+    // Right panel frame
+    if (f >= 100 && f <= 150 && f % 2 === 0) {
+      const seg = Math.floor((f - 100) / 2) % 25;
+      brush.set('2B', '#3A3525', 2.0 + amp * 2);
+      if (seg < 7) {
+        brush.line(rx + rw * (seg / 6), py, rx + rw * ((seg + 1) / 6), py);
+      } else if (seg < 13) {
+        const s = (seg - 7) / 5;
+        brush.line(rx + rw, py + ph * s, rx + rw, py + ph * (s + 1/5));
+      } else if (seg < 19) {
+        const s = (seg - 13) / 5;
+        brush.line(rx + rw * (1 - s), py + ph, rx + rw * (1 - s - 1/5), py + ph);
+      } else {
+        const s = (seg - 19) / 5;
+        brush.line(rx, py + ph * (1 - s), rx, py + ph * (1 - s - 1/5));
+      }
+    }
+
+    // Cross marks in panels (X pattern)
+    if (f >= 140 && f <= 180 && f % 5 === 0) {
+      brush.set('2B', '#4A4535', 1.5 + amp);
+      const which = Math.floor((f - 140) / 5);
+      if (which < 4) {
+        // Left panel X marks
+        const yOff = py + ph * 0.2 + (which * ph * 0.2);
+        const xMid = lx + lw / 2;
+        brush.line(xMid - 30, yOff - 20, xMid + 30, yOff + 20);
+        brush.line(xMid + 30, yOff - 20, xMid - 30, yOff + 20);
+      } else {
+        // Right panel X marks
+        const idx = which - 4;
+        const yOff = py + ph * 0.2 + (idx * ph * 0.2);
+        const xMid = rx + rw / 2;
+        brush.line(xMid - 30, yOff - 20, xMid + 30, yOff + 20);
+        brush.line(xMid + 30, yOff - 20, xMid - 30, yOff + 20);
+      }
+    }
+
+    // Horizontal division lines in panels
+    if (f >= 160 && f <= 200 && f % 8 === 0) {
+      const which = Math.floor((f - 160) / 8);
+      brush.set('HB', '#3A3525', 1.8 + amp);
+      if (which === 0) brush.line(lx, py + ph / 3, lx + lw, py + ph / 3);
+      if (which === 1) brush.line(lx, py + ph * 2 / 3, lx + lw, py + ph * 2 / 3);
+      if (which === 2) brush.line(rx, py + ph / 3, rx + rw, py + ph / 3);
+      if (which === 3) brush.line(rx, py + ph * 2 / 3, rx + rw, py + ph * 2 / 3);
+      if (which === 4) brush.line(lx, py + ph / 2, lx + lw, py + ph / 2);
+      if (which === 5) brush.line(rx, py + ph / 2, rx + rw, py + ph / 2);
+    }
+  }
+
+  // ── STAGE 3: Hatch and texture (frames 150-280) ──
+  if (f >= 150 && f <= 280) {
+    const lx = doorX + 25, lw = cx - 25 - lx;
+    const rx = cx + 25, rw = doorX + doorW - 25 - rx;
+    const py = panelTop + 20, ph = panelH - 40;
+
+    // Hatch in left upper section
+    if (f >= 150 && f <= 180 && f % 10 === 0) {
+      try {
+        brush.hatch(12, 45 + sin(f * 0.02) * 8, { rand: 0.1 });
+        brush.hatchStyle('2H', '#5A5040', 0.8);
+        brush.rect(lx + 10, py + 10, lw - 20, ph / 3 - 10);
+        brush.noHatch();
+      } catch(e) {}
+    }
+
+    // Hatch in right lower section
+    if (f >= 180 && f <= 210 && f % 10 === 0) {
+      try {
+        brush.hatch(14, -30 + sin(f * 0.015) * 5, { rand: 0.12 });
+        brush.hatchStyle('2H', '#5A5040', 0.8);
+        brush.rect(rx + 10, py + ph * 2 / 3 + 5, rw - 20, ph / 3 - 10);
+        brush.noHatch();
+      } catch(e) {}
+    }
+
+    // Flow lines — organic field-following strokes through the door
+    if (f >= 180 && f % 3 === 0) {
+      // Within the door area only
+      const margin = 40;
+      const fx = doorX + margin + random(0, doorW - 2 * margin);
+      const fy = panelTop + margin + random(0, panelH - 2 * margin);
+      brush.set('charcoal', '#2A2215', 1.5 + amp * 2);
+      brush.flowLine(fx, fy, random(40, 120), random(0, TWO_PI));
+    }
+
+    // Crayon accent marks along the arch
+    if (f >= 220 && f <= 260 && f % 8 === 0) {
+      const idx = Math.floor(random(0, archPts.length - 1));
+      const pt = archPts[idx];
+      brush.set('2B', '#1A3A6A', 2.5 + amp * 2);
+      brush.line(pt[0] - 15, pt[1] + random(-8, 8), pt[0] + 15, pt[1] + random(-8, 8));
+    }
+  }
+
+  // ── STAGE 4: Rosettes and detail (frames 200-360) ──
+  if (f >= 200 && f <= 360) {
+    const lx = doorX + 25, lw = cx - 25 - lx;
+    const rx = cx + 25, rw = doorX + doorW - 25 - rx;
+    const py = panelTop + 20, ph = panelH - 40;
+
+    // Rosette outlines — concentric circles
+    if (f >= 200 && f <= 240 && f % 6 === 0) {
+      const which = Math.floor((f - 200) / 6);
+      brush.set('HB', '#4A3A20', 1.5 + amp);
+      if (which < 3) {
+        const r = 30 + which * 25;
+        brush.circle(lx + lw / 2, py + ph / 2, r);
+      } else {
+        const r = 30 + (which - 3) * 25;
+        brush.circle(rx + rw / 2, py + ph / 2, r);
+      }
+    }
+
+    // Star-like radial lines in rosettes
+    if (f >= 240 && f <= 280 && f % 4 === 0) {
+      const which = Math.floor((f - 240) / 4);
+      brush.set('2H', '#5A4A30', 1.2 + amp);
+      const angle = (which % 8) * (TWO_PI / 8);
+      const r = 55;
+
+      // Left rosette
+      if (which < 8) {
+        const rcx = lx + lw / 2, rcy = py + ph / 2;
+        brush.line(rcx, rcy, rcx + cos(angle) * r, rcy + sin(angle) * r);
+      }
+      // Right rosette
+      if (which >= 8 && which < 16) {
+        const rcx = rx + rw / 2, rcy = py + ph / 2;
+        brush.line(rcx, rcy, rcx + cos(angle) * r, rcy + sin(angle) * r);
+      }
+    }
+
+    // Dense flow lines — painting fills in
+    if (f >= 260 && f % 2 === 0) {
+      const margin = 30;
+      const fx = doorX + margin + random(0, doorW - 2 * margin);
+      const fy = doorY + margin + random(0, doorH - 2 * margin);
+      brush.set('charcoal', '#1A1510', 1.0 + amp * 1.5);
+      brush.flowLine(fx, fy, random(30, 80), random(0, TWO_PI));
+    }
+
+    // Arch detail — thickening pass
+    if (f >= 280 && f <= 320 && f % 4 === 0) {
+      const idx = Math.floor(((f - 280) / 40) * 40);
+      if (idx < 40 && idx >= 0) {
+        brush.set('2B', '#1A1510', 2.0 + amp);
+        brush.line(archPts[idx][0], archPts[idx][1], archPts[idx + 1][0], archPts[idx + 1][1]);
+      }
+    }
+
+    // Final dense touches
+    if (f >= 320 && f % 3 === 0) {
+      // Fine pencil details
+      brush.set('2H', '#3A3020', 0.8 + amp * 0.5);
+      const fx = doorX + 20 + random(0, doorW - 40);
+      const fy = doorY + 20 + random(0, doorH - 40);
+      brush.flowLine(fx, fy, random(20, 50), random(0, TWO_PI));
+    }
+  }
+
+  // ── STAGE 5: Animated watercolor paint layers (frames 250+) ──
+  // One fill every ~15 frames — each appears and STAYS, layering on top
+  if (f > 250 && f % 15 === 0) {
+    // Islamic palette
+    const palette = [
+      '#0D3B8E',  // lapis
+      '#C0392B',  // vermillion
+      '#B8860B',  // gold
+      '#0E4D2E',  // terre verte
+      '#8B2252',  // rose
+      '#3A0C6E',  // tyrian
+      '#8B1A1A',  // ruby
+    ];
+
+    // Pick color — tajweed events (high amp) bias toward lapis/gold
+    const pick = amp > 0.08
+      ? (random() > 0.5 ? palette[0] : palette[2])
+      : palette[Math.floor(random(0, palette.length))];
+
+    // Audio amplitude modulates opacity: louder = more opaque
+    const opacity = constrain(80 + amp * 400, 80, 140);
+
+    // Larger fills placed within the door area
+    const fillW = random(250, 500);
+    const fillH = random(200, 450);
+    const fillX = doorX + random(-20, doorW - fillW + 20);
+    const fillY = doorY + random(-20, doorH - fillH + 20);
+
+    brush.noStroke();
+    brush.fill(pick, opacity);
+    brush.fillBleed(random(0.35, 0.65), 'out');
+    brush.fillTexture(0.5, 0.25);
+    brush.rect(fillX, fillY, fillW, fillH);
+    brush.noFill();
+  }
+
+  // ── STAGE 6: Flowers around door frame (frames 200+) ──
+  // One flower element every 4 frames — faster blooming
+  if (f > 200) {
+    const flowerIdx = Math.floor((f - 201) / 4);
+    if (flowerIdx < totalFlowerElements) {
+      const el = flowerElements[flowerIdx];
+      brush.noField(); // flowers drawn without flow field
+      brush.wiggle(0.15); // slight organic wobble
+
+      if (el.type === 'rose') {
+        drawRose(el.x, el.y, el.size, el.color);
+      } else if (el.type === 'saz') {
+        drawSaz(el.x, el.y, el.angle, el.len);
+      } else if (el.type === 'bud') {
+        drawBud(el.x, el.y, el.size);
+      }
+    }
+  }
+
+  brush.noField();
+  brush.wiggle(0);
+}
+</script>
+</body>
+</html>
