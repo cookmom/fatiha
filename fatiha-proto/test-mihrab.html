@@ -1,319 +1,247 @@
+<!-- بسم الله الرحمن الرحيم -->
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>Mihrab v10</title>
-  <script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
-  <style>
-    html, body { margin: 0; padding: 0; overflow: hidden; background: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; }
-    canvas { display: block; }
-  </style>
+<meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+<style>* { margin:0; } body { background:#f2eada; }</style>
 </head>
 <body>
 <script>
+var W = 1080, H = 1920;
+var cx = W/2;
+
+// Arch parameters — equilateral pointed arch
+var archSpan = 620;
+var halfSpan = archSpan / 2;
+var archR = archSpan; // R = S for equilateral
+var springY = 1300;
+var archH = archSpan * Math.sqrt(3)/2; // = S * √3/2
+var peakY = springY - archH;
+// Centers at springing points
+var C1x = cx - halfSpan, C2x = cx + halfSpan;
+
+// Frame dimensions
+var frameL = cx - halfSpan - 80;
+var frameR = cx + halfSpan + 80;
+var frameT = peakY - 120;
+var frameB = H - 80;
+
+function archY(x) {
+  // Left arc or right arc
+  if (x <= cx) {
+    var dx = x - C2x; // left side uses RIGHT center
+    return springY - Math.sqrt(Math.max(0, archR*archR - dx*dx));
+  } else {
+    var dx = x - C1x; // right side uses LEFT center
+    return springY - Math.sqrt(Math.max(0, archR*archR - dx*dx));
+  }
+}
+
 function setup() {
-  createCanvas(1080, 1920, WEBGL);
+  createCanvas(W, H, WEBGL);
   brush.load();
-  translate(-width / 2, -height / 2);
+  translate(-width/2, -height/2);
+  background(242, 234, 218);
   randomSeed(42);
-  background(238, 235, 228);
-  brush.scaleBrushes(2);
+  brush.wiggle(1.2);
 
-  var W = 1080, H = 1920, cx = W / 2;
-
-  var archSpan = 740, halfSpan = archSpan / 2;
-  var archR = archSpan * 1.15;
-  var springY = 1420;
-  var archApexH = Math.sqrt(archR * archR - halfSpan * halfSpan);
-  var apexY = springY - archApexH;
-  var archL = cx - halfSpan, archRx = cx + halfSpan;
-  var floorY = springY + 260;
-  var M_IN = 52, fillInset = M_IN + 5, fi2 = fillInset + 3;
-  var LAPIS = '#0a1e60', GS = '#c0bab0', FC = '#a8a090';
-  var zoneSplitY = apexY + (springY - apexY) * 0.42;
-
-  function archCurve(n, inset) {
-    var pts = [], R = archR - inset;
-    var lCx = archL + inset, rCx = archRx - inset;
-    var ea = Math.acos(Math.max(-1, Math.min(1, (cx - lCx) / R)));
-    for (var i = 0; i <= n; i++) { var a = (i/n)*ea; pts.push([lCx+R*Math.cos(a), springY-R*Math.sin(a)]); }
-    for (var i = 1; i <= n; i++) { var a = (Math.PI-ea)+(i/n)*ea; pts.push([rCx+R*Math.cos(a), springY-R*Math.sin(a)]); }
-    return pts;
+  // =============================================
+  // LAYER 1: NESTED FRAMES (3 layers)
+  // =============================================
+  brush.noFill();
+  
+  // Outer frame
+  brush.set('2H', '#b0a898', 1.5);
+  brush.rect(frameL, frameT, frameR - frameL, frameB - frameT);
+  
+  // Middle frame
+  brush.set('2H', '#b0a898', 1.0);
+  brush.rect(frameL + 25, frameT + 25, frameR - frameL - 50, frameB - frameT - 50);
+  
+  // Inner frame
+  brush.set('2H', '#c0b8a8', 0.8);
+  brush.rect(frameL + 50, frameT + 50, frameR - frameL - 100, frameB - frameT - 100);
+  
+  // Column lines flanking arch
+  brush.set('2H', '#b0a898', 1.2);
+  brush.line(cx - halfSpan, springY, cx - halfSpan, frameB - 55);
+  brush.line(cx + halfSpan, springY, cx + halfSpan, frameB - 55);
+  // Double columns
+  brush.set('2H', '#c0b8a8', 0.6);
+  brush.line(cx - halfSpan - 12, springY, cx - halfSpan - 12, frameB - 55);
+  brush.line(cx + halfSpan + 12, springY, cx + halfSpan + 12, frameB - 55);
+  
+  // =============================================
+  // LAYER 2: BLUE FILL INSIDE ARCH
+  // =============================================
+  // Build arch polygon (interior shape)
+  var archPoly = [];
+  var steps = 60;
+  // Left arc
+  for (var i = 0; i <= steps; i++) {
+    var t = i / steps;
+    var x = (cx - halfSpan) + halfSpan * t;
+    var dx = x - C2x;
+    var y = springY - Math.sqrt(Math.max(0, archR*archR - dx*dx));
+    archPoly.push([x, y]);
   }
-
-  function insideArch(px, py, ins) {
-    if (py > springY) return px >= archL+ins && px <= archRx-ins && py <= floorY;
-    var R = archR-ins, lCx = archL+ins, rCx = archRx-ins;
-    if (px <= cx) { var dx=px-lCx, dy=springY-py; return dx*dx+dy*dy<=R*R && px>=lCx; }
-    else { var dx=px-rCx, dy=springY-py; return dx*dx+dy*dy<=R*R && px<=rCx; }
+  // Right arc
+  for (var i = 0; i <= steps; i++) {
+    var t = i / steps;
+    var x = cx + halfSpan * t;
+    var dx = x - C1x;
+    var y = springY - Math.sqrt(Math.max(0, archR*archR - dx*dx));
+    archPoly.push([x, y]);
   }
-
-  function clipL(x1,y1,x2,y2) {
-    var s=50,p=[];
-    for (var i=0;i<=s;i++) { var t=i/s; if (insideArch(x1+(x2-x1)*t,y1+(y2-y1)*t,fi2)) p.push(t); }
-    if (p.length<2) return null;
-    return [x1+(x2-x1)*p[0],y1+(y2-y1)*p[0],x1+(x2-x1)*p[p.length-1],y1+(y2-y1)*p[p.length-1]];
+  // Bottom line
+  archPoly.push([cx + halfSpan, springY + 600]);
+  archPoly.push([cx - halfSpan, springY + 600]);
+  
+  // Dark blue fill
+  brush.noStroke();
+  brush.fill('#0c3a6a', 200);
+  brush.fillBleed(0.08, 'out');
+  brush.fillTexture(0.3, 0.2);
+  brush.polygon(archPoly);
+  brush.noFill();
+  
+  // Lighter blue gradient at top
+  var topPoly = [];
+  for (var i = 0; i <= steps; i++) {
+    var t = i / steps;
+    var x = (cx - halfSpan * 0.8) + halfSpan * 1.6 * t;
+    var clampX = Math.max(cx - halfSpan + 20, Math.min(cx + halfSpan - 20, x));
+    topPoly.push([clampX, archY(clampX) + 10]);
   }
-
-  // S1: BG STARS
-  console.log('S1');
-  brush.noFill(); brush.noHatch(); brush.set('2H', GS, 0.05); brush.wiggle(0.5);
-  var bgR=50, bgSp=bgR*(1+Math.sqrt(2));
-  for (var gy=-bgR; gy<H+bgR; gy+=bgSp) {
-    for (var gx=-bgR; gx<W+bgR; gx+=bgSp) {
-      if (insideArch(gx,gy,-25)||gy>floorY+10) continue;
-      var p8=[];
-      for (var si=0;si<8;si++) p8.push([gx+bgR*Math.cos(si*Math.PI/4-Math.PI/2),gy+bgR*Math.sin(si*Math.PI/4-Math.PI/2)]);
-      for (var si=0;si<8;si++) brush.line(p8[si][0],p8[si][1],p8[(si+3)%8][0],p8[(si+3)%8][1]);
-      var ir=bgR*(Math.sqrt(2)-1);
-      for (var si=0;si<8;si++) {
-        var a1=si*Math.PI/4-Math.PI/2+Math.PI/8, a2=(si+1)*Math.PI/4-Math.PI/2+Math.PI/8;
-        brush.line(gx+ir*Math.cos(a1),gy+ir*Math.sin(a1),gx+ir*Math.cos(a2),gy+ir*Math.sin(a2));
+  topPoly.push([cx + halfSpan * 0.6, peakY + archH * 0.4]);
+  topPoly.push([cx - halfSpan * 0.6, peakY + archH * 0.4]);
+  
+  brush.fill('#1a5a9a', 80);
+  brush.fillBleed(0.15, 'out');
+  brush.polygon(topPoly);
+  brush.noFill();
+  
+  // =============================================
+  // LAYER 3: 12-FOLD STAR PATTERN (cream lines on blue)
+  // Formula: {12/5} star polygon
+  // P_k = (cx + r * cos(k*π/6 - π/2), cy + r * sin(k*π/6 - π/2))
+  // Connect P_k to P_{(k+5) mod 12}
+  // =============================================
+  var starCx = cx;
+  var starCy = springY - archH * 0.25; // center of arch interior
+  
+  brush.set('2H', '#e8e0d0', 0.6); // cream pencil on blue
+  
+  // Multiple scale layers for dense fill
+  var scales = [280, 180, 110, 60];
+  
+  for (var si = 0; si < scales.length; si++) {
+    var r = scales[si];
+    
+    // 12 vertices
+    var verts = [];
+    for (var k = 0; k < 12; k++) {
+      var angle = k * Math.PI / 6 - Math.PI / 2;
+      verts.push([starCx + r * Math.cos(angle), starCy + r * Math.sin(angle)]);
+    }
+    
+    // {12/5} connections — each vertex to vertex+5
+    for (var k = 0; k < 12; k++) {
+      var k2 = (k + 5) % 12;
+      brush.line(verts[k][0], verts[k][1], verts[k2][0], verts[k2][1]);
+    }
+    
+    // {12/4} connections — each vertex to vertex+4 (secondary pattern)
+    if (si < 2) {
+      brush.set('2H', '#d8d0c0', 0.4);
+      for (var k = 0; k < 12; k++) {
+        var k2 = (k + 4) % 12;
+        brush.line(verts[k][0], verts[k][1], verts[k2][0], verts[k2][1]);
+      }
+      brush.set('2H', '#e8e0d0', 0.6);
+    }
+    
+    // Dodecagon outline
+    if (si === 0) {
+      for (var k = 0; k < 12; k++) {
+        var k2 = (k + 1) % 12;
+        brush.line(verts[k][0], verts[k][1], verts[k2][0], verts[k2][1]);
       }
     }
-  }
-
-  // S2: FRAMES
-  console.log('S2');
-  brush.set('2H', FC, 0.07); brush.wiggle(1.0);
-  var fm=[28,30,52,54,74,76];
-  for (var f=0;f<fm.length;f++) { var m=fm[f]; brush.line(m,m,W-m,m); brush.line(W-m,m,W-m,H-m); brush.line(W-m,H-m,m,H-m); brush.line(m,H-m,m,m); }
-
-  // S3: MOLDING
-  console.log('S3');
-  brush.wiggle(1.5);
-  function drawMold(from,to,col,wt) {
-    brush.set('2H',col,wt);
-    for (var ins=from;ins<=to;ins+=1.5) {
-      var pts=archCurve(100,ins);
-      for (var ai=0;ai<pts.length-1;ai++) brush.line(pts[ai][0],pts[ai][1],pts[ai+1][0],pts[ai+1][1]);
-      brush.line(archL+ins,springY,archL+ins,floorY); brush.line(archRx-ins,springY,archRx-ins,floorY);
-    }
-  }
-  drawMold(-5,18,'#dcd8cc',0.03);
-  brush.set('2H',FC,0.12);
-  var edges=[-8,18,38,M_IN];
-  for (var ei=0;ei<edges.length;ei++) {
-    var pts=archCurve(120,edges[ei]);
-    for (var ai=0;ai<pts.length-1;ai++) brush.line(pts[ai][0],pts[ai][1],pts[ai+1][0],pts[ai+1][1]);
-    brush.line(archL+edges[ei],springY,archL+edges[ei],floorY); brush.line(archRx-edges[ei],springY,archRx-edges[ei],floorY);
-  }
-  brush.set('2H',FC,0.05);
-  var bc=archCurve(400,28);
-  for (var bi=0;bi<bc.length-1;bi++) {
-    var t=bi/(bc.length-1), i0=Math.max(bi-1,0), i1=Math.min(bi+1,bc.length-1);
-    var dx=bc[i1][0]-bc[i0][0], dy=bc[i1][1]-bc[i0][1], len=Math.sqrt(dx*dx+dy*dy)||1;
-    var nx=-dy/len, ny=dx/len;
-    var o1=5*Math.sin(2*Math.PI*55*t), o2=5*Math.sin(2*Math.PI*55*(bi+1)/(bc.length-1));
-    brush.line(bc[bi][0]+o1*nx,bc[bi][1]+o1*ny,bc[bi+1][0]+o2*nx,bc[bi+1][1]+o2*ny);
-    brush.line(bc[bi][0]-o1*nx,bc[bi][1]-o1*ny,bc[bi+1][0]-o2*nx,bc[bi+1][1]-o2*ny);
-  }
-  for (var side=-1;side<=1;side+=2) {
-    var bx3=side===-1?archL+28:archRx-28;
-    for (var y=springY;y<floorY-2;y+=1.5) {
-      var t3=(y-springY)/(floorY-springY);
-      brush.line(bx3+5*Math.sin(2*Math.PI*28*t3),y,bx3+5*Math.sin(2*Math.PI*28*((y+1.5-springY)/(floorY-springY))),y+1.5);
-      brush.line(bx3-5*Math.sin(2*Math.PI*28*t3),y,bx3-5*Math.sin(2*Math.PI*28*((y+1.5-springY)/(floorY-springY))),y+1.5);
-    }
-  }
-  drawMold(38,M_IN,'#dcd8cc',0.03);
-  brush.set('2H',FC,0.10);
-  brush.line(archL-8,floorY,archRx+8,floorY); brush.line(28,springY,archL-10,springY); brush.line(archRx+10,springY,W-28,springY);
-
-  // S4: BLUE FILL (4 passes for deep uniform blue)
-  console.log('S4');
-  brush.noStroke();
-  var ac=archCurve(50,fillInset);
-  var fp=[]; for (var i=0;i<ac.length;i++) fp.push(ac[i]);
-  fp.push([ac[ac.length-1][0],floorY]); fp.push([ac[0][0],floorY]);
-
-  for (var pass=0;pass<4;pass++) {
-    brush.fill([LAPIS,LAPIS,'#081040','#061035'][pass],[255,220,180,140][pass]);
-    brush.fillBleed([0.08,0.05,0.03,0.02][pass],['out','in','in','in'][pass]);
-    brush.fillTexture(0.10,0.05);
-    brush.beginShape(0);
-    for (var i=0;i<fp.length;i++) brush.vertex(fp[i][0],fp[i][1]);
-    brush.endShape(true);
-  }
-  // Extra fill pass for rectangle below springY to equalize color
-  brush.fill(LAPIS, 180);
-  brush.fillBleed(0.04, 'in');
-  brush.fillTexture(0.08, 0.04);
-  brush.beginShape(0);
-  brush.vertex(archL+fillInset, springY-10);
-  brush.vertex(archRx-fillInset, springY-10);
-  brush.vertex(archRx-fillInset, floorY);
-  brush.vertex(archL+fillInset, floorY);
-  brush.endShape(true);
-
-  brush.noFill();
-
-  // S5: WHITE PATTERNS
-  console.log('S5');
-  push(); strokeCap(ROUND); noFill();
-  var dL=0;
-
-  // 5A: STARS (bottom zone)
-  stroke(240,236,228,220); strokeWeight(2.2);
-  var sR=28, sSp=sR*(1+Math.sqrt(2));
-
-  function star8(scx,scy,r) {
-    var pts=[];
-    for (var i=0;i<8;i++) pts.push([scx+r*Math.cos(i*Math.PI/4-Math.PI/2),scy+r*Math.sin(i*Math.PI/4-Math.PI/2)]);
-    for (var i=0;i<8;i++) { var cl=clipL(pts[i][0],pts[i][1],pts[(i+3)%8][0],pts[(i+3)%8][1]); if(cl){line(cl[0],cl[1],cl[2],cl[3]);dL++;} }
-    var ir=r*(Math.sqrt(2)-1);
-    for (var i=0;i<8;i++) {
-      var a1=i*Math.PI/4-Math.PI/2+Math.PI/8, a2=(i+1)*Math.PI/4-Math.PI/2+Math.PI/8;
-      var cl=clipL(scx+ir*Math.cos(a1),scy+ir*Math.sin(a1),scx+ir*Math.cos(a2),scy+ir*Math.sin(a2)); if(cl){line(cl[0],cl[1],cl[2],cl[3]);dL++;}
-    }
-  }
-
-  for (var gy=zoneSplitY;gy<floorY;gy+=sSp) {
-    var row=Math.round((gy-zoneSplitY)/sSp), ox=(row%2!==0)?sSp/2:0;
-    for (var gx=archL;gx<archRx;gx+=sSp) { var sx=gx+ox; if(insideArch(sx,gy,fi2)) star8(sx,gy,sR); }
-  }
-
-  stroke(240,236,228,160); strokeWeight(1.0);
-  for (var gy=zoneSplitY;gy<floorY;gy+=sSp) {
-    var row=Math.round((gy-zoneSplitY)/sSp), ox=(row%2!==0)?sSp/2:0;
-    for (var gx=archL;gx<archRx;gx+=sSp) {
-      var sx=gx+ox; if(!insideArch(sx,gy,fi2)) continue;
-      if(insideArch(sx+sSp,gy,fi2)) { var cl=clipL(sx+sR*0.5,gy,sx+sSp-sR*0.5,gy); if(cl){line(cl[0],cl[1],cl[2],cl[3]);dL++;} }
-    }
-  }
-
-  // Zone divider (subtle)
-  stroke(240,236,228,100); strokeWeight(1.2);
-  var zL2=cx,zR2=cx;
-  for (var x=archL;x<cx;x+=2) { if(insideArch(x,zoneSplitY,fi2)){zL2=x;break;} }
-  for (var x=archRx;x>cx;x-=2) { if(insideArch(x,zoneSplitY,fi2)){zR2=x;break;} }
-  line(zL2+3,zoneSplitY,zR2-3,zoneSplitY);
-
-  // 5B: DENSE ARABESQUES (grid fills entire upper zone)
-  console.log('S5b');
-  stroke(255,255,255);
-  var gs = 35; // tighter grid
-
-  var araInset = fi2 + 28; // tighter boundary for arabesques
-  for (var gy=apexY+55;gy<zoneSplitY-3;gy+=gs) {
-    for (var gx=archL+40;gx<archRx-40;gx+=gs) {
-      if (!insideArch(gx,gy,araInset)) continue;
-      var ct = ((Math.round(gx/gs)+Math.round(gy/gs))%4);
-      var relY = (gy-apexY)/(zoneSplitY-apexY);
-
-      if (ct===0) {
-        // 6-petal flower with center
-        strokeWeight(2.5);
-        for (var fi3=0;fi3<6;fi3++) {
-          var fa=fi3*Math.PI/3+relY*0.5;
-          var fx=gx+9*Math.cos(fa),fy=gy+9*Math.sin(fa);
-          if(insideArch(fx,fy,araInset)){line(gx,gy,fx,fy);dL++;}
-        }
-        strokeWeight(1.8);
-        for (var fi3=0;fi3<6;fi3++) {
-          var fa1=fi3*Math.PI/3+relY*0.5, fa2=(fi3+1)*Math.PI/3+relY*0.5;
-          var fx1=gx+4.5*Math.cos(fa1),fy1=gy+4.5*Math.sin(fa1);
-          var fx2=gx+4.5*Math.cos(fa2),fy2=gy+4.5*Math.sin(fa2);
-          if(insideArch(fx1,fy1,araInset)&&insideArch(fx2,fy2,araInset)){line(fx1,fy1,fx2,fy2);dL++;}
-        }
-      } else if (ct===1) {
-        // Leaf pair pointing up and out
-        strokeWeight(2.3);
-        for (var ls=-1;ls<=1;ls+=2) {
-          var la=ls*0.65-Math.PI/2, ll=14;
-          var lx=gx+ll*Math.cos(la),ly=gy+ll*Math.sin(la);
-          if(insideArch(lx,ly,araInset)){line(gx,gy,lx,ly);dL++;}
-          var la2=la+ls*0.22;
-          var lx2=gx+ll*0.68*Math.cos(la2),ly2=gy+ll*0.68*Math.sin(la2);
-          if(insideArch(lx2,ly2,araInset)){line(gx,gy,lx2,ly2);dL++;if(insideArch(lx,ly,araInset)){line(lx,ly,lx2,ly2);dL++;}}
-        }
-        // Small stem down
-        strokeWeight(1.8);
-        if(insideArch(gx,gy+10,araInset)){line(gx,gy,gx,gy+10);dL++;}
-      } else if (ct===2) {
-        // 8-petal rosette (smaller)
-        strokeWeight(2.0);
-        for (var fi3=0;fi3<8;fi3++) {
-          var fa=fi3*Math.PI/4+relY*0.3;
-          var fx=gx+8*Math.cos(fa),fy=gy+8*Math.sin(fa);
-          if(insideArch(fx,fy,araInset)){line(gx,gy,fx,fy);dL++;}
-        }
-      } else {
-        // Vine tendril
-        strokeWeight(2.0);
-        var vDir=(gx<cx)?1:-1;
-        var va=vDir*0.3+Math.PI/2, px2=gx, py2=gy;
-        for (var vs=0;vs<6;vs++) {
-          va+=vDir*0.18*Math.sin(vs*0.6);
-          var vnx=px2+4.5*Math.cos(va),vny=py2+4.5*Math.sin(va);
-          if(!insideArch(vnx,vny,araInset)) break;
-          line(px2,py2,vnx,vny);dL++;
-          px2=vnx;py2=vny;
-        }
-        // Leaf at end
-        if(insideArch(px2,py2,araInset)) {
-          var la=va+vDir*0.8, ll=8;
-          var lx=px2+ll*Math.cos(la),ly=py2+ll*Math.sin(la);
-          if(insideArch(lx,ly,araInset)){line(px2,py2,lx,ly);dL++;}
-        }
+    
+    // Radial lines from center
+    if (si === 0) {
+      brush.set('2H', '#d0c8b8', 0.3);
+      for (var k = 0; k < 12; k++) {
+        brush.line(starCx, starCy, verts[k][0], verts[k][1]);
       }
+      brush.set('2H', '#e8e0d0', 0.6);
     }
   }
-
-  // Central palmette
-  strokeWeight(3.5);
-  var palCx=cx, palCy=apexY+55;
-  for (var ri=-11;ri<=11;ri++) {
-    var a=-Math.PI/2+ri*0.11, rl=10+Math.abs(ri)*5;
-    var tx=palCx+rl*Math.cos(a),ty=palCy+rl*Math.sin(a);
-    if(insideArch(tx,ty,araInset)){line(palCx,palCy,tx,ty);dL++;}
-  }
-  strokeWeight(3.0);
-  for (var sc=-1;sc<=1;sc+=2) {
-    var px3,py3;
-    for (var t=0;t<=35;t++) {
-      var tt=t/35;
-      var px=palCx+sc*(6+55*Math.pow(tt,0.5)), py=palCy-2+45*Math.sin(Math.PI*tt);
-      if(t>0&&insideArch(px,py,araInset)&&insideArch(px3,py3,araInset)){line(px3,py3,px,py);dL++;}
-      px3=px;py3=py;
-    }
-  }
-
-  // Connecting vine curves between grid cells
-  strokeWeight(1.8);
-  for (var gy=apexY+12+gs/2;gy<zoneSplitY-gs;gy+=gs) {
-    for (var gx=archL+20+gs/2;gx<archRx-20;gx+=gs) {
-      if(!insideArch(gx,gy,araInset)) continue;
-      // Connect right and down
-      if(insideArch(gx+gs,gy,fi2+4)){line(gx+6,gy,gx+gs-6,gy);dL++;}
-      if(insideArch(gx,gy+gs,fi2+4)&&gy+gs<zoneSplitY){line(gx,gy+6,gx,gy+gs-6);dL++;}
-    }
-  }
-
-  // 12-pointed medallion
-  strokeWeight(3.0);
-  for (var i=0;i<12;i++) {
-    var a1=(2*Math.PI*i)/12-Math.PI/2, a2=(2*Math.PI*((i+5)%12))/12-Math.PI/2;
-    var cl=clipL(palCx+20*Math.cos(a1),palCy+20*Math.sin(a1),palCx+20*Math.cos(a2),palCy+20*Math.sin(a2));
-    if(cl){line(cl[0],cl[1],cl[2],cl[3]);dL++;}
-  }
-
-  pop();
-
-  // S6: FLOOR
-  console.log('S6');
-  brush.noStroke();
-  brush.fill('#d5d0c5',50); brush.fillBleed(0.03,'out'); brush.fillTexture(0.1,0.05);
-  brush.beginShape(0);
-  brush.vertex(52,floorY); brush.vertex(W-52,floorY); brush.vertex(W-52,H-52); brush.vertex(52,H-52);
-  brush.endShape(true);
+  
+  // Inner concentric circles
+  brush.set('2H', '#d8d0c0', 0.4);
+  brush.circle(starCx, starCy, 40);
+  brush.circle(starCx, starCy, 100);
+  
+  // =============================================
+  // LAYER 4: ARCH OUTLINE (pencil)
+  // =============================================
   brush.noFill();
-  brush.set('2H',FC,0.08); brush.wiggle(1.0);
-  brush.line(52,floorY,W-52,floorY);
-
-  console.log('Lines: '+dL);
-  console.log('Mihrab v10 done');
+  brush.set('2H', '#8a8070', 1.8);
+  
+  // Left arc
+  var archLinePts = [];
+  for (var i = 0; i <= 40; i++) {
+    var t = i / 40;
+    var x = (cx - halfSpan) + halfSpan * t;
+    var dx = x - C2x;
+    var y = springY - Math.sqrt(Math.max(0, archR*archR - dx*dx));
+    archLinePts.push([x, y, 0.3 + 0.7 * Math.sin(Math.PI * t)]);
+  }
+  brush.spline(archLinePts, 0.3);
+  
+  // Right arc
+  archLinePts = [];
+  for (var i = 0; i <= 40; i++) {
+    var t = i / 40;
+    var x = cx + halfSpan * t;
+    var dx = x - C1x;
+    var y = springY - Math.sqrt(Math.max(0, archR*archR - dx*dx));
+    archLinePts.push([x, y, 0.3 + 0.7 * Math.sin(Math.PI * t)]);
+  }
+  brush.spline(archLinePts, 0.3);
+  
+  // =============================================
+  // LAYER 5: BORDER BAND (simple zigzag)
+  // =============================================
+  brush.set('2H', '#b0a898', 0.5);
+  var bandY1 = frameT + 30, bandY2 = frameT + 45;
+  var bandStep = 30;
+  for (var x = frameL + 55; x < frameR - 55; x += bandStep) {
+    brush.line(x, bandY1, x + bandStep/2, bandY2);
+    brush.line(x + bandStep/2, bandY2, x + bandStep, bandY1);
+  }
+  // Bottom band
+  bandY1 = frameB - 80; bandY2 = frameB - 65;
+  for (var x = frameL + 55; x < frameR - 55; x += bandStep) {
+    brush.line(x, bandY1, x + bandStep/2, bandY2);
+    brush.line(x + bandStep/2, bandY2, x + bandStep, bandY1);
+  }
+  
+  // Side bands
+  var bandX1 = frameL + 30, bandX2 = frameL + 45;
+  for (var y = frameT + 55; y < frameB - 55; y += bandStep) {
+    brush.line(bandX1, y, bandX2, y + bandStep/2);
+    brush.line(bandX2, y + bandStep/2, bandX1, y + bandStep);
+  }
+  bandX1 = frameR - 45; bandX2 = frameR - 30;
+  for (var y = frameT + 55; y < frameB - 55; y += bandStep) {
+    brush.line(bandX1, y, bandX2, y + bandStep/2);
+    brush.line(bandX2, y + bandStep/2, bandX1, y + bandStep);
+  }
 }
 </script>
 </body>
