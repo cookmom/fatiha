@@ -22,10 +22,17 @@ var peakY = springY - archH;
 // Centers at springing points
 var C1x = cx - halfSpan, C2x = cx + halfSpan;
 
-// Frame dimensions
-var frameL = cx - halfSpan - 80;
-var frameR = cx + halfSpan + 80;
-var frameT = peakY - 120;
+// Outer dome — semicircular arch above the inner pointed arch
+var domeSpan = archSpan + 200; // wider than inner arch
+var domeHalfSpan = domeSpan / 2;
+var domeR = domeSpan / 2; // semicircle
+var domeSpringY = springY - 100; // springs above inner arch springing
+var domePeakY = domeSpringY - domeR;
+
+// Frame dimensions — encompasses the dome
+var frameL = cx - domeHalfSpan - 60;
+var frameR = cx + domeHalfSpan + 60;
+var frameT = domePeakY - 80;
 var frameB = H - 80;
 
 function archY(x) {
@@ -63,6 +70,51 @@ function setup() {
   // Inner frame
   brush.set('2H', '#c0b8a8', 0.8);
   brush.rect(frameL + 50, frameT + 50, frameR - frameL - 100, frameB - frameT - 100);
+  
+  // =============================================
+  // OUTER DOME — semicircular arch
+  // =============================================
+  brush.set('2H', '#9a9080', 1.5);
+  
+  // Dome arc (semicircle)
+  var domePts = [];
+  for (var i = 0; i <= 50; i++) {
+    var angle = Math.PI + (i / 50) * Math.PI; // PI to 2PI (semicircle)
+    domePts.push([cx + domeR * Math.cos(angle), domeSpringY + domeR * Math.sin(angle), 0.3 + 0.7 * Math.sin(Math.PI * i/50)]);
+  }
+  brush.spline(domePts, 0.3);
+  
+  // Dome vertical sides
+  brush.line(cx - domeHalfSpan, domeSpringY, cx - domeHalfSpan, frameB - 55);
+  brush.line(cx + domeHalfSpan, domeSpringY, cx + domeHalfSpan, frameB - 55);
+  
+  // Inner dome outline (slightly smaller, lighter)
+  brush.set('2H', '#b0a898', 0.8);
+  var innerDomeR = domeR - 20;
+  var innerDomePts = [];
+  for (var i = 0; i <= 50; i++) {
+    var angle = Math.PI + (i / 50) * Math.PI;
+    innerDomePts.push([cx + innerDomeR * Math.cos(angle), domeSpringY + innerDomeR * Math.sin(angle), 0.4]);
+  }
+  brush.spline(innerDomePts, 0.3);
+  
+  // Spandrel decoration between dome and inner arch — light star pattern
+  brush.set('2H', '#c8c0b0', 0.3);
+  // Small 6-fold stars in the spandrel corners
+  var spandrelStarR = 50;
+  var spandrelPositions = [
+    {x: cx - halfSpan - 40, y: springY - 80},
+    {x: cx + halfSpan + 40, y: springY - 80},
+  ];
+  for (var si = 0; si < spandrelPositions.length; si++) {
+    var sp = spandrelPositions[si];
+    for (var k = 0; k < 6; k++) {
+      var a1 = k * Math.PI / 3 - Math.PI / 2;
+      var a2 = ((k + 2) % 6) * Math.PI / 3 - Math.PI / 2;
+      brush.line(sp.x + spandrelStarR * Math.cos(a1), sp.y + spandrelStarR * Math.sin(a1),
+                 sp.x + spandrelStarR * Math.cos(a2), sp.y + spandrelStarR * Math.sin(a2));
+    }
+  }
   
   // Column lines flanking arch
   brush.set('2H', '#b0a898', 1.2);
