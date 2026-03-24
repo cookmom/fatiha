@@ -31,27 +31,39 @@ body { background:#f2eada; overflow:hidden; }
 .corner-sq.tr { top:-4px; right:-4px; }
 .corner-sq.bl2 { bottom:-4px; left:-4px; }
 .corner-sq.br2 { bottom:-4px; right:-4px; }
+/* Info panel — INSIDE the track box, smart-positioned to avoid occlusion */
 .hud-info {
-  position:absolute; bottom:8px; left:8px; right:8px;
+  position:absolute; max-width:70%;
   background:rgba(0,8,16,0.78);
   border:1px solid rgba(0,212,255,0.3);
-  border-radius:4px; padding:10px 14px;
+  border-radius:4px; padding:8px 12px;
+  white-space:nowrap;
 }
-.hud-label { color:#00d4ff; font-size:15px; font-weight:bold; letter-spacing:2px; text-transform:uppercase; margin-bottom:5px; text-shadow:0 0 10px rgba(0,212,255,0.5); }
-.hud-formula { color:rgba(0,212,255,0.8); font-size:13px; margin-bottom:3px; }
-.hud-coords { color:rgba(0,212,255,0.55); font-size:12px; }
+/* Default: top-right corner of box (drawing usually starts bottom-left/center) */
+.hud-info.pos-tr { top:6px; right:6px; }
+.hud-info.pos-tl { top:6px; left:6px; }
+.hud-info.pos-br { bottom:6px; right:6px; }
+.hud-info.pos-bl { bottom:6px; left:6px; }
+.hud-label { color:#00d4ff; font-size:13px; font-weight:bold; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:4px; text-shadow:0 0 8px rgba(0,212,255,0.5); }
+.hud-formula { color:rgba(0,212,255,0.75); font-size:11px; margin-bottom:3px; }
+.hud-coords { color:rgba(0,212,255,0.5); font-size:11px; }
 .track-box.complete { animation: pulse-complete 0.6s ease; }
 @keyframes pulse-complete {
   0% { filter: drop-shadow(0 0 4px rgba(0,212,255,0.8)); }
   50% { filter: drop-shadow(0 0 16px rgba(0,212,255,1)); }
   100% { filter: drop-shadow(0 0 4px rgba(0,212,255,0.15)); }
 }
-/* Pencil cursor dot */
+/* Pencil cursor — large glowing dot */
 #pencil-dot {
-  position:absolute; width:8px; height:8px; border-radius:50%;
-  background:#00d4ff; box-shadow: 0 0 8px rgba(0,212,255,0.8), 0 0 20px rgba(0,212,255,0.3);
-  pointer-events:none; transition: left 0.03s linear, top 0.03s linear;
-  z-index:10;
+  position:absolute; width:14px; height:14px; border-radius:50%;
+  background:radial-gradient(circle, #fff 0%, #00d4ff 40%, rgba(0,212,255,0) 70%);
+  box-shadow: 0 0 12px 4px rgba(0,212,255,0.9), 0 0 30px 8px rgba(0,212,255,0.4), 0 0 60px 16px rgba(0,212,255,0.15);
+  pointer-events:none; z-index:15;
+}
+/* Trail dots */
+.trail-dot {
+  position:absolute; border-radius:50%; pointer-events:none;
+  background:rgba(0,212,255,0.5); z-index:14;
 }
 </style>
 </head>
@@ -167,14 +179,14 @@ for(var i=0;i<=60;i++){var t=i/60;var x=bandL+50+(bandR-bandL-100)*t;calligPts.p
 
 var STEPS = [
   // 0: Ground line
-  { name:'GROUND LINE', formula:'y = H − U/φ²', dur:0.8,
+  { name:'GROUND LINE', panelPos:'tl', formula:'y = H − U/φ²', dur:0.8,
     bbox:[bandL-10,baseBot-15,bandR+10,baseBot+15],
     draw: function(p) {
       brush.set('2H','#5a5248',2.0);
       return drawSegments([{from:[bandL-10,baseBot],to:[bandR+10,baseBot]}], p);
     }},
   // 1: Left base
-  { name:'LEFT BASE', formula:'w = U/φ² × φ/√2 = '+bw.toFixed(0)+'px', dur:0.8,
+  { name:'LEFT BASE', panelPos:'tr', formula:'w = U/φ² × φ/√2 = '+bw.toFixed(0)+'px', dur:0.8,
     bbox:[colLx-bw/2,colBot,colLx+bw/2,baseBot],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -186,7 +198,7 @@ var STEPS = [
       ], p);
     }},
   // 2: Right base
-  { name:'RIGHT BASE', formula:'mirror of left', dur:0.8,
+  { name:'RIGHT BASE', panelPos:'tl', formula:'mirror of left', dur:0.8,
     bbox:[colRx-bw/2,colBot,colRx+bw/2,baseBot],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -198,7 +210,7 @@ var STEPS = [
       ], p);
     }},
   // 3: Left column (draws upward)
-  { name:'LEFT COLUMN', formula:'w = U/φ² = '+colWidth.toFixed(0)+' | h = '+Math.round(colBot-colTop), dur:1.2,
+  { name:'LEFT COLUMN', panelPos:'tr', formula:'w = U/φ² = '+colWidth.toFixed(0)+' | h = '+Math.round(colBot-colTop), dur:1.2,
     bbox:[colLx-colWidth/2,colTop,colLx+colWidth/2,colBot],
     draw: function(p) {
       brush.set('2H','#5a5248',2.0);
@@ -215,7 +227,7 @@ var STEPS = [
       return [colLx, endY];
     }},
   // 4: Right column
-  { name:'RIGHT COLUMN', formula:'w = U/φ²', dur:1.2,
+  { name:'RIGHT COLUMN', panelPos:'tl', formula:'w = U/φ²', dur:1.2,
     bbox:[colRx-colWidth/2,colTop,colRx+colWidth/2,colBot],
     draw: function(p) {
       brush.set('2H','#5a5248',2.0);
@@ -230,7 +242,7 @@ var STEPS = [
       return [colRx, endY];
     }},
   // 5: Left capital
-  { name:'LEFT CAPITAL', formula:'h = colW × φ = '+capHeight.toFixed(0)+'px', dur:0.8,
+  { name:'LEFT CAPITAL', panelPos:'tr', formula:'h = colW × φ = '+capHeight.toFixed(0)+'px', dur:0.8,
     bbox:[colLx-capW*0.62,capTop-6,colLx+capW*0.62,capBot],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -241,7 +253,7 @@ var STEPS = [
       ], p);
     }},
   // 6: Right capital
-  { name:'RIGHT CAPITAL', formula:'h = colW × φ', dur:0.8,
+  { name:'RIGHT CAPITAL', panelPos:'tl', formula:'h = colW × φ', dur:0.8,
     bbox:[colRx-capW*0.62,capTop-6,colRx+capW*0.62,capBot],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -252,7 +264,7 @@ var STEPS = [
       ], p);
     }},
   // 7: Main arch (left then right arc as one step)
-  { name:'NICHE ARCH', formula:'R = 2U = '+archSpan.toFixed(0)+' | H = U√3 = '+archH.toFixed(0), dur:2.0,
+  { name:'NICHE ARCH', panelPos:'br', formula:'R = 2U = '+archSpan.toFixed(0)+' | H = U√3 = '+archH.toFixed(0), dur:2.0,
     bbox:[cx-halfSpan,peakY,cx+halfSpan,springY+20],
     draw: function(p) {
       brush.set('2H','#5a5248',2.5);
@@ -275,7 +287,7 @@ var STEPS = [
       }
     }},
   // 8: Inscription band
-  { name:'INSCRIPTION BAND', formula:'h = U/φ = '+bandHeight_v.toFixed(0)+'px', dur:1.5,
+  { name:'INSCRIPTION BAND', panelPos:'tr', formula:'h = U/φ = '+bandHeight_v.toFixed(0)+'px', dur:1.5,
     bbox:[bandL,bandTop_y,bandR,bandBot_y],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -313,7 +325,7 @@ var STEPS = [
       }
     }},
   // 9: Crown arch
-  { name:'CROWN ARCH', formula:'span = bandW×√φ | R = span/√2 = '+crownR.toFixed(0), dur:1.5,
+  { name:'CROWN ARCH', panelPos:'br', formula:'span = bandW×√φ | R = span/√2 = '+crownR.toFixed(0), dur:1.5,
     bbox:[cx-crownHalfSpan,crownPeakY,cx+crownHalfSpan,crownSpringY],
     draw: function(p) {
       brush.set('2H','#5a5248',2.2);
@@ -325,7 +337,7 @@ var STEPS = [
       }
     }},
   // 10: Star
-  { name:'12-FOLD STAR', formula:'{12/5} — scales: r, r/φ, r/φ², r/φ³', dur:2.0,
+  { name:'12-FOLD STAR', panelPos:'bl', formula:'{12/5} — scales: r, r/φ, r/φ², r/φ³', dur:2.0,
     bbox:[starCx-starR_val-15,starCy-starR_val-15,starCx+starR_val+15,starCy+starR_val+15],
     draw: function(p) {
       var scales=[starR_val,starR_val/PHI,starR_val/(PHI*PHI),starR_val/(PHI*PHI*PHI)];
@@ -351,7 +363,7 @@ var STEPS = [
       return [tipX, tipY];
     }},
   // 11: Blue wash
-  { name:'NICHE WASH', formula:'fill #0c3a6a α=35', dur:1.0,
+  { name:'NICHE WASH', panelPos:'tr', formula:'fill #0c3a6a α=35', dur:1.0,
     bbox:[cx-halfSpan,peakY,cx+halfSpan,baseBot],
     draw: function(p) {
       // Fill just appears (no progressive for polygon fill)
@@ -403,7 +415,10 @@ function createTrackBox(step) {
   ['tl','tr','bl2','br2'].forEach(function(c){var s=document.createElement('div');s.className='corner-sq '+c;box.appendChild(s);});
   var bl=document.createElement('div');bl.className='bl';bl.style.cssText='position:absolute;bottom:0;left:0;width:100%;height:100%;pointer-events:none;';box.appendChild(bl);
   var br=document.createElement('div');br.className='br';br.style.cssText='position:absolute;bottom:0;right:0;width:100%;height:100%;pointer-events:none;';box.appendChild(br);
-  var info=document.createElement('div');info.className='hud-info';
+  // Info panel — placed at the corner least likely to occlude drawing
+  // Drawing usually starts at bottom/center, so default top-right
+  var pos = step.panelPos || 'tr';
+  var info=document.createElement('div');info.className='hud-info pos-'+pos;
   var lbl=document.createElement('div');lbl.className='hud-label';lbl.textContent=step.name;info.appendChild(lbl);
   var frm=document.createElement('div');frm.className='hud-formula';frm.textContent=step.formula;info.appendChild(frm);
   var crd=document.createElement('div');crd.className='hud-coords';crd.id='live-coords';crd.textContent='x:— y:—';info.appendChild(crd);
