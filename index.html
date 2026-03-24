@@ -677,14 +677,14 @@ var STEPS = [
       if (p >= 0.95) { brush.set('2H','#8a8278',0.6); brush.circle(starCx,starCy,starR_val*0.15); brush.circle(starCx,starCy,starR_val/PHI); }
       return [tipX, tipY];
     }},
-  // 11: Gold star center — the payoff
-  { name:'STAR CENTER', formula:'gold #c8a832 α=40', dur:0.07,
+  // 11: Gold star center — flat wash, no glow
+  { name:'STAR CENTER', formula:'gold #c8a832 α=35', dur:0.07,
     bbox:[starCx-starR_val/PHI-5,starCy-starR_val/PHI-5,starCx+starR_val/PHI+5,starCy+starR_val/PHI+5],
     draw: function(p) {
       if (p >= 0) {
         randomSeed(1006);
         brush.noStroke();
-        brush.fill('#c8a832', 40);
+        brush.fill('#c8a832', 35);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         brush.circle(starCx, starCy, starR_val/(PHI*PHI));
         brush.noFill();
