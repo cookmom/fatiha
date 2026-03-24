@@ -899,10 +899,11 @@ function draw() {
       var _r2 = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
       var oldB = STEPS[lastHudStep].bbox;
       var newB = STEPS[activeStep].bbox;
-      var oldCx = (oldB[0]+oldB[2])/2*_s2 + _r2.left;
-      var oldCy = (oldB[1]+oldB[3])/2*_s2 + _r2.top;
-      var newCx = (newB[0]+newB[2])/2*_s2 + _r2.left;
-      var newCy = (newB[1]+newB[3])/2*_s2 + _r2.top;
+      var _pad2 = 12 * _s2;
+      var oldCx = oldB[0]*_s2 + _r2.left - _pad2;
+      var oldCy = oldB[1]*_s2 + _r2.top - _pad2;
+      var newCx = newB[0]*_s2 + _r2.left - _pad2;
+      var newCy = newB[1]*_s2 + _r2.top - _pad2;
       var ln = document.createElement('div');
       ln.style.cssText = 'position:absolute;pointer-events:none;z-index:5;';
       var dx = newCx-oldCx, dy = newCy-oldCy;
