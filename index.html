@@ -14,8 +14,6 @@ body { overflow: hidden; padding: 0; margin: 0; display: flex; justify-content: 
   <body>
     <main></main>
     <script>
-//////////////////////////////////////////////////
-// CANVAS SIZE and Resize Function (NOT IMPORTANT)
 const C = {
     loaded: false,
     prop() {return this.height/this.width},
@@ -42,9 +40,6 @@ function windowResized () {
     C.resize();
 }
 
-
-//////////////////////////////////////////////////
-// Sketch
 let palette = ["#002185", "#fcd300", "#ff2702", "#6b9404", "#000000"]
 let x_values = [], y_values = [], active_states = [];
 
@@ -63,7 +58,6 @@ function setup () {
 }
 
 function draw() {
-
     background("#e2e7dc")
     translate(-width/2,-height/2)
     strokeWeight(3)
@@ -83,7 +77,6 @@ function draw() {
 
     noLoop()
 }
-
 
 function mousePressed() {
     for (let j = 0; j < x_values.length; j++) {
