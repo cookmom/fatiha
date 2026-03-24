@@ -490,25 +490,76 @@ var STEPS = [
       ], p);
     }},
   // 7: Main arch (left then right arc as one step)
-  { name:'NICHE ARCH', panelPos:'br', formula:'R = 2U = '+archSpan.toFixed(0)+' | H = U√3 = '+archH.toFixed(0), dur:1.33,
+  { name:'NICHE ARCH', panelPos:'br', formula:'R = 2U = '+archSpan.toFixed(0)+' | H = U√3 = '+archH.toFixed(0), dur:2.0,
     bbox:[cx-halfSpan,peakY,cx+halfSpan,springY+20],
     draw: function(p) {
-      brush.set('2H','#5a5248',2.5);
-      if (p <= 0.45) {
-        // Left arc
-        return drawSplinePartial(archPtsL, p/0.45, 0.3);
-      } else if (p <= 0.9) {
-        // Full left + partial right
+      // COMPASS SWEEP — radius line rotates and traces the arch
+      // Left arc: center C2x, sweep from PI to 2PI/3 (60° sweep)
+      var leftStartA = Math.PI;           // pointing left (springing point)
+      var leftEndA = Math.PI * 2 / 3;     // pointing up-left (peak)
+      // Right arc: center C1x, sweep from 0 to PI/3 (60° sweep)
+      var rightStartA = 0;                // pointing right (springing point)
+      var rightEndA = Math.PI / 3;        // pointing up-right (peak)
+      
+      if (p <= 0.4) {
+        // LEFT ARC — compass sweeps from springing to peak
+        var t = p / 0.4;
+        var angle = leftStartA + (leftEndA - leftStartA) * t;
+        // Draw the traced arc up to current angle
+        brush.set('2H','#5a5248',2.5);
+        var arcPts = [];
+        var steps = Math.max(3, Math.round(t * 40));
+        for (var i = 0; i <= steps; i++) {
+          var at = leftStartA + (angle - leftStartA) * i / steps;
+          arcPts.push([C2x + archR * Math.cos(at), springY + archR * Math.sin(at), 0.5]);
+        }
+        if (arcPts.length >= 2) brush.spline(arcPts, 0.3);
+        // Draw compass arm (radius line from center to current point)
+        var tipX = C2x + archR * Math.cos(angle);
+        var tipY = springY + archR * Math.sin(angle);
+        brush.set('2H','#a09888',0.6);
+        brush.line(C2x, springY, tipX, tipY);
+        // Center dot
+        brush.circle(C2x, springY, 5);
+        return [tipX, tipY];
+        
+      } else if (p <= 0.8) {
+        // Full left arc + RIGHT ARC compass sweep
+        brush.set('2H','#5a5248',2.5);
         brush.spline(archPtsL, 0.3);
-        return drawSplinePartial(archPtsR, (p-0.45)/0.45, 0.3);
+        
+        var t = (p - 0.4) / 0.4;
+        var angle = rightStartA + (rightEndA - rightStartA) * t;
+        var arcPts = [];
+        var steps = Math.max(3, Math.round(t * 40));
+        for (var i = 0; i <= steps; i++) {
+          var at = rightStartA + (angle - rightStartA) * i / steps;
+          arcPts.push([C1x + archR * Math.cos(at), springY + archR * Math.sin(at), 0.5]);
+        }
+        if (arcPts.length >= 2) brush.spline(arcPts, 0.3);
+        // Compass arm from right center
+        var tipX = C1x + archR * Math.cos(angle);
+        var tipY = springY + archR * Math.sin(angle);
+        brush.set('2H','#a09888',0.6);
+        brush.line(C1x, springY, tipX, tipY);
+        brush.circle(C1x, springY, 5);
+        // Left center dot stays visible
+        brush.circle(C2x, springY, 5);
+        return [tipX, tipY];
+        
       } else {
-        // Both arcs + legs
+        // Both arcs complete + legs drawing down
+        brush.set('2H','#5a5248',2.5);
         brush.spline(archPtsL, 0.3);
         brush.spline(archPtsR, 0.3);
-        var legP = (p-0.9)/0.1;
-        var legEndY = springY + (baseBot-springY)*legP;
-        brush.line(cx-halfSpan,springY,cx-halfSpan,legEndY);
-        brush.line(cx+halfSpan,springY,cx+halfSpan,legEndY);
+        var legP = (p - 0.8) / 0.2;
+        var legEndY = springY + (baseBot - springY) * legP;
+        brush.line(cx-halfSpan, springY, cx-halfSpan, legEndY);
+        brush.line(cx+halfSpan, springY, cx+halfSpan, legEndY);
+        // Center dots remain as construction marks
+        brush.set('2H','#a09888',0.5);
+        brush.circle(C2x, springY, 4);
+        brush.circle(C1x, springY, 4);
         return [cx+halfSpan, legEndY];
       }
     }},
@@ -551,15 +602,62 @@ var STEPS = [
       }
     }},
   // 9: Crown arch
-  { name:'CROWN ARCH', panelPos:'br', formula:'span = bandW×√φ | R = span/√2 = '+crownR.toFixed(0), dur:1.0,
+  { name:'CROWN ARCH', panelPos:'br', formula:'R = span/√2 = '+crownR.toFixed(0), dur:1.5,
     bbox:[cx-crownHalfSpan,crownPeakY,cx+crownHalfSpan,crownSpringY],
     draw: function(p) {
-      brush.set('2H','#5a5248',2.2);
-      if (p <= 0.5) {
-        return drawSplinePartial(crownPtsL, p/0.5, 0.3);
+      // COMPASS SWEEP for crown arch
+      // Crown arch angles (sub-equilateral = 45° sweep per side)
+      var crLeftStartA = Math.PI;
+      var crLeftEndA = Math.atan2(-(crownSpringY - crownPeakY), -crownHalfSpan);
+      var crRightStartA = 0;
+      var crRightEndA = Math.atan2(-(crownSpringY - crownPeakY), crownHalfSpan);
+      
+      if (p <= 0.45) {
+        // LEFT sweep
+        var t = p / 0.45;
+        var angle = crLeftStartA + (crLeftEndA - crLeftStartA) * t;
+        brush.set('2H','#5a5248',2.2);
+        var arcPts = [];
+        var steps = Math.max(3, Math.round(t * 30));
+        for (var i = 0; i <= steps; i++) {
+          var at = crLeftStartA + (angle - crLeftStartA) * i / steps;
+          arcPts.push([crownC2x + crownR * Math.cos(at), crownSpringY + crownR * Math.sin(at), 0.5]);
+        }
+        if (arcPts.length >= 2) brush.spline(arcPts, 0.3);
+        var tipX = crownC2x + crownR * Math.cos(angle);
+        var tipY = crownSpringY + crownR * Math.sin(angle);
+        brush.set('2H','#a09888',0.6);
+        brush.line(crownC2x, crownSpringY, tipX, tipY);
+        brush.circle(crownC2x, crownSpringY, 5);
+        return [tipX, tipY];
       } else {
+        // Full left + RIGHT sweep
+        brush.set('2H','#5a5248',2.2);
         brush.spline(crownPtsL, 0.3);
-        return drawSplinePartial(crownPtsR, (p-0.5)/0.5, 0.3);
+        var t = (p - 0.45) / 0.55;
+        if (t < 1) {
+          var angle = crRightStartA + (crRightEndA - crRightStartA) * t;
+          var arcPts = [];
+          var steps = Math.max(3, Math.round(t * 30));
+          for (var i = 0; i <= steps; i++) {
+            var at = crRightStartA + (crRightEndA - crRightStartA) * i / steps;
+            arcPts.push([crownC1x + crownR * Math.cos(at), crownSpringY + crownR * Math.sin(at), 0.5]);
+          }
+          if (arcPts.length >= 2) brush.spline(arcPts, 0.3);
+          var tipX = crownC1x + crownR * Math.cos(angle);
+          var tipY = crownSpringY + crownR * Math.sin(angle);
+          brush.set('2H','#a09888',0.6);
+          brush.line(crownC1x, crownSpringY, tipX, tipY);
+          brush.circle(crownC1x, crownSpringY, 5);
+          brush.circle(crownC2x, crownSpringY, 4);
+          return [tipX, tipY];
+        } else {
+          brush.spline(crownPtsR, 0.3);
+          brush.set('2H','#a09888',0.5);
+          brush.circle(crownC1x, crownSpringY, 4);
+          brush.circle(crownC2x, crownSpringY, 4);
+          return [cx, crownPeakY];
+        }
       }
     }},
   // 10: Star
