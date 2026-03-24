@@ -190,163 +190,161 @@ function drawAngleArc(cx_,cy_,r,startA,endA) {
 }
 
 // =============================================
-// ANNOTATION LAYOUT SYSTEM — φ-proportional
-// Reusable for any architectural composition
+// ANNOTATION SYSTEM v2 — Architectural Convention
+// ISO 128 / ASME Y14.5 compliant dimension placement
+// All dimensions OUTSIDE the drawing in stacked parallel rows
 // =============================================
-var GUTTER = U / PHI;                    // gutter width = U/φ
-var LABEL_GAP = U / (PHI*PHI*PHI*PHI);   // vertical gap = U/φ⁴ (matches font size)
-var LABEL_SIZE = Math.round(U / (PHI*PHI*PHI*PHI)); // font size = U/φ⁴ ≈ 30px canvas → ~11px on phone
-var ANNOT_COLOR = '#7a7268';
 
-// Annotation registry — all labels registered here, laid out once per step change
-var _annotRegistry = [];   // {text, anchorX, anchorY, side, stepIdx}
-var _annotEls = [];
-var _lastAnnotStep = -1;
+// Row spacing derived from U
+var DIM_GAP = U / (PHI*PHI*PHI*PHI);     // gap between extension line and object
+var ROW_OFFSET = U / (PHI*PHI);           // first row distance from drawing edge
+var ROW_SPACE = U / (PHI*PHI*PHI);        // spacing between parallel dim rows
+var EXT_OVERSHOOT = U / (PHI*PHI*PHI*PHI); // extension line overshoot past dim line
+var TICK_SIZE = U / (PHI*PHI*PHI*PHI);    // tick mark length at dim line ends
+var ANNOT_FONT = Math.round(U / (PHI*PHI*PHI*PHI)); // text size in canvas px
 
-function registerAnnot(text, anchorX, anchorY, side, stepIdx) {
-  // Only register once per text
-  for (var i=0;i<_annotRegistry.length;i++) if (_annotRegistry[i].text === text) return;
-  _annotRegistry.push({text:text, anchorX:anchorX, anchorY:anchorY, side:side||'auto', stepIdx:stepIdx});
+// Drawing bounding box (outermost elements)
+var drawLeft = cx - crownHalfSpan;
+var drawRight = cx + crownHalfSpan;
+var drawTop = crownPeakY;
+var drawBot = baseBot;
+
+// Dimension row positions
+// BOTTOM horizontal rows (y positions below drawing)
+var botRow1 = drawBot + ROW_OFFSET;
+var botRow2 = botRow1 + ROW_SPACE;
+var botRow3 = botRow2 + ROW_SPACE;
+
+// RIGHT vertical rows (x positions right of drawing)
+var rtRow1 = drawRight + ROW_OFFSET;
+var rtRow2 = rtRow1 + ROW_SPACE;
+
+// LEFT vertical rows (x positions left of drawing)
+var ltRow1 = drawLeft - ROW_OFFSET;
+var ltRow2 = ltRow1 - ROW_SPACE;
+
+// HTML label elements
+var _dimLabels = [];
+var _lastDimStep = -1;
+
+function clearDimLabels() {
+  for (var i=0;i<_dimLabels.length;i++) _dimLabels[i].remove();
+  _dimLabels = [];
 }
 
-function layoutAnnotations(upToStep) {
-  if (upToStep === _lastAnnotStep) return;
-  _lastAnnotStep = upToStep;
-  
-  // Clear existing label elements
-  for (var i=0;i<_annotEls.length;i++) _annotEls[i].remove();
-  _annotEls = [];
-  
-  // Filter to visible annotations
-  var visible = [];
-  for (var i=0;i<_annotRegistry.length;i++) {
-    if (_annotRegistry[i].stepIdx <= upToStep) visible.push(_annotRegistry[i]);
-  }
-  
-  // Assign sides: auto = element left of cx → right gutter, else left
-  var leftLabels = [], rightLabels = [], centerLabels = [];
-  for (var i=0;i<visible.length;i++) {
-    var a = visible[i];
-    var side = a.side;
-    if (side === 'auto') side = a.anchorX < cx ? 'left' : 'right';
-    if (side === 'center') { centerLabels.push(a); continue; }
-    if (side === 'left') leftLabels.push(a);
-    else rightLabels.push(a);
-  }
-  
-  // Sort each gutter by anchorY
-  leftLabels.sort(function(a,b){return a.anchorY - b.anchorY;});
-  rightLabels.sort(function(a,b){return a.anchorY - b.anchorY;});
-  
+function addDimText(canvasX, canvasY, text, align) {
+  // Check duplicate
+  for (var i=0;i<_dimLabels.length;i++) if (_dimLabels[i]._t === text) return;
+  var el = document.createElement('div');
+  el._t = text;
   var s = window._hudScale || 1;
-  var r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0,width:W,height:H};
-  
-  // Gutter X positions (in canvas coords)
-  // Label zones: labels sit just outside the column edges
-  // On narrow screens they overlap dimension lines — acceptable for architectural style
-  var drawingLeft = colLx - colWidth/2;          // left column outer edge
-  var drawingRight = colRx + colWidth/2;         // right column outer edge
-  
-  // Layout left gutter — right-aligned, stacked top-to-bottom
-  var prevBottom = 0;
-  for (var i=0;i<leftLabels.length;i++) {
-    var a = leftLabels[i];
-    var labelY = Math.max(a.anchorY, prevBottom + LABEL_GAP);
-    prevBottom = labelY + LABEL_SIZE + 2;
-    
-    var el = document.createElement('div');
-    el.style.cssText = 'position:absolute;color:'+ANNOT_COLOR+';font-family:SF Mono,Fira Code,monospace;font-size:'+Math.round(LABEL_SIZE*s)+'px;white-space:nowrap;pointer-events:none;letter-spacing:0.5px;text-align:right;transform:translateX(-100%);';
-    el.style.left = (drawingLeft * s + r.left - 8*s) + 'px';
-    el.style.top = (labelY * s + r.top) + 'px';
-    el.textContent = a.text;
-    document.getElementById('hud').appendChild(el);
-    _annotEls.push(el);
-  }
-  
-  // Layout right gutter — left-aligned, stacked top-to-bottom
-  prevBottom = 0;
-  for (var i=0;i<rightLabels.length;i++) {
-    var a = rightLabels[i];
-    var labelY = Math.max(a.anchorY, prevBottom + LABEL_GAP);
-    prevBottom = labelY + LABEL_SIZE + 2;
-    
-    var el = document.createElement('div');
-    el.style.cssText = 'position:absolute;color:'+ANNOT_COLOR+';font-family:SF Mono,Fira Code,monospace;font-size:'+Math.round(LABEL_SIZE*s)+'px;white-space:nowrap;pointer-events:none;letter-spacing:0.5px;';
-    el.style.left = (drawingRight * s + r.left + 8*s) + 'px';
-    el.style.top = (labelY * s + r.top) + 'px';
-    el.textContent = a.text;
-    document.getElementById('hud').appendChild(el);
-    _annotEls.push(el);
-  }
-  
-  // Center labels — centered horizontally at their anchor position
-  for (var i=0;i<centerLabels.length;i++) {
-    var a = centerLabels[i];
-    var el = document.createElement('div');
-    el.style.cssText = 'position:absolute;color:'+ANNOT_COLOR+';font-family:SF Mono,Fira Code,monospace;font-size:'+Math.round(LABEL_SIZE*s)+'px;white-space:nowrap;pointer-events:none;letter-spacing:0.5px;transform:translateX(-50%);';
-    el.style.left = (a.anchorX * s + r.left) + 'px';
-    el.style.top = (a.anchorY * s + r.top) + 'px';
-    el.textContent = a.text;
-    document.getElementById('hud').appendChild(el);
-    _annotEls.push(el);
-  }
+  var r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
+  el.style.cssText = 'position:absolute;color:#8a8278;font-family:SF Mono,Fira Code,monospace;font-size:'+Math.max(9,Math.round(ANNOT_FONT*s))+'px;white-space:nowrap;pointer-events:none;letter-spacing:0.3px;';
+  el.style.left = (canvasX * s + r.left) + 'px';
+  el.style.top = (canvasY * s + r.top) + 'px';
+  if (align === 'center') el.style.transform = 'translateX(-50%)';
+  else if (align === 'right') el.style.transform = 'translateX(-100%)';
+  el.textContent = text;
+  document.getElementById('hud').appendChild(el);
+  _dimLabels.push(el);
 }
 
-// Draw dimension lines + register labels for each step
+// Draw a horizontal dimension with extension lines + ticks + centered text
+function drawHDim(x1, x2, rowY, label, stepIdx, curStep) {
+  if (stepIdx > curStep) return;
+  brush.set('2H','#b0a898',0.4);
+  // Extension lines (vertical, from near object down to row)
+  brush.line(x1, drawBot + DIM_GAP, x1, rowY + EXT_OVERSHOOT);
+  brush.line(x2, drawBot + DIM_GAP, x2, rowY + EXT_OVERSHOOT);
+  // Dimension line (horizontal at row)
+  brush.line(x1, rowY, x2, rowY);
+  // Ticks at ends
+  brush.line(x1, rowY - TICK_SIZE, x1, rowY + TICK_SIZE);
+  brush.line(x2, rowY - TICK_SIZE, x2, rowY + TICK_SIZE);
+  // Label centered on dim line
+  addDimText((x1+x2)/2, rowY - ANNOT_FONT - 4, label, 'center');
+}
+
+// Draw a vertical dimension with extension lines + ticks + text
+function drawVDim(y1, y2, rowX, label, stepIdx, curStep, side) {
+  if (stepIdx > curStep) return;
+  brush.set('2H','#b0a898',0.4);
+  var edgeX = (side === 'left') ? drawLeft : drawRight;
+  // Extension lines (horizontal, from near object to row)
+  brush.line(edgeX + (side==='left'?-DIM_GAP:DIM_GAP), y1, rowX + (side==='left'?-EXT_OVERSHOOT:EXT_OVERSHOOT), y1);
+  brush.line(edgeX + (side==='left'?-DIM_GAP:DIM_GAP), y2, rowX + (side==='left'?-EXT_OVERSHOOT:EXT_OVERSHOOT), y2);
+  // Dimension line (vertical at row)
+  brush.line(rowX, y1, rowX, y2);
+  // Ticks
+  brush.line(rowX - TICK_SIZE, y1, rowX + TICK_SIZE, y1);
+  brush.line(rowX - TICK_SIZE, y2, rowX + TICK_SIZE, y2);
+  // Label beside dim line
+  var textX = (side === 'left') ? rowX - 6 : rowX + 6;
+  var textAlign = (side === 'left') ? 'right' : 'left';
+  addDimText(textX, (y1+y2)/2 - ANNOT_FONT/2, label, textAlign);
+}
+
+// Radius callout inside the drawing (leader + circle at center)
+function drawRCallout(cx_, cy_, px, py, label, stepIdx, curStep) {
+  if (stepIdx > curStep) return;
+  brush.set('2H','#b0a898',0.4);
+  brush.line(cx_, cy_, px, py);
+  brush.circle(cx_, cy_, 4);
+  // Label at midpoint
+  addDimText((cx_+px)/2 + 12, (cy_+py)/2 - ANNOT_FONT - 2, label);
+}
+
 function drawAnnotations(stepIdx) {
-  brush.set('2H','#a09888',0.5);
-  
-  if (stepIdx >= 3) {
-    drawDimLine(colLx-colWidth/2, colBot-15, colLx+colWidth/2, colBot-15, null, 'below');
-    registerAnnot('U/\u03c6\u00b2 = '+colWidth.toFixed(0), colLx, colBot+20, 'center', 3);
+  // Clear and rebuild labels when step changes
+  if (stepIdx !== _lastDimStep) {
+    clearDimLabels();
+    _lastDimStep = stepIdx;
   }
-  if (stepIdx >= 4) {
-    drawDimLine(colRx+colWidth/2+15, colBot, colRx+colWidth/2+15, colTop, null, 'right');
-    registerAnnot(Math.round(colBot-colTop)+'px', colRx+colWidth/2, (colTop+colBot)/2, 'right', 4);
-    registerAnnot('w = U/\u03c6\u00b2', colLx-colWidth/2, (colTop+colBot)/2, 'left', 4);
-  }
-  if (stepIdx >= 5) {
-    drawDimLine(colLx-capW*0.62-10, capBot, colLx-capW*0.62-10, capTop, null, 'left');
-    registerAnnot('colW\u00d7\u03c6', colLx-capW*0.62, (capTop+capBot)/2, 'left', 5);
-  }
-  if (stepIdx >= 7) {
-    drawDimLine(cx-halfSpan, springY+20, cx+halfSpan, springY+20, null, 'below');
-    registerAnnot('2U = '+archSpan.toFixed(0), cx, springY+35, 'center', 7);
-    drawRadiusCallout(C2x, springY, cx, peakY, null);
-    registerAnnot('R = 2U', cx+20, (springY+peakY)/2, 'right', 7);
-    drawDimLine(cx+halfSpan+35, springY, cx+halfSpan+35, peakY, null, 'right');
-    registerAnnot('H = U\u221a3 = '+archH.toFixed(0), cx+halfSpan, (springY+peakY)/2+20, 'right', 7);
-    registerAnnot('spring @ H/\u03c6', cx+halfSpan, springY+40, 'right', 7);
-  }
-  if (stepIdx >= 8) {
-    drawDimLine(bandR+18, bandBot_y, bandR+18, bandTop_y, null, 'right');
-    registerAnnot('U/\u03c6 = '+bandHeight_v.toFixed(0), bandR, (bandBot_y+bandTop_y)/2, 'right', 8);
-  }
+
+  // === BOTTOM HORIZONTAL DIMENSIONS ===
+  // Row 1 (closest): column width, base width
+  drawHDim(colLx-colWidth/2, colLx+colWidth/2, botRow1, 'U/\u03c6\u00b2 = '+colWidth.toFixed(0), 3, stepIdx);
+
+  // Row 2: arch span
+  drawHDim(cx-halfSpan, cx+halfSpan, botRow2, '2U = '+archSpan.toFixed(0), 7, stepIdx);
+
+  // Row 3: crown span (outermost = largest)
+  drawHDim(cx-crownHalfSpan, cx+crownHalfSpan, botRow3, 'bandW\u00d7\u221a\u03c6 = '+crownSpan.toFixed(0), 9, stepIdx);
+
+  // === RIGHT VERTICAL DIMENSIONS ===
+  // Row 1: capital height, band height
+  drawVDim(capTop, capBot, rtRow1, 'colW\u00d7\u03c6 = '+capHeight.toFixed(0), 5, stepIdx, 'right');
+  drawVDim(bandTop_y, bandBot_y, rtRow1, 'U/\u03c6 = '+bandHeight_v.toFixed(0), 8, stepIdx, 'right');
+
+  // Row 2: arch height, column height
+  drawVDim(peakY, springY, rtRow2, 'U\u221a3 = '+archH.toFixed(0), 7, stepIdx, 'right');
+  drawVDim(colTop, colBot, rtRow2, Math.round(colBot-colTop)+'px', 4, stepIdx, 'right');
+
+  // === INSIDE: Radius callouts ===
+  drawRCallout(C2x, springY, cx, peakY, 'R = 2U', 7, stepIdx);
   if (stepIdx >= 9) {
     var crMidX = cx - crownHalfSpan*0.5;
     var crMidDx = crMidX - crownC2x;
     var crMidY = crownSpringY - Math.sqrt(Math.max(0, crownR*crownR - crMidDx*crMidDx));
-    drawRadiusCallout(crownC2x, crownSpringY, crMidX, crMidY, null);
-    registerAnnot('R = span/\u221a2', crownC2x, (crownSpringY+crMidY)/2, 'left', 9);
-    drawDimLine(cx-crownHalfSpan, crownSpringY+12, cx+crownHalfSpan, crownSpringY+12, null, 'below');
-    registerAnnot('bandW\u00d7\u221a\u03c6 = '+crownSpan.toFixed(0), cx, crownSpringY+25, 'center', 9);
+    drawRCallout(crownC2x, crownSpringY, crMidX, crMidY, 'R = span/\u221a2', 9, stepIdx);
   }
+
+  // === STAR annotation (inside crown) ===
   if (stepIdx >= 10) {
-    brush.set('2H','#a09888',0.5);
-    var sAngle = -Math.PI/2;
-    brush.line(starCx, starCy, starCx + starR_val*Math.cos(sAngle), starCy + starR_val*Math.sin(sAngle));
+    brush.set('2H','#b0a898',0.4);
+    brush.line(starCx, starCy, starCx, starCy - starR_val);
     brush.circle(starCx, starCy, 4);
-    registerAnnot('r = '+starR_val.toFixed(0)+'  {12/5}', starCx, starCy-starR_val-35, 'center', 10);
-    registerAnnot('r, r/\u03c6, r/\u03c6\u00b2, r/\u03c6\u00b3', starCx, starCy-starR_val-15, 'center', 10);
+    addDimText(starCx, starCy - starR_val - ANNOT_FONT - 6, '{12/5}  r='+starR_val.toFixed(0), 'center');
+    addDimText(starCx, starCy - starR_val - 2, 'r, r/\u03c6, r/\u03c6\u00b2, r/\u03c6\u00b3', 'center');
   }
+
+  // === BASE UNIT LEGEND (bottom left) ===
   if (stepIdx >= 0) {
-    registerAnnot('U = W/(2\u03c6+2) = '+U.toFixed(1), 30, baseBot+20, 'center', 0);
-    registerAnnot('\u03c6=1.618  \u221a3=1.732  \u221a2=1.414', 30, baseBot+40, 'center', 0);
+    addDimText(20, botRow3 + ROW_SPACE, 'U = W/(2\u03c6+2) = '+U.toFixed(1));
+    addDimText(20, botRow3 + ROW_SPACE + ANNOT_FONT + 4, '\u03c6=1.618  \u221a3=1.732  \u221a2=1.414');
   }
-  
-  // Layout all visible labels
-  layoutAnnotations(stepIdx);
 }
+
 
 // =============================================
 // PROGRESSIVE LINE DRAWING
