@@ -91,7 +91,7 @@ var bandL = colLx - colWidth/2 - bandOverhang;
 var bandR = colRx + colWidth/2 + bandOverhang;
 var bandW = bandR - bandL;
 var crownSpan = bandW * Math.sqrt(PHI), crownHalfSpan = crownSpan/2;
-var margin_top = U/PHI/PHI, margin_bot = margin_top;
+var margin_top = U/PHI/PHI, margin_bot = margin_top + 55; // extra 55px at bottom for annotation rows
 var baseHeight = colWidth/PHI;
 var baseBot = H - margin_bot, baseTop = baseBot - baseHeight;
 var compH = baseTop - margin_top;
