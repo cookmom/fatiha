@@ -42,7 +42,7 @@ var outerC2x = cx + outerDomeHalfSpan;
 // Outer frame — encompasses the dome
 var outerFrameL = cx - outerDomeHalfSpan - 50;
 var outerFrameR = cx + outerDomeHalfSpan + 50;
-var outerFrameT = outerDomePeakY - 60;
+var outerFrameT = outerDomePeakY - 500; // room for crown arch above
 var outerFrameB = frameB + 40;
 
 function archY(x) {
@@ -211,70 +211,10 @@ function setup() {
   brush.noFill();
   
   // =============================================
-  // LAYER 3: 12-FOLD STAR PATTERN (cream lines on blue)
-  // Formula: {12/5} star polygon
-  // P_k = (cx + r * cos(k*π/6 - π/2), cy + r * sin(k*π/6 - π/2))
-  // Connect P_k to P_{(k+5) mod 12}
-  // =============================================
-  var starCx = cx;
-  var starCy = outerDomePeakY + outerDomeH * 0.35; // inside the DOME top
-  
-  brush.set('2H', '#e8e0d0', 0.6); // cream pencil on blue
-  
-  // Multiple scale layers — scaled to fit dome
-  var scales = [200, 130, 80, 45];
-  
-  for (var si = 0; si < scales.length; si++) {
-    var r = scales[si];
-    
-    // 12 vertices
-    var verts = [];
-    for (var k = 0; k < 12; k++) {
-      var angle = k * Math.PI / 6 - Math.PI / 2;
-      verts.push([starCx + r * Math.cos(angle), starCy + r * Math.sin(angle)]);
-    }
-    
-    // {12/5} connections — each vertex to vertex+5
-    for (var k = 0; k < 12; k++) {
-      var k2 = (k + 5) % 12;
-      brush.line(verts[k][0], verts[k][1], verts[k2][0], verts[k2][1]);
-    }
-    
-    // {12/4} connections — each vertex to vertex+4 (secondary pattern)
-    if (si < 2) {
-      brush.set('2H', '#d8d0c0', 0.4);
-      for (var k = 0; k < 12; k++) {
-        var k2 = (k + 4) % 12;
-        brush.line(verts[k][0], verts[k][1], verts[k2][0], verts[k2][1]);
-      }
-      brush.set('2H', '#e8e0d0', 0.6);
-    }
-    
-    // Dodecagon outline
-    if (si === 0) {
-      for (var k = 0; k < 12; k++) {
-        var k2 = (k + 1) % 12;
-        brush.line(verts[k][0], verts[k][1], verts[k2][0], verts[k2][1]);
-      }
-    }
-    
-    // Radial lines from center
-    if (si === 0) {
-      brush.set('2H', '#d0c8b8', 0.3);
-      for (var k = 0; k < 12; k++) {
-        brush.line(starCx, starCy, verts[k][0], verts[k][1]);
-      }
-      brush.set('2H', '#e8e0d0', 0.6);
-    }
-  }
-  
-  // Inner concentric circles
-  brush.set('2H', '#d8d0c0', 0.4);
-  brush.circle(starCx, starCy, 40);
-  brush.circle(starCx, starCy, 100);
+  // (Star pattern moved to LAYER 6 — drawn LAST on top of everything)
   
   // =============================================
-  // LAYER 4: ARCH OUTLINE (pencil)
+  // LAYER 3: ARCH OUTLINE (pencil)
   // =============================================
   brush.noFill();
   brush.set('2H', '#8a8070', 1.8);
@@ -329,6 +269,87 @@ function setup() {
     brush.line(bandX1, y, bandX2, y + bandStep/2);
     brush.line(bandX2, y + bandStep/2, bandX1, y + bandStep);
   }
+  // =============================================
+  // LAYER 6: 12-FOLD STAR PATTERN — TOPMOST LAYER
+  // Formula: {12/5} star polygon
+  // P_k = (cx + r * cos(k*π/6 - π/2), cy + r * sin(k*π/6 - π/2))
+  // Connect P_k to P_{(k+5) mod 12}
+  // =============================================
+  // Star sits ABOVE the dome peak, in its own space
+  var starCx = cx;
+  var starCy = outerDomePeakY - 180; // well above the dome peak
+  
+  // THIRD ARCH — wraps around JUST the star pattern
+  var crownSpan = 500;
+  var crownHalfSpan = crownSpan / 2;
+  var crownR = crownSpan;
+  var crownSpringY = outerDomePeakY - 30;
+  var crownH = crownSpan * Math.sqrt(3) / 2;
+  var crownPeakY = crownSpringY - crownH;
+  var crownC1x = cx - crownHalfSpan, crownC2x = cx + crownHalfSpan;
+  
+  // Draw crown arch
+  brush.set('2H', '#8a8070', 1.5);
+  var crownPtsL = [];
+  for (var i = 0; i <= 30; i++) {
+    var t = i/30;
+    var x = (cx - crownHalfSpan) + crownHalfSpan * t;
+    var dx = x - crownC2x;
+    var y = crownSpringY - Math.sqrt(Math.max(0, crownR*crownR - dx*dx));
+    crownPtsL.push([x, y, 0.3 + 0.7 * Math.sin(Math.PI * t)]);
+  }
+  brush.spline(crownPtsL, 0.3);
+  var crownPtsR = [];
+  for (var i = 0; i <= 30; i++) {
+    var t = i/30;
+    var x = cx + crownHalfSpan * t;
+    var dx = x - crownC1x;
+    var y = crownSpringY - Math.sqrt(Math.max(0, crownR*crownR - dx*dx));
+    crownPtsR.push([x, y, 0.3 + 0.7 * Math.sin(Math.PI * t)]);
+  }
+  brush.spline(crownPtsR, 0.3);
+  
+  // Crown vertical sides
+  brush.line(cx - crownHalfSpan, crownSpringY, cx - crownHalfSpan, outerDomePeakY + 10);
+  brush.line(cx + crownHalfSpan, crownSpringY, cx + crownHalfSpan, outerDomePeakY + 10);
+  
+  brush.set('2H', '#e8e0d0', 0.6);
+  
+  var scales = [200, 130, 80, 45];
+  for (var si = 0; si < scales.length; si++) {
+    var r = scales[si];
+    var verts = [];
+    for (var k = 0; k < 12; k++) {
+      var angle = k * Math.PI / 6 - Math.PI / 2;
+      verts.push([starCx + r * Math.cos(angle), starCy + r * Math.sin(angle)]);
+    }
+    for (var k = 0; k < 12; k++) {
+      var k2 = (k + 5) % 12;
+      brush.line(verts[k][0], verts[k][1], verts[k2][0], verts[k2][1]);
+    }
+    if (si < 2) {
+      brush.set('2H', '#d8d0c0', 0.4);
+      for (var k = 0; k < 12; k++) {
+        var k2 = (k + 4) % 12;
+        brush.line(verts[k][0], verts[k][1], verts[k2][0], verts[k2][1]);
+      }
+      brush.set('2H', '#e8e0d0', 0.6);
+    }
+    if (si === 0) {
+      for (var k = 0; k < 12; k++) {
+        var k2 = (k + 1) % 12;
+        brush.line(verts[k][0], verts[k][1], verts[k2][0], verts[k2][1]);
+      }
+      brush.set('2H', '#d0c8b8', 0.3);
+      for (var k = 0; k < 12; k++) {
+        brush.line(starCx, starCy, verts[k][0], verts[k][1]);
+      }
+      brush.set('2H', '#e8e0d0', 0.6);
+    }
+  }
+  brush.set('2H', '#d8d0c0', 0.4);
+  brush.circle(starCx, starCy, 40);
+  brush.circle(starCx, starCy, 100);
 }
 </script>
 </body>
