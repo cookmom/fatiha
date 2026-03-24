@@ -891,8 +891,36 @@ function draw() {
   // Annotations on top of everything
   drawAnnotations(activeStep - 1);
   
-  // Update HUD — reposition every frame to handle viewport shifts (Safari fullscreen)
+  // Update HUD — draw transition line between boxes, then snap
   if (activeStep !== lastHudStep) {
+    // Draw transition line from old box center to new box center
+    if (lastHudStep >= 0 && trackBox) {
+      var _s2 = window._hudScale || 1;
+      var _r2 = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
+      var oldB = STEPS[lastHudStep].bbox;
+      var newB = STEPS[activeStep].bbox;
+      var oldCx = (oldB[0]+oldB[2])/2*_s2 + _r2.left;
+      var oldCy = (oldB[1]+oldB[3])/2*_s2 + _r2.top;
+      var newCx = (newB[0]+newB[2])/2*_s2 + _r2.left;
+      var newCy = (newB[1]+newB[3])/2*_s2 + _r2.top;
+      var ln = document.createElement('div');
+      ln.style.cssText = 'position:absolute;pointer-events:none;z-index:5;';
+      var dx = newCx-oldCx, dy = newCy-oldCy;
+      var len = Math.sqrt(dx*dx+dy*dy);
+      var ang = Math.atan2(dy,dx)*180/Math.PI;
+      ln.style.left = oldCx+'px';
+      ln.style.top = oldCy+'px';
+      ln.style.width = len+'px';
+      ln.style.height = '1px';
+      ln.style.background = '#5a5248';
+      ln.style.transformOrigin = '0 0';
+      ln.style.transform = 'rotate('+ang+'deg)';
+      ln.style.opacity = '0.6';
+      ln.style.transition = 'opacity 0.5s ease';
+      document.getElementById('hud').appendChild(ln);
+      setTimeout(function(){ln.style.opacity='0';},300);
+      setTimeout(function(){ln.remove();},800);
+    }
     createTrackBox(STEPS[activeStep]);
     lastHudStep = activeStep;
   }
