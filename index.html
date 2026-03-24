@@ -194,8 +194,8 @@ function drawAngleArc(cx_,cy_,r,startA,endA) {
 // Reusable for any architectural composition
 // =============================================
 var GUTTER = U / PHI;                    // gutter width = U/φ
-var LABEL_GAP = U / (PHI*PHI*PHI);       // vertical gap between labels = U/φ³
-var LABEL_SIZE = Math.max(10, Math.round(U / (PHI*PHI*PHI))); // font size = U/φ³
+var LABEL_GAP = U / (PHI*PHI*PHI*PHI);   // vertical gap = U/φ⁴ (matches font size)
+var LABEL_SIZE = Math.round(U / (PHI*PHI*PHI*PHI)); // font size = U/φ⁴ ≈ 30px canvas → ~11px on phone
 var ANNOT_COLOR = '#7a7268';
 
 // Annotation registry — all labels registered here, laid out once per step change
@@ -771,13 +771,11 @@ function setup() {
   frameRate(FPS);
   window._hudScale = c.elt.getBoundingClientRect().width / W;
   window._canvasEl = c.elt;
-  // Snapshot system — cache completed steps as an image
-  window._snapshot = null;
-  window._snapshotStep = -1;
 }
 
 function draw() {
   translate(-width/2, -height/2);
+  background(242, 234, 218);
   
   var f = frameCount - 1;
   if (f >= totalAnimFrames) f = totalAnimFrames - 1;
@@ -788,37 +786,19 @@ function draw() {
     if (f >= frameStarts[i]) { activeStep = i; break; }
   }
   
-  // When a new step starts, snapshot everything completed so far
-  if (activeStep > 0 && activeStep !== window._snapshotStep + 1) {
-    // Need to build snapshot for this transition
-  }
-  if (activeStep > window._snapshotStep + 1) {
-    // Render all completed steps once into a snapshot
-    background(242, 234, 218);
-    for (var i = 0; i < activeStep; i++) STEPS[i].draw(1);
-    drawAnnotations(activeStep - 1);
-    window._snapshot = get(); // capture as p5 image
-    window._snapshotStep = activeStep - 1;
-  } else if (activeStep > 0 && window._snapshotStep < activeStep - 1) {
-    // First frame of new step — take snapshot
-    background(242, 234, 218);
-    for (var i = 0; i < activeStep; i++) STEPS[i].draw(1);
-    drawAnnotations(activeStep - 1);
-    window._snapshot = get();
-    window._snapshotStep = activeStep - 1;
-  }
-  
-  // Draw: snapshot (fast) + current partial step
-  background(242, 234, 218);
-  if (window._snapshot && activeStep > 0) {
-    image(window._snapshot, 0, 0);
+  // Draw ALL completed steps at full progress
+  for (var i = 0; i < activeStep; i++) {
+    STEPS[i].draw(1);
   }
   
   // Draw current step at partial progress
   var stepFrame = f - frameStarts[activeStep];
-  var stepDurFrames = frameEnds[activeStep] - frameStarts[activeStep];
+  var stepDurFrames = Math.max(1, frameEnds[activeStep] - frameStarts[activeStep]);
   var progress = Math.min(1, stepFrame / stepDurFrames);
   var tip = STEPS[activeStep].draw(progress);
+  
+  // Annotations on top of everything
+  drawAnnotations(activeStep - 1);
   
   // Update HUD
   if (activeStep !== lastHudStep) {
@@ -830,10 +810,6 @@ function draw() {
   
   // Done
   if (f >= totalAnimFrames - 1) {
-    // Final frame — draw everything clean
-    background(242, 234, 218);
-    for (var i = 0; i < STEPS.length; i++) STEPS[i].draw(1);
-    drawAnnotations(STEPS.length - 1);
     noLoop();
     if (pencilDot) pencilDot.style.display = 'none';
   }
