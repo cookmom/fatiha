@@ -28,12 +28,16 @@ var frameR = cx + halfSpan + 80;
 var frameT = peakY - 120;
 var frameB = H - 80;
 
-// Outer dome — wraps OUTSIDE the current frame
-var outerDomeSpan = (frameR - frameL) + 100; // wider than inner frame
+// Outer dome — POINTED arch (same style as inner, just bigger)
+var outerDomeSpan = (frameR - frameL) + 100;
 var outerDomeHalfSpan = outerDomeSpan / 2;
-var outerDomeR = outerDomeSpan / 2; // semicircle
-var outerDomeSpringY = frameT + 40; // springs from top of inner frame area
-var outerDomePeakY = outerDomeSpringY - outerDomeR;
+var outerDomeR = outerDomeSpan; // R = S for equilateral pointed arch
+var outerDomeSpringY = springY - 50;
+var outerDomeH = outerDomeSpan * Math.sqrt(3) / 2;
+var outerDomePeakY = outerDomeSpringY - outerDomeH;
+// Centers for outer pointed arch
+var outerC1x = cx - outerDomeHalfSpan;
+var outerC2x = cx + outerDomeHalfSpan;
 
 // Outer frame — encompasses the dome
 var outerFrameL = cx - outerDomeHalfSpan - 50;
@@ -89,14 +93,28 @@ function setup() {
   brush.set('2H', '#a8a090', 1.0);
   brush.rect(outerFrameL + 20, outerFrameT + 20, outerFrameR - outerFrameL - 40, outerFrameB - outerFrameT - 40);
   
-  // Dome arc (semicircle) — outside the inner frame
+  // Dome arc — POINTED arch (equilateral, same style as inner)
   brush.set('2H', '#8a8070', 2.0);
-  var domePts = [];
-  for (var i = 0; i <= 50; i++) {
-    var angle = Math.PI + (i / 50) * Math.PI;
-    domePts.push([cx + outerDomeR * Math.cos(angle), outerDomeSpringY + outerDomeR * Math.sin(angle), 0.3 + 0.7 * Math.sin(Math.PI * i/50)]);
+  // Left arc of outer pointed arch
+  var domePtsL = [];
+  for (var i = 0; i <= 30; i++) {
+    var t = i / 30;
+    var x = (cx - outerDomeHalfSpan) + outerDomeHalfSpan * t;
+    var dx = x - outerC2x;
+    var y = outerDomeSpringY - Math.sqrt(Math.max(0, outerDomeR*outerDomeR - dx*dx));
+    domePtsL.push([x, y, 0.3 + 0.7 * Math.sin(Math.PI * t)]);
   }
-  brush.spline(domePts, 0.3);
+  brush.spline(domePtsL, 0.3);
+  // Right arc
+  var domePtsR = [];
+  for (var i = 0; i <= 30; i++) {
+    var t = i / 30;
+    var x = cx + outerDomeHalfSpan * t;
+    var dx = x - outerC1x;
+    var y = outerDomeSpringY - Math.sqrt(Math.max(0, outerDomeR*outerDomeR - dx*dx));
+    domePtsR.push([x, y, 0.3 + 0.7 * Math.sin(Math.PI * t)]);
+  }
+  brush.spline(domePtsR, 0.3);
   
   // Dome vertical sides down to bottom
   brush.line(cx - outerDomeHalfSpan, outerDomeSpringY, cx - outerDomeHalfSpan, outerFrameB - 25);
@@ -199,12 +217,12 @@ function setup() {
   // Connect P_k to P_{(k+5) mod 12}
   // =============================================
   var starCx = cx;
-  var starCy = springY - archH * 0.25; // center of arch interior
+  var starCy = outerDomePeakY + outerDomeH * 0.35; // inside the DOME top
   
   brush.set('2H', '#e8e0d0', 0.6); // cream pencil on blue
   
-  // Multiple scale layers for dense fill
-  var scales = [280, 180, 110, 60];
+  // Multiple scale layers — scaled to fit dome
+  var scales = [200, 130, 80, 45];
   
   for (var si = 0; si < scales.length; si++) {
     var r = scales[si];
