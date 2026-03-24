@@ -294,35 +294,35 @@ function drawAnnotations(stepIdx) {
 
   // === BOTTOM HORIZONTAL DIMENSIONS (2 rows) ===
   // Row 1: column width (smallest, closest)
-  drawHDim(colLx-colWidth/2, colLx+colWidth/2, botRow1, 'U/\u03c6\u00b2 = '+colWidth.toFixed(0), 4, stepIdx);
+  drawHDim(colLx-colWidth/2, colLx+colWidth/2, botRow1, 'U/\u03c6\u00b2 = '+colWidth.toFixed(0), 3, stepIdx);
   // Row 2: arch span (larger, further)
-  drawHDim(cx-halfSpan, cx+halfSpan, botRow2, '2U = '+archSpan.toFixed(0), 8, stepIdx);
+  drawHDim(cx-halfSpan, cx+halfSpan, botRow2, '2U = '+archSpan.toFixed(0), 7, stepIdx);
 
   // Crown span — centered text inside the band area (no room for bottom row 3)
-  if (stepIdx >= 10) {
+  if (stepIdx >= 9) {
     addDimText(cx, crownSpringY + 6, 'crown = bandW\u00d7\u221a\u03c6 = '+crownSpan.toFixed(0), 'center');
   }
 
   // === LEFT VERTICAL DIMENSIONS (all on left side) ===
   // Row 1 (closest): capital height, band height
-  drawVDim(capTop, capBot, ltRow1, 'colW\u00d7\u03c6', 6, stepIdx, 'left');
-  drawVDim(bandTop_y, bandBot_y, ltRow1, 'U/\u03c6', 9, stepIdx, 'left');
+  drawVDim(capTop, capBot, ltRow1, 'colW\u00d7\u03c6', 5, stepIdx, 'left');
+  drawVDim(bandTop_y, bandBot_y, ltRow1, 'U/\u03c6', 8, stepIdx, 'left');
   // Row 2: column height
-  drawVDim(colTop, colBot, ltRow2, Math.round(colBot-colTop)+'px', 5, stepIdx, 'left');
+  drawVDim(colTop, colBot, ltRow2, Math.round(colBot-colTop)+'px', 4, stepIdx, 'left');
   // Row 3: arch height (largest, outermost)
-  drawVDim(peakY, springY, ltRow3, 'U\u221a3 = '+archH.toFixed(0), 8, stepIdx, 'left');
+  drawVDim(peakY, springY, ltRow3, 'U\u221a3 = '+archH.toFixed(0), 7, stepIdx, 'left');
 
   // === INSIDE: Radius callouts ===
-  drawRCallout(C2x, springY, cx, peakY, 'R = 2U', 8, stepIdx);
-  if (stepIdx >= 10) {
+  drawRCallout(C2x, springY, cx, peakY, 'R = 2U', 7, stepIdx);
+  if (stepIdx >= 9) {
     var crMidX = cx - crownHalfSpan*0.5;
     var crMidDx = crMidX - crownC2x;
     var crMidY = crownSpringY - Math.sqrt(Math.max(0, crownR*crownR - crMidDx*crMidDx));
-    drawRCallout(crownC2x, crownSpringY, crMidX, crMidY, 'R = span/\u221a2', 10, stepIdx);
+    drawRCallout(crownC2x, crownSpringY, crMidX, crMidY, 'R = span/\u221a2', 9, stepIdx);
   }
 
   // === STAR annotation (inside crown) ===
-  if (stepIdx >= 11) {
+  if (stepIdx >= 10) {
     brush.set('2H','#b0a898',0.4);
     brush.line(starCx, starCy, starCx, starCy - starR_val);
     brush.circle(starCx, starCy, 4);
@@ -404,33 +404,7 @@ var bandMidY = (bandBot_y+bandTop_y)/2;
 for(var i=0;i<=60;i++){var t=i/60;var x=bandL+50+(bandR-bandL-100)*t;calligPts.push([x,bandMidY+Math.sin(t*Math.PI*9)*10+Math.sin(t*Math.PI*3.5)*6,0.3+0.7*Math.abs(Math.sin(t*Math.PI*5))]);}
 
 var STEPS = [
-  // 0: Parchment wash — aged manuscript feel
-  { name:'PARCHMENT', formula:'coffee wash — manuscript ground', dur:0.3,
-    bbox:[0,0,W,H],
-    draw: function(p) {
-      if (p >= 0) {
-        // Base warm wash — uneven, organic
-        randomSeed(2001);
-        brush.noStroke();
-        brush.fill('#d4c4a8', 18);
-        brush.fillBleed(0.02); brush.fillTexture(0.1, 0.1);
-        brush.rect(20, 20, W-40, H-40);
-        brush.noFill();
-        // Darker pooling at edges (aged paper darkens at margins)
-        randomSeed(2002);
-        brush.fill('#c0a880', 14);
-        brush.fillBleed(0.03); brush.fillTexture(0.15, 0.1);
-        brush.rect(10, 10, W*0.35, H-20);  // left edge darker
-        brush.noFill();
-        randomSeed(2003);
-        brush.fill('#b8a070', 12);
-        brush.fillBleed(0.03); brush.fillTexture(0.1, 0.15);
-        brush.rect(10, H*0.65, W-20, H*0.35-10);  // bottom edge darker
-        brush.noFill();
-      }
-      return [cx, H/2];
-    }},
-  // 1: Ground line
+  // 0: Ground line
   { name:'GROUND LINE', panelPos:'tl', formula:'y = H − U/φ²', dur:0.53,
     bbox:[bandL-10,baseBot-15,bandR+10,baseBot+15],
     draw: function(p) {
@@ -795,7 +769,7 @@ var STEPS = [
 
 // Compute frame timeline — pauses between pencil steps, no pause between washes
 var PAUSE_S = 0.2;
-var WASH_START = 12; // step index where washes begin (shifted +1 for parchment step)
+var WASH_START = 11; // step index where washes begin
 var frameStarts = [], frameEnds = [];
 var f = 0;
 for (var i = 0; i < STEPS.length; i++) {
