@@ -71,13 +71,7 @@ function setup() {
   // OUTERMOST FRAME + DOME (wraps around everything)
   // =============================================
   
-  // Outer rectangular frame
-  brush.set('2H', '#9a9080', 1.8);
-  brush.rect(outerFrameL, outerFrameT, outerFrameR - outerFrameL, outerFrameB - outerFrameT);
-  
-  // Second outer frame (inset)
-  brush.set('2H', '#a8a090', 1.0);
-  brush.rect(outerFrameL + 20, outerFrameT + 20, outerFrameR - outerFrameL - 40, outerFrameB - outerFrameT - 40);
+  // Outer frames REMOVED
   
   // Dome arc — POINTED arch (equilateral, same style as inner)
   brush.set('2H', '#8a8070', 2.0);
@@ -123,19 +117,7 @@ function setup() {
     }
   }
   
-  // Outer border band (zigzag around the outer frame)
-  brush.set('2H', '#b0a898', 0.4);
-  var obStep = 25;
-  // Top
-  for (var x = outerFrameL + 25; x < outerFrameR - 25; x += obStep) {
-    brush.line(x, outerFrameT + 12, x + obStep/2, outerFrameT + 22);
-    brush.line(x + obStep/2, outerFrameT + 22, x + obStep, outerFrameT + 12);
-  }
-  // Bottom
-  for (var x = outerFrameL + 25; x < outerFrameR - 25; x += obStep) {
-    brush.line(x, outerFrameB - 22, x + obStep/2, outerFrameB - 12);
-    brush.line(x + obStep/2, outerFrameB - 12, x + obStep, outerFrameB - 22);
-  }
+  // Outer border bands REMOVED (no frame)
   
   // Column lines flanking arch
   brush.set('2H', '#b0a898', 1.2);
@@ -237,13 +219,13 @@ function setup() {
   // =============================================
   // Star sits ABOVE the dome peak, in its own space
   var starCx = cx;
-  var starCy = outerDomePeakY - 180; // well above the dome peak
+  var starCy = outerDomePeakY - 280; // higher above the dome peak
   
   // THIRD ARCH — wraps around JUST the star pattern
   var crownSpan = 500;
   var crownHalfSpan = crownSpan / 2;
   var crownR = crownSpan;
-  var crownSpringY = outerDomePeakY - 30;
+  var crownSpringY = outerDomePeakY - 130; // higher
   var crownH = crownSpan * Math.sqrt(3) / 2;
   var crownPeakY = crownSpringY - crownH;
   var crownC1x = cx - crownHalfSpan, crownC2x = cx + crownHalfSpan;
