@@ -771,6 +771,11 @@ function setup() {
   frameRate(FPS);
   window._hudScale = c.elt.getBoundingClientRect().width / W;
   window._canvasEl = c.elt;
+  // Recalculate on viewport change (Safari fullscreen, orientation)
+  window.addEventListener('resize', function() {
+    window._hudScale = c.elt.getBoundingClientRect().width / W;
+    _lastAnnotStep = -1; // force re-layout of annotations
+  });
 }
 
 function draw() {
@@ -800,10 +805,17 @@ function draw() {
   // Annotations on top of everything
   drawAnnotations(activeStep - 1);
   
-  // Update HUD
+  // Update HUD — reposition every frame to handle viewport shifts (Safari fullscreen)
   if (activeStep !== lastHudStep) {
     createTrackBox(STEPS[activeStep]);
     lastHudStep = activeStep;
+  }
+  if (trackBox) {
+    var _r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
+    var _s = window._hudScale || 1;
+    var _b = STEPS[activeStep].bbox, _pad = 12 * _s;
+    trackBox.style.left = (_b[0]*_s + _r.left - _pad) + 'px';
+    trackBox.style.top = (_b[1]*_s + _r.top - _pad) + 'px';
   }
   
   if (tip) updatePencilDot(tip[0], tip[1]);
