@@ -7,10 +7,10 @@
 <script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
 <style>
 * { margin:0; }
-body { background:#f2eada; overflow:hidden; display:flex; justify-content:center; align-items:center; height:100vh; height:100dvh; }
-canvas { object-fit:contain !important; }
+body { background:#f2eada; overflow:hidden; margin:0; padding:0; }
+canvas { object-fit:contain !important; display:block; }
 #hud {
-  position:absolute; top:0; left:0; width:100vw; height:100vh;
+  position:absolute; top:0; left:0; width:100vw; height:100%;
   pointer-events:none; font-family:'SF Mono','Fira Code',monospace;
   overflow:hidden;
 }
@@ -45,9 +45,9 @@ canvas { object-fit:contain !important; }
   border-radius:4px; padding:8px 12px;
   white-space:nowrap;
 }
-.hud-label { color:#3a3430; font-size:13px; font-weight:bold; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:4px; }
-.hud-formula { color:#5a5248; font-size:11px; margin-bottom:3px; }
-.hud-coords { color:#8a8278; font-size:11px; }
+.hud-label { color:#3a3430; font-weight:500; letter-spacing:0.3px; text-transform:uppercase; margin-bottom:3px; }
+.hud-formula { color:#5a5248; font-weight:normal; letter-spacing:0.3px; margin-bottom:2px; }
+.hud-coords { color:#8a8278; font-weight:normal; letter-spacing:0.3px; }
 .track-box.complete { animation: pulse-complete 0.5s ease; }
 @keyframes pulse-complete {
   0% { filter: drop-shadow(0 0 4px rgba(90,82,72,0.6)); }
@@ -91,7 +91,7 @@ var bandL = colLx - colWidth/2 - bandOverhang;
 var bandR = colRx + colWidth/2 + bandOverhang;
 var bandW = bandR - bandL;
 var crownSpan = bandW * Math.sqrt(PHI), crownHalfSpan = crownSpan/2;
-var margin_top = U/PHI/PHI, margin_bot = margin_top;
+var margin_top = U/PHI/PHI, margin_bot = margin_top + 55; // extra 55px at bottom for annotation rows
 var baseHeight = colWidth/PHI;
 var baseBot = H - margin_bot, baseTop = baseBot - baseHeight;
 var compH = baseTop - margin_top;
@@ -114,6 +114,229 @@ var crownC1x = cx-crownHalfSpan, crownC2x = cx+crownHalfSpan;
 var starCx = cx, starCy = crownPeakY + crownH/PHI;
 var starR_val = Math.min(crownH/(2*PHI), crownHalfSpan/(PHI*PHI));
 var bw = colWidth * PHI / ROOT2;
+
+// =============================================
+// ANNOTATION DRAWING — architectural dimension lines, radius callouts, labels
+// All drawn in pencil grey (#8a8278) at thin weight
+// =============================================
+function drawDimLine(x1,y1,x2,y2,label,side) {
+  var off = side === 'left' ? -35 : (side === 'right' ? 35 : 0);
+  var offY = side === 'above' ? -25 : (side === 'below' ? 25 : 0);
+  var ax1=x1+off, ay1=y1+offY, ax2=x2+off, ay2=y2+offY;
+  brush.set('2H','#a09888',0.5);
+  brush.line(ax1,ay1,ax2,ay2);
+  // Ticks at ends
+  var dx=ax2-ax1, dy=ay2-ay1;
+  var len=Math.sqrt(dx*dx+dy*dy);
+  if(len<1) return;
+  var nx=-dy/len*8, ny=dx/len*8;
+  brush.line(ax1-nx,ay1-ny,ax1+nx,ay1+ny);
+  brush.line(ax2-nx,ay2-ny,ax2+nx,ay2+ny);
+  // Leader lines
+  brush.set('2H','#b8b0a0',0.3);
+  brush.line(x1,y1,ax1,ay1);
+  brush.line(x2,y2,ax2,ay2);
+  // Text label at midpoint
+  if (label) {
+    var mx=(ax1+ax2)/2, my=(ay1+ay2)/2;
+    push();
+    fill(140,130,118);
+    noStroke();
+    
+    textSize(18);
+    textAlign(CENTER,CENTER);
+    if (Math.abs(dx) > Math.abs(dy)) {
+      // Horizontal line — text above
+      text(label, mx, my - 14);
+    } else {
+      // Vertical line — text rotated beside
+      translate(mx - 16, my);
+      rotate(-HALF_PI);
+      text(label, 0, 0);
+    }
+    pop();
+  }
+}
+
+function drawRadiusCallout(cx_,cy_,px,py,label) {
+  brush.set('2H','#a09888',0.5);
+  brush.line(cx_,cy_,px,py);
+  brush.circle(cx_,cy_,4);
+  // Label at midpoint of radius line
+  if (label) {
+    var mx=(cx_+px)/2, my=(cy_+py)/2;
+    push();
+    fill(140,130,118);
+    noStroke();
+    
+    textSize(16);
+    textAlign(LEFT,CENTER);
+    text(label, mx+10, my-8);
+    pop();
+  }
+}
+
+function drawAngleArc(cx_,cy_,r,startA,endA) {
+  // Small arc showing angle at springing point
+  brush.set('2H','#a09888',0.5);
+  var pts = [];
+  var steps = 12;
+  for (var i=0;i<=steps;i++) {
+    var t = i/steps;
+    var a = startA + (endA-startA)*t;
+    pts.push([cx_+r*Math.cos(a), cy_+r*Math.sin(a)]);
+  }
+  brush.spline(pts, 0.5);
+}
+
+// =============================================
+// ANNOTATION SYSTEM v2 — Architectural Convention
+// ISO 128 / ASME Y14.5 compliant dimension placement
+// All dimensions OUTSIDE the drawing in stacked parallel rows
+// =============================================
+
+// Row spacing derived from U
+var DIM_GAP = U / (PHI*PHI*PHI*PHI);     // gap between extension line and object
+var ROW_OFFSET = U / (PHI*PHI);           // first row distance from drawing edge
+var ROW_SPACE = U / (PHI*PHI*PHI);        // spacing between parallel dim rows
+var EXT_OVERSHOOT = U / (PHI*PHI*PHI*PHI); // extension line overshoot past dim line
+var TICK_SIZE = U / (PHI*PHI*PHI*PHI);    // tick mark length at dim line ends
+var ANNOT_FONT = Math.round(U / (PHI*PHI*PHI*PHI*1.15)); // text size in canvas px (2 hairs smaller)
+
+// Drawing bounding box (outermost elements)
+var drawBot = baseBot;
+
+// Dimension row positions — fit within canvas bounds
+// BOTTOM: 2 rows only (79px available), tight spacing
+var botRow1 = drawBot + ROW_OFFSET * 0.6;
+var botRow2 = botRow1 + ROW_SPACE * 0.7;
+
+// LEFT vertical rows (206px available to left column — plenty of room)
+var leftEdge = colLx - colWidth / 2;  // left column outer edge
+var ltRow1 = leftEdge - ROW_OFFSET;
+var ltRow2 = ltRow1 - ROW_SPACE;
+var ltRow3 = ltRow2 - ROW_SPACE;
+
+// HTML label elements
+var _dimLabels = [];
+var _lastDimStep = -1;
+
+function clearDimLabels() {
+  for (var i=0;i<_dimLabels.length;i++) _dimLabels[i].remove();
+  _dimLabels = [];
+}
+
+function addDimText(canvasX, canvasY, text, align) {
+  // Check duplicate
+  for (var i=0;i<_dimLabels.length;i++) if (_dimLabels[i]._t === text) return;
+  var el = document.createElement('div');
+  el._t = text;
+  var s = window._hudScale || 1;
+  var r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
+  el.style.cssText = 'position:absolute;color:#8a8278;font-family:SF Mono,Fira Code,monospace;font-size:'+Math.max(9,Math.round(ANNOT_FONT*s))+'px;white-space:nowrap;pointer-events:none;letter-spacing:0.3px;';
+  el.style.left = (canvasX * s + r.left) + 'px';
+  el.style.top = (canvasY * s + r.top) + 'px';
+  if (align === 'center') el.style.transform = 'translateX(-50%)';
+  else if (align === 'right') el.style.transform = 'translateX(-100%)';
+  el.textContent = text;
+  document.getElementById('hud').appendChild(el);
+  _dimLabels.push(el);
+}
+
+// Draw a horizontal dimension with extension lines + ticks + centered text
+function drawHDim(x1, x2, rowY, label, stepIdx, curStep) {
+  if (stepIdx > curStep) return;
+  brush.set('2H','#b0a898',0.4);
+  // Extension lines (vertical, from base down to row)
+  brush.line(x1, baseBot + DIM_GAP, x1, rowY + EXT_OVERSHOOT);
+  brush.line(x2, baseBot + DIM_GAP, x2, rowY + EXT_OVERSHOOT);
+  // Dimension line (horizontal at row)
+  brush.line(x1, rowY, x2, rowY);
+  // Ticks at ends
+  brush.line(x1, rowY - TICK_SIZE, x1, rowY + TICK_SIZE);
+  brush.line(x2, rowY - TICK_SIZE, x2, rowY + TICK_SIZE);
+  // Label centered on dim line
+  addDimText((x1+x2)/2, rowY - ANNOT_FONT - 4, label, 'center');
+}
+
+// Draw a vertical dimension with extension lines + ticks + text
+function drawVDim(y1, y2, rowX, label, stepIdx, curStep, side) {
+  if (stepIdx > curStep) return;
+  brush.set('2H','#b0a898',0.4);
+  // Extension lines (horizontal, from left column edge to row)
+  brush.line(leftEdge - DIM_GAP, y1, rowX - EXT_OVERSHOOT, y1);
+  brush.line(leftEdge - DIM_GAP, y2, rowX - EXT_OVERSHOOT, y2);
+  // Dimension line (vertical at row)
+  brush.line(rowX, y1, rowX, y2);
+  // Ticks
+  brush.line(rowX - TICK_SIZE, y1, rowX + TICK_SIZE, y1);
+  brush.line(rowX - TICK_SIZE, y2, rowX + TICK_SIZE, y2);
+  // Label left of dim line — but ensure it stays on canvas
+  addDimText(Math.max(5, rowX - 6), (y1+y2)/2 - ANNOT_FONT/2, label, 'left');
+}
+
+// Radius callout inside the drawing (leader + circle at center)
+function drawRCallout(cx_, cy_, px, py, label, stepIdx, curStep) {
+  if (stepIdx > curStep) return;
+  brush.set('2H','#b0a898',0.4);
+  brush.line(cx_, cy_, px, py);
+  brush.circle(cx_, cy_, 4);
+  // Label at midpoint
+  addDimText((cx_+px)/2 + 12, (cy_+py)/2 - ANNOT_FONT - 2, label);
+}
+
+function drawAnnotations(stepIdx) {
+  // Clear and rebuild labels when step changes
+  if (stepIdx !== _lastDimStep) {
+    clearDimLabels();
+    _lastDimStep = stepIdx;
+  }
+
+  // === BOTTOM HORIZONTAL DIMENSIONS (2 rows) ===
+  // Row 1: column width (smallest, closest)
+  drawHDim(colLx-colWidth/2, colLx+colWidth/2, botRow1, 'U/\u03c6\u00b2 = '+colWidth.toFixed(0), 3, stepIdx);
+  // Row 2: arch span (larger, further)
+  drawHDim(cx-halfSpan, cx+halfSpan, botRow2, '2U = '+archSpan.toFixed(0), 7, stepIdx);
+
+  // Crown span — centered text inside the band area (no room for bottom row 3)
+  if (stepIdx >= 9) {
+    addDimText(cx, crownSpringY + 6, 'crown = bandW\u00d7\u221a\u03c6 = '+crownSpan.toFixed(0), 'center');
+  }
+
+  // === LEFT VERTICAL DIMENSIONS (all on left side) ===
+  // Row 1 (closest): capital height, band height
+  drawVDim(capTop, capBot, ltRow1, 'colW\u00d7\u03c6', 5, stepIdx, 'left');
+  drawVDim(bandTop_y, bandBot_y, ltRow1, 'U/\u03c6', 8, stepIdx, 'left');
+  // Row 2: column height
+  drawVDim(colTop, colBot, ltRow2, Math.round(colBot-colTop)+'px', 4, stepIdx, 'left');
+  // Row 3: arch height (largest, outermost)
+  drawVDim(peakY, springY, ltRow3, 'U\u221a3 = '+archH.toFixed(0), 7, stepIdx, 'left');
+
+  // === INSIDE: Radius callouts ===
+  drawRCallout(C2x, springY, cx, peakY, 'R = 2U', 7, stepIdx);
+  if (stepIdx >= 9) {
+    var crMidX = cx - crownHalfSpan*0.5;
+    var crMidDx = crMidX - crownC2x;
+    var crMidY = crownSpringY - Math.sqrt(Math.max(0, crownR*crownR - crMidDx*crMidDx));
+    drawRCallout(crownC2x, crownSpringY, crMidX, crMidY, 'R = span/\u221a2', 9, stepIdx);
+  }
+
+  // === STAR annotation (inside crown) ===
+  if (stepIdx >= 10) {
+    brush.set('2H','#b0a898',0.4);
+    brush.line(starCx, starCy, starCx, starCy - starR_val);
+    brush.circle(starCx, starCy, 4);
+    addDimText(starCx, starCy - starR_val - ANNOT_FONT - 6, '{12/5}  r='+starR_val.toFixed(0), 'center');
+    addDimText(starCx, starCy - starR_val - 2, 'r, r/\u03c6, r/\u03c6\u00b2, r/\u03c6\u00b3', 'center');
+  }
+
+  // === BASE UNIT LEGEND (inside niche, bottom area over wash) ===
+  if (stepIdx >= 0) {
+    addDimText(cx, baseBot - ANNOT_FONT * 3, 'U = W/(2\u03c6+2) = '+U.toFixed(1), 'center');
+    addDimText(cx, baseBot - ANNOT_FONT * 1.5, '\u03c6=1.618  \u221a3=1.732  \u221a2=1.414', 'center');
+  }
+}
+
 
 // =============================================
 // PROGRESSIVE LINE DRAWING
@@ -182,14 +405,14 @@ for(var i=0;i<=60;i++){var t=i/60;var x=bandL+50+(bandR-bandL-100)*t;calligPts.p
 
 var STEPS = [
   // 0: Ground line
-  { name:'GROUND LINE', panelPos:'tl', formula:'y = H − U/φ²', dur:0.8,
+  { name:'GROUND LINE', panelPos:'tl', formula:'y = H − U/φ²', dur:0.53,
     bbox:[bandL-10,baseBot-15,bandR+10,baseBot+15],
     draw: function(p) {
       brush.set('2H','#5a5248',2.0);
       return drawSegments([{from:[bandL-10,baseBot],to:[bandR+10,baseBot]}], p);
     }},
   // 1: Left base
-  { name:'LEFT BASE', panelPos:'tr', formula:'w = U/φ² × φ/√2 = '+bw.toFixed(0)+'px', dur:0.8,
+  { name:'LEFT BASE', panelPos:'tr', formula:'w = U/φ² × φ/√2 = '+bw.toFixed(0)+'px', dur:0.53,
     bbox:[colLx-bw/2,colBot,colLx+bw/2,baseBot],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -201,7 +424,7 @@ var STEPS = [
       ], p);
     }},
   // 2: Right base
-  { name:'RIGHT BASE', panelPos:'tl', formula:'mirror of left', dur:0.8,
+  { name:'RIGHT BASE', panelPos:'tl', formula:'mirror of left', dur:0.53,
     bbox:[colRx-bw/2,colBot,colRx+bw/2,baseBot],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -213,7 +436,7 @@ var STEPS = [
       ], p);
     }},
   // 3: Left column (draws upward)
-  { name:'LEFT COLUMN', panelPos:'tr', formula:'w = U/φ² = '+colWidth.toFixed(0)+' | h = '+Math.round(colBot-colTop), dur:1.2,
+  { name:'LEFT COLUMN', panelPos:'tr', formula:'w = U/φ² = '+colWidth.toFixed(0)+' | h = '+Math.round(colBot-colTop), dur:0.8,
     bbox:[colLx-colWidth/2,colTop,colLx+colWidth/2,colBot],
     draw: function(p) {
       brush.set('2H','#5a5248',2.0);
@@ -230,7 +453,7 @@ var STEPS = [
       return [colLx, endY];
     }},
   // 4: Right column
-  { name:'RIGHT COLUMN', panelPos:'tl', formula:'w = U/φ²', dur:1.2,
+  { name:'RIGHT COLUMN', panelPos:'tl', formula:'w = U/φ²', dur:0.8,
     bbox:[colRx-colWidth/2,colTop,colRx+colWidth/2,colBot],
     draw: function(p) {
       brush.set('2H','#5a5248',2.0);
@@ -245,7 +468,7 @@ var STEPS = [
       return [colRx, endY];
     }},
   // 5: Left capital
-  { name:'LEFT CAPITAL', panelPos:'tr', formula:'h = colW × φ = '+capHeight.toFixed(0)+'px', dur:0.8,
+  { name:'LEFT CAPITAL', panelPos:'tr', formula:'h = colW × φ = '+capHeight.toFixed(0)+'px', dur:0.53,
     bbox:[colLx-capW*0.62,capTop-6,colLx+capW*0.62,capBot],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -256,7 +479,7 @@ var STEPS = [
       ], p);
     }},
   // 6: Right capital
-  { name:'RIGHT CAPITAL', panelPos:'tl', formula:'h = colW × φ', dur:0.8,
+  { name:'RIGHT CAPITAL', panelPos:'tl', formula:'h = colW × φ', dur:0.53,
     bbox:[colRx-capW*0.62,capTop-6,colRx+capW*0.62,capBot],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -270,27 +493,72 @@ var STEPS = [
   { name:'NICHE ARCH', panelPos:'br', formula:'R = 2U = '+archSpan.toFixed(0)+' | H = U√3 = '+archH.toFixed(0), dur:2.0,
     bbox:[cx-halfSpan,peakY,cx+halfSpan,springY+20],
     draw: function(p) {
-      brush.set('2H','#5a5248',2.5);
-      if (p <= 0.45) {
-        // Left arc
-        return drawSplinePartial(archPtsL, p/0.45, 0.3);
-      } else if (p <= 0.9) {
-        // Full left + partial right
+      // COMPASS SWEEP — radius line sweeps UPWARD from horizontal
+      // theta = 0 at springing (horizontal), PI/3 at peak (equilateral = 60°)
+      var archSweep = Math.PI / 3;  // 60° for equilateral
+      
+      if (p <= 0.4) {
+        // LEFT ARC — center C2x, compass sweeps upward
+        var t = p / 0.4;
+        var theta = archSweep * t;
+        brush.set('2H','#5a5248',2.5);
+        var arcPts = [];
+        var steps = Math.max(3, Math.round(t * 40));
+        for (var i = 0; i <= steps; i++) {
+          var th = archSweep * t * i / steps;
+          // Left arc: x goes LEFT from center, y goes UP
+          arcPts.push([C2x - archR * Math.cos(th), springY - archR * Math.sin(th), 0.5]);
+        }
+        if (arcPts.length >= 2) brush.spline(arcPts, 0.3);
+        // Compass arm
+        var tipX = C2x - archR * Math.cos(theta);
+        var tipY = springY - archR * Math.sin(theta);
+        brush.set('2H','#a09888',0.6);
+        brush.line(C2x, springY, tipX, tipY);
+        brush.circle(C2x, springY, 5);
+        return [tipX, tipY];
+        
+      } else if (p <= 0.8) {
+        // Full left arc + RIGHT ARC compass sweep
+        brush.set('2H','#5a5248',2.5);
         brush.spline(archPtsL, 0.3);
-        return drawSplinePartial(archPtsR, (p-0.45)/0.45, 0.3);
+        
+        var t = (p - 0.4) / 0.4;
+        var theta = archSweep * t;
+        var arcPts = [];
+        var steps = Math.max(3, Math.round(t * 40));
+        for (var i = 0; i <= steps; i++) {
+          var th = archSweep * t * i / steps;
+          // Right arc: x goes RIGHT from center, y goes UP
+          arcPts.push([C1x + archR * Math.cos(th), springY - archR * Math.sin(th), 0.5]);
+        }
+        if (arcPts.length >= 2) brush.spline(arcPts, 0.3);
+        var tipX = C1x + archR * Math.cos(theta);
+        var tipY = springY - archR * Math.sin(theta);
+        brush.set('2H','#a09888',0.6);
+        brush.line(C1x, springY, tipX, tipY);
+        brush.circle(C1x, springY, 5);
+        brush.circle(C2x, springY, 5);
+        return [tipX, tipY];
+        
       } else {
-        // Both arcs + legs
+        // Both arcs complete + legs drawing down
+        brush.set('2H','#5a5248',2.5);
         brush.spline(archPtsL, 0.3);
         brush.spline(archPtsR, 0.3);
-        var legP = (p-0.9)/0.1;
-        var legEndY = springY + (baseBot-springY)*legP;
-        brush.line(cx-halfSpan,springY,cx-halfSpan,legEndY);
-        brush.line(cx+halfSpan,springY,cx+halfSpan,legEndY);
+        var legP = (p - 0.8) / 0.2;
+        var legEndY = springY + (baseBot - springY) * legP;
+        brush.line(cx-halfSpan, springY, cx-halfSpan, legEndY);
+        brush.line(cx+halfSpan, springY, cx+halfSpan, legEndY);
+        // Center dots remain as construction marks
+        brush.set('2H','#a09888',0.5);
+        brush.circle(C2x, springY, 4);
+        brush.circle(C1x, springY, 4);
         return [cx+halfSpan, legEndY];
       }
     }},
   // 8: Inscription band
-  { name:'INSCRIPTION BAND', panelPos:'tr', formula:'h = U/φ = '+bandHeight_v.toFixed(0)+'px', dur:1.5,
+  { name:'INSCRIPTION BAND', panelPos:'tr', formula:'h = U/φ = '+bandHeight_v.toFixed(0)+'px', dur:1.0,
     bbox:[bandL,bandTop_y,bandR,bandBot_y],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -328,19 +596,63 @@ var STEPS = [
       }
     }},
   // 9: Crown arch
-  { name:'CROWN ARCH', panelPos:'br', formula:'span = bandW×√φ | R = span/√2 = '+crownR.toFixed(0), dur:1.5,
+  { name:'CROWN ARCH', panelPos:'br', formula:'R = span/√2 = '+crownR.toFixed(0), dur:1.5,
     bbox:[cx-crownHalfSpan,crownPeakY,cx+crownHalfSpan,crownSpringY],
     draw: function(p) {
-      brush.set('2H','#5a5248',2.2);
-      if (p <= 0.5) {
-        return drawSplinePartial(crownPtsL, p/0.5, 0.3);
+      // COMPASS SWEEP for crown — same theta approach, upward
+      // Crown sweep angle: asin(crownH / crownR)
+      var crSweep = Math.asin(Math.min(1, (crownSpringY - crownPeakY) / crownR));
+      
+      if (p <= 0.45) {
+        // LEFT sweep — center crownC2x
+        var t = p / 0.45;
+        var theta = crSweep * t;
+        brush.set('2H','#5a5248',2.2);
+        var arcPts = [];
+        var steps = Math.max(3, Math.round(t * 30));
+        for (var i = 0; i <= steps; i++) {
+          var th = crSweep * t * i / steps;
+          arcPts.push([crownC2x - crownR * Math.cos(th), crownSpringY - crownR * Math.sin(th), 0.5]);
+        }
+        if (arcPts.length >= 2) brush.spline(arcPts, 0.3);
+        var tipX = crownC2x - crownR * Math.cos(theta);
+        var tipY = crownSpringY - crownR * Math.sin(theta);
+        brush.set('2H','#a09888',0.6);
+        brush.line(crownC2x, crownSpringY, tipX, tipY);
+        brush.circle(crownC2x, crownSpringY, 5);
+        return [tipX, tipY];
       } else {
+        // Full left + RIGHT sweep — center crownC1x
+        brush.set('2H','#5a5248',2.2);
         brush.spline(crownPtsL, 0.3);
-        return drawSplinePartial(crownPtsR, (p-0.5)/0.5, 0.3);
+        var t = (p - 0.45) / 0.55;
+        if (t < 1) {
+          var theta = crSweep * t;
+          var arcPts = [];
+          var steps = Math.max(3, Math.round(t * 30));
+          for (var i = 0; i <= steps; i++) {
+            var th = crSweep * t * i / steps;
+            arcPts.push([crownC1x + crownR * Math.cos(th), crownSpringY - crownR * Math.sin(th), 0.5]);
+          }
+          if (arcPts.length >= 2) brush.spline(arcPts, 0.3);
+          var tipX = crownC1x + crownR * Math.cos(theta);
+          var tipY = crownSpringY - crownR * Math.sin(theta);
+          brush.set('2H','#a09888',0.6);
+          brush.line(crownC1x, crownSpringY, tipX, tipY);
+          brush.circle(crownC1x, crownSpringY, 5);
+          brush.circle(crownC2x, crownSpringY, 4);
+          return [tipX, tipY];
+        } else {
+          brush.spline(crownPtsR, 0.3);
+          brush.set('2H','#a09888',0.5);
+          brush.circle(crownC1x, crownSpringY, 4);
+          brush.circle(crownC2x, crownSpringY, 4);
+          return [cx, crownPeakY];
+        }
       }
     }},
   // 10: Star
-  { name:'12-FOLD STAR', panelPos:'bl', formula:'{12/5} — scales: r, r/φ, r/φ², r/φ³', dur:2.0,
+  { name:'12-FOLD STAR', panelPos:'bl', formula:'{12/5} — scales: r, r/φ, r/φ², r/φ³', dur:1.33,
     bbox:[starCx-starR_val-15,starCy-starR_val-15,starCx+starR_val+15,starCy+starR_val+15],
     draw: function(p) {
       var scales=[starR_val,starR_val/PHI,starR_val/(PHI*PHI),starR_val/(PHI*PHI*PHI)];
@@ -366,7 +678,7 @@ var STEPS = [
       return [tipX, tipY];
     }},
   // 11: Niche wash — deep lapis
-  { name:'NICHE WASH', formula:'lapis #0c3a6a α=35', dur:0.1,
+  { name:'NICHE WASH', formula:'lapis #0c3a6a α=35', dur:0.07,
     bbox:[cx-halfSpan,peakY,cx+halfSpan,baseBot],
     draw: function(p) {
       if (p >= 0) {
@@ -383,7 +695,7 @@ var STEPS = [
       return [cx, springY];
     }},
   // 12: Crown wash — lighter blue
-  { name:'CROWN WASH', formula:'azure #1a4a8a α=28', dur:0.1,
+  { name:'CROWN WASH', formula:'azure #1a4a8a α=28', dur:0.07,
     bbox:[cx-crownHalfSpan,crownPeakY,cx+crownHalfSpan,crownSpringY],
     draw: function(p) {
       if (p >= 0) {
@@ -400,7 +712,7 @@ var STEPS = [
       return [cx, starCy];
     }},
   // 13: Inscription band wash — muted magenta
-  { name:'BAND WASH', formula:'amethyst #4a1a3a α=30', dur:0.1,
+  { name:'BAND WASH', formula:'amethyst #4a1a3a α=30', dur:0.07,
     bbox:[bandL,bandTop_y,bandR,bandBot_y],
     draw: function(p) {
       if (p >= 0) {
@@ -414,7 +726,7 @@ var STEPS = [
       return [cx, bandBot_y];
     }},
   // 14: Column base tint — dark blue-grey
-  { name:'BASE TINT', formula:'slate #1a2a3a α=25', dur:0.1,
+  { name:'BASE TINT', formula:'slate #1a2a3a α=25', dur:0.07,
     bbox:[colLx-bw/2,colBot,colRx+bw/2,baseBot],
     draw: function(p) {
       if (p >= 0) {
@@ -434,7 +746,7 @@ var STEPS = [
       return [cx, baseBot];
     }},
   // 15: Capital accent — magenta touch
-  { name:'CAPITAL ACCENT', formula:'magenta #5a1a4a α=45', dur:0.1,
+  { name:'CAPITAL ACCENT', formula:'magenta #5a1a4a α=45', dur:0.07,
     bbox:[colLx-capW*0.6,capTop,colRx+capW*0.6,capBot],
     draw: function(p) {
       if (p >= 0) {
@@ -456,7 +768,7 @@ var STEPS = [
 ];
 
 // Compute frame timeline — pauses between pencil steps, no pause between washes
-var PAUSE_S = 0.3;
+var PAUSE_S = 0.2;
 var WASH_START = 11; // step index where washes begin
 var frameStarts = [], frameEnds = [];
 var f = 0;
@@ -492,10 +804,11 @@ function createTrackBox(step) {
   var br=document.createElement('div');br.className='br';br.style.cssText='position:absolute;bottom:0;right:0;width:100%;height:100%;pointer-events:none;';box.appendChild(br);
   // Info panel — placed at the corner least likely to occlude drawing
   // Drawing usually starts at bottom/center, so default top-right
+  var _fs = Math.max(9, Math.round(ANNOT_FONT * (window._hudScale||1))) + 'px';
   var info=document.createElement('div');info.className='hud-info';
-  var lbl=document.createElement('div');lbl.className='hud-label';lbl.textContent=step.name;info.appendChild(lbl);
-  var frm=document.createElement('div');frm.className='hud-formula';frm.textContent=step.formula;info.appendChild(frm);
-  var crd=document.createElement('div');crd.className='hud-coords';crd.id='live-coords';crd.textContent='x:— y:—';info.appendChild(crd);
+  var lbl=document.createElement('div');lbl.className='hud-label';lbl.style.fontSize=_fs;lbl.textContent=step.name;info.appendChild(lbl);
+  var frm=document.createElement('div');frm.className='hud-formula';frm.style.fontSize=_fs;frm.textContent=step.formula;info.appendChild(frm);
+  var crd=document.createElement('div');crd.className='hud-coords';crd.style.fontSize=_fs;crd.id='live-coords';crd.textContent='x:— y:—';info.appendChild(crd);
   box.appendChild(info);
   hud.appendChild(box);
   trackBox = box;
@@ -520,25 +833,20 @@ var lastHudStep = -1;
 function setup() {
   var c = createCanvas(W, H, WEBGL);
   pixelDensity(1); // Force 1:1 pixels AFTER canvas creation
-  // CSS scales canvas to fill viewport while maintaining aspect ratio
-  var viewAspect = window.innerWidth / window.innerHeight;
-  var canvasAspect = W / H;
-  if (viewAspect < canvasAspect) {
-    // Width-limited
-    c.elt.style.width = '100vw';
-    c.elt.style.height = (window.innerWidth / canvasAspect) + 'px';
-  } else {
-    // Height-limited
-    c.elt.style.height = '100vh';
-    c.elt.style.width = (window.innerHeight * canvasAspect) + 'px';
-  }
+  // CSS scales canvas — width-limited (phone is always narrower than 9:16)
+  c.elt.style.width = '100vw';
+  c.elt.style.height = (window.innerWidth / (W/H)) + 'px';
   c.elt.style.display = 'block';
-  c.elt.style.margin = '0 auto';
+  c.elt.style.margin = '0'; // top-left, no centering offset
   brush.load();
   frameRate(FPS);
-  // HUD scale (fixed) — offset recalculated each frame
   window._hudScale = c.elt.getBoundingClientRect().width / W;
   window._canvasEl = c.elt;
+  // Recalculate on viewport change (Safari fullscreen, orientation)
+  window.addEventListener('resize', function() {
+    window._hudScale = c.elt.getBoundingClientRect().width / W;
+    _lastAnnotStep = -1; // force re-layout of annotations
+  });
 }
 
 function draw() {
@@ -554,22 +862,33 @@ function draw() {
     if (f >= frameStarts[i]) { activeStep = i; break; }
   }
   
-  // Draw all completed steps at progress=1
+  // Draw ALL completed steps at full progress
   for (var i = 0; i < activeStep; i++) {
     STEPS[i].draw(1);
   }
   
   // Draw current step at partial progress
   var stepFrame = f - frameStarts[activeStep];
-  var stepDurFrames = frameEnds[activeStep] - frameStarts[activeStep];
+  var stepDurFrames = Math.max(1, frameEnds[activeStep] - frameStarts[activeStep]);
   var progress = Math.min(1, stepFrame / stepDurFrames);
   var tip = STEPS[activeStep].draw(progress);
   
-  // Update HUD
+  // Annotations on top of everything
+  drawAnnotations(activeStep - 1);
+  
+  // Update HUD — reposition every frame to handle viewport shifts (Safari fullscreen)
   if (activeStep !== lastHudStep) {
     createTrackBox(STEPS[activeStep]);
     lastHudStep = activeStep;
   }
+  if (trackBox) {
+    var _r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
+    var _s = window._hudScale || 1;
+    var _b = STEPS[activeStep].bbox, _pad = 12 * _s;
+    trackBox.style.left = (_b[0]*_s + _r.left - _pad) + 'px';
+    trackBox.style.top = (_b[1]*_s + _r.top - _pad) + 'px';
+  }
+  
   if (tip) updatePencilDot(tip[0], tip[1]);
   
   // Done
