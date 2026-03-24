@@ -3,9 +3,6 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
 <style>
@@ -847,11 +844,8 @@ function setup() {
   window._canvasEl = c.elt;
   // Recalculate on viewport change (Safari fullscreen, orientation)
   window.addEventListener('resize', function() {
-    // Recalculate canvas CSS height for new viewport
-    c.elt.style.height = (window.innerWidth / (W/H)) + 'px';
     window._hudScale = c.elt.getBoundingClientRect().width / W;
     _lastAnnotStep = -1; // force re-layout of annotations
-    _lastDimStep = -1;   // force re-layout of dimension labels
   });
 }
 
@@ -904,6 +898,5 @@ function draw() {
   }
 }
 </script>
-<script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 </body>
 </html>
