@@ -45,9 +45,9 @@ canvas { object-fit:contain !important; display:block; }
   border-radius:4px; padding:8px 12px;
   white-space:nowrap;
 }
-.hud-label { color:#3a3430; font-size:13px; font-weight:bold; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:4px; }
-.hud-formula { color:#5a5248; font-size:11px; margin-bottom:3px; }
-.hud-coords { color:#8a8278; font-size:11px; }
+.hud-label { color:#3a3430; font-size:9px; font-weight:bold; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:3px; }
+.hud-formula { color:#5a5248; font-size:9px; margin-bottom:2px; }
+.hud-coords { color:#8a8278; font-size:9px; }
 .track-box.complete { animation: pulse-complete 0.5s ease; }
 @keyframes pulse-complete {
   0% { filter: drop-shadow(0 0 4px rgba(90,82,72,0.6)); }
@@ -201,7 +201,7 @@ var ROW_OFFSET = U / (PHI*PHI);           // first row distance from drawing edg
 var ROW_SPACE = U / (PHI*PHI*PHI);        // spacing between parallel dim rows
 var EXT_OVERSHOOT = U / (PHI*PHI*PHI*PHI); // extension line overshoot past dim line
 var TICK_SIZE = U / (PHI*PHI*PHI*PHI);    // tick mark length at dim line ends
-var ANNOT_FONT = Math.round(U / (PHI*PHI*PHI*PHI)); // text size in canvas px
+var ANNOT_FONT = Math.round(U / (PHI*PHI*PHI*PHI*1.15)); // text size in canvas px (2 hairs smaller)
 
 // Drawing bounding box (outermost elements)
 var drawBot = baseBot;
