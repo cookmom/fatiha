@@ -204,24 +204,18 @@ var TICK_SIZE = U / (PHI*PHI*PHI*PHI);    // tick mark length at dim line ends
 var ANNOT_FONT = Math.round(U / (PHI*PHI*PHI*PHI)); // text size in canvas px
 
 // Drawing bounding box (outermost elements)
-var drawLeft = cx - crownHalfSpan;
-var drawRight = cx + crownHalfSpan;
-var drawTop = crownPeakY;
 var drawBot = baseBot;
 
-// Dimension row positions
-// BOTTOM horizontal rows (y positions below drawing)
-var botRow1 = drawBot + ROW_OFFSET;
-var botRow2 = botRow1 + ROW_SPACE;
-var botRow3 = botRow2 + ROW_SPACE;
+// Dimension row positions — fit within canvas bounds
+// BOTTOM: 2 rows only (79px available), tight spacing
+var botRow1 = drawBot + ROW_OFFSET * 0.6;
+var botRow2 = botRow1 + ROW_SPACE * 0.7;
 
-// RIGHT vertical rows (x positions right of drawing)
-var rtRow1 = drawRight + ROW_OFFSET;
-var rtRow2 = rtRow1 + ROW_SPACE;
-
-// LEFT vertical rows (x positions left of drawing)
-var ltRow1 = drawLeft - ROW_OFFSET;
+// LEFT vertical rows (206px available to left column — plenty of room)
+var leftEdge = colLx - colWidth / 2;  // left column outer edge
+var ltRow1 = leftEdge - ROW_OFFSET;
 var ltRow2 = ltRow1 - ROW_SPACE;
+var ltRow3 = ltRow2 - ROW_SPACE;
 
 // HTML label elements
 var _dimLabels = [];
@@ -253,9 +247,9 @@ function addDimText(canvasX, canvasY, text, align) {
 function drawHDim(x1, x2, rowY, label, stepIdx, curStep) {
   if (stepIdx > curStep) return;
   brush.set('2H','#b0a898',0.4);
-  // Extension lines (vertical, from near object down to row)
-  brush.line(x1, drawBot + DIM_GAP, x1, rowY + EXT_OVERSHOOT);
-  brush.line(x2, drawBot + DIM_GAP, x2, rowY + EXT_OVERSHOOT);
+  // Extension lines (vertical, from base down to row)
+  brush.line(x1, baseBot + DIM_GAP, x1, rowY + EXT_OVERSHOOT);
+  brush.line(x2, baseBot + DIM_GAP, x2, rowY + EXT_OVERSHOOT);
   // Dimension line (horizontal at row)
   brush.line(x1, rowY, x2, rowY);
   // Ticks at ends
@@ -269,19 +263,16 @@ function drawHDim(x1, x2, rowY, label, stepIdx, curStep) {
 function drawVDim(y1, y2, rowX, label, stepIdx, curStep, side) {
   if (stepIdx > curStep) return;
   brush.set('2H','#b0a898',0.4);
-  var edgeX = (side === 'left') ? drawLeft : drawRight;
-  // Extension lines (horizontal, from near object to row)
-  brush.line(edgeX + (side==='left'?-DIM_GAP:DIM_GAP), y1, rowX + (side==='left'?-EXT_OVERSHOOT:EXT_OVERSHOOT), y1);
-  brush.line(edgeX + (side==='left'?-DIM_GAP:DIM_GAP), y2, rowX + (side==='left'?-EXT_OVERSHOOT:EXT_OVERSHOOT), y2);
+  // Extension lines (horizontal, from left column edge to row)
+  brush.line(leftEdge - DIM_GAP, y1, rowX - EXT_OVERSHOOT, y1);
+  brush.line(leftEdge - DIM_GAP, y2, rowX - EXT_OVERSHOOT, y2);
   // Dimension line (vertical at row)
   brush.line(rowX, y1, rowX, y2);
   // Ticks
   brush.line(rowX - TICK_SIZE, y1, rowX + TICK_SIZE, y1);
   brush.line(rowX - TICK_SIZE, y2, rowX + TICK_SIZE, y2);
-  // Label beside dim line
-  var textX = (side === 'left') ? rowX - 6 : rowX + 6;
-  var textAlign = (side === 'left') ? 'right' : 'left';
-  addDimText(textX, (y1+y2)/2 - ANNOT_FONT/2, label, textAlign);
+  // Label left of dim line — but ensure it stays on canvas
+  addDimText(Math.max(5, rowX - 6), (y1+y2)/2 - ANNOT_FONT/2, label, 'left');
 }
 
 // Radius callout inside the drawing (leader + circle at center)
@@ -301,24 +292,25 @@ function drawAnnotations(stepIdx) {
     _lastDimStep = stepIdx;
   }
 
-  // === BOTTOM HORIZONTAL DIMENSIONS ===
-  // Row 1 (closest): column width, base width
+  // === BOTTOM HORIZONTAL DIMENSIONS (2 rows) ===
+  // Row 1: column width (smallest, closest)
   drawHDim(colLx-colWidth/2, colLx+colWidth/2, botRow1, 'U/\u03c6\u00b2 = '+colWidth.toFixed(0), 3, stepIdx);
-
-  // Row 2: arch span
+  // Row 2: arch span (larger, further)
   drawHDim(cx-halfSpan, cx+halfSpan, botRow2, '2U = '+archSpan.toFixed(0), 7, stepIdx);
 
-  // Row 3: crown span (outermost = largest)
-  drawHDim(cx-crownHalfSpan, cx+crownHalfSpan, botRow3, 'bandW\u00d7\u221a\u03c6 = '+crownSpan.toFixed(0), 9, stepIdx);
+  // Crown span — centered text inside the band area (no room for bottom row 3)
+  if (stepIdx >= 9) {
+    addDimText(cx, crownSpringY + 6, 'crown = bandW\u00d7\u221a\u03c6 = '+crownSpan.toFixed(0), 'center');
+  }
 
-  // === RIGHT VERTICAL DIMENSIONS ===
-  // Row 1: capital height, band height
-  drawVDim(capTop, capBot, rtRow1, 'colW\u00d7\u03c6 = '+capHeight.toFixed(0), 5, stepIdx, 'right');
-  drawVDim(bandTop_y, bandBot_y, rtRow1, 'U/\u03c6 = '+bandHeight_v.toFixed(0), 8, stepIdx, 'right');
-
-  // Row 2: arch height, column height
-  drawVDim(peakY, springY, rtRow2, 'U\u221a3 = '+archH.toFixed(0), 7, stepIdx, 'right');
-  drawVDim(colTop, colBot, rtRow2, Math.round(colBot-colTop)+'px', 4, stepIdx, 'right');
+  // === LEFT VERTICAL DIMENSIONS (all on left side) ===
+  // Row 1 (closest): capital height, band height
+  drawVDim(capTop, capBot, ltRow1, 'colW\u00d7\u03c6', 5, stepIdx, 'left');
+  drawVDim(bandTop_y, bandBot_y, ltRow1, 'U/\u03c6', 8, stepIdx, 'left');
+  // Row 2: column height
+  drawVDim(colTop, colBot, ltRow2, Math.round(colBot-colTop)+'px', 4, stepIdx, 'left');
+  // Row 3: arch height (largest, outermost)
+  drawVDim(peakY, springY, ltRow3, 'U\u221a3 = '+archH.toFixed(0), 7, stepIdx, 'left');
 
   // === INSIDE: Radius callouts ===
   drawRCallout(C2x, springY, cx, peakY, 'R = 2U', 7, stepIdx);
@@ -338,10 +330,10 @@ function drawAnnotations(stepIdx) {
     addDimText(starCx, starCy - starR_val - 2, 'r, r/\u03c6, r/\u03c6\u00b2, r/\u03c6\u00b3', 'center');
   }
 
-  // === BASE UNIT LEGEND (bottom left) ===
+  // === BASE UNIT LEGEND (inside niche, bottom area over wash) ===
   if (stepIdx >= 0) {
-    addDimText(20, botRow3 + ROW_SPACE, 'U = W/(2\u03c6+2) = '+U.toFixed(1));
-    addDimText(20, botRow3 + ROW_SPACE + ANNOT_FONT + 4, '\u03c6=1.618  \u221a3=1.732  \u221a2=1.414');
+    addDimText(cx, baseBot - ANNOT_FONT * 3, 'U = W/(2\u03c6+2) = '+U.toFixed(1), 'center');
+    addDimText(cx, baseBot - ANNOT_FONT * 1.5, '\u03c6=1.618  \u221a3=1.732  \u221a2=1.414', 'center');
   }
 }
 
