@@ -63,16 +63,9 @@ body { background:#f2eada; overflow:hidden; }
 // =============================================
 var PHI = (1 + Math.sqrt(5)) / 2;
 var ROOT3 = Math.sqrt(3), ROOT2 = Math.sqrt(2);
-// Responsive canvas — fit window, cap DPR at 2
-var _dpr = Math.min(window.devicePixelRatio || 1, 2);
-var W = Math.round(window.innerWidth * _dpr);
-var H = Math.round(window.innerHeight * _dpr);
-// Cap max framebuffer to avoid Safari crash
-if (W * H > 1080 * 1920) {
-  var _fbScale = Math.sqrt((1080 * 1920) / (W * H));
-  W = Math.round(W * _fbScale);
-  H = Math.round(H * _fbScale);
-}
+// Fixed canvas size — CSS scales to fit viewport
+// This keeps the math consistent and avoids Safari memory crashes
+var W = 1080, H = 1920;
 var cx = W/2;
 var U = W / (2*PHI + 2);
 var archSpan = U*2, halfSpan = U;
@@ -436,13 +429,26 @@ var lastHudStep = -1;
 
 function setup() {
   var c = createCanvas(W, H, WEBGL);
-  // Size canvas CSS to fill viewport
-  c.elt.style.width = '100vw';
-  c.elt.style.height = '100vh';
+  pixelDensity(1); // Force 1:1 pixels AFTER canvas creation
+  // CSS scales canvas to fill viewport while maintaining aspect ratio
+  var viewAspect = window.innerWidth / window.innerHeight;
+  var canvasAspect = W / H;
+  if (viewAspect < canvasAspect) {
+    // Width-limited
+    c.elt.style.width = '100vw';
+    c.elt.style.height = (window.innerWidth / canvasAspect) + 'px';
+  } else {
+    // Height-limited
+    c.elt.style.height = '100vh';
+    c.elt.style.width = (window.innerHeight * canvasAspect) + 'px';
+  }
+  c.elt.style.display = 'block';
+  c.elt.style.margin = '0 auto';
   brush.load();
   frameRate(FPS);
-  // Store scale factor for HUD positioning
-  window._hudScale = window.innerWidth / W;
+  // HUD scale: canvas CSS width / canvas pixel width
+  var cssW = c.elt.getBoundingClientRect().width;
+  window._hudScale = cssW / W;
 }
 
 function draw() {
