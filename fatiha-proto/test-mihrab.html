@@ -228,33 +228,7 @@ function setup() {
   brush.spline(archLinePts, 0.3);
   
   // =============================================
-  // LAYER 5: BORDER BAND (simple zigzag)
-  // =============================================
-  brush.set('2H', '#b0a898', 0.5);
-  var bandY1 = frameT + 30, bandY2 = frameT + 45;
-  var bandStep = 30;
-  for (var x = frameL + 55; x < frameR - 55; x += bandStep) {
-    brush.line(x, bandY1, x + bandStep/2, bandY2);
-    brush.line(x + bandStep/2, bandY2, x + bandStep, bandY1);
-  }
-  // Bottom band
-  bandY1 = frameB - 80; bandY2 = frameB - 65;
-  for (var x = frameL + 55; x < frameR - 55; x += bandStep) {
-    brush.line(x, bandY1, x + bandStep/2, bandY2);
-    brush.line(x + bandStep/2, bandY2, x + bandStep, bandY1);
-  }
-  
-  // Side bands
-  var bandX1 = frameL + 30, bandX2 = frameL + 45;
-  for (var y = frameT + 55; y < frameB - 55; y += bandStep) {
-    brush.line(bandX1, y, bandX2, y + bandStep/2);
-    brush.line(bandX2, y + bandStep/2, bandX1, y + bandStep);
-  }
-  bandX1 = frameR - 45; bandX2 = frameR - 30;
-  for (var y = frameT + 55; y < frameB - 55; y += bandStep) {
-    brush.line(bandX1, y, bandX2, y + bandStep/2);
-    brush.line(bandX2, y + bandStep/2, bandX1, y + bandStep);
-  }
+  // Inner zigzag borders REMOVED
   // =============================================
   // LAYER 6: 12-FOLD STAR PATTERN — TOPMOST LAYER
   // Formula: {12/5} star polygon
