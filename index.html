@@ -189,86 +189,163 @@ function drawAngleArc(cx_,cy_,r,startA,endA) {
   brush.spline(pts, 0.5);
 }
 
-// HTML annotation labels — positioned over canvas
+// =============================================
+// ANNOTATION LAYOUT SYSTEM — φ-proportional
+// Reusable for any architectural composition
+// =============================================
+var GUTTER = U / PHI;                    // gutter width = U/φ
+var LABEL_GAP = U / (PHI*PHI*PHI);       // vertical gap between labels = U/φ³
+var LABEL_SIZE = Math.max(10, Math.round(U / (PHI*PHI*PHI))); // font size = U/φ³
+var ANNOT_COLOR = '#7a7268';
+
+// Annotation registry — all labels registered here, laid out once per step change
+var _annotRegistry = [];   // {text, anchorX, anchorY, side, stepIdx}
 var _annotEls = [];
-function addAnnotLabel(x, y, text, align) {
-  // Only add once — check by text content
-  for (var i=0;i<_annotEls.length;i++) if (_annotEls[i]._t === text) return;
-  var el = document.createElement('div');
-  el._t = text;
-  var s = window._hudScale || 1;
-  var r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
-  el.style.cssText = 'position:absolute;color:#7a7268;font-family:SF Mono,Fira Code,monospace;font-size:13px;white-space:nowrap;pointer-events:none;letter-spacing:0.5px;font-weight:500;';
-  // Clamp to canvas bounds
-  var elX = x*s + r.left;
-  var elY = y*s + r.top;
-  var maxX = r.left + r.width - 10;
-  if (elX > maxX) elX = maxX;
-  if (elX < r.left + 5) elX = r.left + 5;
-  el.style.left = elX + 'px';
-  el.style.top = elY + 'px';
-  if (align === 'right') el.style.transform = 'translateX(-100%)';
-  if (align === 'center') el.style.transform = 'translateX(-50%)';
-  // If near right edge, switch to right-align to prevent clipping
-  if (elX > maxX - 80 && align !== 'right' && align !== 'center') el.style.transform = 'translateX(-100%)';
-  el.textContent = text;
-  document.getElementById('hud').appendChild(el);
-  _annotEls.push(el);
+var _lastAnnotStep = -1;
+
+function registerAnnot(text, anchorX, anchorY, side, stepIdx) {
+  // Only register once per text
+  for (var i=0;i<_annotRegistry.length;i++) if (_annotRegistry[i].text === text) return;
+  _annotRegistry.push({text:text, anchorX:anchorX, anchorY:anchorY, side:side||'auto', stepIdx:stepIdx});
 }
 
-// Annotations for each completed step — drawn as permanent marks
+function layoutAnnotations(upToStep) {
+  if (upToStep === _lastAnnotStep) return;
+  _lastAnnotStep = upToStep;
+  
+  // Clear existing label elements
+  for (var i=0;i<_annotEls.length;i++) _annotEls[i].remove();
+  _annotEls = [];
+  
+  // Filter to visible annotations
+  var visible = [];
+  for (var i=0;i<_annotRegistry.length;i++) {
+    if (_annotRegistry[i].stepIdx <= upToStep) visible.push(_annotRegistry[i]);
+  }
+  
+  // Assign sides: auto = element left of cx → right gutter, else left
+  var leftLabels = [], rightLabels = [], centerLabels = [];
+  for (var i=0;i<visible.length;i++) {
+    var a = visible[i];
+    var side = a.side;
+    if (side === 'auto') side = a.anchorX < cx ? 'left' : 'right';
+    if (side === 'center') { centerLabels.push(a); continue; }
+    if (side === 'left') leftLabels.push(a);
+    else rightLabels.push(a);
+  }
+  
+  // Sort each gutter by anchorY
+  leftLabels.sort(function(a,b){return a.anchorY - b.anchorY;});
+  rightLabels.sort(function(a,b){return a.anchorY - b.anchorY;});
+  
+  var s = window._hudScale || 1;
+  var r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0,width:W,height:H};
+  
+  // Gutter X positions (in canvas coords)
+  // Label zones: labels sit just outside the column edges
+  // On narrow screens they overlap dimension lines — acceptable for architectural style
+  var drawingLeft = colLx - colWidth/2;          // left column outer edge
+  var drawingRight = colRx + colWidth/2;         // right column outer edge
+  
+  // Layout left gutter — right-aligned, stacked top-to-bottom
+  var prevBottom = 0;
+  for (var i=0;i<leftLabels.length;i++) {
+    var a = leftLabels[i];
+    var labelY = Math.max(a.anchorY, prevBottom + LABEL_GAP);
+    prevBottom = labelY + LABEL_SIZE + 2;
+    
+    var el = document.createElement('div');
+    el.style.cssText = 'position:absolute;color:'+ANNOT_COLOR+';font-family:SF Mono,Fira Code,monospace;font-size:'+Math.round(LABEL_SIZE*s)+'px;white-space:nowrap;pointer-events:none;letter-spacing:0.5px;text-align:right;transform:translateX(-100%);';
+    el.style.left = (drawingLeft * s + r.left - 8*s) + 'px';
+    el.style.top = (labelY * s + r.top) + 'px';
+    el.textContent = a.text;
+    document.getElementById('hud').appendChild(el);
+    _annotEls.push(el);
+  }
+  
+  // Layout right gutter — left-aligned, stacked top-to-bottom
+  prevBottom = 0;
+  for (var i=0;i<rightLabels.length;i++) {
+    var a = rightLabels[i];
+    var labelY = Math.max(a.anchorY, prevBottom + LABEL_GAP);
+    prevBottom = labelY + LABEL_SIZE + 2;
+    
+    var el = document.createElement('div');
+    el.style.cssText = 'position:absolute;color:'+ANNOT_COLOR+';font-family:SF Mono,Fira Code,monospace;font-size:'+Math.round(LABEL_SIZE*s)+'px;white-space:nowrap;pointer-events:none;letter-spacing:0.5px;';
+    el.style.left = (drawingRight * s + r.left + 8*s) + 'px';
+    el.style.top = (labelY * s + r.top) + 'px';
+    el.textContent = a.text;
+    document.getElementById('hud').appendChild(el);
+    _annotEls.push(el);
+  }
+  
+  // Center labels — centered horizontally at their anchor position
+  for (var i=0;i<centerLabels.length;i++) {
+    var a = centerLabels[i];
+    var el = document.createElement('div');
+    el.style.cssText = 'position:absolute;color:'+ANNOT_COLOR+';font-family:SF Mono,Fira Code,monospace;font-size:'+Math.round(LABEL_SIZE*s)+'px;white-space:nowrap;pointer-events:none;letter-spacing:0.5px;transform:translateX(-50%);';
+    el.style.left = (a.anchorX * s + r.left) + 'px';
+    el.style.top = (a.anchorY * s + r.top) + 'px';
+    el.textContent = a.text;
+    document.getElementById('hud').appendChild(el);
+    _annotEls.push(el);
+  }
+}
+
+// Draw dimension lines + register labels for each step
 function drawAnnotations(stepIdx) {
   brush.set('2H','#a09888',0.5);
   
   if (stepIdx >= 3) {
     drawDimLine(colLx-colWidth/2, colBot-15, colLx+colWidth/2, colBot-15, null, 'below');
-    addAnnotLabel((colLx-colWidth/2+colLx+colWidth/2)/2, colBot+15, 'U/φ² = '+colWidth.toFixed(0), 'center');
+    registerAnnot('U/\u03c6\u00b2 = '+colWidth.toFixed(0), colLx, colBot+20, 'center', 3);
   }
   if (stepIdx >= 4) {
     drawDimLine(colRx+colWidth/2+15, colBot, colRx+colWidth/2+15, colTop, null, 'right');
-    addAnnotLabel(colRx+colWidth/2+45, (colTop+colBot)/2, Math.round(colBot-colTop)+'px');
-    addAnnotLabel(colLx-colWidth/2-10, (colTop+colBot)/2, 'w = U/φ²', 'right');
+    registerAnnot(Math.round(colBot-colTop)+'px', colRx+colWidth/2, (colTop+colBot)/2, 'right', 4);
+    registerAnnot('w = U/\u03c6\u00b2', colLx-colWidth/2, (colTop+colBot)/2, 'left', 4);
   }
   if (stepIdx >= 5) {
     drawDimLine(colLx-capW*0.62-10, capBot, colLx-capW*0.62-10, capTop, null, 'left');
-    addAnnotLabel(colLx-capW*0.62-50, (capTop+capBot)/2, 'colW×φ', 'right');
+    registerAnnot('colW\u00d7\u03c6', colLx-capW*0.62, (capTop+capBot)/2, 'left', 5);
   }
   if (stepIdx >= 7) {
     drawDimLine(cx-halfSpan, springY+20, cx+halfSpan, springY+20, null, 'below');
-    addAnnotLabel(cx, springY+35, '2U = '+archSpan.toFixed(0), 'center');
+    registerAnnot('2U = '+archSpan.toFixed(0), cx, springY+35, 'center', 7);
     drawRadiusCallout(C2x, springY, cx, peakY, null);
-    addAnnotLabel((C2x+cx)/2+20, (springY+peakY)/2-15, 'R = 2U');
+    registerAnnot('R = 2U', cx+20, (springY+peakY)/2, 'right', 7);
     drawDimLine(cx+halfSpan+35, springY, cx+halfSpan+35, peakY, null, 'right');
-    addAnnotLabel(cx+halfSpan+60, (springY+peakY)/2, 'U√3 = '+archH.toFixed(0));
-    addAnnotLabel(cx+halfSpan+8, springY+35, 'spring @ H/φ');
+    registerAnnot('H = U\u221a3 = '+archH.toFixed(0), cx+halfSpan, (springY+peakY)/2+20, 'right', 7);
+    registerAnnot('spring @ H/\u03c6', cx+halfSpan, springY+40, 'right', 7);
   }
   if (stepIdx >= 8) {
     drawDimLine(bandR+18, bandBot_y, bandR+18, bandTop_y, null, 'right');
-    addAnnotLabel(bandR+35, (bandBot_y+bandTop_y)/2, 'U/φ = '+bandHeight_v.toFixed(0));
+    registerAnnot('U/\u03c6 = '+bandHeight_v.toFixed(0), bandR, (bandBot_y+bandTop_y)/2, 'right', 8);
   }
   if (stepIdx >= 9) {
     var crMidX = cx - crownHalfSpan*0.5;
     var crMidDx = crMidX - crownC2x;
     var crMidY = crownSpringY - Math.sqrt(Math.max(0, crownR*crownR - crMidDx*crMidDx));
     drawRadiusCallout(crownC2x, crownSpringY, crMidX, crMidY, null);
-    addAnnotLabel((crownC2x+crMidX)/2+15, (crownSpringY+crMidY)/2-10, 'R = span/√2');
+    registerAnnot('R = span/\u221a2', crownC2x, (crownSpringY+crMidY)/2, 'left', 9);
     drawDimLine(cx-crownHalfSpan, crownSpringY+12, cx+crownHalfSpan, crownSpringY+12, null, 'below');
-    addAnnotLabel(cx, crownSpringY+30, 'bandW×√φ = '+crownSpan.toFixed(0), 'center');
+    registerAnnot('bandW\u00d7\u221a\u03c6 = '+crownSpan.toFixed(0), cx, crownSpringY+25, 'center', 9);
   }
   if (stepIdx >= 10) {
     brush.set('2H','#a09888',0.5);
     var sAngle = -Math.PI/2;
-    var sTipX = starCx + starR_val*Math.cos(sAngle);
-    var sTipY = starCy + starR_val*Math.sin(sAngle);
-    brush.line(starCx, starCy, sTipX, sTipY);
+    brush.line(starCx, starCy, starCx + starR_val*Math.cos(sAngle), starCy + starR_val*Math.sin(sAngle));
     brush.circle(starCx, starCy, 4);
-    addAnnotLabel(starCx, starCy-starR_val-45, 'r = '+starR_val.toFixed(0)+'  {12/5}', 'center');
-    addAnnotLabel(starCx, starCy-starR_val-25, 'scales: r, r/φ, r/φ², r/φ³', 'center');
+    registerAnnot('r = '+starR_val.toFixed(0)+'  {12/5}', starCx, starCy-starR_val-35, 'center', 10);
+    registerAnnot('r, r/\u03c6, r/\u03c6\u00b2, r/\u03c6\u00b3', starCx, starCy-starR_val-15, 'center', 10);
   }
   if (stepIdx >= 0) {
-    addAnnotLabel(30, baseBot+25, 'U = W/(2φ+2) = '+U.toFixed(1)+'px');
-    addAnnotLabel(30, baseBot+42, 'φ = 1.618  √3 = 1.732  √2 = 1.414');
+    registerAnnot('U = W/(2\u03c6+2) = '+U.toFixed(1), 30, baseBot+20, 'center', 0);
+    registerAnnot('\u03c6=1.618  \u221a3=1.732  \u221a2=1.414', 30, baseBot+40, 'center', 0);
   }
+  
+  // Layout all visible labels
+  layoutAnnotations(stepIdx);
 }
 
 // =============================================
