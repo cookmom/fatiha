@@ -222,7 +222,7 @@ var STEPS = [
       brush.line(colLx-colWidth/2, colBot, colLx-colWidth/2, endY);
       brush.line(colLx+colWidth/2, colBot, colLx+colWidth/2, endY);
       // Fluting follows
-      if (p > 0.1) {
+      if (p >= 0) {
         brush.set('2H','#9a9288',0.7);
         var fEnd = colBot - 20 - (colBot-colTop-40) * Math.min(1,(p-0.1)/0.9);
         for(var fi=-1;fi<=1;fi++) brush.line(colLx+fi*colWidth*0.22,colBot-20,colLx+fi*colWidth*0.22,fEnd);
@@ -237,7 +237,7 @@ var STEPS = [
       var endY = colBot - (colBot-colTop) * p;
       brush.line(colRx-colWidth/2, colBot, colRx-colWidth/2, endY);
       brush.line(colRx+colWidth/2, colBot, colRx+colWidth/2, endY);
-      if (p > 0.1) {
+      if (p >= 0) {
         brush.set('2H','#9a9288',0.7);
         var fEnd = colBot - 20 - (colBot-colTop-40) * Math.min(1,(p-0.1)/0.9);
         for(var fi=-1;fi<=1;fi++) brush.line(colRx+fi*colWidth*0.22,colBot-20,colRx+fi*colWidth*0.22,fEnd);
@@ -366,13 +366,13 @@ var STEPS = [
       return [tipX, tipY];
     }},
   // 11: Niche wash — deep lapis
-  { name:'NICHE WASH', formula:'lapis #0c3a6a α=35', dur:0.25,
+  { name:'NICHE WASH', formula:'lapis #0c3a6a α=35', dur:0.1,
     bbox:[cx-halfSpan,peakY,cx+halfSpan,baseBot],
     draw: function(p) {
-      if (p > 0.1) {
+      if (p >= 0) {
         randomSeed(1001);
         brush.noStroke();
-        brush.fill('#0c3a6a', Math.round(35*Math.min(1,(p-0.1)/0.5)));
+        brush.fill('#0c3a6a', 35);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         var poly=[];
         for(var i=0;i<=60;i++){var t=i/60;var x=(cx-halfSpan)+halfSpan*t;var dx=x-C2x;poly.push([x,springY-Math.sqrt(Math.max(0,archR*archR-dx*dx))]);}
@@ -383,13 +383,13 @@ var STEPS = [
       return [cx, springY];
     }},
   // 12: Crown wash — lighter blue
-  { name:'CROWN WASH', formula:'azure #1a4a8a α=28', dur:0.2,
+  { name:'CROWN WASH', formula:'azure #1a4a8a α=28', dur:0.1,
     bbox:[cx-crownHalfSpan,crownPeakY,cx+crownHalfSpan,crownSpringY],
     draw: function(p) {
-      if (p > 0.1) {
+      if (p >= 0) {
         randomSeed(1002);
         brush.noStroke();
-        brush.fill('#1a4a8a', Math.round(28*Math.min(1,(p-0.1)/0.5)));
+        brush.fill('#1a4a8a', 28);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         var poly=[];
         for(var i=0;i<=40;i++){var t=i/40;var x=(cx-crownHalfSpan)+crownHalfSpan*t;var dx=x-crownC2x;poly.push([x,crownSpringY-Math.sqrt(Math.max(0,crownR*crownR-dx*dx))]);}
@@ -400,13 +400,13 @@ var STEPS = [
       return [cx, starCy];
     }},
   // 13: Inscription band wash — muted magenta
-  { name:'BAND WASH', formula:'amethyst #4a1a3a α=30', dur:0.2,
+  { name:'BAND WASH', formula:'amethyst #4a1a3a α=30', dur:0.1,
     bbox:[bandL,bandTop_y,bandR,bandBot_y],
     draw: function(p) {
-      if (p > 0.1) {
+      if (p >= 0) {
         randomSeed(1003);
         brush.noStroke();
-        brush.fill('#4a1a3a', Math.round(30*Math.min(1,(p-0.1)/0.5)));
+        brush.fill('#4a1a3a', 30);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         brush.rect(bandL+4,bandTop_y+4,bandR-bandL-8,bandBot_y-bandTop_y-8);
         brush.noFill();
@@ -414,11 +414,11 @@ var STEPS = [
       return [cx, bandBot_y];
     }},
   // 14: Column base tint — dark blue-grey
-  { name:'BASE TINT', formula:'slate #1a2a3a α=25', dur:0.2,
+  { name:'BASE TINT', formula:'slate #1a2a3a α=25', dur:0.1,
     bbox:[colLx-bw/2,colBot,colRx+bw/2,baseBot],
     draw: function(p) {
-      if (p > 0.1) {
-        var a = Math.round(25*Math.min(1,(p-0.1)/0.5));
+      if (p >= 0) {
+        var a = 25;
         randomSeed(1004);
         brush.noStroke();
         brush.fill('#1a2a3a', a);
@@ -434,11 +434,11 @@ var STEPS = [
       return [cx, baseBot];
     }},
   // 15: Capital accent — magenta touch
-  { name:'CAPITAL ACCENT', formula:'magenta #5a1a4a α=22', dur:0.2,
+  { name:'CAPITAL ACCENT', formula:'magenta #5a1a4a α=45', dur:0.1,
     bbox:[colLx-capW*0.6,capTop,colRx+capW*0.6,capBot],
     draw: function(p) {
-      if (p > 0.1) {
-        var a = Math.round(22*Math.min(1,(p-0.1)/0.5));
+      if (p >= 0) {
+        var a = 45;
         randomSeed(1005);
         brush.noStroke();
         brush.fill('#5a1a4a', a);
