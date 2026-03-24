@@ -16,7 +16,7 @@ canvas { object-fit:contain !important; }
 }
 .track-box {
   position:absolute; transition: opacity 0.3s ease, left 0.4s ease, top 0.4s ease, width 0.4s ease, height 0.4s ease;
-  min-width:200px; min-height:120px;
+  min-width:60px; min-height:60px; overflow:visible;
 }
 .track-box::before, .track-box::after,
 .track-box .bl::before, .track-box .br::before {
@@ -405,9 +405,7 @@ function createTrackBox(step) {
   var oy = window._canvasOffsetY || 0;
   var b = step.bbox, pad = 25 * s;
   var bx=(b[0]*s)+ox-pad,by=(b[1]*s)+oy-pad,bwid=(b[2]-b[0])*s+pad*2,bh=(b[3]-b[1])*s+pad*2;
-  var minW = 180, minH = 120;
-  if(bwid<minW){bx-=(minW-bwid)/2;bwid=minW;}
-  if(bh<minH){by-=(minH-bh)/2;bh=minH;}
+    // No minimum size inflation — box wraps tightly around the element
   box.style.left=bx+'px';box.style.top=by+'px';
   box.style.width=bwid+'px';box.style.height=bh+'px';
   ['tl','tr','bl2','br2'].forEach(function(c){var s=document.createElement('div');s.className='corner-sq '+c;box.appendChild(s);});
