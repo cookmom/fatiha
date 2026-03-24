@@ -34,17 +34,12 @@ canvas { object-fit:contain !important; }
 .corner-sq.br2 { bottom:-4px; right:-4px; }
 /* Info panel — INSIDE the track box, smart-positioned to avoid occlusion */
 .hud-info {
-  position:absolute; max-width:70%;
+  position:absolute; bottom:100%; left:0; margin-bottom:8px;
   background:rgba(0,8,16,0.78);
   border:1px solid rgba(0,212,255,0.3);
   border-radius:4px; padding:8px 12px;
   white-space:nowrap;
 }
-/* Default: top-right corner of box (drawing usually starts bottom-left/center) */
-.hud-info.pos-tr { top:6px; right:6px; }
-.hud-info.pos-tl { top:6px; left:6px; }
-.hud-info.pos-br { bottom:6px; right:6px; }
-.hud-info.pos-bl { bottom:6px; left:6px; }
 .hud-label { color:#00d4ff; font-size:13px; font-weight:bold; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:4px; text-shadow:0 0 8px rgba(0,212,255,0.5); }
 .hud-formula { color:rgba(0,212,255,0.75); font-size:11px; margin-bottom:3px; }
 .hud-coords { color:rgba(0,212,255,0.5); font-size:11px; }
@@ -420,8 +415,7 @@ function createTrackBox(step) {
   var br=document.createElement('div');br.className='br';br.style.cssText='position:absolute;bottom:0;right:0;width:100%;height:100%;pointer-events:none;';box.appendChild(br);
   // Info panel — placed at the corner least likely to occlude drawing
   // Drawing usually starts at bottom/center, so default top-right
-  var pos = step.panelPos || 'tr';
-  var info=document.createElement('div');info.className='hud-info pos-'+pos;
+  var info=document.createElement('div');info.className='hud-info';
   var lbl=document.createElement('div');lbl.className='hud-label';lbl.textContent=step.name;info.appendChild(lbl);
   var frm=document.createElement('div');frm.className='hud-formula';frm.textContent=step.formula;info.appendChild(frm);
   var crd=document.createElement('div');crd.className='hud-coords';crd.id='live-coords';crd.textContent='x:— y:—';info.appendChild(crd);
