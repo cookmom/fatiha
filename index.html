@@ -677,7 +677,21 @@ var STEPS = [
       if (p >= 0.95) { brush.set('2H','#8a8278',0.6); brush.circle(starCx,starCy,starR_val*0.15); brush.circle(starCx,starCy,starR_val/PHI); }
       return [tipX, tipY];
     }},
-  // 11: Niche wash — deep lapis
+  // 11: Gold star center — the payoff
+  { name:'STAR CENTER', formula:'gold #c8a832 α=40', dur:0.07,
+    bbox:[starCx-starR_val/PHI-5,starCy-starR_val/PHI-5,starCx+starR_val/PHI+5,starCy+starR_val/PHI+5],
+    draw: function(p) {
+      if (p >= 0) {
+        randomSeed(1006);
+        brush.noStroke();
+        brush.fill('#c8a832', 40);
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        brush.circle(starCx, starCy, starR_val/(PHI*PHI));
+        brush.noFill();
+      }
+      return [starCx, starCy];
+    }},
+  // 12: Niche wash — deep lapis
   { name:'NICHE WASH', formula:'lapis #0c3a6a α=35', dur:0.07,
     bbox:[cx-halfSpan,peakY,cx+halfSpan,baseBot],
     draw: function(p) {
@@ -769,7 +783,7 @@ var STEPS = [
 
 // Compute frame timeline — pauses between pencil steps, no pause between washes
 var PAUSE_S = 0.2;
-var WASH_START = 11; // step index where washes begin
+var WASH_START = 11; // step index where washes begin (gold + fills)
 var frameStarts = [], frameEnds = [];
 var f = 0;
 for (var i = 0; i < STEPS.length; i++) {
@@ -891,10 +905,21 @@ function draw() {
   
   if (tip) updatePencilDot(tip[0], tip[1]);
   
-  // Done
+  // Done — hold 7 seconds, then restart
   if (f >= totalAnimFrames - 1) {
     noLoop();
     if (pencilDot) pencilDot.style.display = 'none';
+    if (trackBox) trackBox.remove();
+    trackBox = null;
+    // Clear annotation labels
+    clearDimLabels();
+    _lastDimStep = -1;
+    setTimeout(function() {
+      // Reset state
+      lastHudStep = -1;
+      frameCount = 0;
+      loop();
+    }, 7000);
   }
 }
 </script>
