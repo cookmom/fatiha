@@ -64,22 +64,8 @@ function setup() {
   randomSeed(42);
   brush.wiggle(1.2);
 
-  // =============================================
-  // LAYER 1: NESTED FRAMES (3 layers)
-  // =============================================
+  // Inner frames REMOVED — only outer dome frame + crown
   brush.noFill();
-  
-  // Outer frame
-  brush.set('2H', '#b0a898', 1.5);
-  brush.rect(frameL, frameT, frameR - frameL, frameB - frameT);
-  
-  // Middle frame
-  brush.set('2H', '#b0a898', 1.0);
-  brush.rect(frameL + 25, frameT + 25, frameR - frameL - 50, frameB - frameT - 50);
-  
-  // Inner frame
-  brush.set('2H', '#c0b8a8', 0.8);
-  brush.rect(frameL + 50, frameT + 50, frameR - frameL - 100, frameB - frameT - 100);
   
   // =============================================
   // OUTERMOST FRAME + DOME (wraps around everything)
