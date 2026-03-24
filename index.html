@@ -9,8 +9,9 @@
 * { margin:0; }
 body { background:#f2eada; overflow:hidden; }
 #hud {
-  position:absolute; top:0; left:0; width:1080px; height:1920px;
+  position:absolute; top:0; left:0; width:100vw; height:100vh;
   pointer-events:none; font-family:'SF Mono','Fira Code',monospace;
+  overflow:hidden;
 }
 .track-box {
   position:absolute; transition: opacity 0.3s ease, left 0.4s ease, top 0.4s ease, width 0.4s ease, height 0.4s ease;
@@ -62,7 +63,17 @@ body { background:#f2eada; overflow:hidden; }
 // =============================================
 var PHI = (1 + Math.sqrt(5)) / 2;
 var ROOT3 = Math.sqrt(3), ROOT2 = Math.sqrt(2);
-var W = 1080, H = 1920, cx = W/2;
+// Responsive canvas — fit window, cap DPR at 2
+var _dpr = Math.min(window.devicePixelRatio || 1, 2);
+var W = Math.round(window.innerWidth * _dpr);
+var H = Math.round(window.innerHeight * _dpr);
+// Cap max framebuffer to avoid Safari crash
+if (W * H > 1080 * 1920) {
+  var _fbScale = Math.sqrt((1080 * 1920) / (W * H));
+  W = Math.round(W * _fbScale);
+  H = Math.round(H * _fbScale);
+}
+var cx = W/2;
 var U = W / (2*PHI + 2);
 var archSpan = U*2, halfSpan = U;
 var colWidth = U/PHI/PHI, colGap = colWidth/PHI, bandOverhang = colWidth/2;
@@ -388,10 +399,12 @@ function createTrackBox(step) {
   if (trackBox) trackBox.remove();
   var box = document.createElement('div');
   box.className = 'track-box';
-  var b = step.bbox, pad = 25;
-  var bx=b[0]-pad,by=b[1]-pad,bwid=(b[2]-b[0])+pad*2,bh=(b[3]-b[1])+pad*2;
-  if(bwid<220){bx-=(220-bwid)/2;bwid=220;}
-  if(bh<150){by-=(150-bh)/2;bh=150;}
+  var s = window._hudScale || 1;
+  var b = step.bbox, pad = 25 * s;
+  var bx=(b[0]*s)-pad,by=(b[1]*s)-pad,bwid=(b[2]-b[0])*s+pad*2,bh=(b[3]-b[1])*s+pad*2;
+  var minW = 180, minH = 120;
+  if(bwid<minW){bx-=(minW-bwid)/2;bwid=minW;}
+  if(bh<minH){by-=(minH-bh)/2;bh=minH;}
   box.style.left=bx+'px';box.style.top=by+'px';
   box.style.width=bwid+'px';box.style.height=bh+'px';
   ['tl','tr','bl2','br2'].forEach(function(c){var s=document.createElement('div');s.className='corner-sq '+c;box.appendChild(s);});
@@ -409,8 +422,9 @@ function createTrackBox(step) {
 function updatePencilDot(x, y) {
   if (!pencilDot) pencilDot = document.getElementById('pencil-dot');
   pencilDot.style.display = 'block';
-  pencilDot.style.left = (x-4) + 'px';
-  pencilDot.style.top = (y-4) + 'px';
+  var s = window._hudScale || 1;
+  pencilDot.style.left = (x*s-4) + 'px';
+  pencilDot.style.top = (y*s-4) + 'px';
   var el = document.getElementById('live-coords');
   if (el) el.textContent = 'x:' + Math.round(x) + ' y:' + Math.round(y);
 }
@@ -421,9 +435,14 @@ function updatePencilDot(x, y) {
 var lastHudStep = -1;
 
 function setup() {
-  createCanvas(W, H, WEBGL);
+  var c = createCanvas(W, H, WEBGL);
+  // Size canvas CSS to fill viewport
+  c.elt.style.width = '100vw';
+  c.elt.style.height = '100vh';
   brush.load();
   frameRate(FPS);
+  // Store scale factor for HUD positioning
+  window._hudScale = window.innerWidth / W;
 }
 
 function draw() {
