@@ -116,6 +116,92 @@ var starR_val = Math.min(crownH/(2*PHI), crownHalfSpan/(PHI*PHI));
 var bw = colWidth * PHI / ROOT2;
 
 // =============================================
+// ANNOTATION DRAWING — architectural dimension lines, radius callouts, labels
+// All drawn in pencil grey (#8a8278) at thin weight
+// =============================================
+function drawDimLine(x1,y1,x2,y2,label,side) {
+  // Dimension line with perpendicular ticks and centered label
+  var off = side === 'left' ? -25 : (side === 'right' ? 25 : 0);
+  var offY = side === 'above' ? -20 : (side === 'below' ? 20 : 0);
+  var ax1=x1+off, ay1=y1+offY, ax2=x2+off, ay2=y2+offY;
+  brush.set('2H','#a09888',0.5);
+  brush.line(ax1,ay1,ax2,ay2);
+  // Ticks at ends (perpendicular, 8px)
+  var dx=ax2-ax1, dy=ay2-ay1;
+  var len=Math.sqrt(dx*dx+dy*dy);
+  if(len<1) return;
+  var nx=-dy/len*8, ny=dx/len*8;
+  brush.line(ax1-nx,ay1-ny,ax1+nx,ay1+ny);
+  brush.line(ax2-nx,ay2-ny,ax2+nx,ay2+ny);
+  // Leader lines back to element
+  brush.set('2H','#b8b0a0',0.3);
+  brush.line(x1,y1,ax1,ay1);
+  brush.line(x2,y2,ax2,ay2);
+}
+
+function drawRadiusCallout(cx_,cy_,px,py,label) {
+  // Line from center to point on arc with label
+  brush.set('2H','#a09888',0.5);
+  brush.line(cx_,cy_,px,py);
+  // Small circle at center
+  brush.circle(cx_,cy_,4);
+}
+
+function drawAngleArc(cx_,cy_,r,startA,endA) {
+  // Small arc showing angle at springing point
+  brush.set('2H','#a09888',0.5);
+  var pts = [];
+  var steps = 12;
+  for (var i=0;i<=steps;i++) {
+    var t = i/steps;
+    var a = startA + (endA-startA)*t;
+    pts.push([cx_+r*Math.cos(a), cy_+r*Math.sin(a)]);
+  }
+  brush.spline(pts, 0.5);
+}
+
+// Annotations for each completed step — drawn as permanent marks
+function drawAnnotations(stepIdx) {
+  brush.set('2H','#a09888',0.5);
+  
+  if (stepIdx >= 3) {
+    // Column width dimension — horizontal below column
+    drawDimLine(colLx-colWidth/2, colBot-15, colLx+colWidth/2, colBot-15, '', 'below');
+  }
+  if (stepIdx >= 4) {
+    // Column height dimension — vertical beside right column  
+    drawDimLine(colRx+colWidth/2+15, colBot, colRx+colWidth/2+15, colTop, '', 'right');
+  }
+  if (stepIdx >= 7) {
+    // Arch span dimension — horizontal below springing
+    drawDimLine(cx-halfSpan, springY+20, cx+halfSpan, springY+20, '', 'below');
+    // Arch radius callout — line from C2x to peak
+    var peakArcX = cx, peakArcY = peakY;
+    drawRadiusCallout(C2x, springY, peakArcX, peakArcY, 'R=2U');
+    // Arch height dimension — vertical beside arch
+    drawDimLine(cx+halfSpan+30, springY, cx+halfSpan+30, peakY, '', 'right');
+  }
+  if (stepIdx >= 8) {
+    // Band height dimension — vertical beside band
+    drawDimLine(bandR+15, bandBot_y, bandR+15, bandTop_y, '', 'right');
+  }
+  if (stepIdx >= 9) {
+    // Crown radius callout
+    var crMidX = cx - crownHalfSpan*0.5;
+    var crMidDx = crMidX - crownC2x;
+    var crMidY = crownSpringY - Math.sqrt(Math.max(0, crownR*crownR - crMidDx*crMidDx));
+    drawRadiusCallout(crownC2x, crownSpringY, crMidX, crMidY, 'R');
+  }
+  if (stepIdx >= 10) {
+    // Star radius lines — one spoke highlighted
+    brush.set('2H','#a09888',0.5);
+    var sAngle = -Math.PI/2;
+    brush.line(starCx, starCy, starCx + starR_val*Math.cos(sAngle), starCy + starR_val*Math.sin(sAngle));
+    brush.circle(starCx, starCy, 4);
+  }
+}
+
+// =============================================
 // PROGRESSIVE LINE DRAWING
 // Given an array of [x,y] segments and progress 0-1,
 // draw only up to that progress. Returns current tip position.
@@ -559,6 +645,9 @@ function draw() {
     STEPS[i].draw(1);
   }
   
+  // Draw annotations for all completed steps
+  drawAnnotations(activeStep - 1);
+  
   // Draw current step at partial progress
   var stepFrame = f - frameStarts[activeStep];
   var stepDurFrames = frameEnds[activeStep] - frameStarts[activeStep];
@@ -572,8 +661,9 @@ function draw() {
   }
   if (tip) updatePencilDot(tip[0], tip[1]);
   
-  // Done
+  // Done — draw final annotations
   if (f >= totalAnimFrames - 1) {
+    drawAnnotations(STEPS.length - 1);
     noLoop();
     if (pencilDot) pencilDot.style.display = 'none';
   }
