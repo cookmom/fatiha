@@ -359,7 +359,7 @@ var STEPS = [
       return [tipX, tipY];
     }},
   // 11: Niche wash — deep lapis
-  { name:'NICHE WASH', formula:'lapis #0c3a6a α=35', dur:1.0,
+  { name:'NICHE WASH', formula:'lapis #0c3a6a α=35', dur:0.4,
     bbox:[cx-halfSpan,peakY,cx+halfSpan,baseBot],
     draw: function(p) {
       if (p > 0.1) {
@@ -376,7 +376,7 @@ var STEPS = [
       return [cx, springY];
     }},
   // 12: Crown wash — lighter blue
-  { name:'CROWN WASH', formula:'azure #1a4a8a α=28', dur:0.8,
+  { name:'CROWN WASH', formula:'azure #1a4a8a α=28', dur:0.3,
     bbox:[cx-crownHalfSpan,crownPeakY,cx+crownHalfSpan,crownSpringY],
     draw: function(p) {
       if (p > 0.1) {
@@ -393,7 +393,7 @@ var STEPS = [
       return [cx, starCy];
     }},
   // 13: Inscription band wash — muted magenta
-  { name:'BAND WASH', formula:'amethyst #4a1a3a α=30', dur:0.8,
+  { name:'BAND WASH', formula:'amethyst #4a1a3a α=30', dur:0.3,
     bbox:[bandL,bandTop_y,bandR,bandBot_y],
     draw: function(p) {
       if (p > 0.1) {
@@ -407,7 +407,7 @@ var STEPS = [
       return [cx, bandBot_y];
     }},
   // 14: Column base tint — dark blue-grey
-  { name:'BASE TINT', formula:'slate #1a2a3a α=25', dur:0.6,
+  { name:'BASE TINT', formula:'slate #1a2a3a α=25', dur:0.3,
     bbox:[colLx-bw/2,colBot,colRx+bw/2,baseBot],
     draw: function(p) {
       if (p > 0.1) {
@@ -427,7 +427,7 @@ var STEPS = [
       return [cx, baseBot];
     }},
   // 15: Capital accent — magenta touch
-  { name:'CAPITAL ACCENT', formula:'magenta #5a1a4a α=22', dur:0.6,
+  { name:'CAPITAL ACCENT', formula:'magenta #5a1a4a α=22', dur:0.3,
     bbox:[colLx-capW*0.6,capTop,colRx+capW*0.6,capBot],
     draw: function(p) {
       if (p > 0.1) {
