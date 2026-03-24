@@ -45,9 +45,9 @@ canvas { object-fit:contain !important; display:block; }
   border-radius:4px; padding:8px 12px;
   white-space:nowrap;
 }
-.hud-label { color:#3a3430; font-size:9px; font-weight:500; letter-spacing:0.3px; text-transform:uppercase; margin-bottom:3px; }
-.hud-formula { color:#5a5248; font-size:9px; font-weight:normal; letter-spacing:0.3px; margin-bottom:2px; }
-.hud-coords { color:#8a8278; font-size:9px; font-weight:normal; letter-spacing:0.3px; }
+.hud-label { color:#3a3430; font-weight:500; letter-spacing:0.3px; text-transform:uppercase; margin-bottom:3px; }
+.hud-formula { color:#5a5248; font-weight:normal; letter-spacing:0.3px; margin-bottom:2px; }
+.hud-coords { color:#8a8278; font-weight:normal; letter-spacing:0.3px; }
 .track-box.complete { animation: pulse-complete 0.5s ease; }
 @keyframes pulse-complete {
   0% { filter: drop-shadow(0 0 4px rgba(90,82,72,0.6)); }
@@ -804,10 +804,11 @@ function createTrackBox(step) {
   var br=document.createElement('div');br.className='br';br.style.cssText='position:absolute;bottom:0;right:0;width:100%;height:100%;pointer-events:none;';box.appendChild(br);
   // Info panel — placed at the corner least likely to occlude drawing
   // Drawing usually starts at bottom/center, so default top-right
+  var _fs = Math.max(9, Math.round(ANNOT_FONT * (window._hudScale||1))) + 'px';
   var info=document.createElement('div');info.className='hud-info';
-  var lbl=document.createElement('div');lbl.className='hud-label';lbl.textContent=step.name;info.appendChild(lbl);
-  var frm=document.createElement('div');frm.className='hud-formula';frm.textContent=step.formula;info.appendChild(frm);
-  var crd=document.createElement('div');crd.className='hud-coords';crd.id='live-coords';crd.textContent='x:— y:—';info.appendChild(crd);
+  var lbl=document.createElement('div');lbl.className='hud-label';lbl.style.fontSize=_fs;lbl.textContent=step.name;info.appendChild(lbl);
+  var frm=document.createElement('div');frm.className='hud-formula';frm.style.fontSize=_fs;frm.textContent=step.formula;info.appendChild(frm);
+  var crd=document.createElement('div');crd.className='hud-coords';crd.style.fontSize=_fs;crd.id='live-coords';crd.textContent='x:— y:—';info.appendChild(crd);
   box.appendChild(info);
   hud.appendChild(box);
   trackBox = box;
