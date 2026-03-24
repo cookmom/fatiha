@@ -1,0 +1,468 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+<style>
+* { margin:0; }
+body { background:#f2eada; overflow:hidden; }
+#hud {
+  position:absolute; top:0; left:0; width:1080px; height:1920px;
+  pointer-events:none; font-family:'SF Mono','Fira Code',monospace;
+}
+.track-box {
+  position:absolute; transition: opacity 0.3s ease, left 0.4s ease, top 0.4s ease, width 0.4s ease, height 0.4s ease;
+  min-width:200px; min-height:120px;
+}
+.track-box::before, .track-box::after,
+.track-box .bl::before, .track-box .br::before {
+  content:''; position:absolute; width:22px; height:22px;
+  border-color:#00d4ff; border-style:solid; border-width:0;
+}
+.track-box::before { top:-2px; left:-2px; border-top-width:2px; border-left-width:2px; }
+.track-box::after  { top:-2px; right:-2px; border-top-width:2px; border-right-width:2px; }
+.track-box .bl::before { bottom:-2px; left:-2px; border-bottom-width:2px; border-left-width:2px; position:absolute; }
+.track-box .br::before { bottom:-2px; right:-2px; border-bottom-width:2px; border-right-width:2px; position:absolute; }
+.corner-sq { position:absolute; width:7px; height:7px; background:#00d4ff; }
+.corner-sq.tl { top:-4px; left:-4px; }
+.corner-sq.tr { top:-4px; right:-4px; }
+.corner-sq.bl2 { bottom:-4px; left:-4px; }
+.corner-sq.br2 { bottom:-4px; right:-4px; }
+.hud-info {
+  position:absolute; bottom:8px; left:8px; right:8px;
+  background:rgba(0,8,16,0.78);
+  border:1px solid rgba(0,212,255,0.3);
+  border-radius:4px; padding:10px 14px;
+}
+.hud-label { color:#00d4ff; font-size:15px; font-weight:bold; letter-spacing:2px; text-transform:uppercase; margin-bottom:5px; text-shadow:0 0 10px rgba(0,212,255,0.5); }
+.hud-formula { color:rgba(0,212,255,0.8); font-size:13px; margin-bottom:3px; }
+.hud-coords { color:rgba(0,212,255,0.55); font-size:12px; }
+.track-box.complete { animation: pulse-complete 0.6s ease; }
+@keyframes pulse-complete {
+  0% { filter: drop-shadow(0 0 4px rgba(0,212,255,0.8)); }
+  50% { filter: drop-shadow(0 0 16px rgba(0,212,255,1)); }
+  100% { filter: drop-shadow(0 0 4px rgba(0,212,255,0.15)); }
+}
+/* Pencil cursor dot */
+#pencil-dot {
+  position:absolute; width:8px; height:8px; border-radius:50%;
+  background:#00d4ff; box-shadow: 0 0 8px rgba(0,212,255,0.8), 0 0 20px rgba(0,212,255,0.3);
+  pointer-events:none; transition: left 0.03s linear, top 0.03s linear;
+  z-index:10;
+}
+</style>
+</head>
+<body>
+<div id="hud"><div id="pencil-dot" style="display:none"></div></div>
+<script>
+// =============================================
+// CONSTANTS
+// =============================================
+var PHI = (1 + Math.sqrt(5)) / 2;
+var ROOT3 = Math.sqrt(3), ROOT2 = Math.sqrt(2);
+var W = 1080, H = 1920, cx = W/2;
+var U = W / (2*PHI + 2);
+var archSpan = U*2, halfSpan = U;
+var colWidth = U/PHI/PHI, colGap = colWidth/PHI, bandOverhang = colWidth/2;
+var colLx = cx - halfSpan - colGap - colWidth/2;
+var colRx = cx + halfSpan + colGap + colWidth/2;
+var bandL = colLx - colWidth/2 - bandOverhang;
+var bandR = colRx + colWidth/2 + bandOverhang;
+var bandW = bandR - bandL;
+var crownSpan = bandW * Math.sqrt(PHI), crownHalfSpan = crownSpan/2;
+var margin_top = U/PHI/PHI, margin_bot = margin_top;
+var baseHeight = colWidth/PHI;
+var baseBot = H - margin_bot, baseTop = baseBot - baseHeight;
+var compH = baseTop - margin_top;
+var springY = margin_top + compH/PHI;
+var archH = archSpan * ROOT3/2, archR = archSpan;
+var peakY = springY - archH;
+var C1x = cx-halfSpan, C2x = cx+halfSpan;
+var colBot = baseTop, colTop = springY;
+var capHeight = colWidth*PHI, capW = colWidth*PHI;
+var capBot = colTop, capTop = capBot - capHeight;
+var bandGap = U/(PHI*PHI*PHI), bandBot_y = peakY - bandGap;
+var bandHeight_v = U/PHI, bandTop_y = bandBot_y - bandHeight_v;
+var crownSpringY = bandTop_y;
+var crownR = crownSpan * ROOT2/2;
+var crownH_sq = crownR*crownR - crownHalfSpan*crownHalfSpan;
+var crownH = crownH_sq > 0 ? Math.sqrt(crownH_sq) : crownSpan*ROOT3/2;
+var crownPeakY = crownSpringY - crownH;
+if (crownPeakY < margin_top) { crownH = crownSpringY-margin_top; crownPeakY = margin_top; crownR = Math.sqrt(crownHalfSpan*crownHalfSpan+crownH*crownH); }
+var crownC1x = cx-crownHalfSpan, crownC2x = cx+crownHalfSpan;
+var starCx = cx, starCy = crownPeakY + crownH/PHI;
+var starR_val = Math.min(crownH/(2*PHI), crownHalfSpan/(PHI*PHI));
+var bw = colWidth * PHI / ROOT2;
+
+// =============================================
+// PROGRESSIVE LINE DRAWING
+// Given an array of [x,y] segments and progress 0-1,
+// draw only up to that progress. Returns current tip position.
+// =============================================
+function drawSegments(segs, progress) {
+  // segs = array of {from:[x,y], to:[x,y]}
+  var totalLen = 0;
+  var lens = [];
+  for (var i = 0; i < segs.length; i++) {
+    var dx = segs[i].to[0]-segs[i].from[0], dy = segs[i].to[1]-segs[i].from[1];
+    var l = Math.sqrt(dx*dx+dy*dy);
+    lens.push(l);
+    totalLen += l;
+  }
+  var targetLen = progress * totalLen;
+  var drawn = 0;
+  var tipX = segs[0].from[0], tipY = segs[0].from[1];
+  for (var i = 0; i < segs.length; i++) {
+    if (drawn + lens[i] <= targetLen) {
+      // Draw full segment
+      brush.line(segs[i].from[0], segs[i].from[1], segs[i].to[0], segs[i].to[1]);
+      drawn += lens[i];
+      tipX = segs[i].to[0]; tipY = segs[i].to[1];
+    } else {
+      // Partial segment
+      var remain = targetLen - drawn;
+      var t = remain / lens[i];
+      var px = segs[i].from[0] + (segs[i].to[0]-segs[i].from[0]) * t;
+      var py = segs[i].from[1] + (segs[i].to[1]-segs[i].from[1]) * t;
+      brush.line(segs[i].from[0], segs[i].from[1], px, py);
+      tipX = px; tipY = py;
+      break;
+    }
+  }
+  return [tipX, tipY];
+}
+
+// Progressive spline: draw points up to progress
+function drawSplinePartial(allPts, progress, tension) {
+  var n = Math.max(2, Math.floor(allPts.length * progress));
+  var pts = allPts.slice(0, n);
+  if (pts.length >= 2) brush.spline(pts, tension || 0.3);
+  var last = pts[pts.length-1];
+  return [last[0], last[1]];
+}
+
+// =============================================
+// STEP DEFINITIONS with progressive draw
+// =============================================
+var FPS = 60;
+
+// Pre-compute arch point arrays
+var archPtsL = [], archPtsR = [];
+for (var i=0;i<=50;i++){var t=i/50;var x=(cx-halfSpan)+halfSpan*t;var dx=x-C2x;archPtsL.push([x,springY-Math.sqrt(Math.max(0,archR*archR-dx*dx)),0.3+0.7*Math.sin(Math.PI*t)]);}
+for (var i=0;i<=50;i++){var t=i/50;var x=cx+halfSpan*t;var dx=x-C1x;archPtsR.push([x,springY-Math.sqrt(Math.max(0,archR*archR-dx*dx)),0.3+0.7*Math.sin(Math.PI*t)]);}
+var crownPtsL = [], crownPtsR = [];
+for (var i=0;i<=40;i++){var t=i/40;var x=(cx-crownHalfSpan)+crownHalfSpan*t;var dx=x-crownC2x;crownPtsL.push([x,crownSpringY-Math.sqrt(Math.max(0,crownR*crownR-dx*dx)),0.3+0.7*Math.sin(Math.PI*t)]);}
+for (var i=0;i<=40;i++){var t=i/40;var x=cx+crownHalfSpan*t;var dx=x-crownC1x;crownPtsR.push([x,crownSpringY-Math.sqrt(Math.max(0,crownR*crownR-dx*dx)),0.3+0.7*Math.sin(Math.PI*t)]);}
+
+// Calligraphy points
+var calligPts = [];
+var bandMidY = (bandBot_y+bandTop_y)/2;
+for(var i=0;i<=60;i++){var t=i/60;var x=bandL+50+(bandR-bandL-100)*t;calligPts.push([x,bandMidY+Math.sin(t*Math.PI*9)*10+Math.sin(t*Math.PI*3.5)*6,0.3+0.7*Math.abs(Math.sin(t*Math.PI*5))]);}
+
+var STEPS = [
+  // 0: Ground line
+  { name:'GROUND LINE', formula:'y = H − U/φ²', dur:0.8,
+    bbox:[bandL-10,baseBot-15,bandR+10,baseBot+15],
+    draw: function(p) {
+      brush.set('2H','#5a5248',2.0);
+      return drawSegments([{from:[bandL-10,baseBot],to:[bandR+10,baseBot]}], p);
+    }},
+  // 1: Left base
+  { name:'LEFT BASE', formula:'w = U/φ² × φ/√2 = '+bw.toFixed(0)+'px', dur:0.8,
+    bbox:[colLx-bw/2,colBot,colLx+bw/2,baseBot],
+    draw: function(p) {
+      brush.set('2H','#5a5248',1.8);
+      return drawSegments([
+        {from:[colLx-bw/2,baseBot],to:[colLx+bw/2,baseBot]},
+        {from:[colLx+bw/2,baseBot],to:[colLx+bw/2,colBot]},
+        {from:[colLx+bw/2,colBot],to:[colLx-bw/2,colBot]},
+        {from:[colLx-bw/2,colBot],to:[colLx-bw/2,baseBot]}
+      ], p);
+    }},
+  // 2: Right base
+  { name:'RIGHT BASE', formula:'mirror of left', dur:0.8,
+    bbox:[colRx-bw/2,colBot,colRx+bw/2,baseBot],
+    draw: function(p) {
+      brush.set('2H','#5a5248',1.8);
+      return drawSegments([
+        {from:[colRx-bw/2,baseBot],to:[colRx+bw/2,baseBot]},
+        {from:[colRx+bw/2,baseBot],to:[colRx+bw/2,colBot]},
+        {from:[colRx+bw/2,colBot],to:[colRx-bw/2,colBot]},
+        {from:[colRx-bw/2,colBot],to:[colRx-bw/2,baseBot]}
+      ], p);
+    }},
+  // 3: Left column (draws upward)
+  { name:'LEFT COLUMN', formula:'w = U/φ² = '+colWidth.toFixed(0)+' | h = '+Math.round(colBot-colTop), dur:1.2,
+    bbox:[colLx-colWidth/2,colTop,colLx+colWidth/2,colBot],
+    draw: function(p) {
+      brush.set('2H','#5a5248',2.0);
+      // Both edges draw upward simultaneously
+      var endY = colBot - (colBot-colTop) * p;
+      brush.line(colLx-colWidth/2, colBot, colLx-colWidth/2, endY);
+      brush.line(colLx+colWidth/2, colBot, colLx+colWidth/2, endY);
+      // Fluting follows
+      if (p > 0.1) {
+        brush.set('2H','#9a9288',0.7);
+        var fEnd = colBot - 20 - (colBot-colTop-40) * Math.min(1,(p-0.1)/0.9);
+        for(var fi=-1;fi<=1;fi++) brush.line(colLx+fi*colWidth*0.22,colBot-20,colLx+fi*colWidth*0.22,fEnd);
+      }
+      return [colLx, endY];
+    }},
+  // 4: Right column
+  { name:'RIGHT COLUMN', formula:'w = U/φ²', dur:1.2,
+    bbox:[colRx-colWidth/2,colTop,colRx+colWidth/2,colBot],
+    draw: function(p) {
+      brush.set('2H','#5a5248',2.0);
+      var endY = colBot - (colBot-colTop) * p;
+      brush.line(colRx-colWidth/2, colBot, colRx-colWidth/2, endY);
+      brush.line(colRx+colWidth/2, colBot, colRx+colWidth/2, endY);
+      if (p > 0.1) {
+        brush.set('2H','#9a9288',0.7);
+        var fEnd = colBot - 20 - (colBot-colTop-40) * Math.min(1,(p-0.1)/0.9);
+        for(var fi=-1;fi<=1;fi++) brush.line(colRx+fi*colWidth*0.22,colBot-20,colRx+fi*colWidth*0.22,fEnd);
+      }
+      return [colRx, endY];
+    }},
+  // 5: Left capital
+  { name:'LEFT CAPITAL', formula:'h = colW × φ = '+capHeight.toFixed(0)+'px', dur:0.8,
+    bbox:[colLx-capW*0.62,capTop-6,colLx+capW*0.62,capBot],
+    draw: function(p) {
+      brush.set('2H','#5a5248',1.8);
+      return drawSegments([
+        {from:[colLx-capW/2,capBot],to:[colLx+capW/2,capBot]},
+        {from:[colLx-capW*0.58,capTop],to:[colLx+capW*0.58,capTop]},
+        {from:[colLx-capW*0.62,capTop-6],to:[colLx+capW*0.62,capTop-6]}
+      ], p);
+    }},
+  // 6: Right capital
+  { name:'RIGHT CAPITAL', formula:'h = colW × φ', dur:0.8,
+    bbox:[colRx-capW*0.62,capTop-6,colRx+capW*0.62,capBot],
+    draw: function(p) {
+      brush.set('2H','#5a5248',1.8);
+      return drawSegments([
+        {from:[colRx-capW/2,capBot],to:[colRx+capW/2,capBot]},
+        {from:[colRx-capW*0.58,capTop],to:[colRx+capW*0.58,capTop]},
+        {from:[colRx-capW*0.62,capTop-6],to:[colRx+capW*0.62,capTop-6]}
+      ], p);
+    }},
+  // 7: Main arch (left then right arc as one step)
+  { name:'NICHE ARCH', formula:'R = 2U = '+archSpan.toFixed(0)+' | H = U√3 = '+archH.toFixed(0), dur:2.0,
+    bbox:[cx-halfSpan,peakY,cx+halfSpan,springY+20],
+    draw: function(p) {
+      brush.set('2H','#5a5248',2.5);
+      if (p <= 0.45) {
+        // Left arc
+        return drawSplinePartial(archPtsL, p/0.45, 0.3);
+      } else if (p <= 0.9) {
+        // Full left + partial right
+        brush.spline(archPtsL, 0.3);
+        return drawSplinePartial(archPtsR, (p-0.45)/0.45, 0.3);
+      } else {
+        // Both arcs + legs
+        brush.spline(archPtsL, 0.3);
+        brush.spline(archPtsR, 0.3);
+        var legP = (p-0.9)/0.1;
+        var legEndY = springY + (baseBot-springY)*legP;
+        brush.line(cx-halfSpan,springY,cx-halfSpan,legEndY);
+        brush.line(cx+halfSpan,springY,cx+halfSpan,legEndY);
+        return [cx+halfSpan, legEndY];
+      }
+    }},
+  // 8: Inscription band
+  { name:'INSCRIPTION BAND', formula:'h = U/φ = '+bandHeight_v.toFixed(0)+'px', dur:1.5,
+    bbox:[bandL,bandTop_y,bandR,bandBot_y],
+    draw: function(p) {
+      brush.set('2H','#5a5248',1.8);
+      if (p <= 0.3) {
+        // Top and bottom lines
+        var lineP = p/0.3;
+        var endX = bandL + (bandR-bandL)*lineP;
+        brush.line(bandL,bandBot_y,endX,bandBot_y);
+        brush.line(bandL,bandTop_y,endX,bandTop_y);
+        return [endX, bandBot_y];
+      } else if (p <= 0.5) {
+        // Full lines + jambs drawing down
+        brush.line(bandL,bandBot_y,bandR,bandBot_y);
+        brush.line(bandL,bandTop_y,bandR,bandTop_y);
+        brush.set('2H','#5a5248',1.5);
+        var jP = (p-0.3)/0.2;
+        var jEndY = bandBot_y + (capTop-6-bandBot_y)*jP;
+        brush.line(bandL,bandBot_y,bandL,jEndY);
+        brush.line(bandR,bandBot_y,bandR,jEndY);
+        return [bandL, jEndY];
+      } else {
+        // Full structure + calligraphy
+        brush.line(bandL,bandBot_y,bandR,bandBot_y);
+        brush.line(bandL,bandTop_y,bandR,bandTop_y);
+        brush.set('2H','#5a5248',1.5);
+        brush.line(bandL,bandBot_y,bandL,capTop-6);
+        brush.line(bandR,bandBot_y,bandR,capTop-6);
+        brush.set('2H','#8a8278',0.7);
+        brush.line(bandL+8,bandBot_y-8,bandR-8,bandBot_y-8);
+        brush.line(bandL+8,bandTop_y+8,bandR-8,bandTop_y+8);
+        // Calligraphy progressively
+        brush.set('2H','#7a7068',1.2);
+        var calP = (p-0.5)/0.5;
+        return drawSplinePartial(calligPts, calP, 0.4);
+      }
+    }},
+  // 9: Crown arch
+  { name:'CROWN ARCH', formula:'span = bandW×√φ | R = span/√2 = '+crownR.toFixed(0), dur:1.5,
+    bbox:[cx-crownHalfSpan,crownPeakY,cx+crownHalfSpan,crownSpringY],
+    draw: function(p) {
+      brush.set('2H','#5a5248',2.2);
+      if (p <= 0.5) {
+        return drawSplinePartial(crownPtsL, p/0.5, 0.3);
+      } else {
+        brush.spline(crownPtsL, 0.3);
+        return drawSplinePartial(crownPtsR, (p-0.5)/0.5, 0.3);
+      }
+    }},
+  // 10: Star
+  { name:'12-FOLD STAR', formula:'{12/5} — scales: r, r/φ, r/φ², r/φ³', dur:2.0,
+    bbox:[starCx-starR_val-15,starCy-starR_val-15,starCx+starR_val+15,starCy+starR_val+15],
+    draw: function(p) {
+      var scales=[starR_val,starR_val/PHI,starR_val/(PHI*PHI),starR_val/(PHI*PHI*PHI)];
+      var layerP = p * scales.length;
+      var numLayers = Math.min(scales.length, Math.ceil(layerP));
+      var tipX = starCx, tipY = starCy;
+      for (var si=0; si < numLayers; si++) {
+        var r = scales[si];
+        var verts = [];
+        for (var k=0;k<12;k++){var a=k*Math.PI/6-Math.PI/2;verts.push([starCx+r*Math.cos(a),starCy+r*Math.sin(a)]);}
+        // How many of the 12 lines in this layer?
+        var thisLayerP = si < numLayers-1 ? 1 : (layerP - si);
+        var numLines = Math.max(1, Math.round(thisLayerP * 12));
+        brush.set('2H','#6a6258',1.0);
+        for (var k=0;k<numLines;k++){var k2=(k+5)%12;brush.line(verts[k][0],verts[k][1],verts[k2][0],verts[k2][1]);tipX=verts[k2][0];tipY=verts[k2][1];}
+        if (thisLayerP >= 1) {
+          if(si<2){brush.set('2H','#8a8278',0.5);for(var k=0;k<12;k++){var k2=(k+4)%12;brush.line(verts[k][0],verts[k][1],verts[k2][0],verts[k2][1]);}}
+          if(si===0){brush.set('2H','#6a6258',1.0);for(var k=0;k<12;k++){var k2=(k+1)%12;brush.line(verts[k][0],verts[k][1],verts[k2][0],verts[k2][1]);}
+          brush.set('2H','#9a9288',0.4);for(var k=0;k<12;k++)brush.line(starCx,starCy,verts[k][0],verts[k][1]);}
+        }
+      }
+      if (p >= 0.95) { brush.set('2H','#8a8278',0.6); brush.circle(starCx,starCy,starR_val*0.15); brush.circle(starCx,starCy,starR_val/PHI); }
+      return [tipX, tipY];
+    }},
+  // 11: Blue wash
+  { name:'NICHE WASH', formula:'fill #0c3a6a α=35', dur:1.0,
+    bbox:[cx-halfSpan,peakY,cx+halfSpan,baseBot],
+    draw: function(p) {
+      // Fill just appears (no progressive for polygon fill)
+      if (p > 0.1) {
+        brush.noStroke();
+        brush.fill('#0c3a6a', Math.round(35*Math.min(1,(p-0.1)/0.5)));
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        var poly=[];
+        for(var i=0;i<=60;i++){var t=i/60;var x=(cx-halfSpan)+halfSpan*t;var dx=x-C2x;poly.push([x,springY-Math.sqrt(Math.max(0,archR*archR-dx*dx))]);}
+        for(var i=0;i<=60;i++){var t=i/60;var x=cx+halfSpan*t;var dx=x-C1x;poly.push([x,springY-Math.sqrt(Math.max(0,archR*archR-dx*dx))]);}
+        poly.push([cx+halfSpan,baseBot],[cx-halfSpan,baseBot]);
+        brush.polygon(poly); brush.noFill();
+      }
+      return [cx, springY];
+    }}
+];
+
+// Compute frame timeline
+var PAUSE_S = 0.3;
+var frameStarts = [], frameEnds = [];
+var f = 0;
+for (var i = 0; i < STEPS.length; i++) {
+  frameStarts.push(Math.round(f));
+  f += STEPS[i].dur * FPS;
+  frameEnds.push(Math.round(f));
+  if (i < STEPS.length-1) f += PAUSE_S * FPS;
+}
+var totalAnimFrames = Math.round(f);
+
+// =============================================
+// HUD
+// =============================================
+var trackBox = null;
+var pencilDot = null;
+
+function createTrackBox(step) {
+  var hud = document.getElementById('hud');
+  if (trackBox) trackBox.remove();
+  var box = document.createElement('div');
+  box.className = 'track-box';
+  var b = step.bbox, pad = 25;
+  var bx=b[0]-pad,by=b[1]-pad,bwid=(b[2]-b[0])+pad*2,bh=(b[3]-b[1])+pad*2;
+  if(bwid<220){bx-=(220-bwid)/2;bwid=220;}
+  if(bh<150){by-=(150-bh)/2;bh=150;}
+  box.style.left=bx+'px';box.style.top=by+'px';
+  box.style.width=bwid+'px';box.style.height=bh+'px';
+  ['tl','tr','bl2','br2'].forEach(function(c){var s=document.createElement('div');s.className='corner-sq '+c;box.appendChild(s);});
+  var bl=document.createElement('div');bl.className='bl';bl.style.cssText='position:absolute;bottom:0;left:0;width:100%;height:100%;pointer-events:none;';box.appendChild(bl);
+  var br=document.createElement('div');br.className='br';br.style.cssText='position:absolute;bottom:0;right:0;width:100%;height:100%;pointer-events:none;';box.appendChild(br);
+  var info=document.createElement('div');info.className='hud-info';
+  var lbl=document.createElement('div');lbl.className='hud-label';lbl.textContent=step.name;info.appendChild(lbl);
+  var frm=document.createElement('div');frm.className='hud-formula';frm.textContent=step.formula;info.appendChild(frm);
+  var crd=document.createElement('div');crd.className='hud-coords';crd.id='live-coords';crd.textContent='x:— y:—';info.appendChild(crd);
+  box.appendChild(info);
+  hud.appendChild(box);
+  trackBox = box;
+}
+
+function updatePencilDot(x, y) {
+  if (!pencilDot) pencilDot = document.getElementById('pencil-dot');
+  pencilDot.style.display = 'block';
+  pencilDot.style.left = (x-4) + 'px';
+  pencilDot.style.top = (y-4) + 'px';
+  var el = document.getElementById('live-coords');
+  if (el) el.textContent = 'x:' + Math.round(x) + ' y:' + Math.round(y);
+}
+
+// =============================================
+// MAIN LOOP
+// =============================================
+var lastHudStep = -1;
+
+function setup() {
+  createCanvas(W, H, WEBGL);
+  brush.load();
+  frameRate(FPS);
+}
+
+function draw() {
+  translate(-width/2, -height/2);
+  background(242, 234, 218);
+  
+  var f = frameCount - 1;
+  if (f >= totalAnimFrames) f = totalAnimFrames - 1;
+  
+  // Find active step
+  var activeStep = 0;
+  for (var i = STEPS.length-1; i >= 0; i--) {
+    if (f >= frameStarts[i]) { activeStep = i; break; }
+  }
+  
+  // Draw all completed steps at progress=1
+  for (var i = 0; i < activeStep; i++) {
+    STEPS[i].draw(1);
+  }
+  
+  // Draw current step at partial progress
+  var stepFrame = f - frameStarts[activeStep];
+  var stepDurFrames = frameEnds[activeStep] - frameStarts[activeStep];
+  var progress = Math.min(1, stepFrame / stepDurFrames);
+  var tip = STEPS[activeStep].draw(progress);
+  
+  // Update HUD
+  if (activeStep !== lastHudStep) {
+    createTrackBox(STEPS[activeStep]);
+    lastHudStep = activeStep;
+  }
+  if (tip) updatePencilDot(tip[0], tip[1]);
+  
+  // Done
+  if (f >= totalAnimFrames - 1) {
+    noLoop();
+    if (pencilDot) pencilDot.style.display = 'none';
+  }
+}
+</script>
+</body>
+</html>
