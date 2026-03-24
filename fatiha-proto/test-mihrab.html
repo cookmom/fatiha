@@ -139,27 +139,72 @@ function setup() {
   archPoly.push([cx + halfSpan, springY + 600]);
   archPoly.push([cx - halfSpan, springY + 600]);
   
-  // Dark blue fill
+  // Multiple large polygon fills layered for rich watercolor effect
   brush.noStroke();
-  brush.fill('#0c3a6a', 200);
-  brush.fillBleed(0.08, 'out');
+  
+  // Base fill — dark blue, full arch
+  brush.fill('#0c3a6a', 160);
+  brush.fillBleed(0.1, 'out');
   brush.polygon(archPoly);
-  brush.noFill();
   
-  // Lighter blue gradient at top
-  var topPoly = [];
-  for (var i = 0; i <= steps; i++) {
-    var t = i / steps;
-    var x = (cx - halfSpan * 0.8) + halfSpan * 1.6 * t;
-    var clampX = Math.max(cx - halfSpan + 20, Math.min(cx + halfSpan - 20, x));
-    topPoly.push([clampX, archY(clampX) + 10]);
+  // Upper region — slightly lighter, offset polygon
+  var upperPoly = [];
+  for (var i = 0; i <= 40; i++) {
+    var t = i / 40;
+    var x = (cx - halfSpan * 0.85) + halfSpan * 1.7 * t;
+    var clampX = Math.max(cx - halfSpan + 15, Math.min(cx + halfSpan - 15, x));
+    upperPoly.push([clampX, archY(clampX) + 8]);
   }
-  topPoly.push([cx + halfSpan * 0.6, peakY + archH * 0.4]);
-  topPoly.push([cx - halfSpan * 0.6, peakY + archH * 0.4]);
+  upperPoly.push([cx + halfSpan * 0.7, peakY + archH * 0.5]);
+  upperPoly.push([cx - halfSpan * 0.7, peakY + archH * 0.5]);
+  brush.fill('#1a4a8a', 100);
+  brush.fillBleed(0.12, 'out');
+  brush.polygon(upperPoly);
   
-  brush.fill('#1a5a9a', 80);
+  // Mid-left wash blob
+  var midLeftPoly = [
+    [cx - halfSpan + 30, springY - archH * 0.3],
+    [cx - 40, springY - archH * 0.5],
+    [cx - 60, springY - archH * 0.15],
+    [cx - halfSpan + 50, springY + 50],
+  ];
+  brush.fill('#0a3060', 90);
   brush.fillBleed(0.15, 'out');
-  brush.polygon(topPoly);
+  brush.polygon(midLeftPoly);
+  
+  // Mid-right wash blob
+  var midRightPoly = [
+    [cx + 40, springY - archH * 0.45],
+    [cx + halfSpan - 30, springY - archH * 0.25],
+    [cx + halfSpan - 50, springY + 80],
+    [cx + 60, springY - archH * 0.1],
+  ];
+  brush.fill('#0e3868', 85);
+  brush.fillBleed(0.15, 'out');
+  brush.polygon(midRightPoly);
+  
+  // Lower deep pool
+  var lowerPoly = [
+    [cx - halfSpan + 20, springY + 100],
+    [cx + halfSpan - 20, springY + 100],
+    [cx + halfSpan - 40, springY + 500],
+    [cx - halfSpan + 40, springY + 500],
+  ];
+  brush.fill('#08284a', 120);
+  brush.fillBleed(0.1, 'out');
+  brush.polygon(lowerPoly);
+  
+  // Light highlight at arch peak
+  var peakHighlight = [
+    [cx - 80, peakY + 20],
+    [cx + 80, peakY + 20],
+    [cx + 50, peakY + 120],
+    [cx - 50, peakY + 120],
+  ];
+  brush.fill('#2a6aaa', 70);
+  brush.fillBleed(0.2, 'out');
+  brush.polygon(peakHighlight);
+  
   brush.noFill();
   
   // =============================================
