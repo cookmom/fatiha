@@ -104,17 +104,28 @@ Replace filled shapes with stroke alternatives that don't consume fill budget:
 
 ---
 
-## Clean Fill Parameters
+## Fill Methods — Two Approaches
 
-Avoid circle/bubble artifacts in watercolor fills:
-
+### Clean fills (flat color, no artifacts):
 ```js
 brush.noStroke();
-brush.fill("#8B4513", 60);          // color, opacity (0–255)
-brush.fillBleed(0.001);             // SMALL value → clean edges, no artifacts
+brush.fill("#8B4513", 60);
+brush.fillBleed(0.001);             // tiny bleed → clean edges
 brush.fillTexture(0, 0);            // zero texture → no circle artifacts
 brush.polygon(vertices);
 ```
+
+### Watercolor bleed fills (organic stains — PREFERRED for artistic fills):
+```js
+brush.fill("#a08060", 70);
+brush.fillBleed(0.2);               // 0.1–0.4 for organic watercolor bleed
+brush.beginShape(0);                // 0 = fill mode
+brush.vertex(x1, y1);
+brush.vertex(x2, y2);
+randomSeed(42);                     // locks bleed pattern (critical for animation)
+brush.endShape(CLOSE);
+```
+See `references/watercolor-techniques.md` for full details + coffee stain recipe.
 
 **fillBleed values:**
 - `0.001` — clean, controlled edge
