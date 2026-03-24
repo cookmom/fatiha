@@ -22,18 +22,24 @@ var peakY = springY - archH;
 // Centers at springing points
 var C1x = cx - halfSpan, C2x = cx + halfSpan;
 
-// Outer dome — semicircular arch above the inner pointed arch
-var domeSpan = archSpan + 200; // wider than inner arch
-var domeHalfSpan = domeSpan / 2;
-var domeR = domeSpan / 2; // semicircle
-var domeSpringY = springY - 100; // springs above inner arch springing
-var domePeakY = domeSpringY - domeR;
-
-// Frame dimensions — encompasses the dome
-var frameL = cx - domeHalfSpan - 60;
-var frameR = cx + domeHalfSpan + 60;
-var frameT = domePeakY - 80;
+// Inner frame dimensions (current frame around the pointed arch)
+var frameL = cx - halfSpan - 80;
+var frameR = cx + halfSpan + 80;
+var frameT = peakY - 120;
 var frameB = H - 80;
+
+// Outer dome — wraps OUTSIDE the current frame
+var outerDomeSpan = (frameR - frameL) + 100; // wider than inner frame
+var outerDomeHalfSpan = outerDomeSpan / 2;
+var outerDomeR = outerDomeSpan / 2; // semicircle
+var outerDomeSpringY = frameT + 40; // springs from top of inner frame area
+var outerDomePeakY = outerDomeSpringY - outerDomeR;
+
+// Outer frame — encompasses the dome
+var outerFrameL = cx - outerDomeHalfSpan - 50;
+var outerFrameR = cx + outerDomeHalfSpan + 50;
+var outerFrameT = outerDomePeakY - 60;
+var outerFrameB = frameB + 40;
 
 function archY(x) {
   // Left arc or right arc
@@ -72,48 +78,59 @@ function setup() {
   brush.rect(frameL + 50, frameT + 50, frameR - frameL - 100, frameB - frameT - 100);
   
   // =============================================
-  // OUTER DOME — semicircular arch
+  // OUTERMOST FRAME + DOME (wraps around everything)
   // =============================================
-  brush.set('2H', '#9a9080', 1.5);
   
-  // Dome arc (semicircle)
+  // Outer rectangular frame
+  brush.set('2H', '#9a9080', 1.8);
+  brush.rect(outerFrameL, outerFrameT, outerFrameR - outerFrameL, outerFrameB - outerFrameT);
+  
+  // Second outer frame (inset)
+  brush.set('2H', '#a8a090', 1.0);
+  brush.rect(outerFrameL + 20, outerFrameT + 20, outerFrameR - outerFrameL - 40, outerFrameB - outerFrameT - 40);
+  
+  // Dome arc (semicircle) — outside the inner frame
+  brush.set('2H', '#8a8070', 2.0);
   var domePts = [];
   for (var i = 0; i <= 50; i++) {
-    var angle = Math.PI + (i / 50) * Math.PI; // PI to 2PI (semicircle)
-    domePts.push([cx + domeR * Math.cos(angle), domeSpringY + domeR * Math.sin(angle), 0.3 + 0.7 * Math.sin(Math.PI * i/50)]);
+    var angle = Math.PI + (i / 50) * Math.PI;
+    domePts.push([cx + outerDomeR * Math.cos(angle), outerDomeSpringY + outerDomeR * Math.sin(angle), 0.3 + 0.7 * Math.sin(Math.PI * i/50)]);
   }
   brush.spline(domePts, 0.3);
   
-  // Dome vertical sides
-  brush.line(cx - domeHalfSpan, domeSpringY, cx - domeHalfSpan, frameB - 55);
-  brush.line(cx + domeHalfSpan, domeSpringY, cx + domeHalfSpan, frameB - 55);
+  // Dome vertical sides down to bottom
+  brush.line(cx - outerDomeHalfSpan, outerDomeSpringY, cx - outerDomeHalfSpan, outerFrameB - 25);
+  brush.line(cx + outerDomeHalfSpan, outerDomeSpringY, cx + outerDomeHalfSpan, outerFrameB - 25);
   
-  // Inner dome outline (slightly smaller, lighter)
-  brush.set('2H', '#b0a898', 0.8);
-  var innerDomeR = domeR - 20;
-  var innerDomePts = [];
-  for (var i = 0; i <= 50; i++) {
-    var angle = Math.PI + (i / 50) * Math.PI;
-    innerDomePts.push([cx + innerDomeR * Math.cos(angle), domeSpringY + innerDomeR * Math.sin(angle), 0.4]);
-  }
-  brush.spline(innerDomePts, 0.3);
-  
-  // Spandrel decoration between dome and inner arch — light star pattern
-  brush.set('2H', '#c8c0b0', 0.3);
-  // Small 6-fold stars in the spandrel corners
-  var spandrelStarR = 50;
-  var spandrelPositions = [
-    {x: cx - halfSpan - 40, y: springY - 80},
-    {x: cx + halfSpan + 40, y: springY - 80},
+  // Spandrel stars between dome and outer frame
+  brush.set('2H', '#c0b8a8', 0.4);
+  var spR = 40;
+  var spandrels = [
+    {x: outerFrameL + 50, y: outerDomeSpringY - spR},
+    {x: outerFrameR - 50, y: outerDomeSpringY - spR},
   ];
-  for (var si = 0; si < spandrelPositions.length; si++) {
-    var sp = spandrelPositions[si];
+  for (var si = 0; si < spandrels.length; si++) {
+    var sp = spandrels[si];
     for (var k = 0; k < 6; k++) {
-      var a1 = k * Math.PI / 3 - Math.PI / 2;
-      var a2 = ((k + 2) % 6) * Math.PI / 3 - Math.PI / 2;
-      brush.line(sp.x + spandrelStarR * Math.cos(a1), sp.y + spandrelStarR * Math.sin(a1),
-                 sp.x + spandrelStarR * Math.cos(a2), sp.y + spandrelStarR * Math.sin(a2));
+      var a1 = k * Math.PI / 3;
+      var a2 = ((k + 2) % 6) * Math.PI / 3;
+      brush.line(sp.x + spR * Math.cos(a1), sp.y + spR * Math.sin(a1),
+                 sp.x + spR * Math.cos(a2), sp.y + spR * Math.sin(a2));
     }
+  }
+  
+  // Outer border band (zigzag around the outer frame)
+  brush.set('2H', '#b0a898', 0.4);
+  var obStep = 25;
+  // Top
+  for (var x = outerFrameL + 25; x < outerFrameR - 25; x += obStep) {
+    brush.line(x, outerFrameT + 12, x + obStep/2, outerFrameT + 22);
+    brush.line(x + obStep/2, outerFrameT + 22, x + obStep, outerFrameT + 12);
+  }
+  // Bottom
+  for (var x = outerFrameL + 25; x < outerFrameR - 25; x += obStep) {
+    brush.line(x, outerFrameB - 22, x + obStep/2, outerFrameB - 12);
+    brush.line(x + obStep/2, outerFrameB - 12, x + obStep, outerFrameB - 22);
   }
   
   // Column lines flanking arch
