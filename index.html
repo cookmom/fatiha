@@ -448,15 +448,17 @@ var STEPS = [
     }}
 ];
 
-// Compute frame timeline
+// Compute frame timeline — pauses between pencil steps, no pause between washes
 var PAUSE_S = 0.3;
+var WASH_START = 11; // step index where washes begin
 var frameStarts = [], frameEnds = [];
 var f = 0;
 for (var i = 0; i < STEPS.length; i++) {
   frameStarts.push(Math.round(f));
   f += STEPS[i].dur * FPS;
   frameEnds.push(Math.round(f));
-  if (i < STEPS.length-1) f += PAUSE_S * FPS;
+  // Only pause between pencil steps, not between washes
+  if (i < STEPS.length-1 && i < WASH_START - 1) f += PAUSE_S * FPS;
 }
 var totalAnimFrames = Math.round(f);
 
