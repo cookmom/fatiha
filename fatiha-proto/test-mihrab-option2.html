@@ -1,0 +1,378 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+<style>* { margin:0; } body { background:#f2eada; }</style>
+</head>
+<body>
+<script>
+// =============================================
+// ISLAMIC MIHRAB — MATHEMATICALLY PURPOSEFUL
+// Every dimension derives from a base unit (U)
+// using φ (golden ratio), √3, √2, and Islamic ratios
+// =============================================
+var W = 1080, H = 1920;
+var cx = W / 2;
+var PHI = (1 + Math.sqrt(5)) / 2;  // 1.618033...
+var ROOT3 = Math.sqrt(3);           // 1.732050...
+var ROOT2 = Math.sqrt(2);           // 1.414213...
+
+// BASE UNIT — everything derives from this
+// U = canvas width / (2φ + 2) ≈ W/5.236 ≈ 206px
+// This gives a niche that's ~2U wide with columns at ±(U + colW)
+var U = W / (2 * PHI + 2);  // ~206px
+
+// =============================================
+// HORIZONTAL PROPORTIONS (all from U and φ)
+// =============================================
+var archSpan    = U * 2;                    // ~412px — niche width = 2U
+var halfSpan    = U;                        // U
+var colWidth    = U / PHI / PHI;            // U/φ² ≈ 78px — column width
+var colGap      = colWidth / PHI;           // colW/φ ≈ 48px — gap between arch and column
+var totalW_half = halfSpan + colGap + colWidth; // one side = U + U/φ³ ... 
+var bandOverhang = colWidth / 2;            // band extends half-column past columns
+
+// Column center positions
+var colLx = cx - halfSpan - colGap - colWidth / 2;
+var colRx = cx + halfSpan + colGap + colWidth / 2;
+
+// Band horizontal extent
+var bandL = colLx - colWidth / 2 - bandOverhang;
+var bandR = colRx + colWidth / 2 + bandOverhang;
+var bandW = bandR - bandL;
+
+// Crown span = bandW × √φ ≈ 1.272× band (wider, harmonious)
+var crownSpan = bandW * Math.sqrt(PHI);
+var crownHalfSpan = crownSpan / 2;
+
+// =============================================
+// VERTICAL PROPORTIONS (all from U, φ, √3)
+// =============================================
+// Total composition height divided by φ:
+//   upper zone (crown + band) = totalH / φ
+//   lower zone (niche + columns + base) = totalH / φ²
+// This is the golden section — the niche dominates
+
+var margin_top = U / PHI / PHI;             // ~79px
+var margin_bot = U / PHI / PHI;             // ~79px
+var totalH = H - margin_top - margin_bot;   // ~1762px
+
+var upperZone = totalH / PHI;               // ~1089px — crown + band
+var lowerZone = totalH - upperZone;          // ~673px — niche arch + columns + base
+
+// ARCH — equilateral pointed arch, height = span × √3/2
+var archH = archSpan * ROOT3 / 2;           // ~357px (equilateral)
+var archR = archSpan;                       // R = span for equilateral
+
+// Column zone + base
+var baseHeight = colWidth / PHI;            // ~48px
+
+// Vertical positions — springing at golden section of total height
+var baseBot = H - margin_bot;
+var baseTop = baseBot - baseHeight;
+// Springing point at φ/(1+φ) = ~61.8% down from top of composition
+var compTop = margin_top;
+var compH = baseTop - compTop;
+var springY = compTop + compH / PHI;        // golden section — 61.8% down
+var colBot = baseTop;
+var colTop = springY;                       // columns end at springing
+var peakY = springY - archH;               // arch peak
+
+// Band — sits ABOVE arch peak
+var bandGapAbovePeak = U / (PHI * PHI * PHI); // ~30px — small breathing room
+var bandBot = peakY - bandGapAbovePeak;
+var bandHeight = U / PHI;                   // ~127px — substantial
+var bandTop = bandBot - bandHeight;
+
+// Capital
+var capHeight = colWidth * PHI;             // ~127px ≈ colW × φ
+var capBot = colTop;
+var capTop = capBot - capHeight;
+
+// Crown — pointed arch with R = crownSpan × √2/2 (horseshoe-ish = wide and round)
+var crownSpringY = bandTop;
+var crownR = crownSpan * ROOT2 / 2;         // R = span/√2 — wide, dome-like profile
+var crownH_sq = crownR * crownR - crownHalfSpan * crownHalfSpan;
+var crownH = crownH_sq > 0 ? Math.sqrt(crownH_sq) : crownSpan * ROOT3 / 2;
+var crownPeakY = crownSpringY - crownH;
+
+// If crown exceeds canvas, use available space (and note the clamp)
+var crownClamped = false;
+if (crownPeakY < margin_top) {
+  crownClamped = true;
+  crownH = crownSpringY - margin_top;
+  crownPeakY = margin_top;
+  crownR = Math.sqrt(crownHalfSpan * crownHalfSpan + crownH * crownH);
+}
+var crownC1x = cx - crownHalfSpan, crownC2x = cx + crownHalfSpan;
+
+// Star — centered in crown, sized to fit with breathing room
+var starCx = cx;
+var starCy = crownPeakY + crownH / PHI;    // golden section of crown height
+// Star radius = smaller of crownH/(2φ²) or crownHalfSpan/φ (whichever fits)
+var starR = Math.min(crownH / (2 * PHI), crownHalfSpan / (PHI * PHI));
+
+// Arch centers for equilateral pointed arch
+var C1x = cx - halfSpan, C2x = cx + halfSpan;
+
+function archY(x) {
+  if (x <= cx) {
+    var dx = x - C2x;
+    return springY - Math.sqrt(Math.max(0, archR * archR - dx * dx));
+  } else {
+    var dx = x - C1x;
+    return springY - Math.sqrt(Math.max(0, archR * archR - dx * dx));
+  }
+}
+
+function setup() {
+  createCanvas(W, H, WEBGL);
+  brush.load();
+  translate(-width / 2, -height / 2);
+  background(242, 234, 218);
+  randomSeed(42);
+  brush.wiggle(1.0);
+  brush.noFill();
+
+  // =============================================
+  // 1. BLUE WATERCOLOR FILL — inside niche
+  // =============================================
+  var archPoly = [];
+  var steps = 60;
+  for (var i = 0; i <= steps; i++) {
+    var t = i / steps;
+    var x = (cx - halfSpan) + halfSpan * t;
+    var dx = x - C2x;
+    archPoly.push([x, springY - Math.sqrt(Math.max(0, archR * archR - dx * dx))]);
+  }
+  for (var i = 0; i <= steps; i++) {
+    var t = i / steps;
+    var x = cx + halfSpan * t;
+    var dx = x - C1x;
+    archPoly.push([x, springY - Math.sqrt(Math.max(0, archR * archR - dx * dx))]);
+  }
+  archPoly.push([cx + halfSpan, baseBot]);
+  archPoly.push([cx - halfSpan, baseBot]);
+
+  brush.noStroke();
+  brush.fill('#0c3a6a', 35);
+  brush.fillBleed(0.001);
+  brush.fillTexture(0, 0);
+  brush.polygon(archPoly);
+  brush.noFill();
+
+  // =============================================
+  // 2. MAIN POINTED ARCH — equilateral (R = span)
+  // =============================================
+  brush.set('2H', '#5a5248', 2.5);
+  var aL = [];
+  for (var i = 0; i <= 40; i++) {
+    var t = i / 40;
+    var x = (cx - halfSpan) + halfSpan * t;
+    var dx = x - C2x;
+    aL.push([x, springY - Math.sqrt(Math.max(0, archR * archR - dx * dx)), 0.3 + 0.7 * Math.sin(Math.PI * t)]);
+  }
+  brush.spline(aL, 0.3);
+  var aR = [];
+  for (var i = 0; i <= 40; i++) {
+    var t = i / 40;
+    var x = cx + halfSpan * t;
+    var dx = x - C1x;
+    aR.push([x, springY - Math.sqrt(Math.max(0, archR * archR - dx * dx)), 0.3 + 0.7 * Math.sin(Math.PI * t)]);
+  }
+  brush.spline(aR, 0.3);
+  // Arch legs
+  brush.line(cx - halfSpan, springY, cx - halfSpan, baseBot);
+  brush.line(cx + halfSpan, springY, cx + halfSpan, baseBot);
+
+  // =============================================
+  // 3. COLUMNS — width = U/φ²
+  // =============================================
+  brush.set('2H', '#5a5248', 2.0);
+  // Shafts
+  brush.line(colLx - colWidth/2, colTop, colLx - colWidth/2, colBot);
+  brush.line(colLx + colWidth/2, colTop, colLx + colWidth/2, colBot);
+  brush.line(colRx - colWidth/2, colTop, colRx - colWidth/2, colBot);
+  brush.line(colRx + colWidth/2, colTop, colRx + colWidth/2, colBot);
+  // Fluting
+  brush.set('2H', '#9a9288', 0.7);
+  for (var fi = -1; fi <= 1; fi++) {
+    brush.line(colLx + fi * colWidth * 0.22, colTop + 20, colLx + fi * colWidth * 0.22, colBot - 20);
+    brush.line(colRx + fi * colWidth * 0.22, colTop + 20, colRx + fi * colWidth * 0.22, colBot - 20);
+  }
+  // Entasis rings at φ divisions
+  brush.set('2H', '#8a8278', 0.8);
+  var colH = colBot - colTop;
+  brush.line(colLx - colWidth/2, colTop + colH/PHI, colLx + colWidth/2, colTop + colH/PHI);
+  brush.line(colRx - colWidth/2, colTop + colH/PHI, colRx + colWidth/2, colTop + colH/PHI);
+  brush.line(colLx - colWidth/2, colTop + colH/(PHI*PHI), colLx + colWidth/2, colTop + colH/(PHI*PHI));
+  brush.line(colRx - colWidth/2, colTop + colH/(PHI*PHI), colRx + colWidth/2, colTop + colH/(PHI*PHI));
+
+  // =============================================
+  // 4. COLUMN BASES — width = colWidth × φ
+  // =============================================
+  brush.set('2H', '#5a5248', 1.8);
+  var bw = colWidth * PHI / ROOT2;  // base wider by φ/√2
+  // Left base
+  brush.line(colLx - bw/2, colBot, colLx + bw/2, colBot);
+  brush.line(colLx - bw/2, colBot, colLx - bw/2, baseBot);
+  brush.line(colLx + bw/2, colBot, colLx + bw/2, baseBot);
+  brush.line(colLx - bw/2, baseBot, colLx + bw/2, baseBot);
+  brush.set('2H', '#8a8278', 0.8);
+  brush.line(colLx - bw/2 + 5, colBot + baseHeight/PHI, colLx + bw/2 - 5, colBot + baseHeight/PHI);
+  // Right base
+  brush.set('2H', '#5a5248', 1.8);
+  brush.line(colRx - bw/2, colBot, colRx + bw/2, colBot);
+  brush.line(colRx - bw/2, colBot, colRx - bw/2, baseBot);
+  brush.line(colRx + bw/2, colBot, colRx + bw/2, baseBot);
+  brush.line(colRx - bw/2, baseBot, colRx + bw/2, baseBot);
+  brush.set('2H', '#8a8278', 0.8);
+  brush.line(colRx - bw/2 + 5, colBot + baseHeight/PHI, colRx + bw/2 - 5, colBot + baseHeight/PHI);
+  // Ground
+  brush.set('2H', '#5a5248', 2.0);
+  brush.line(bandL - 10, baseBot, bandR + 10, baseBot);
+
+  // =============================================
+  // 5. CAPITALS — height = colWidth × φ
+  // =============================================
+  brush.set('2H', '#5a5248', 1.8);
+  var capW = colWidth * PHI;
+  // Left
+  brush.line(colLx - capW/2, capBot, colLx + capW/2, capBot);
+  var lcL = [], lcR = [];
+  for (var i = 0; i <= 12; i++) {
+    var t = i/12;
+    var y = capBot - capHeight * t;
+    var flare = capW/2 * (1 + 0.12 * Math.sin(Math.PI * t));
+    lcL.push([colLx - flare, y]);
+    lcR.push([colLx + flare, y]);
+  }
+  brush.spline(lcL, 0.4);
+  brush.spline(lcR, 0.4);
+  brush.line(colLx - capW*0.58, capTop, colLx + capW*0.58, capTop);
+  brush.set('2H', '#7a7268', 1.0);
+  brush.line(colLx - capW*0.62, capTop - 6, colLx + capW*0.62, capTop - 6);
+  // Volutes
+  brush.set('2H', '#8a8278', 0.9);
+  var vL1 = [];
+  for (var i = 0; i <= 10; i++) { var t = i/10; vL1.push([colLx - capW*0.3 + t*capW*0.25, capBot - capHeight*0.35 - 14*Math.sin(Math.PI*t)]); }
+  brush.spline(vL1, 0.5);
+  var vL2 = [];
+  for (var i = 0; i <= 10; i++) { var t = i/10; vL2.push([colLx + capW*0.05 + t*capW*0.25, capBot - capHeight*0.35 - 14*Math.sin(Math.PI*t)]); }
+  brush.spline(vL2, 0.5);
+  // Right capital (mirror)
+  brush.set('2H', '#5a5248', 1.8);
+  brush.line(colRx - capW/2, capBot, colRx + capW/2, capBot);
+  var rcL = [], rcR = [];
+  for (var i = 0; i <= 12; i++) {
+    var t = i/12;
+    var y = capBot - capHeight * t;
+    var flare = capW/2 * (1 + 0.12 * Math.sin(Math.PI * t));
+    rcL.push([colRx - flare, y]);
+    rcR.push([colRx + flare, y]);
+  }
+  brush.spline(rcL, 0.4);
+  brush.spline(rcR, 0.4);
+  brush.line(colRx - capW*0.58, capTop, colRx + capW*0.58, capTop);
+  brush.set('2H', '#7a7268', 1.0);
+  brush.line(colRx - capW*0.62, capTop - 6, colRx + capW*0.62, capTop - 6);
+  brush.set('2H', '#8a8278', 0.9);
+  var vR1 = [];
+  for (var i = 0; i <= 10; i++) { var t = i/10; vR1.push([colRx - capW*0.3 + t*capW*0.25, capBot - capHeight*0.35 - 14*Math.sin(Math.PI*t)]); }
+  brush.spline(vR1, 0.5);
+  var vR2 = [];
+  for (var i = 0; i <= 10; i++) { var t = i/10; vR2.push([colRx + capW*0.05 + t*capW*0.25, capBot - capHeight*0.35 - 14*Math.sin(Math.PI*t)]); }
+  brush.spline(vR2, 0.5);
+
+  // =============================================
+  // 6. INSCRIPTION BAND — height = U/φ
+  // =============================================
+  brush.set('2H', '#5a5248', 1.8);
+  brush.line(bandL, bandBot, bandR, bandBot);
+  brush.line(bandL, bandTop, bandR, bandTop);
+  // Vertical jambs connecting band to capitals
+  brush.set('2H', '#5a5248', 1.5);
+  brush.line(bandL, bandBot, bandL, capTop - 6);
+  brush.line(bandR, bandBot, bandR, capTop - 6);
+  // Inner borders
+  brush.set('2H', '#8a8278', 0.7);
+  brush.line(bandL + 8, bandBot - 8, bandR - 8, bandBot - 8);
+  brush.line(bandL + 8, bandTop + 8, bandR - 8, bandTop + 8);
+  // Calligraphy
+  brush.set('2H', '#7a7068', 1.2);
+  var bandMidY = (bandBot + bandTop) / 2;
+  var callig = [];
+  for (var i = 0; i <= 60; i++) {
+    var t = i/60;
+    var x = bandL + 50 + (bandR - bandL - 100) * t;
+    callig.push([x, bandMidY + Math.sin(t*Math.PI*9)*10 + Math.sin(t*Math.PI*3.5)*6, 0.3 + 0.7*Math.abs(Math.sin(t*Math.PI*5))]);
+  }
+  brush.spline(callig, 0.4);
+  brush.set('2H', '#9a9088', 0.6);
+  var dots = [];
+  for (var i = 0; i <= 45; i++) {
+    var t = i/45;
+    var x = bandL + 70 + (bandR - bandL - 140) * t;
+    dots.push([x, bandMidY - 14 + Math.sin(t*Math.PI*7+0.8)*6, 0.2 + 0.5*Math.abs(Math.sin(t*Math.PI*3.5))]);
+  }
+  brush.spline(dots, 0.5);
+
+  // =============================================
+  // 7. CROWN ARCH — equilateral pointed (R = span)
+  // =============================================
+  brush.set('2H', '#5a5248', 2.2);
+  var cL = [];
+  for (var i = 0; i <= 35; i++) {
+    var t = i/35;
+    var x = (cx - crownHalfSpan) + crownHalfSpan * t;
+    var dx = x - crownC2x;
+    cL.push([x, crownSpringY - Math.sqrt(Math.max(0, crownR*crownR - dx*dx)), 0.3 + 0.7*Math.sin(Math.PI*t)]);
+  }
+  brush.spline(cL, 0.3);
+  var cR = [];
+  for (var i = 0; i <= 35; i++) {
+    var t = i/35;
+    var x = cx + crownHalfSpan * t;
+    var dx = x - crownC1x;
+    cR.push([x, crownSpringY - Math.sqrt(Math.max(0, crownR*crownR - dx*dx)), 0.3 + 0.7*Math.sin(Math.PI*t)]);
+  }
+  brush.spline(cR, 0.3);
+
+  // =============================================
+  // 8. 12-FOLD STAR — {12/5} polygon, 4 scales at φ ratios
+  // =============================================
+  brush.set('2H', '#6a6258', 1.0);
+  var scales = [starR, starR/PHI, starR/(PHI*PHI), starR/(PHI*PHI*PHI)];
+  for (var si = 0; si < scales.length; si++) {
+    var r = scales[si];
+    var verts = [];
+    for (var k = 0; k < 12; k++) {
+      var angle = k * Math.PI/6 - Math.PI/2;
+      verts.push([starCx + r*Math.cos(angle), starCy + r*Math.sin(angle)]);
+    }
+    for (var k = 0; k < 12; k++) {
+      var k2 = (k+5)%12;
+      brush.line(verts[k][0], verts[k][1], verts[k2][0], verts[k2][1]);
+    }
+    if (si < 2) {
+      brush.set('2H', '#8a8278', 0.5);
+      for (var k = 0; k < 12; k++) { var k2 = (k+4)%12; brush.line(verts[k][0], verts[k][1], verts[k2][0], verts[k2][1]); }
+      brush.set('2H', '#6a6258', 1.0);
+    }
+    if (si === 0) {
+      for (var k = 0; k < 12; k++) { var k2 = (k+1)%12; brush.line(verts[k][0], verts[k][1], verts[k2][0], verts[k2][1]); }
+      brush.set('2H', '#9a9288', 0.4);
+      for (var k = 0; k < 12; k++) { brush.line(starCx, starCy, verts[k][0], verts[k][1]); }
+      brush.set('2H', '#6a6258', 1.0);
+    }
+  }
+  brush.set('2H', '#8a8278', 0.6);
+  brush.circle(starCx, starCy, starR * 0.15);
+  brush.circle(starCx, starCy, starR / PHI);
+}
+</script>
+</body>
+</html>

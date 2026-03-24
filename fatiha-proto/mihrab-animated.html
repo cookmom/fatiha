@@ -7,62 +7,81 @@
 <script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
 <style>
 * { margin:0; }
-body { background:#f2eada; overflow:hidden; }
+body { background:#f2eada; overflow:hidden; display:flex; justify-content:center; align-items:center; height:100vh; height:100dvh; }
+canvas { object-fit:contain !important; }
 #hud {
-  position:absolute; top:0; left:0; width:1080px; height:1920px;
+  position:absolute; top:0; left:0; width:100vw; height:100vh;
   pointer-events:none; font-family:'SF Mono','Fira Code',monospace;
+  overflow:hidden;
 }
 .track-box {
   position:absolute; transition: opacity 0.3s ease, left 0.4s ease, top 0.4s ease, width 0.4s ease, height 0.4s ease;
-  min-width:200px; min-height:120px;
+  min-width:60px; min-height:60px; overflow:visible;
 }
+/* Corner crosshairs — extended L-brackets with circle at intersection */
 .track-box::before, .track-box::after,
 .track-box .bl::before, .track-box .br::before {
-  content:''; position:absolute; width:22px; height:22px;
-  border-color:#00d4ff; border-style:solid; border-width:0;
+  content:''; position:absolute; width:30px; height:30px;
+  border-color:#5a5248; border-style:solid; border-width:0;
 }
-.track-box::before { top:-2px; left:-2px; border-top-width:2px; border-left-width:2px; }
-.track-box::after  { top:-2px; right:-2px; border-top-width:2px; border-right-width:2px; }
-.track-box .bl::before { bottom:-2px; left:-2px; border-bottom-width:2px; border-left-width:2px; position:absolute; }
-.track-box .br::before { bottom:-2px; right:-2px; border-bottom-width:2px; border-right-width:2px; position:absolute; }
-.corner-sq { position:absolute; width:7px; height:7px; background:#00d4ff; }
-.corner-sq.tl { top:-4px; left:-4px; }
-.corner-sq.tr { top:-4px; right:-4px; }
-.corner-sq.bl2 { bottom:-4px; left:-4px; }
-.corner-sq.br2 { bottom:-4px; right:-4px; }
+.track-box::before { top:-2px; left:-2px; border-top-width:1.5px; border-left-width:1.5px; }
+.track-box::after  { top:-2px; right:-2px; border-top-width:1.5px; border-right-width:1.5px; }
+.track-box .bl::before { bottom:-2px; left:-2px; border-bottom-width:1.5px; border-left-width:1.5px; position:absolute; }
+.track-box .br::before { bottom:-2px; right:-2px; border-bottom-width:1.5px; border-right-width:1.5px; position:absolute; }
+/* Corner circles centered on corner intersection */
+.corner-circ {
+  position:absolute; width:10px; height:10px;
+  border:1.5px solid #5a5248; border-radius:50%;
+}
+.corner-circ.tl { top:-6px; left:-6px; }
+.corner-circ.tr { top:-6px; right:-6px; }
+.corner-circ.bl2 { bottom:-6px; left:-6px; }
+.corner-circ.br2 { bottom:-6px; right:-6px; }
+/* Info panel — INSIDE the track box, smart-positioned to avoid occlusion */
 .hud-info {
-  position:absolute; bottom:8px; left:8px; right:8px;
-  background:rgba(0,8,16,0.78);
-  border:1px solid rgba(0,212,255,0.3);
-  border-radius:4px; padding:10px 14px;
+  position:absolute; bottom:100%; left:0; margin-bottom:10px;
+  background:rgba(242,234,218,0.88);
+  border:1px solid rgba(90,82,72,0.3);
+  border-radius:4px; padding:8px 12px;
+  white-space:nowrap;
 }
-.hud-label { color:#00d4ff; font-size:15px; font-weight:bold; letter-spacing:2px; text-transform:uppercase; margin-bottom:5px; text-shadow:0 0 10px rgba(0,212,255,0.5); }
-.hud-formula { color:rgba(0,212,255,0.8); font-size:13px; margin-bottom:3px; }
-.hud-coords { color:rgba(0,212,255,0.55); font-size:12px; }
-.track-box.complete { animation: pulse-complete 0.6s ease; }
+.hud-label { color:#3a3430; font-size:13px; font-weight:bold; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:4px; }
+.hud-formula { color:#5a5248; font-size:11px; margin-bottom:3px; }
+.hud-coords { color:#8a8278; font-size:11px; }
+.track-box.complete { animation: pulse-complete 0.5s ease; }
 @keyframes pulse-complete {
-  0% { filter: drop-shadow(0 0 4px rgba(0,212,255,0.8)); }
-  50% { filter: drop-shadow(0 0 16px rgba(0,212,255,1)); }
-  100% { filter: drop-shadow(0 0 4px rgba(0,212,255,0.15)); }
+  0% { filter: drop-shadow(0 0 4px rgba(90,82,72,0.6)); }
+  50% { filter: drop-shadow(0 0 12px rgba(90,82,72,0.8)); }
+  100% { filter: drop-shadow(0 0 2px rgba(90,82,72,0.1)); }
 }
-/* Pencil cursor dot */
+/* Pencil cursor — crosshair in pencil grey */
 #pencil-dot {
-  position:absolute; width:8px; height:8px; border-radius:50%;
-  background:#00d4ff; box-shadow: 0 0 8px rgba(0,212,255,0.8), 0 0 20px rgba(0,212,255,0.3);
-  pointer-events:none; transition: left 0.03s linear, top 0.03s linear;
-  z-index:10;
+  position:absolute; width:28px; height:28px; pointer-events:none; z-index:15;
+}
+#pencil-dot::before {
+  content:''; position:absolute; left:13px; top:0; width:1.5px; height:28px; background:#5a5248;
+}
+#pencil-dot::after {
+  content:''; position:absolute; top:13px; left:0; width:28px; height:1.5px; background:#5a5248;
+}
+#pencil-dot .ch-circle {
+  position:absolute; top:8px; left:8px; width:12px; height:12px;
+  border:1.5px solid #5a5248; border-radius:50%;
 }
 </style>
 </head>
 <body>
-<div id="hud"><div id="pencil-dot" style="display:none"></div></div>
+<div id="hud"><div id="pencil-dot" style="display:none"><div class="ch-circle"></div></div></div>
 <script>
 // =============================================
 // CONSTANTS
 // =============================================
 var PHI = (1 + Math.sqrt(5)) / 2;
 var ROOT3 = Math.sqrt(3), ROOT2 = Math.sqrt(2);
-var W = 1080, H = 1920, cx = W/2;
+// Fixed canvas size — CSS scales to fit viewport
+// This keeps the math consistent and avoids Safari memory crashes
+var W = 1080, H = 1920;
+var cx = W/2;
 var U = W / (2*PHI + 2);
 var archSpan = U*2, halfSpan = U;
 var colWidth = U/PHI/PHI, colGap = colWidth/PHI, bandOverhang = colWidth/2;
@@ -146,7 +165,7 @@ function drawSplinePartial(allPts, progress, tension) {
 // =============================================
 // STEP DEFINITIONS with progressive draw
 // =============================================
-var FPS = 60;
+var FPS = 30;
 
 // Pre-compute arch point arrays
 var archPtsL = [], archPtsR = [];
@@ -163,14 +182,14 @@ for(var i=0;i<=60;i++){var t=i/60;var x=bandL+50+(bandR-bandL-100)*t;calligPts.p
 
 var STEPS = [
   // 0: Ground line
-  { name:'GROUND LINE', formula:'y = H − U/φ²', dur:0.8,
+  { name:'GROUND LINE', panelPos:'tl', formula:'y = H − U/φ²', dur:0.8,
     bbox:[bandL-10,baseBot-15,bandR+10,baseBot+15],
     draw: function(p) {
       brush.set('2H','#5a5248',2.0);
       return drawSegments([{from:[bandL-10,baseBot],to:[bandR+10,baseBot]}], p);
     }},
   // 1: Left base
-  { name:'LEFT BASE', formula:'w = U/φ² × φ/√2 = '+bw.toFixed(0)+'px', dur:0.8,
+  { name:'LEFT BASE', panelPos:'tr', formula:'w = U/φ² × φ/√2 = '+bw.toFixed(0)+'px', dur:0.8,
     bbox:[colLx-bw/2,colBot,colLx+bw/2,baseBot],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -182,7 +201,7 @@ var STEPS = [
       ], p);
     }},
   // 2: Right base
-  { name:'RIGHT BASE', formula:'mirror of left', dur:0.8,
+  { name:'RIGHT BASE', panelPos:'tl', formula:'mirror of left', dur:0.8,
     bbox:[colRx-bw/2,colBot,colRx+bw/2,baseBot],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -194,7 +213,7 @@ var STEPS = [
       ], p);
     }},
   // 3: Left column (draws upward)
-  { name:'LEFT COLUMN', formula:'w = U/φ² = '+colWidth.toFixed(0)+' | h = '+Math.round(colBot-colTop), dur:1.2,
+  { name:'LEFT COLUMN', panelPos:'tr', formula:'w = U/φ² = '+colWidth.toFixed(0)+' | h = '+Math.round(colBot-colTop), dur:1.2,
     bbox:[colLx-colWidth/2,colTop,colLx+colWidth/2,colBot],
     draw: function(p) {
       brush.set('2H','#5a5248',2.0);
@@ -203,7 +222,7 @@ var STEPS = [
       brush.line(colLx-colWidth/2, colBot, colLx-colWidth/2, endY);
       brush.line(colLx+colWidth/2, colBot, colLx+colWidth/2, endY);
       // Fluting follows
-      if (p > 0.1) {
+      if (p >= 0) {
         brush.set('2H','#9a9288',0.7);
         var fEnd = colBot - 20 - (colBot-colTop-40) * Math.min(1,(p-0.1)/0.9);
         for(var fi=-1;fi<=1;fi++) brush.line(colLx+fi*colWidth*0.22,colBot-20,colLx+fi*colWidth*0.22,fEnd);
@@ -211,14 +230,14 @@ var STEPS = [
       return [colLx, endY];
     }},
   // 4: Right column
-  { name:'RIGHT COLUMN', formula:'w = U/φ²', dur:1.2,
+  { name:'RIGHT COLUMN', panelPos:'tl', formula:'w = U/φ²', dur:1.2,
     bbox:[colRx-colWidth/2,colTop,colRx+colWidth/2,colBot],
     draw: function(p) {
       brush.set('2H','#5a5248',2.0);
       var endY = colBot - (colBot-colTop) * p;
       brush.line(colRx-colWidth/2, colBot, colRx-colWidth/2, endY);
       brush.line(colRx+colWidth/2, colBot, colRx+colWidth/2, endY);
-      if (p > 0.1) {
+      if (p >= 0) {
         brush.set('2H','#9a9288',0.7);
         var fEnd = colBot - 20 - (colBot-colTop-40) * Math.min(1,(p-0.1)/0.9);
         for(var fi=-1;fi<=1;fi++) brush.line(colRx+fi*colWidth*0.22,colBot-20,colRx+fi*colWidth*0.22,fEnd);
@@ -226,7 +245,7 @@ var STEPS = [
       return [colRx, endY];
     }},
   // 5: Left capital
-  { name:'LEFT CAPITAL', formula:'h = colW × φ = '+capHeight.toFixed(0)+'px', dur:0.8,
+  { name:'LEFT CAPITAL', panelPos:'tr', formula:'h = colW × φ = '+capHeight.toFixed(0)+'px', dur:0.8,
     bbox:[colLx-capW*0.62,capTop-6,colLx+capW*0.62,capBot],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -237,7 +256,7 @@ var STEPS = [
       ], p);
     }},
   // 6: Right capital
-  { name:'RIGHT CAPITAL', formula:'h = colW × φ', dur:0.8,
+  { name:'RIGHT CAPITAL', panelPos:'tl', formula:'h = colW × φ', dur:0.8,
     bbox:[colRx-capW*0.62,capTop-6,colRx+capW*0.62,capBot],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -248,7 +267,7 @@ var STEPS = [
       ], p);
     }},
   // 7: Main arch (left then right arc as one step)
-  { name:'NICHE ARCH', formula:'R = 2U = '+archSpan.toFixed(0)+' | H = U√3 = '+archH.toFixed(0), dur:2.0,
+  { name:'NICHE ARCH', panelPos:'br', formula:'R = 2U = '+archSpan.toFixed(0)+' | H = U√3 = '+archH.toFixed(0), dur:2.0,
     bbox:[cx-halfSpan,peakY,cx+halfSpan,springY+20],
     draw: function(p) {
       brush.set('2H','#5a5248',2.5);
@@ -271,7 +290,7 @@ var STEPS = [
       }
     }},
   // 8: Inscription band
-  { name:'INSCRIPTION BAND', formula:'h = U/φ = '+bandHeight_v.toFixed(0)+'px', dur:1.5,
+  { name:'INSCRIPTION BAND', panelPos:'tr', formula:'h = U/φ = '+bandHeight_v.toFixed(0)+'px', dur:1.5,
     bbox:[bandL,bandTop_y,bandR,bandBot_y],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -309,7 +328,7 @@ var STEPS = [
       }
     }},
   // 9: Crown arch
-  { name:'CROWN ARCH', formula:'span = bandW×√φ | R = span/√2 = '+crownR.toFixed(0), dur:1.5,
+  { name:'CROWN ARCH', panelPos:'br', formula:'span = bandW×√φ | R = span/√2 = '+crownR.toFixed(0), dur:1.5,
     bbox:[cx-crownHalfSpan,crownPeakY,cx+crownHalfSpan,crownSpringY],
     draw: function(p) {
       brush.set('2H','#5a5248',2.2);
@@ -321,7 +340,7 @@ var STEPS = [
       }
     }},
   // 10: Star
-  { name:'12-FOLD STAR', formula:'{12/5} — scales: r, r/φ, r/φ², r/φ³', dur:2.0,
+  { name:'12-FOLD STAR', panelPos:'bl', formula:'{12/5} — scales: r, r/φ, r/φ², r/φ³', dur:2.0,
     bbox:[starCx-starR_val-15,starCy-starR_val-15,starCx+starR_val+15,starCy+starR_val+15],
     draw: function(p) {
       var scales=[starR_val,starR_val/PHI,starR_val/(PHI*PHI),starR_val/(PHI*PHI*PHI)];
@@ -346,14 +365,14 @@ var STEPS = [
       if (p >= 0.95) { brush.set('2H','#8a8278',0.6); brush.circle(starCx,starCy,starR_val*0.15); brush.circle(starCx,starCy,starR_val/PHI); }
       return [tipX, tipY];
     }},
-  // 11: Blue wash
-  { name:'NICHE WASH', formula:'fill #0c3a6a α=35', dur:1.0,
+  // 11: Niche wash — deep lapis
+  { name:'NICHE WASH', formula:'lapis #0c3a6a α=35', dur:0.1,
     bbox:[cx-halfSpan,peakY,cx+halfSpan,baseBot],
     draw: function(p) {
-      // Fill just appears (no progressive for polygon fill)
-      if (p > 0.1) {
+      if (p >= 0) {
+        randomSeed(1001);
         brush.noStroke();
-        brush.fill('#0c3a6a', Math.round(35*Math.min(1,(p-0.1)/0.5)));
+        brush.fill('#0c3a6a', 35);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         var poly=[];
         for(var i=0;i<=60;i++){var t=i/60;var x=(cx-halfSpan)+halfSpan*t;var dx=x-C2x;poly.push([x,springY-Math.sqrt(Math.max(0,archR*archR-dx*dx))]);}
@@ -362,18 +381,91 @@ var STEPS = [
         brush.polygon(poly); brush.noFill();
       }
       return [cx, springY];
+    }},
+  // 12: Crown wash — lighter blue
+  { name:'CROWN WASH', formula:'azure #1a4a8a α=28', dur:0.1,
+    bbox:[cx-crownHalfSpan,crownPeakY,cx+crownHalfSpan,crownSpringY],
+    draw: function(p) {
+      if (p >= 0) {
+        randomSeed(1002);
+        brush.noStroke();
+        brush.fill('#1a4a8a', 28);
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        var poly=[];
+        for(var i=0;i<=40;i++){var t=i/40;var x=(cx-crownHalfSpan)+crownHalfSpan*t;var dx=x-crownC2x;poly.push([x,crownSpringY-Math.sqrt(Math.max(0,crownR*crownR-dx*dx))]);}
+        for(var i=0;i<=40;i++){var t=i/40;var x=cx+crownHalfSpan*t;var dx=x-crownC1x;poly.push([x,crownSpringY-Math.sqrt(Math.max(0,crownR*crownR-dx*dx))]);}
+        poly.push([cx+crownHalfSpan,crownSpringY],[cx-crownHalfSpan,crownSpringY]);
+        brush.polygon(poly); brush.noFill();
+      }
+      return [cx, starCy];
+    }},
+  // 13: Inscription band wash — muted magenta
+  { name:'BAND WASH', formula:'amethyst #4a1a3a α=30', dur:0.1,
+    bbox:[bandL,bandTop_y,bandR,bandBot_y],
+    draw: function(p) {
+      if (p >= 0) {
+        randomSeed(1003);
+        brush.noStroke();
+        brush.fill('#4a1a3a', 30);
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        brush.rect(bandL+4,bandTop_y+4,bandR-bandL-8,bandBot_y-bandTop_y-8);
+        brush.noFill();
+      }
+      return [cx, bandBot_y];
+    }},
+  // 14: Column base tint — dark blue-grey
+  { name:'BASE TINT', formula:'slate #1a2a3a α=25', dur:0.1,
+    bbox:[colLx-bw/2,colBot,colRx+bw/2,baseBot],
+    draw: function(p) {
+      if (p >= 0) {
+        var a = 25;
+        randomSeed(1004);
+        brush.noStroke();
+        brush.fill('#1a2a3a', a);
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        brush.rect(colLx-bw/2+2,colBot+2,bw-4,baseBot-colBot-4);
+        brush.noFill();
+        randomSeed(1014);
+        brush.fill('#1a2a3a', a);
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        brush.rect(colRx-bw/2+2,colBot+2,bw-4,baseBot-colBot-4);
+        brush.noFill();
+      }
+      return [cx, baseBot];
+    }},
+  // 15: Capital accent — magenta touch
+  { name:'CAPITAL ACCENT', formula:'magenta #5a1a4a α=45', dur:0.1,
+    bbox:[colLx-capW*0.6,capTop,colRx+capW*0.6,capBot],
+    draw: function(p) {
+      if (p >= 0) {
+        var a = 45;
+        randomSeed(1005);
+        brush.noStroke();
+        brush.fill('#5a1a4a', a);
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        brush.rect(colLx-capW*0.5,capTop+4,capW,capHeight-8);
+        brush.noFill();
+        randomSeed(1015);
+        brush.fill('#5a1a4a', a);
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        brush.rect(colRx-capW*0.5,capTop+4,capW,capHeight-8);
+        brush.noFill();
+      }
+      return [cx, capTop];
     }}
 ];
 
-// Compute frame timeline
+// Compute frame timeline — pauses between pencil steps, no pause between washes
 var PAUSE_S = 0.3;
+var WASH_START = 11; // step index where washes begin
 var frameStarts = [], frameEnds = [];
 var f = 0;
 for (var i = 0; i < STEPS.length; i++) {
   frameStarts.push(Math.round(f));
   f += STEPS[i].dur * FPS;
   frameEnds.push(Math.round(f));
-  if (i < STEPS.length-1) f += PAUSE_S * FPS;
+  // Only pause between pencil steps, not between washes
+  if (i < STEPS.length-1 && i < WASH_START - 1) f += PAUSE_S * FPS;
 }
 var totalAnimFrames = Math.round(f);
 
@@ -388,15 +480,18 @@ function createTrackBox(step) {
   if (trackBox) trackBox.remove();
   var box = document.createElement('div');
   box.className = 'track-box';
-  var b = step.bbox, pad = 25;
-  var bx=b[0]-pad,by=b[1]-pad,bwid=(b[2]-b[0])+pad*2,bh=(b[3]-b[1])+pad*2;
-  if(bwid<220){bx-=(220-bwid)/2;bwid=220;}
-  if(bh<150){by-=(150-bh)/2;bh=150;}
+  var s = window._hudScale || 1;
+  var r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
+  var b = step.bbox, pad = 12 * s;
+  var bx=(b[0]*s)+r.left-pad,by=(b[1]*s)+r.top-pad,bwid=(b[2]-b[0])*s+pad*2,bh=(b[3]-b[1])*s+pad*2;
+    // No minimum size inflation — box wraps tightly around the element
   box.style.left=bx+'px';box.style.top=by+'px';
   box.style.width=bwid+'px';box.style.height=bh+'px';
-  ['tl','tr','bl2','br2'].forEach(function(c){var s=document.createElement('div');s.className='corner-sq '+c;box.appendChild(s);});
+  ['tl','tr','bl2','br2'].forEach(function(c){var ci=document.createElement('div');ci.className='corner-circ '+c;box.appendChild(ci);});
   var bl=document.createElement('div');bl.className='bl';bl.style.cssText='position:absolute;bottom:0;left:0;width:100%;height:100%;pointer-events:none;';box.appendChild(bl);
   var br=document.createElement('div');br.className='br';br.style.cssText='position:absolute;bottom:0;right:0;width:100%;height:100%;pointer-events:none;';box.appendChild(br);
+  // Info panel — placed at the corner least likely to occlude drawing
+  // Drawing usually starts at bottom/center, so default top-right
   var info=document.createElement('div');info.className='hud-info';
   var lbl=document.createElement('div');lbl.className='hud-label';lbl.textContent=step.name;info.appendChild(lbl);
   var frm=document.createElement('div');frm.className='hud-formula';frm.textContent=step.formula;info.appendChild(frm);
@@ -409,8 +504,10 @@ function createTrackBox(step) {
 function updatePencilDot(x, y) {
   if (!pencilDot) pencilDot = document.getElementById('pencil-dot');
   pencilDot.style.display = 'block';
-  pencilDot.style.left = (x-4) + 'px';
-  pencilDot.style.top = (y-4) + 'px';
+  var s = window._hudScale || 1;
+  var r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
+  pencilDot.style.left = (x*s + r.left - 14) + 'px';
+  pencilDot.style.top = (y*s + r.top - 14) + 'px';
   var el = document.getElementById('live-coords');
   if (el) el.textContent = 'x:' + Math.round(x) + ' y:' + Math.round(y);
 }
@@ -421,9 +518,27 @@ function updatePencilDot(x, y) {
 var lastHudStep = -1;
 
 function setup() {
-  createCanvas(W, H, WEBGL);
+  var c = createCanvas(W, H, WEBGL);
+  pixelDensity(1); // Force 1:1 pixels AFTER canvas creation
+  // CSS scales canvas to fill viewport while maintaining aspect ratio
+  var viewAspect = window.innerWidth / window.innerHeight;
+  var canvasAspect = W / H;
+  if (viewAspect < canvasAspect) {
+    // Width-limited
+    c.elt.style.width = '100vw';
+    c.elt.style.height = (window.innerWidth / canvasAspect) + 'px';
+  } else {
+    // Height-limited
+    c.elt.style.height = '100vh';
+    c.elt.style.width = (window.innerHeight * canvasAspect) + 'px';
+  }
+  c.elt.style.display = 'block';
+  c.elt.style.margin = '0 auto';
   brush.load();
   frameRate(FPS);
+  // HUD scale (fixed) — offset recalculated each frame
+  window._hudScale = c.elt.getBoundingClientRect().width / W;
+  window._canvasEl = c.elt;
 }
 
 function draw() {
