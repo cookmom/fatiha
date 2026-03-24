@@ -158,7 +158,7 @@ function drawSplinePartial(allPts, progress, tension) {
 // =============================================
 // STEP DEFINITIONS with progressive draw
 // =============================================
-var FPS = 60;
+var FPS = 30;
 
 // Pre-compute arch point arrays
 var archPtsL = [], archPtsR = [];
@@ -358,11 +358,10 @@ var STEPS = [
       if (p >= 0.95) { brush.set('2H','#8a8278',0.6); brush.circle(starCx,starCy,starR_val*0.15); brush.circle(starCx,starCy,starR_val/PHI); }
       return [tipX, tipY];
     }},
-  // 11: Blue wash
-  { name:'NICHE WASH', panelPos:'tr', formula:'fill #0c3a6a α=35', dur:1.0,
+  // 11: Niche wash — deep lapis
+  { name:'NICHE WASH', formula:'lapis #0c3a6a α=35', dur:1.0,
     bbox:[cx-halfSpan,peakY,cx+halfSpan,baseBot],
     draw: function(p) {
-      // Fill just appears (no progressive for polygon fill)
       if (p > 0.1) {
         brush.noStroke();
         brush.fill('#0c3a6a', Math.round(35*Math.min(1,(p-0.1)/0.5)));
@@ -374,6 +373,71 @@ var STEPS = [
         brush.polygon(poly); brush.noFill();
       }
       return [cx, springY];
+    }},
+  // 12: Crown wash — lighter blue
+  { name:'CROWN WASH', formula:'azure #1a4a8a α=28', dur:0.8,
+    bbox:[cx-crownHalfSpan,crownPeakY,cx+crownHalfSpan,crownSpringY],
+    draw: function(p) {
+      if (p > 0.1) {
+        brush.noStroke();
+        brush.fill('#1a4a8a', Math.round(28*Math.min(1,(p-0.1)/0.5)));
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        var poly=[];
+        for(var i=0;i<=40;i++){var t=i/40;var x=(cx-crownHalfSpan)+crownHalfSpan*t;var dx=x-crownC2x;poly.push([x,crownSpringY-Math.sqrt(Math.max(0,crownR*crownR-dx*dx))]);}
+        for(var i=0;i<=40;i++){var t=i/40;var x=cx+crownHalfSpan*t;var dx=x-crownC1x;poly.push([x,crownSpringY-Math.sqrt(Math.max(0,crownR*crownR-dx*dx))]);}
+        poly.push([cx+crownHalfSpan,crownSpringY],[cx-crownHalfSpan,crownSpringY]);
+        brush.polygon(poly); brush.noFill();
+      }
+      return [cx, starCy];
+    }},
+  // 13: Inscription band wash — muted magenta
+  { name:'BAND WASH', formula:'amethyst #4a1a3a α=30', dur:0.8,
+    bbox:[bandL,bandTop_y,bandR,bandBot_y],
+    draw: function(p) {
+      if (p > 0.1) {
+        brush.noStroke();
+        brush.fill('#4a1a3a', Math.round(30*Math.min(1,(p-0.1)/0.5)));
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        brush.rect(bandL+4,bandTop_y+4,bandR-bandL-8,bandBot_y-bandTop_y-8);
+        brush.noFill();
+      }
+      return [cx, bandBot_y];
+    }},
+  // 14: Column base tint — dark blue-grey
+  { name:'BASE TINT', formula:'slate #1a2a3a α=25', dur:0.6,
+    bbox:[colLx-bw/2,colBot,colRx+bw/2,baseBot],
+    draw: function(p) {
+      if (p > 0.1) {
+        var a = Math.round(25*Math.min(1,(p-0.1)/0.5));
+        brush.noStroke();
+        brush.fill('#1a2a3a', a);
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        brush.rect(colLx-bw/2+2,colBot+2,bw-4,baseBot-colBot-4);
+        brush.noFill();
+        brush.fill('#1a2a3a', a);
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        brush.rect(colRx-bw/2+2,colBot+2,bw-4,baseBot-colBot-4);
+        brush.noFill();
+      }
+      return [cx, baseBot];
+    }},
+  // 15: Capital accent — magenta touch
+  { name:'CAPITAL ACCENT', formula:'magenta #5a1a4a α=22', dur:0.6,
+    bbox:[colLx-capW*0.6,capTop,colRx+capW*0.6,capBot],
+    draw: function(p) {
+      if (p > 0.1) {
+        var a = Math.round(22*Math.min(1,(p-0.1)/0.5));
+        brush.noStroke();
+        brush.fill('#5a1a4a', a);
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        brush.rect(colLx-capW*0.5,capTop+4,capW,capHeight-8);
+        brush.noFill();
+        brush.fill('#5a1a4a', a);
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        brush.rect(colRx-capW*0.5,capTop+4,capW,capHeight-8);
+        brush.noFill();
+      }
+      return [cx, capTop];
     }}
 ];
 
