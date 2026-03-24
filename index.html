@@ -189,75 +189,78 @@ function drawAngleArc(cx_,cy_,r,startA,endA) {
   brush.spline(pts, 0.5);
 }
 
+// HTML annotation labels — positioned over canvas
+var _annotEls = [];
+function addAnnotLabel(x, y, text, align) {
+  // Only add once — check by text content
+  for (var i=0;i<_annotEls.length;i++) if (_annotEls[i]._t === text) return;
+  var el = document.createElement('div');
+  el._t = text;
+  var s = window._hudScale || 1;
+  var r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
+  el.style.cssText = 'position:absolute;color:#8a8278;font-family:SF Mono,Fira Code,monospace;font-size:10px;white-space:nowrap;pointer-events:none;letter-spacing:0.5px;';
+  el.style.left = (x*s + r.left) + 'px';
+  el.style.top = (y*s + r.top) + 'px';
+  if (align === 'right') el.style.transform = 'translateX(-100%)';
+  if (align === 'center') el.style.transform = 'translateX(-50%)';
+  el.textContent = text;
+  document.getElementById('hud').appendChild(el);
+  _annotEls.push(el);
+}
+
 // Annotations for each completed step — drawn as permanent marks
 function drawAnnotations(stepIdx) {
   brush.set('2H','#a09888',0.5);
   
   if (stepIdx >= 3) {
-    // Column width — U/φ²
-    drawDimLine(colLx-colWidth/2, colBot-15, colLx+colWidth/2, colBot-15, 'U/\u03C6\u00B2 = '+colWidth.toFixed(0), 'below');
+    drawDimLine(colLx-colWidth/2, colBot-15, colLx+colWidth/2, colBot-15, null, 'below');
+    addAnnotLabel((colLx-colWidth/2+colLx+colWidth/2)/2, colBot+15, 'U/φ² = '+colWidth.toFixed(0), 'center');
   }
   if (stepIdx >= 4) {
-    // Column height
-    drawDimLine(colRx+colWidth/2+15, colBot, colRx+colWidth/2+15, colTop, Math.round(colBot-colTop)+'px', 'right');
-    // Formula label beside left column
-    push(); fill(140,130,118); noStroke();  textSize(15);
-    textAlign(RIGHT,CENTER);
-    text('w = U/\u03C6\u00B2', colLx-colWidth/2-12, (colTop+colBot)/2);
-    pop();
+    drawDimLine(colRx+colWidth/2+15, colBot, colRx+colWidth/2+15, colTop, null, 'right');
+    addAnnotLabel(colRx+colWidth/2+45, (colTop+colBot)/2, Math.round(colBot-colTop)+'px');
+    addAnnotLabel(colLx-colWidth/2-10, (colTop+colBot)/2, 'w = U/φ²', 'right');
   }
   if (stepIdx >= 5) {
-    // Capital height
-    drawDimLine(colLx-capW*0.62-10, capBot, colLx-capW*0.62-10, capTop, 'colW\u00D7\u03C6', 'left');
+    drawDimLine(colLx-capW*0.62-10, capBot, colLx-capW*0.62-10, capTop, null, 'left');
+    addAnnotLabel(colLx-capW*0.62-50, (capTop+capBot)/2, 'colW×φ', 'right');
   }
   if (stepIdx >= 7) {
-    // Arch span — 2U
-    drawDimLine(cx-halfSpan, springY+20, cx+halfSpan, springY+20, '2U = '+archSpan.toFixed(0), 'below');
-    // Arch radius callout
-    drawRadiusCallout(C2x, springY, cx, peakY, 'R = 2U');
-    // Arch height — U√3
-    drawDimLine(cx+halfSpan+35, springY, cx+halfSpan+35, peakY, 'U\u221A3 = '+archH.toFixed(0), 'right');
-    // Springing point label
-    push(); fill(140,130,118); noStroke();  textSize(13);
-    textAlign(LEFT,TOP);
-    text('spring @ H/\u03C6', cx+halfSpan+8, springY+30);
-    pop();
+    drawDimLine(cx-halfSpan, springY+20, cx+halfSpan, springY+20, null, 'below');
+    addAnnotLabel(cx, springY+35, '2U = '+archSpan.toFixed(0), 'center');
+    drawRadiusCallout(C2x, springY, cx, peakY, null);
+    addAnnotLabel((C2x+cx)/2+15, (springY+peakY)/2-10, 'R = 2U');
+    drawDimLine(cx+halfSpan+35, springY, cx+halfSpan+35, peakY, null, 'right');
+    addAnnotLabel(cx+halfSpan+50, (springY+peakY)/2, 'U√3 = '+archH.toFixed(0));
+    addAnnotLabel(cx+halfSpan+8, springY+35, 'spring @ H/φ');
   }
   if (stepIdx >= 8) {
-    // Band height — U/φ
-    drawDimLine(bandR+18, bandBot_y, bandR+18, bandTop_y, 'U/\u03C6 = '+bandHeight_v.toFixed(0), 'right');
+    drawDimLine(bandR+18, bandBot_y, bandR+18, bandTop_y, null, 'right');
+    addAnnotLabel(bandR+35, (bandBot_y+bandTop_y)/2, 'U/φ = '+bandHeight_v.toFixed(0));
   }
   if (stepIdx >= 9) {
-    // Crown radius
     var crMidX = cx - crownHalfSpan*0.5;
     var crMidDx = crMidX - crownC2x;
     var crMidY = crownSpringY - Math.sqrt(Math.max(0, crownR*crownR - crMidDx*crMidDx));
-    drawRadiusCallout(crownC2x, crownSpringY, crMidX, crMidY, 'R = span/\u221A2');
-    // Crown span
-    drawDimLine(cx-crownHalfSpan, crownSpringY+12, cx+crownHalfSpan, crownSpringY+12, 'bandW\u00D7\u221A\u03C6 = '+crownSpan.toFixed(0), 'below');
+    drawRadiusCallout(crownC2x, crownSpringY, crMidX, crMidY, null);
+    addAnnotLabel((crownC2x+crMidX)/2+15, (crownSpringY+crMidY)/2-10, 'R = span/√2');
+    drawDimLine(cx-crownHalfSpan, crownSpringY+12, cx+crownHalfSpan, crownSpringY+12, null, 'below');
+    addAnnotLabel(cx, crownSpringY+25, 'bandW×√φ = '+crownSpan.toFixed(0), 'center');
   }
   if (stepIdx >= 10) {
-    // Star radius + formula
     brush.set('2H','#a09888',0.5);
     var sAngle = -Math.PI/2;
     var sTipX = starCx + starR_val*Math.cos(sAngle);
     var sTipY = starCy + starR_val*Math.sin(sAngle);
     brush.line(starCx, starCy, sTipX, sTipY);
     brush.circle(starCx, starCy, 4);
-    push(); fill(140,130,118); noStroke();  textSize(13);
-    textAlign(LEFT,CENTER);
-    text('r = '+starR_val.toFixed(0), starCx+starR_val+10, starCy);
-    text('{12/5} star', starCx+starR_val+10, starCy+18);
-    text('scales: r, r/\u03C6, r/\u03C6\u00B2, r/\u03C6\u00B3', starCx+starR_val+10, starCy+36);
-    pop();
+    addAnnotLabel(starCx+starR_val+12, starCy-10, 'r = '+starR_val.toFixed(0));
+    addAnnotLabel(starCx+starR_val+12, starCy+6, '{12/5} star');
+    addAnnotLabel(starCx+starR_val+12, starCy+22, 'r, r/φ, r/φ², r/φ³');
   }
-  // Base unit label at bottom
   if (stepIdx >= 0) {
-    push(); fill(160,150,140); noStroke();  textSize(14);
-    textAlign(LEFT,TOP);
-    text('U = W/(2\u03C6+2) = '+U.toFixed(1)+'px', 30, baseBot+20);
-    text('\u03C6 = 1.618  \u221A3 = 1.732  \u221A2 = 1.414', 30, baseBot+38);
-    pop();
+    addAnnotLabel(30, baseBot+25, 'U = W/(2φ+2) = '+U.toFixed(1)+'px');
+    addAnnotLabel(30, baseBot+42, 'φ = 1.618  √3 = 1.732  √2 = 1.414');
   }
 }
 
