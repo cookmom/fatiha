@@ -29,7 +29,7 @@ var frameT = peakY - 120;
 var frameB = H - 80;
 
 // Outer dome — POINTED arch (same style as inner, just bigger)
-var outerDomeSpan = (frameR - frameL) + 100;
+var outerDomeSpan = (frameR - frameL) - 60; // smaller so it doesn't overlap crown star
 var outerDomeHalfSpan = outerDomeSpan / 2;
 var outerDomeR = outerDomeSpan; // R = S for equilateral pointed arch
 var outerDomeSpringY = springY - 50;
