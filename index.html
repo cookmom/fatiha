@@ -198,11 +198,19 @@ function addAnnotLabel(x, y, text, align) {
   el._t = text;
   var s = window._hudScale || 1;
   var r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
-  el.style.cssText = 'position:absolute;color:#8a8278;font-family:SF Mono,Fira Code,monospace;font-size:10px;white-space:nowrap;pointer-events:none;letter-spacing:0.5px;';
-  el.style.left = (x*s + r.left) + 'px';
-  el.style.top = (y*s + r.top) + 'px';
+  el.style.cssText = 'position:absolute;color:#7a7268;font-family:SF Mono,Fira Code,monospace;font-size:13px;white-space:nowrap;pointer-events:none;letter-spacing:0.5px;font-weight:500;';
+  // Clamp to canvas bounds
+  var elX = x*s + r.left;
+  var elY = y*s + r.top;
+  var maxX = r.left + r.width - 10;
+  if (elX > maxX) elX = maxX;
+  if (elX < r.left + 5) elX = r.left + 5;
+  el.style.left = elX + 'px';
+  el.style.top = elY + 'px';
   if (align === 'right') el.style.transform = 'translateX(-100%)';
   if (align === 'center') el.style.transform = 'translateX(-50%)';
+  // If near right edge, switch to right-align to prevent clipping
+  if (elX > maxX - 80 && align !== 'right' && align !== 'center') el.style.transform = 'translateX(-100%)';
   el.textContent = text;
   document.getElementById('hud').appendChild(el);
   _annotEls.push(el);
@@ -229,9 +237,9 @@ function drawAnnotations(stepIdx) {
     drawDimLine(cx-halfSpan, springY+20, cx+halfSpan, springY+20, null, 'below');
     addAnnotLabel(cx, springY+35, '2U = '+archSpan.toFixed(0), 'center');
     drawRadiusCallout(C2x, springY, cx, peakY, null);
-    addAnnotLabel((C2x+cx)/2+15, (springY+peakY)/2-10, 'R = 2U');
+    addAnnotLabel((C2x+cx)/2+20, (springY+peakY)/2-15, 'R = 2U');
     drawDimLine(cx+halfSpan+35, springY, cx+halfSpan+35, peakY, null, 'right');
-    addAnnotLabel(cx+halfSpan+50, (springY+peakY)/2, 'U√3 = '+archH.toFixed(0));
+    addAnnotLabel(cx+halfSpan+60, (springY+peakY)/2, 'U√3 = '+archH.toFixed(0));
     addAnnotLabel(cx+halfSpan+8, springY+35, 'spring @ H/φ');
   }
   if (stepIdx >= 8) {
@@ -245,7 +253,7 @@ function drawAnnotations(stepIdx) {
     drawRadiusCallout(crownC2x, crownSpringY, crMidX, crMidY, null);
     addAnnotLabel((crownC2x+crMidX)/2+15, (crownSpringY+crMidY)/2-10, 'R = span/√2');
     drawDimLine(cx-crownHalfSpan, crownSpringY+12, cx+crownHalfSpan, crownSpringY+12, null, 'below');
-    addAnnotLabel(cx, crownSpringY+25, 'bandW×√φ = '+crownSpan.toFixed(0), 'center');
+    addAnnotLabel(cx, crownSpringY+30, 'bandW×√φ = '+crownSpan.toFixed(0), 'center');
   }
   if (stepIdx >= 10) {
     brush.set('2H','#a09888',0.5);
@@ -254,9 +262,8 @@ function drawAnnotations(stepIdx) {
     var sTipY = starCy + starR_val*Math.sin(sAngle);
     brush.line(starCx, starCy, sTipX, sTipY);
     brush.circle(starCx, starCy, 4);
-    addAnnotLabel(starCx+starR_val+12, starCy-10, 'r = '+starR_val.toFixed(0));
-    addAnnotLabel(starCx+starR_val+12, starCy+6, '{12/5} star');
-    addAnnotLabel(starCx+starR_val+12, starCy+22, 'r, r/φ, r/φ², r/φ³');
+    addAnnotLabel(starCx, starCy-starR_val-45, 'r = '+starR_val.toFixed(0)+'  {12/5}', 'center');
+    addAnnotLabel(starCx, starCy-starR_val-25, 'scales: r, r/φ, r/φ², r/φ³', 'center');
   }
   if (stepIdx >= 0) {
     addAnnotLabel(30, baseBot+25, 'U = W/(2φ+2) = '+U.toFixed(1)+'px');
