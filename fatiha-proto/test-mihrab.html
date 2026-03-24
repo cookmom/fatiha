@@ -100,22 +100,7 @@ function setup() {
   brush.line(cx - outerDomeHalfSpan, outerDomeSpringY, cx - outerDomeHalfSpan, outerFrameB - 25);
   brush.line(cx + outerDomeHalfSpan, outerDomeSpringY, cx + outerDomeHalfSpan, outerFrameB - 25);
   
-  // Spandrel stars between dome and outer frame
-  brush.set('2H', '#c0b8a8', 0.4);
-  var spR = 40;
-  var spandrels = [
-    {x: outerFrameL + 50, y: outerDomeSpringY - spR},
-    {x: outerFrameR - 50, y: outerDomeSpringY - spR},
-  ];
-  for (var si = 0; si < spandrels.length; si++) {
-    var sp = spandrels[si];
-    for (var k = 0; k < 6; k++) {
-      var a1 = k * Math.PI / 3;
-      var a2 = ((k + 2) % 6) * Math.PI / 3;
-      brush.line(sp.x + spR * Math.cos(a1), sp.y + spR * Math.sin(a1),
-                 sp.x + spR * Math.cos(a2), sp.y + spR * Math.sin(a2));
-    }
-  }
+  // Spandrel stars REMOVED
   
   // Outer border bands REMOVED (no frame)
   
