@@ -363,6 +363,7 @@ var STEPS = [
     bbox:[cx-halfSpan,peakY,cx+halfSpan,baseBot],
     draw: function(p) {
       if (p > 0.1) {
+        randomSeed(1001);
         brush.noStroke();
         brush.fill('#0c3a6a', Math.round(35*Math.min(1,(p-0.1)/0.5)));
         brush.fillBleed(0.001); brush.fillTexture(0,0);
@@ -379,6 +380,7 @@ var STEPS = [
     bbox:[cx-crownHalfSpan,crownPeakY,cx+crownHalfSpan,crownSpringY],
     draw: function(p) {
       if (p > 0.1) {
+        randomSeed(1002);
         brush.noStroke();
         brush.fill('#1a4a8a', Math.round(28*Math.min(1,(p-0.1)/0.5)));
         brush.fillBleed(0.001); brush.fillTexture(0,0);
@@ -395,6 +397,7 @@ var STEPS = [
     bbox:[bandL,bandTop_y,bandR,bandBot_y],
     draw: function(p) {
       if (p > 0.1) {
+        randomSeed(1003);
         brush.noStroke();
         brush.fill('#4a1a3a', Math.round(30*Math.min(1,(p-0.1)/0.5)));
         brush.fillBleed(0.001); brush.fillTexture(0,0);
@@ -409,11 +412,13 @@ var STEPS = [
     draw: function(p) {
       if (p > 0.1) {
         var a = Math.round(25*Math.min(1,(p-0.1)/0.5));
+        randomSeed(1004);
         brush.noStroke();
         brush.fill('#1a2a3a', a);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         brush.rect(colLx-bw/2+2,colBot+2,bw-4,baseBot-colBot-4);
         brush.noFill();
+        randomSeed(1014);
         brush.fill('#1a2a3a', a);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         brush.rect(colRx-bw/2+2,colBot+2,bw-4,baseBot-colBot-4);
@@ -427,11 +432,13 @@ var STEPS = [
     draw: function(p) {
       if (p > 0.1) {
         var a = Math.round(22*Math.min(1,(p-0.1)/0.5));
+        randomSeed(1005);
         brush.noStroke();
         brush.fill('#5a1a4a', a);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         brush.rect(colLx-capW*0.5,capTop+4,capW,capHeight-8);
         brush.noFill();
+        randomSeed(1015);
         brush.fill('#5a1a4a', a);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         brush.rect(colRx-capW*0.5,capTop+4,capW,capHeight-8);
