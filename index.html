@@ -905,20 +905,14 @@ function draw() {
   
   if (tip) updatePencilDot(tip[0], tip[1]);
   
-  // Done — hold 7 seconds, then restart
+  // Done — hold 7 seconds, then reload for clean restart
   if (f >= totalAnimFrames - 1) {
     noLoop();
     if (pencilDot) pencilDot.style.display = 'none';
     if (trackBox) trackBox.remove();
     trackBox = null;
-    // Clear annotation labels
-    clearDimLabels();
-    _lastDimStep = -1;
     setTimeout(function() {
-      // Reset state
-      lastHudStep = -1;
-      frameCount = 0;
-      loop();
+      window.location.reload();
     }, 7000);
   }
 }
