@@ -120,31 +120,60 @@ var bw = colWidth * PHI / ROOT2;
 // All drawn in pencil grey (#8a8278) at thin weight
 // =============================================
 function drawDimLine(x1,y1,x2,y2,label,side) {
-  // Dimension line with perpendicular ticks and centered label
-  var off = side === 'left' ? -25 : (side === 'right' ? 25 : 0);
-  var offY = side === 'above' ? -20 : (side === 'below' ? 20 : 0);
+  var off = side === 'left' ? -35 : (side === 'right' ? 35 : 0);
+  var offY = side === 'above' ? -25 : (side === 'below' ? 25 : 0);
   var ax1=x1+off, ay1=y1+offY, ax2=x2+off, ay2=y2+offY;
   brush.set('2H','#a09888',0.5);
   brush.line(ax1,ay1,ax2,ay2);
-  // Ticks at ends (perpendicular, 8px)
+  // Ticks at ends
   var dx=ax2-ax1, dy=ay2-ay1;
   var len=Math.sqrt(dx*dx+dy*dy);
   if(len<1) return;
   var nx=-dy/len*8, ny=dx/len*8;
   brush.line(ax1-nx,ay1-ny,ax1+nx,ay1+ny);
   brush.line(ax2-nx,ay2-ny,ax2+nx,ay2+ny);
-  // Leader lines back to element
+  // Leader lines
   brush.set('2H','#b8b0a0',0.3);
   brush.line(x1,y1,ax1,ay1);
   brush.line(x2,y2,ax2,ay2);
+  // Text label at midpoint
+  if (label) {
+    var mx=(ax1+ax2)/2, my=(ay1+ay2)/2;
+    push();
+    fill(140,130,118);
+    noStroke();
+    
+    textSize(18);
+    textAlign(CENTER,CENTER);
+    if (Math.abs(dx) > Math.abs(dy)) {
+      // Horizontal line — text above
+      text(label, mx, my - 14);
+    } else {
+      // Vertical line — text rotated beside
+      translate(mx - 16, my);
+      rotate(-HALF_PI);
+      text(label, 0, 0);
+    }
+    pop();
+  }
 }
 
 function drawRadiusCallout(cx_,cy_,px,py,label) {
-  // Line from center to point on arc with label
   brush.set('2H','#a09888',0.5);
   brush.line(cx_,cy_,px,py);
-  // Small circle at center
   brush.circle(cx_,cy_,4);
+  // Label at midpoint of radius line
+  if (label) {
+    var mx=(cx_+px)/2, my=(cy_+py)/2;
+    push();
+    fill(140,130,118);
+    noStroke();
+    
+    textSize(16);
+    textAlign(LEFT,CENTER);
+    text(label, mx+10, my-8);
+    pop();
+  }
 }
 
 function drawAngleArc(cx_,cy_,r,startA,endA) {
@@ -165,39 +194,70 @@ function drawAnnotations(stepIdx) {
   brush.set('2H','#a09888',0.5);
   
   if (stepIdx >= 3) {
-    // Column width dimension — horizontal below column
-    drawDimLine(colLx-colWidth/2, colBot-15, colLx+colWidth/2, colBot-15, '', 'below');
+    // Column width — U/φ²
+    drawDimLine(colLx-colWidth/2, colBot-15, colLx+colWidth/2, colBot-15, 'U/\u03C6\u00B2 = '+colWidth.toFixed(0), 'below');
   }
   if (stepIdx >= 4) {
-    // Column height dimension — vertical beside right column  
-    drawDimLine(colRx+colWidth/2+15, colBot, colRx+colWidth/2+15, colTop, '', 'right');
+    // Column height
+    drawDimLine(colRx+colWidth/2+15, colBot, colRx+colWidth/2+15, colTop, Math.round(colBot-colTop)+'px', 'right');
+    // Formula label beside left column
+    push(); fill(140,130,118); noStroke();  textSize(15);
+    textAlign(RIGHT,CENTER);
+    text('w = U/\u03C6\u00B2', colLx-colWidth/2-12, (colTop+colBot)/2);
+    pop();
+  }
+  if (stepIdx >= 5) {
+    // Capital height
+    drawDimLine(colLx-capW*0.62-10, capBot, colLx-capW*0.62-10, capTop, 'colW\u00D7\u03C6', 'left');
   }
   if (stepIdx >= 7) {
-    // Arch span dimension — horizontal below springing
-    drawDimLine(cx-halfSpan, springY+20, cx+halfSpan, springY+20, '', 'below');
-    // Arch radius callout — line from C2x to peak
-    var peakArcX = cx, peakArcY = peakY;
-    drawRadiusCallout(C2x, springY, peakArcX, peakArcY, 'R=2U');
-    // Arch height dimension — vertical beside arch
-    drawDimLine(cx+halfSpan+30, springY, cx+halfSpan+30, peakY, '', 'right');
+    // Arch span — 2U
+    drawDimLine(cx-halfSpan, springY+20, cx+halfSpan, springY+20, '2U = '+archSpan.toFixed(0), 'below');
+    // Arch radius callout
+    drawRadiusCallout(C2x, springY, cx, peakY, 'R = 2U');
+    // Arch height — U√3
+    drawDimLine(cx+halfSpan+35, springY, cx+halfSpan+35, peakY, 'U\u221A3 = '+archH.toFixed(0), 'right');
+    // Springing point label
+    push(); fill(140,130,118); noStroke();  textSize(13);
+    textAlign(LEFT,TOP);
+    text('spring @ H/\u03C6', cx+halfSpan+8, springY+30);
+    pop();
   }
   if (stepIdx >= 8) {
-    // Band height dimension — vertical beside band
-    drawDimLine(bandR+15, bandBot_y, bandR+15, bandTop_y, '', 'right');
+    // Band height — U/φ
+    drawDimLine(bandR+18, bandBot_y, bandR+18, bandTop_y, 'U/\u03C6 = '+bandHeight_v.toFixed(0), 'right');
   }
   if (stepIdx >= 9) {
-    // Crown radius callout
+    // Crown radius
     var crMidX = cx - crownHalfSpan*0.5;
     var crMidDx = crMidX - crownC2x;
     var crMidY = crownSpringY - Math.sqrt(Math.max(0, crownR*crownR - crMidDx*crMidDx));
-    drawRadiusCallout(crownC2x, crownSpringY, crMidX, crMidY, 'R');
+    drawRadiusCallout(crownC2x, crownSpringY, crMidX, crMidY, 'R = span/\u221A2');
+    // Crown span
+    drawDimLine(cx-crownHalfSpan, crownSpringY+12, cx+crownHalfSpan, crownSpringY+12, 'bandW\u00D7\u221A\u03C6 = '+crownSpan.toFixed(0), 'below');
   }
   if (stepIdx >= 10) {
-    // Star radius lines — one spoke highlighted
+    // Star radius + formula
     brush.set('2H','#a09888',0.5);
     var sAngle = -Math.PI/2;
-    brush.line(starCx, starCy, starCx + starR_val*Math.cos(sAngle), starCy + starR_val*Math.sin(sAngle));
+    var sTipX = starCx + starR_val*Math.cos(sAngle);
+    var sTipY = starCy + starR_val*Math.sin(sAngle);
+    brush.line(starCx, starCy, sTipX, sTipY);
     brush.circle(starCx, starCy, 4);
+    push(); fill(140,130,118); noStroke();  textSize(13);
+    textAlign(LEFT,CENTER);
+    text('r = '+starR_val.toFixed(0), starCx+starR_val+10, starCy);
+    text('{12/5} star', starCx+starR_val+10, starCy+18);
+    text('scales: r, r/\u03C6, r/\u03C6\u00B2, r/\u03C6\u00B3', starCx+starR_val+10, starCy+36);
+    pop();
+  }
+  // Base unit label at bottom
+  if (stepIdx >= 0) {
+    push(); fill(160,150,140); noStroke();  textSize(14);
+    textAlign(LEFT,TOP);
+    text('U = W/(2\u03C6+2) = '+U.toFixed(1)+'px', 30, baseBot+20);
+    text('\u03C6 = 1.618  \u221A3 = 1.732  \u221A2 = 1.414', 30, baseBot+38);
+    pop();
   }
 }
 
@@ -645,9 +705,6 @@ function draw() {
     STEPS[i].draw(1);
   }
   
-  // Draw annotations for all completed steps
-  drawAnnotations(activeStep - 1);
-  
   // Draw current step at partial progress
   var stepFrame = f - frameStarts[activeStep];
   var stepDurFrames = frameEnds[activeStep] - frameStarts[activeStep];
@@ -659,9 +716,12 @@ function draw() {
     createTrackBox(STEPS[activeStep]);
     lastHudStep = activeStep;
   }
+  // Draw annotations LAST — on top of everything including fills
+  drawAnnotations(activeStep - 1);
+  
   if (tip) updatePencilDot(tip[0], tip[1]);
   
-  // Done — draw final annotations
+  // Done
   if (f >= totalAnimFrames - 1) {
     drawAnnotations(STEPS.length - 1);
     noLoop();
