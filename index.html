@@ -406,8 +406,10 @@ function createTrackBox(step) {
   var box = document.createElement('div');
   box.className = 'track-box';
   var s = window._hudScale || 1;
+  var ox = window._canvasOffsetX || 0;
+  var oy = window._canvasOffsetY || 0;
   var b = step.bbox, pad = 25 * s;
-  var bx=(b[0]*s)-pad,by=(b[1]*s)-pad,bwid=(b[2]-b[0])*s+pad*2,bh=(b[3]-b[1])*s+pad*2;
+  var bx=(b[0]*s)+ox-pad,by=(b[1]*s)+oy-pad,bwid=(b[2]-b[0])*s+pad*2,bh=(b[3]-b[1])*s+pad*2;
   var minW = 180, minH = 120;
   if(bwid<minW){bx-=(minW-bwid)/2;bwid=minW;}
   if(bh<minH){by-=(minH-bh)/2;bh=minH;}
@@ -432,8 +434,10 @@ function updatePencilDot(x, y) {
   if (!pencilDot) pencilDot = document.getElementById('pencil-dot');
   pencilDot.style.display = 'block';
   var s = window._hudScale || 1;
-  pencilDot.style.left = (x*s-4) + 'px';
-  pencilDot.style.top = (y*s-4) + 'px';
+  var ox = window._canvasOffsetX || 0;
+  var oy = window._canvasOffsetY || 0;
+  pencilDot.style.left = (x*s + ox - 7) + 'px';
+  pencilDot.style.top = (y*s + oy - 7) + 'px';
   var el = document.getElementById('live-coords');
   if (el) el.textContent = 'x:' + Math.round(x) + ' y:' + Math.round(y);
 }
@@ -462,9 +466,11 @@ function setup() {
   c.elt.style.margin = '0 auto';
   brush.load();
   frameRate(FPS);
-  // HUD scale: canvas CSS width / canvas pixel width
-  var cssW = c.elt.getBoundingClientRect().width;
-  window._hudScale = cssW / W;
+  // HUD scale + canvas offset for dot alignment
+  var rect = c.elt.getBoundingClientRect();
+  window._hudScale = rect.width / W;
+  window._canvasOffsetX = rect.left;
+  window._canvasOffsetY = rect.top;
 }
 
 function draw() {
