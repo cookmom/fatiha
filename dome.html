@@ -30,19 +30,19 @@ canvas { object-fit:contain !important; display:block; }
 .track-box .br::before { bottom:-2px; right:-2px; border-bottom-width:1.5px; border-right-width:1.5px; position:absolute; }
 /* Corner circles centered on corner intersection */
 .corner-circ {
-  position:absolute; width:10px; height:10px;
-  border:1.5px solid #5a5248; border-radius:50%;
+  position:absolute; width:4px; height:4px;
+  border:1px solid #5a5248; border-radius:50%;
 }
-.corner-circ.tl { top:-6px; left:-6px; }
-.corner-circ.tr { top:-6px; right:-6px; }
-.corner-circ.bl2 { bottom:-6px; left:-6px; }
-.corner-circ.br2 { bottom:-6px; right:-6px; }
+.corner-circ.tl { top:-2px; left:-2px; }
+.corner-circ.tr { top:-2px; right:-2px; }
+.corner-circ.bl2 { bottom:-2px; left:-2px; }
+.corner-circ.br2 { bottom:-2px; right:-2px; }
 /* Info panel — INSIDE the track box, smart-positioned to avoid occlusion */
 .hud-info {
-  position:absolute; bottom:100%; left:0; margin-bottom:10px;
+  position:absolute; bottom:100%; left:0; margin-bottom:4px;
   background:rgba(242,234,218,0.88);
   border:1px solid rgba(90,82,72,0.3);
-  border-radius:4px; padding:8px 12px;
+  border-radius:4px; padding:4px 8px;
   white-space:nowrap;
 }
 .hud-label { color:#3a3430; font-weight:500; letter-spacing:0.3px; text-transform:uppercase; margin-bottom:3px; }
@@ -56,17 +56,17 @@ canvas { object-fit:contain !important; display:block; }
 }
 /* Pencil cursor — crosshair in pencil grey */
 #pencil-dot {
-  position:absolute; width:28px; height:28px; pointer-events:none; z-index:15;
+  position:absolute; width:14px; height:14px; pointer-events:none; z-index:15;
 }
 #pencil-dot::before {
-  content:''; position:absolute; left:13px; top:0; width:1.5px; height:28px; background:#5a5248;
+  content:''; position:absolute; left:6px; top:0; width:1px; height:14px; background:#5a5248;
 }
 #pencil-dot::after {
-  content:''; position:absolute; top:13px; left:0; width:28px; height:1.5px; background:#5a5248;
+  content:''; position:absolute; top:6px; left:0; width:14px; height:1px; background:#5a5248;
 }
 #pencil-dot .ch-circle {
-  position:absolute; top:8px; left:8px; width:12px; height:12px;
-  border:1.5px solid #5a5248; border-radius:50%;
+  position:absolute; top:4px; left:4px; width:6px; height:6px;
+  border:1px solid #5a5248; border-radius:50%;
 }
 </style>
 </head>
@@ -845,7 +845,7 @@ function createTrackBox(step) {
   var _fs = Math.max(9, Math.round(ANNOT_FONT * (window._hudScale||1))) + 'px';
   var info=document.createElement('div');info.className='hud-info';
   // If box top is near screen top, put info INSIDE the box
-  if (by < 60) {
+  if (by < 80) {
     info.style.bottom = 'auto';
     info.style.top = '6px';
     info.style.marginBottom = '0';
@@ -863,8 +863,8 @@ function updatePencilDot(x, y) {
   pencilDot.style.display = 'block';
   var s = window._hudScale || 1;
   var r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
-  pencilDot.style.left = (x*s + r.left - 14) + 'px';
-  pencilDot.style.top = (y*s + r.top - 14) + 'px';
+  pencilDot.style.left = (x*s + r.left - 7) + 'px';
+  pencilDot.style.top = (y*s + r.top - 7) + 'px';
   var el = document.getElementById('live-coords');
   if (el) el.textContent = 'x:' + Math.round(x) + ' y:' + Math.round(y);
 }
