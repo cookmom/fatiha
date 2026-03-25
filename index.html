@@ -857,6 +857,8 @@ function setup() {
   frameRate(FPS);
   window._hudScale = c.elt.getBoundingClientRect().width / W;
   window._canvasEl = c.elt;
+  window._snapshot = null;
+  window._snapshotAtStep = -1;
   // Recalculate on viewport change (Safari fullscreen, orientation)
   window.addEventListener('resize', function() {
     window._hudScale = c.elt.getBoundingClientRect().width / W;
@@ -877,9 +879,23 @@ function draw() {
     if (f >= frameStarts[i]) { activeStep = i; break; }
   }
   
-  // Draw ALL completed steps at full progress
-  for (var i = 0; i < activeStep; i++) {
-    STEPS[i].draw(1);
+  // OPTIMIZATION: snapshot before fills phase
+  // Take snapshot when entering WASH_START (all pencil work done)
+  if (activeStep >= WASH_START && window._snapshotAtStep < WASH_START) {
+    // Draw all pencil steps + annotations into current frame
+    for (var i = 0; i < WASH_START; i++) STEPS[i].draw(1);
+    drawAnnotations(WASH_START - 1);
+    window._snapshot = get();
+    window._snapshotAtStep = WASH_START;
+  }
+  
+  if (window._snapshot && activeStep >= WASH_START) {
+    // Fast path: blit snapshot + only draw fill steps
+    image(window._snapshot, 0, 0);
+    for (var i = WASH_START; i < activeStep; i++) STEPS[i].draw(1);
+  } else {
+    // Normal path: draw all completed steps
+    for (var i = 0; i < activeStep; i++) STEPS[i].draw(1);
   }
   
   // Draw current step at partial progress
