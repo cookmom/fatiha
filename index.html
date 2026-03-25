@@ -685,7 +685,7 @@ var STEPS = [
       if (p >= 0) {
         randomSeed(1001);
         brush.noStroke();
-        brush.fill('#081e3a', 70);
+        brush.fill('#081e3a', 100);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         var poly=[];
         for(var i=0;i<=60;i++){var t=i/60;var x=(cx-halfSpan)+halfSpan*t;var dx=x-C2x;poly.push([x,springY-Math.sqrt(Math.max(0,archR*archR-dx*dx))]);}
@@ -702,7 +702,7 @@ var STEPS = [
       if (p >= 0) {
         randomSeed(1002);
         brush.noStroke();
-        brush.fill('#0a2a4a', 55);
+        brush.fill('#0a2a4a', 80);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         var poly=[];
         for(var i=0;i<=40;i++){var t=i/40;var x=(cx-crownHalfSpan)+crownHalfSpan*t;var dx=x-crownC2x;poly.push([x,crownSpringY-Math.sqrt(Math.max(0,crownR*crownR-dx*dx))]);}
@@ -719,7 +719,7 @@ var STEPS = [
       if (p >= 0) {
         randomSeed(1003);
         brush.noStroke();
-        brush.fill('#7a4a2a', 30);
+        brush.fill('#7a4a2a', 60);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         brush.rect(bandL+4,bandTop_y+4,bandR-bandL-8,bandBot_y-bandTop_y-8);
         brush.noFill();
@@ -731,7 +731,7 @@ var STEPS = [
     bbox:[colLx-bw/2,colBot,colRx+bw/2,baseBot],
     draw: function(p) {
       if (p >= 0) {
-        var a = 50;
+        var a = 70;
         randomSeed(1004);
         brush.noStroke();
         brush.fill('#0a1020', a);
@@ -751,7 +751,7 @@ var STEPS = [
     bbox:[colLx-capW*0.6,capTop,colRx+capW*0.6,capBot],
     draw: function(p) {
       if (p >= 0) {
-        var a = 80;
+        var a = 100;
         randomSeed(1005);
         brush.noStroke();
         brush.fill('#5a1a4a', a);
