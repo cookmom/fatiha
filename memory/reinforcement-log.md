@@ -1,5 +1,10 @@
 # Reinforcement Log
 
+## 2026-03-24 (08:03 PM PT)
+1. **COMMIT EVERY VERSION** — any active canvas/web iteration must be committed after each meaningful change; lost work from skipping this is unforgivable (Lesson 39/Rule 0g).
+2. **VERIFY SPATIALLY WITH NUMBERS** — before claiming any position/layout/visual change works, log actual computed values and match them to the brief numerically — screenshots are ambiguous, numbers aren't (Sin #7, Lesson 38).
+3. **OWN THE AESTHETIC GATE** — before any visual goes to Tawfeeq, ask "is this beautiful?" — technical QC (no errors, renders) is necessary but NOT sufficient; aesthetic judgment is a mandatory separate step (Lesson 39).
+
 ## 2026-03-24 (04:03 PM PT)
 1. **COMMIT EVERY VERSION** — active iteration work (mihrab, threejs, any canvas project) must be committed after each meaningful change — no accumulating hours of uncommitted diffs (Lesson 39/Rule 0g).
 2. **VERIFY SPATIALLY WITH NUMBERS, NOT EYES** — before claiming any position/layout/proportion change works, log actual computed values and confirm they match the brief numerically (Sin #7, Lesson 38).

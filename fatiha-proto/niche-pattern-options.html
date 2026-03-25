@@ -1,0 +1,684 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mihrab Niche — Islamic Geometric Pattern Options</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #2a2118;
+    font-family: 'Georgia', serif;
+    padding: 20px;
+    min-height: 100vh;
+  }
+  h1 {
+    text-align: center;
+    color: #d4b896;
+    font-size: 16px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    font-weight: normal;
+  }
+  .subtitle {
+    text-align: center;
+    color: #8a7560;
+    font-size: 11px;
+    letter-spacing: 2px;
+    margin-bottom: 20px;
+  }
+  .grid {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 16px;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .card-label {
+    color: #c8a87a;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    text-align: center;
+    max-width: 240px;
+    line-height: 1.4;
+  }
+  .card-sublabel {
+    color: #6a5940;
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-align: center;
+    max-width: 240px;
+  }
+  svg {
+    display: block;
+  }
+</style>
+</head>
+<body>
+<h1>Mihrab Lower Niche — Pattern Research</h1>
+<div class="subtitle">6 Sophisticated Islamic Geometric Options · Pencil Sketches</div>
+
+<div class="grid">
+
+  <!-- 1. GIRIH QUASICRYSTAL -->
+  <div class="card">
+    <div class="card-label">1. Girih Quasicrystal</div>
+    <div class="card-sublabel">Darb-i Imam, Isfahan · 5-fold symmetry</div>
+    <svg width="240" height="320" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <!-- Pointed arch clip: rounded base, pointed top -->
+        <clipPath id="arch1">
+          <path d="M20,320 L20,180 Q20,20 120,20 Q220,20 220,180 L220,320 Z"/>
+        </clipPath>
+        <filter id="pencil1" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" result="noise"/>
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.8" xChannelSelector="R" yChannelSelector="G"/>
+        </filter>
+      </defs>
+      <!-- Background -->
+      <rect width="240" height="320" fill="#f5f0e8"/>
+      <!-- Arch outline -->
+      <path d="M20,320 L20,180 Q20,20 120,20 Q220,20 220,180 L220,320 Z" fill="#f0ebe0" stroke="#3a3a3a" stroke-width="2" stroke-linejoin="round"/>
+      
+      <!-- Girih tiles clipped to arch -->
+      <g clip-path="url(#arch1)" filter="url(#pencil1)" stroke="#3a3a3a" stroke-width="0.9" fill="none" stroke-linecap="round">
+        <!-- Decagon center ~(120,200) -->
+        <polygon points="120,130 148,139 157,167 148,195 120,204 92,195 83,167 92,139" stroke-width="1.1"/>
+        <!-- Inner strapwork of decagon -->
+        <polygon points="120,140 144,148 152,167 144,186 120,194 96,186 88,167 96,148" stroke-width="0.7" stroke-dasharray="1,2"/>
+        
+        <!-- Pentagon top -->
+        <polygon points="120,80 143,96 135,123 105,123 97,96"/>
+        <!-- Pentagon decoration lines -->
+        <line x1="120" y1="80" x2="120" y2="105" stroke-width="0.6"/>
+        
+        <!-- Bowtie left -->
+        <polygon points="65,155 83,139 83,195 65,179"/>
+        <!-- Bowtie right -->
+        <polygon points="175,155 157,139 157,195 175,179"/>
+        
+        <!-- Rhombus bottom-left -->
+        <polygon points="83,195 92,220 70,228 61,203"/>
+        <!-- Rhombus bottom-right -->
+        <polygon points="157,195 179,203 170,228 148,220"/>
+        
+        <!-- Elongated hexagon bottom center -->
+        <polygon points="92,220 148,220 157,245 148,270 92,270 83,245"/>
+        
+        <!-- Pentagon bottom-left area -->
+        <polygon points="61,203 70,228 48,240 36,218"/>
+        <!-- Pentagon bottom-right area -->
+        <polygon points="179,203 204,218 192,240 170,228"/>
+        
+        <!-- Strapwork connectors - the Girih lines inside each tile -->
+        <!-- Decagon strapwork -->
+        <line x1="120" y1="130" x2="92" y2="139"/>
+        <line x1="92" y1="139" x2="83" y2="167"/>
+        <line x1="148" y1="139" x2="157" y2="167"/>
+        <line x1="157" y1="167" x2="148" y2="195"/>
+        <line x1="83" y1="167" x2="92" y2="195"/>
+        
+        <!-- Upper pentagon strapwork -->
+        <line x1="120" y1="80" x2="97" y2="96"/>
+        <line x1="120" y1="80" x2="143" y2="96"/>
+        <line x1="105" y1="123" x2="135" y2="123"/>
+        
+        <!-- Lower hexagon strapwork -->
+        <line x1="92" y1="220" x2="92" y2="270"/>
+        <line x1="148" y1="220" x2="148" y2="270"/>
+        <line x1="83" y1="245" x2="120" y2="235"/>
+        <line x1="157" y1="245" x2="120" y2="235"/>
+        
+        <!-- Additional pentagons to fill lower arch -->
+        <polygon points="70,270 92,270 83,295 61,295 52,280"/>
+        <polygon points="148,270 170,295 148,295 136,280" opacity="0.7"/>
+        <polygon points="92,270 148,270 157,295 120,308 83,295"/>
+        
+        <!-- 5-fold axis marker at top -->
+        <circle cx="120" cy="167" r="6" stroke-width="1" stroke-dasharray="2,2"/>
+        <line x1="114" y1="167" x2="126" y2="167" stroke-width="0.7"/>
+        <line x1="120" y1="161" x2="120" y2="173" stroke-width="0.7"/>
+      </g>
+      
+      <!-- Arch border overlay -->
+      <path d="M20,320 L20,180 Q20,20 120,20 Q220,20 220,180 L220,320 Z" fill="none" stroke="#3a3a3a" stroke-width="2"/>
+      <!-- Label area -->
+      <rect x="20" y="295" width="200" height="25" fill="#f5f0e8" opacity="0.85"/>
+      <text x="120" y="311" text-anchor="middle" fill="#5a4a35" font-size="8" letter-spacing="1" font-family="Georgia">GIRIH · DECAGON + 4 TILES · QUASIPERIODIC</text>
+    </svg>
+  </div>
+
+  <!-- 2. MUQARNAS PROJECTION -->
+  <div class="card">
+    <div class="card-label">2. Muqarnas Projection</div>
+    <div class="card-sublabel">Stalactite vaulting unfolded · 2D plan view</div>
+    <svg width="240" height="320" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <clipPath id="arch2">
+          <path d="M20,320 L20,180 Q20,20 120,20 Q220,20 220,180 L220,320 Z"/>
+        </clipPath>
+        <filter id="pencil2" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" result="noise"/>
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.7" xChannelSelector="R" yChannelSelector="G"/>
+        </filter>
+      </defs>
+      <rect width="240" height="320" fill="#f5f0e8"/>
+      <path d="M20,320 L20,180 Q20,20 120,20 Q220,20 220,180 L220,320 Z" fill="#f0ebe0" stroke="#3a3a3a" stroke-width="2"/>
+      
+      <g clip-path="url(#arch2)" filter="url(#pencil2)" stroke="#3a3a3a" fill="none" stroke-linecap="round">
+        <!-- Muqarnas plan: radiating corbelled cells from a central point -->
+        <!-- Tier 1: Central keystone at top of arch interior -->
+        <polygon points="120,45 135,60 120,75 105,60" stroke-width="1.2"/>
+        <!-- Lozenge shadow inside -->
+        <line x1="120" y1="45" x2="120" y2="75" stroke-width="0.5" stroke-dasharray="2,2"/>
+        <line x1="105" y1="60" x2="135" y2="60" stroke-width="0.5" stroke-dasharray="2,2"/>
+        
+        <!-- Tier 2: Flanking cells -->
+        <polygon points="90,50 105,60 90,75 75,65" stroke-width="1"/>
+        <polygon points="150,50 165,65 150,75 135,60" stroke-width="1"/>
+        <!-- Corner squinches -->
+        <polygon points="75,65 90,75 80,90 65,80" stroke-width="0.9"/>
+        <polygon points="165,65 175,80 160,90 150,75" stroke-width="0.9"/>
+        
+        <!-- Tier 3: Wider spread -->
+        <polygon points="80,90 105,80 120,95 105,110 80,110" stroke-width="1"/>
+        <polygon points="160,90 160,110 135,110 120,95 135,80" stroke-width="1"/>
+        <!-- Side cells -->
+        <polygon points="45,85 65,80 80,90 65,105 45,105" stroke-width="0.9"/>
+        <polygon points="195,85 195,105 175,105 160,90 175,80" stroke-width="0.9"/>
+        
+        <!-- Tier 4 -->
+        <polygon points="80,110 105,110 120,125 105,140 80,140" stroke-width="1.1"/>
+        <polygon points="160,110 160,140 135,140 120,125 135,110" stroke-width="1.1"/>
+        <polygon points="45,105 65,105 80,110 80,140 55,145 35,130 35,105" stroke-width="0.9"/>
+        <polygon points="195,105 205,105 205,130 185,145 160,140 160,110 175,105" stroke-width="0.9"/>
+        
+        <!-- Tier 5: Spreading base -->
+        <polygon points="55,145 80,140 105,140 120,155 105,170 80,170 55,165" stroke-width="1.1"/>
+        <polygon points="185,145 185,165 160,170 135,170 120,155 135,140 160,140" stroke-width="1.1"/>
+        <polygon points="35,130 55,145 55,165 30,170 25,150" stroke-width="0.9"/>
+        <polygon points="205,130 215,150 210,170 185,165 185,145" stroke-width="0.9"/>
+        
+        <!-- Tier 6: Wide base tier -->
+        <polygon points="55,165 80,170 120,165 160,170 185,165 185,200 120,210 55,200" stroke-width="1.2"/>
+        <line x1="120" y1="165" x2="120" y2="210" stroke-width="0.7"/>
+        <line x1="80" y1="170" x2="80" y2="200" stroke-width="0.6"/>
+        <line x1="160" y1="170" x2="160" y2="200" stroke-width="0.6"/>
+        
+        <!-- Base squinch row -->
+        <polygon points="25,170 55,165 55,200 30,205 22,190" stroke-width="0.9"/>
+        <polygon points="215,170 218,190 210,205 185,200 185,165" stroke-width="0.9"/>
+        
+        <!-- Tier 7: Final spread to base -->
+        <polygon points="22,190 55,200 120,210 185,200 218,190 218,240 120,255 22,240" stroke-width="1.2"/>
+        <line x1="55" y1="200" x2="55" y2="240" stroke-width="0.6"/>
+        <line x1="185" y1="200" x2="185" y2="240" stroke-width="0.6"/>
+        <line x1="120" y1="210" x2="120" y2="255" stroke-width="0.7"/>
+        <!-- Subdivisions -->
+        <line x1="87" y1="205" x2="87" y2="247" stroke-width="0.5"/>
+        <line x1="153" y1="205" x2="153" y2="247" stroke-width="0.5"/>
+        
+        <!-- Tier 8: Massive base row filling to 320 -->
+        <polygon points="22,240 218,240 218,295 22,295" stroke-width="1.3"/>
+        <!-- Subdivisions of base row — large muqarnas cells -->
+        <line x1="55" y1="240" x2="55" y2="295" stroke-width="0.8"/>
+        <line x1="87" y1="240" x2="87" y2="295" stroke-width="0.7"/>
+        <line x1="120" y1="240" x2="120" y2="295" stroke-width="0.8"/>
+        <line x1="153" y1="240" x2="153" y2="295" stroke-width="0.7"/>
+        <line x1="185" y1="240" x2="185" y2="295" stroke-width="0.8"/>
+        <!-- Cell detail arcs -->
+        <path d="M22,260 Q38,252 55,260" stroke-width="0.6"/>
+        <path d="M55,260 Q71,252 87,260" stroke-width="0.6"/>
+        <path d="M87,260 Q103,252 120,260" stroke-width="0.6"/>
+        <path d="M120,260 Q136,252 153,260" stroke-width="0.6"/>
+        <path d="M153,260 Q169,252 185,260" stroke-width="0.6"/>
+        <path d="M185,260 Q201,252 218,260" stroke-width="0.6"/>
+        <!-- Depth shading lines inside cells -->
+        <line x1="38" y1="268" x2="38" y2="288" stroke-width="0.5" stroke-dasharray="3,3"/>
+        <line x1="71" y1="268" x2="71" y2="288" stroke-width="0.5" stroke-dasharray="3,3"/>
+        <line x1="103" y1="268" x2="103" y2="288" stroke-width="0.5" stroke-dasharray="3,3"/>
+        <line x1="136" y1="268" x2="136" y2="288" stroke-width="0.5" stroke-dasharray="3,3"/>
+        <line x1="169" y1="268" x2="169" y2="288" stroke-width="0.5" stroke-dasharray="3,3"/>
+        <line x1="201" y1="268" x2="201" y2="288" stroke-width="0.5" stroke-dasharray="3,3"/>
+        
+        <!-- Depth indicators: horizontal offsets to show 3D nature -->
+        <line x1="55" y1="257" x2="87" y2="257" stroke-width="0.6" stroke-dasharray="4,2"/>
+        <line x1="87" y1="250" x2="120" y2="250" stroke-width="0.6" stroke-dasharray="4,2"/>
+        <line x1="120" y1="257" x2="153" y2="257" stroke-width="0.6" stroke-dasharray="4,2"/>
+        <line x1="153" y1="250" x2="185" y2="250" stroke-width="0.6" stroke-dasharray="4,2"/>
+      </g>
+      
+      <path d="M20,320 L20,180 Q20,20 120,20 Q220,20 220,180 L220,320 Z" fill="none" stroke="#3a3a3a" stroke-width="2"/>
+      <rect x="20" y="295" width="200" height="25" fill="#f5f0e8" opacity="0.85"/>
+      <text x="120" y="311" text-anchor="middle" fill="#5a4a35" font-size="8" letter-spacing="1" font-family="Georgia">MUQARNAS · STALACTITE VAULT PLAN · 8 TIERS</text>
+    </svg>
+  </div>
+
+  <!-- 3. MASHRABIYA LATTICE -->
+  <div class="card">
+    <div class="card-label">3. Mashrabiya Lattice</div>
+    <div class="card-sublabel">Parametric screen · octagonal grid</div>
+    <svg width="240" height="320" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <clipPath id="arch3">
+          <path d="M20,320 L20,180 Q20,20 120,20 Q220,20 220,180 L220,320 Z"/>
+        </clipPath>
+        <filter id="pencil3" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.95" numOctaves="3" result="noise"/>
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.6" xChannelSelector="R" yChannelSelector="G"/>
+        </filter>
+        <!-- Mashrabiya pattern tile: octagon + square (18px repeat) -->
+        <pattern id="mash" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
+          <!-- Octagon inscribed in 28x28 cell, side = 28*(√2-1)/√2 ≈ 8.2 -->
+          <!-- Octagon vertices (cut corners) -->
+          <polygon points="8,0 20,0 28,8 28,20 20,28 8,28 0,20 0,8" 
+                   fill="none" stroke="#3a3a3a" stroke-width="0.9"/>
+          <!-- Inner octagon (rotated, for depth) -->
+          <polygon points="10,4 18,4 22,10 22,18 18,24 10,24 6,18 6,10"
+                   fill="none" stroke="#3a3a3a" stroke-width="0.5" stroke-dasharray="1,1"/>
+          <!-- Corner squares between octagonal cells -->
+          <!-- These appear at corners of the tile -->
+          <rect x="0" y="0" width="8" height="8" fill="none" stroke="#3a3a3a" stroke-width="0.7"/>
+          <!-- Cross-bar of corner square -->
+          <line x1="0" y1="4" x2="8" y2="4" stroke="#3a3a3a" stroke-width="0.4"/>
+          <line x1="4" y1="0" x2="4" y2="8" stroke="#3a3a3a" stroke-width="0.4"/>
+          <!-- Diagonal of octagon (mashrabiya turning detail) -->
+          <line x1="8" y1="0" x2="20" y2="0" stroke="#3a3a3a" stroke-width="0.9"/>
+          <line x1="28" y1="8" x2="28" y2="20" stroke="#3a3a3a" stroke-width="0.9"/>
+        </pattern>
+        <!-- Larger mashrabiya for outer border -->
+        <pattern id="mash-lg" x="0" y="0" width="42" height="42" patternUnits="userSpaceOnUse">
+          <polygon points="12,0 30,0 42,12 42,30 30,42 12,42 0,30 0,12" 
+                   fill="none" stroke="#3a3a3a" stroke-width="1.1"/>
+          <polygon points="15,6 27,6 34,15 34,27 27,36 15,36 8,27 8,15"
+                   fill="none" stroke="#3a3a3a" stroke-width="0.6"/>
+          <!-- Star in octagon center -->
+          <polygon points="21,9 24,15 30,15 25,19 27,25 21,21 15,25 17,19 12,15 18,15"
+                   fill="none" stroke="#3a3a3a" stroke-width="0.5"/>
+        </pattern>
+      </defs>
+      <rect width="240" height="320" fill="#f5f0e8"/>
+      <path d="M20,320 L20,180 Q20,20 120,20 Q220,20 220,180 L220,320 Z" fill="#f0ebe0" stroke="#3a3a3a" stroke-width="2"/>
+      
+      <!-- Outer border band: larger mashrabiya -->
+      <g clip-path="url(#arch3)">
+        <rect x="0" y="0" width="240" height="320" fill="url(#mash-lg)" opacity="0.25"/>
+      </g>
+      
+      <!-- Main fine mashrabiya fill -->
+      <g clip-path="url(#arch3)" filter="url(#pencil3)">
+        <rect x="0" y="0" width="240" height="320" fill="url(#mash)" opacity="0.9"/>
+        
+        <!-- Parametric variation: outer border band with medium scale -->
+        <!-- Border ring (drawn manually for parametric feel) -->
+        
+        <!-- Central medallion: 8-pointed star in large octagon -->
+        <polygon points="120,140 132,148 140,160 132,172 120,180 108,172 100,160 108,148" 
+                 fill="#f5f0e8" stroke="#3a3a3a" stroke-width="1.3"/>
+        <polygon points="120,130 135,145 150,140 145,155 150,170 135,165 120,180 105,165 90,170 95,155 90,140 105,145"
+                 fill="#f5f0e8" stroke="#3a3a3a" stroke-width="1.1"/>
+        <!-- Inner star detail -->
+        <polygon points="120,143 126,150 134,150 130,157 134,164 126,160 120,167 114,160 106,164 110,157 106,150 114,150"
+                 fill="none" stroke="#3a3a3a" stroke-width="0.8"/>
+        <!-- Hub circle -->
+        <circle cx="120" cy="160" r="5" fill="none" stroke="#3a3a3a" stroke-width="0.8"/>
+        <circle cx="120" cy="160" r="2" fill="#3a3a3a"/>
+        
+        <!-- Secondary medallions above and below -->
+        <circle cx="120" cy="75" r="18" fill="#f5f0e8" stroke="#3a3a3a" stroke-width="1"/>
+        <polygon points="120,58 125,70 138,70 128,78 131,90 120,83 109,90 112,78 102,70 115,70"
+                 fill="none" stroke="#3a3a3a" stroke-width="0.8"/>
+        
+        <circle cx="120" cy="255" r="22" fill="#f5f0e8" stroke="#3a3a3a" stroke-width="1"/>
+        <polygon points="120,234 127,248 142,248 131,258 135,273 120,264 105,273 109,258 98,248 113,248"
+                 fill="none" stroke="#3a3a3a" stroke-width="0.9"/>
+        
+        <!-- Vertical accent band through center -->
+        <line x1="120" y1="30" x2="120" y2="290" stroke="#3a3a3a" stroke-width="0.5" stroke-dasharray="2,4" opacity="0.4"/>
+      </g>
+      
+      <path d="M20,320 L20,180 Q20,20 120,20 Q220,20 220,180 L220,320 Z" fill="none" stroke="#3a3a3a" stroke-width="2"/>
+      <rect x="20" y="295" width="200" height="25" fill="#f5f0e8" opacity="0.85"/>
+      <text x="120" y="311" text-anchor="middle" fill="#5a4a35" font-size="8" letter-spacing="1" font-family="Georgia">MASHRABIYA · OCTAGONAL LATTICE · 3 SCALES</text>
+    </svg>
+  </div>
+
+  <!-- 4. SELF-SIMILAR FRACTAL TESSELLATION -->
+  <div class="card">
+    <div class="card-label">4. Self-Similar Fractal</div>
+    <div class="card-sublabel">Recursive nesting · Topkapi scroll geometry</div>
+    <svg width="240" height="320" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <clipPath id="arch4">
+          <path d="M20,320 L20,180 Q20,20 120,20 Q220,20 220,180 L220,320 Z"/>
+        </clipPath>
+        <filter id="pencil4" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.88" numOctaves="4" result="noise"/>
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.85" xChannelSelector="R" yChannelSelector="G"/>
+        </filter>
+      </defs>
+      <rect width="240" height="320" fill="#f5f0e8"/>
+      <path d="M20,320 L20,180 Q20,20 120,20 Q220,20 220,180 L220,320 Z" fill="#f0ebe0" stroke="#3a3a3a" stroke-width="2"/>
+      
+      <g clip-path="url(#arch4)" filter="url(#pencil4)" stroke="#3a3a3a" fill="none" stroke-linecap="round">
+        <!-- LEVEL 0: Large 12-pointed star, center ~(120, 165) -->
+        <!-- 12-star = two overlapping hexagons -->
+        <!-- Outer hexagon (flat top) -->
+        <polygon points="120,70 178,103 178,169 120,202 62,169 62,103" stroke-width="1.4"/>
+        <!-- Outer hexagon (pointy top, rotated 30°) -->
+        <polygon points="162,78 194,135 162,192 78,192 46,135 78,78" stroke-width="1.4"/>
+        <!-- Inner circle -->
+        <circle cx="120" cy="135" r="28" stroke-width="0.9"/>
+        
+        <!-- LEVEL 1: 6-pointed stars at each tip of large star, scaled ~0.38 -->
+        <!-- Top star (120, 70 area) -->
+        <polygon points="120,50 128,63 120,76 112,63" stroke-width="0.9"/>
+        <polygon points="113,55 127,55 131,68 113,68" stroke-width="0.7"/>
+        
+        <!-- Bottom-right star -->
+        <polygon points="174,168 182,181 174,194 166,181" stroke-width="0.9"/>
+        <polygon points="167,174 181,174 185,187 167,187" stroke-width="0.7"/>
+        
+        <!-- Bottom-left star -->
+        <polygon points="66,168 74,181 66,194 58,181" stroke-width="0.9"/>
+        <polygon points="59,174 73,174 77,187 59,187" stroke-width="0.7"/>
+        
+        <!-- LEVEL 1: 6-star small at other 3 tips -->
+        <!-- Top-right -->
+        <polygon points="173,99 181,112 173,125 165,112" stroke-width="0.9"/>
+        <!-- Top-left -->
+        <polygon points="67,99 75,112 67,125 59,112" stroke-width="0.9"/>
+        <!-- Bottom -->
+        <polygon points="120,196 128,209 120,222 112,209" stroke-width="0.9"/>
+        
+        <!-- LEVEL 2: Tiny stars nested inside level-1 stars (scaled ~0.25) -->
+        <!-- Inside top star -->
+        <polygon points="120,56 122.5,60 120,64 117.5,60" stroke-width="0.6"/>
+        <polygon points="117.5,58 122.5,58 124,62 116,62" stroke-width="0.5"/>
+        
+        <!-- Inside center of large star: recursive 12-star -->
+        <polygon points="120,114 133,122 133,138 120,146 107,138 107,122" stroke-width="0.9"/>
+        <polygon points="131,116 137,127 131,138 109,138 103,127 109,116" stroke-width="0.9"/>
+        <circle cx="120" cy="130" r="8" stroke-width="0.7"/>
+        
+        <!-- LEVEL 3: micro-detail inside center -->
+        <polygon points="120,122 124,126 120,130 116,126" stroke-width="0.6"/>
+        <polygon points="116,124 124,124 126,128 114,128" stroke-width="0.5"/>
+        <!-- Tiny dot -->
+        <circle cx="120" cy="130" r="2" stroke-width="0.6"/>
+        
+        <!-- Connecting lines between levels (self-similar weave) -->
+        <!-- Radial arms from center to level-1 -->
+        <line x1="120" y1="102" x2="120" y2="76" stroke-width="0.6" stroke-dasharray="3,2"/>
+        <line x1="120" y1="158" x2="120" y2="196" stroke-width="0.6" stroke-dasharray="3,2"/>
+        <line x1="148" y1="118" x2="165" y2="109" stroke-width="0.6" stroke-dasharray="3,2"/>
+        <line x1="92" y1="118" x2="75" y2="109" stroke-width="0.6" stroke-dasharray="3,2"/>
+        <line x1="148" y1="142" x2="166" y2="169" stroke-width="0.6" stroke-dasharray="3,2"/>
+        <line x1="92" y1="142" x2="74" y2="169" stroke-width="0.6" stroke-dasharray="3,2"/>
+        
+        <!-- Base area: extension of the pattern downward -->
+        <polygon points="75,202 120,222 165,202 178,240 120,260 62,240" stroke-width="1.1"/>
+        <!-- Sub-division -->
+        <polygon points="92,220 120,232 148,220 155,245 120,255 85,245" stroke-width="0.8"/>
+        <polygon points="103,234 120,241 137,234 140,250 120,256 100,250" stroke-width="0.6"/>
+        <!-- Tiny innermost -->
+        <polygon points="112,243 120,247 128,243 130,251 120,254 110,251" stroke-width="0.5"/>
+        
+        <!-- Fill lower area to arch base -->
+        <polygon points="62,240 178,240 185,285 120,300 55,285" stroke-width="1"/>
+        <line x1="120" y1="255" x2="120" y2="300" stroke-width="0.6" stroke-dasharray="2,2"/>
+        <line x1="55" y1="285" x2="185" y2="285" stroke-width="0.6"/>
+      </g>
+      
+      <path d="M20,320 L20,180 Q20,20 120,20 Q220,20 220,180 L220,320 Z" fill="none" stroke="#3a3a3a" stroke-width="2"/>
+      <rect x="20" y="295" width="200" height="25" fill="#f5f0e8" opacity="0.85"/>
+      <text x="120" y="311" text-anchor="middle" fill="#5a4a35" font-size="8" letter-spacing="1" font-family="Georgia">FRACTAL · 12-STAR RECURSIVE NESTING · 3 LEVELS</text>
+    </svg>
+  </div>
+
+  <!-- 5. ARABESQUE ISLIMI -->
+  <div class="card">
+    <div class="card-label">5. Arabesque Islimi</div>
+    <div class="card-sublabel">Vegetal spiral · golden ratio branching</div>
+    <svg width="240" height="320" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <clipPath id="arch5">
+          <path d="M20,320 L20,180 Q20,20 120,20 Q220,20 220,180 L220,320 Z"/>
+        </clipPath>
+        <filter id="pencil5" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.92" numOctaves="4" result="noise"/>
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.2" xChannelSelector="R" yChannelSelector="G"/>
+        </filter>
+      </defs>
+      <rect width="240" height="320" fill="#f5f0e8"/>
+      <path d="M20,320 L20,180 Q20,20 120,20 Q220,20 220,180 L220,320 Z" fill="#f0ebe0" stroke="#3a3a3a" stroke-width="2"/>
+      
+      <g clip-path="url(#arch5)" filter="url(#pencil5)" stroke="#3a3a3a" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <!-- Main central stem -->
+        <path d="M120,305 C120,280 120,260 120,240 C120,210 110,195 100,175 C90,155 95,135 108,120 C118,108 125,95 120,78" 
+              stroke-width="1.8"/>
+        
+        <!-- Main spiral 1: counter-clockwise left -->
+        <path d="M120,240 C105,235 88,230 75,220 C60,208 52,195 55,180 C58,165 70,158 82,162 C92,165 96,175 90,183 C84,190 74,188 72,180"
+              stroke-width="1.4"/>
+        <!-- Branch leaf at end -->
+        <path d="M72,180 C68,173 65,167 69,162 C73,157 79,160 80,165"
+              stroke-width="0.9"/>
+        <!-- Leaf shape 1 -->
+        <path d="M55,190 C48,185 43,176 47,170 C51,164 58,167 60,174 C55,178 55,185 59,188 Z"
+              stroke-width="0.9"/>
+        
+        <!-- Main spiral 2: clockwise right -->
+        <path d="M120,240 C135,235 152,230 165,220 C180,208 188,195 185,180 C182,165 170,158 158,162 C148,165 144,175 150,183 C156,190 166,188 168,180"
+              stroke-width="1.4"/>
+        <!-- Branch leaf -->
+        <path d="M168,180 C172,173 175,167 171,162 C167,157 161,160 160,165"
+              stroke-width="0.9"/>
+        <!-- Leaf shape 2 -->
+        <path d="M185,190 C192,185 197,176 193,170 C189,164 182,167 180,174 C185,178 185,185 181,188 Z"
+              stroke-width="0.9"/>
+        
+        <!-- Secondary spiral: up from center-left -->
+        <path d="M108,200 C95,188 80,175 68,160 C55,144 55,128 65,118 C75,108 88,112 92,122 C95,130 88,140 80,138"
+              stroke-width="1.2"/>
+        <!-- Bud at end -->
+        <ellipse cx="79" cy="136" rx="5" ry="7" transform="rotate(-20,79,136)" stroke-width="0.8"/>
+        <!-- Leaf branch -->
+        <path d="M80,155 C70,148 63,140 66,133 C69,126 77,128 79,134"
+              stroke-width="0.9"/>
+        
+        <!-- Secondary spiral: up from center-right -->
+        <path d="M132,200 C145,188 160,175 172,160 C185,144 185,128 175,118 C165,108 152,112 148,122 C145,130 152,140 160,138"
+              stroke-width="1.2"/>
+        <ellipse cx="161" cy="136" rx="5" ry="7" transform="rotate(20,161,136)" stroke-width="0.8"/>
+        <path d="M160,155 C170,148 177,140 174,133 C171,126 163,128 161,134"
+              stroke-width="0.9"/>
+        
+        <!-- Upper spiral from main stem -->
+        <path d="M113,155 C100,145 88,132 88,118 C88,104 98,97 108,100 C116,103 118,112 112,118 C106,124 98,120 98,113"
+              stroke-width="1.1"/>
+        <path d="M127,155 C140,145 152,132 152,118 C152,104 142,97 132,100 C124,103 122,112 128,118 C134,124 142,120 142,113"
+              stroke-width="1.1"/>
+        
+        <!-- Top bud/flower -->
+        <path d="M120,78 C115,68 108,60 108,52 C108,44 115,40 120,43 C125,40 132,44 132,52 C132,60 125,68 120,78 Z"
+              stroke-width="1"/>
+        <path d="M120,65 C116,60 113,55 116,50 C119,47 121,47 124,50 C127,55 124,60 120,65"
+              stroke-width="0.7"/>
+        <circle cx="120" cy="55" r="3" stroke-width="0.8"/>
+        
+        <!-- Side buds on upper spirals -->
+        <path d="M98,113 C94,107 91,101 94,96 C97,91 102,93 103,98"
+              stroke-width="0.8"/>
+        <path d="M142,113 C146,107 149,101 146,96 C143,91 138,93 137,98"
+              stroke-width="0.8"/>
+        
+        <!-- Small leaves scattered along main stem -->
+        <!-- Leaf at 175 -->
+        <path d="M120,175 C113,170 106,163 110,157 C114,151 121,154 122,160 C124,166 120,173 120,175 Z"
+              stroke-width="0.8"/>
+        <path d="M120,175 C127,170 134,163 130,157 C126,151 119,154 118,160 C116,166 120,173 120,175 Z"
+              stroke-width="0.8"/>
+        
+        <!-- Leaf at 210 -->  
+        <path d="M120,210 C112,205 106,197 110,190 C114,184 122,186 123,193 C124,200 120,208 120,210 Z"
+              stroke-width="0.7"/>
+        
+        <!-- Base: root spirals going left and right -->
+        <path d="M120,305 C100,295 80,285 65,270 C50,255 48,240 55,232 C62,224 72,228 74,238 C76,248 66,254 60,250"
+              stroke-width="1.3"/>
+        <path d="M120,305 C140,295 160,285 175,270 C190,255 192,240 185,232 C178,224 168,228 166,238 C164,248 174,254 180,250"
+              stroke-width="1.3"/>
+        <!-- Root leaf clusters -->
+        <path d="M55,232 C46,226 41,216 46,210 C51,204 58,208 59,215"
+              stroke-width="0.9"/>
+        <path d="M185,232 C194,226 199,216 194,210 C189,204 182,208 181,215"
+              stroke-width="0.9"/>
+        
+        <!-- Tiny tendrils throughout -->
+        <path d="M90,250 C84,244 82,237 86,232" stroke-width="0.7"/>
+        <path d="M150,250 C156,244 158,237 154,232" stroke-width="0.7"/>
+        <path d="M78,270 C72,264 70,257 74,252" stroke-width="0.6"/>
+        <path d="M162,270 C168,264 170,257 166,252" stroke-width="0.6"/>
+      </g>
+      
+      <path d="M20,320 L20,180 Q20,20 120,20 Q220,20 220,180 L220,320 Z" fill="none" stroke="#3a3a3a" stroke-width="2"/>
+      <rect x="20" y="295" width="200" height="25" fill="#f5f0e8" opacity="0.85"/>
+      <text x="120" y="311" text-anchor="middle" fill="#5a4a35" font-size="8" letter-spacing="1" font-family="Georgia">ISLIMI · ARABESQUE VEGETAL · φ BRANCHING</text>
+    </svg>
+  </div>
+
+  <!-- 6. COMPUTATIONAL PARAMETRIC -->
+  <div class="card">
+    <div class="card-label">6. Computational Parametric</div>
+    <div class="card-sublabel">Generative Zellij · variable-radius rosettes</div>
+    <svg width="240" height="320" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <clipPath id="arch6">
+          <path d="M20,320 L20,180 Q20,20 120,20 Q220,20 220,180 L220,320 Z"/>
+        </clipPath>
+        <filter id="pencil6" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" result="noise"/>
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.7" xChannelSelector="R" yChannelSelector="G"/>
+        </filter>
+      </defs>
+      <rect width="240" height="320" fill="#f5f0e8"/>
+      <path d="M20,320 L20,180 Q20,20 120,20 Q220,20 220,180 L220,320 Z" fill="#f0ebe0" stroke="#3a3a3a" stroke-width="2"/>
+      
+      <g clip-path="url(#arch6)" filter="url(#pencil6)" stroke="#3a3a3a" fill="none" stroke-linecap="round">
+        <!-- Computational approach: variable n-fold rosettes on a triangular grid -->
+        <!-- Shows how parametric control changes the pattern density/symmetry -->
+        
+        <!-- Central large rosette: n=10, radius=50 -->
+        <!-- 10-pointed star via two pentagons -->
+        <polygon points="120,88 133,105 151,105 140,120 145,140 120,130 95,140 100,120 89,105 107,105" 
+                 stroke-width="1.3"/>
+        <!-- Outer ring of this rosette -->
+        <polygon points="120,78 136,102 163,102 142,118 150,145 120,128 90,145 98,118 77,102 104,102"
+                 stroke-width="1"/>
+        <!-- Inner pentagon -->
+        <polygon points="120,105 129,112 126,122 114,122 111,112"
+                 stroke-width="0.8"/>
+        <!-- Tiny 5-star at hub -->
+        <polygon points="120,109 122,113 126,113 123,116 124,120 120,118 116,120 117,116 114,113 118,113"
+                 stroke-width="0.6"/>
+        
+        <!-- Parameter annotation (computational sketch feel) -->
+        <text x="170" y="85" fill="#3a3a3a" font-size="6.5" font-family="monospace" stroke="none">n=10</text>
+        <line x1="163" y1="90" x2="155" y2="98" stroke-width="0.5" stroke-dasharray="2,2"/>
+        
+        <!-- Upper-left rosette: n=6, smaller, r=28 -->
+        <polygon points="70,68 80,83 95,83 85,95 88,110 70,102 52,110 55,95 45,83 60,83"
+                 stroke-width="1"/>
+        <polygon points="70,60 82,79 103,79 87,93 93,114 70,103 47,114 53,93 37,79 58,79"
+                 stroke-width="0.8"/>
+        <circle cx="70" cy="90" r="8" stroke-width="0.7"/>
+        <text x="50" y="58" fill="#3a3a3a" font-size="6.5" font-family="monospace" stroke="none">n=6</text>
+        
+        <!-- Upper-right rosette: n=8, r=28 -->
+        <polygon points="170,68 180,83 195,83 185,95 188,110 170,102 152,110 155,95 145,83 160,83"
+                 stroke-width="1"/>
+        <polygon points="170,60 184,78 204,78 190,92 196,112 170,102 144,112 150,92 136,78 156,78"
+                 stroke-width="0.8"/>
+        <!-- 8-star detail -->
+        <polygon points="170,70 174,80 182,80 176,86 178,95 170,91 162,95 164,86 158,80 166,80"
+                 stroke-width="0.7"/>
+        <text x="155" y="58" fill="#3a3a3a" font-size="6.5" font-family="monospace" stroke="none">n=8</text>
+        
+        <!-- Mid zone: connecting interlace between rosettes -->
+        <!-- Left bridge -->
+        <path d="M95,102 C100,110 105,118 107,127" stroke-width="0.9"/>
+        <path d="M95,83 C98,90 100,96 105,100" stroke-width="0.7" stroke-dasharray="3,2"/>
+        <!-- Right bridge -->
+        <path d="M145,102 C140,110 135,118 133,127" stroke-width="0.9"/>
+        <path d="M145,83 C142,90 140,96 135,100" stroke-width="0.7" stroke-dasharray="3,2"/>
+        <!-- Top bridge left -->
+        <path d="M95,83 C100,75 107,68 107,60" stroke-width="0.7"/>
+        <!-- Top bridge right -->
+        <path d="M145,83 C140,75 133,68 133,60" stroke-width="0.7"/>
+        
+        <!-- Lower zone: n=12 large rosette filling lower half -->
+        <polygon points="120,185 131,199 145,193 143,208 156,214 145,222 145,237 131,232 120,242 109,232 95,237 95,222 84,214 97,208 95,193 109,199"
+                 stroke-width="1.3"/>
+        <!-- Inner 12-fold detail -->
+        <polygon points="120,195 128,204 138,200 137,210 145,215 137,220 137,230 128,226 120,232 112,226 103,230 103,220 95,215 103,210 102,200 112,204"
+                 stroke-width="0.9"/>
+        <!-- Hub -->
+        <circle cx="120" cy="213" r="12" stroke-width="0.8"/>
+        <circle cx="120" cy="213" r="5" stroke-width="0.7"/>
+        <polygon points="120,207 123,210 120,213 117,210" stroke-width="0.5"/>
+        <polygon points="120,219 123,216 120,213 117,216" stroke-width="0.5"/>
+        <text x="152" y="192" fill="#3a3a3a" font-size="6.5" font-family="monospace" stroke="none">n=12</text>
+        
+        <!-- Outer fill: small n=4 rosettes in corners between large ones -->
+        <!-- Bottom-left fill -->
+        <polygon points="60,185 67,196 78,192 75,205 85,210 75,215 75,226 64,222 56,230 48,222 48,211 38,206 48,201 45,190"
+                 stroke-width="0.9"/>
+        <text x="28" y="183" fill="#3a3a3a" font-size="6.5" font-family="monospace" stroke="none">n=14</text>
+        <!-- Bottom-right fill -->
+        <polygon points="180,185 193,190 190,205 200,210 190,215 190,226 179,222 171,230 163,222 163,211 153,206 163,201 160,192"
+                 stroke-width="0.9"/>
+        
+        <!-- Grid guide lines (parametric feel) -->
+        <line x1="30" y1="160" x2="210" y2="160" stroke-width="0.4" stroke-dasharray="5,5" opacity="0.4"/>
+        <line x1="120" y1="30" x2="120" y2="290" stroke-width="0.4" stroke-dasharray="5,5" opacity="0.4"/>
+        <!-- Triangular grid dots -->
+        <circle cx="70" cy="160" r="2" stroke-width="0.6" opacity="0.5"/>
+        <circle cx="120" cy="160" r="2" stroke-width="0.6" opacity="0.5"/>
+        <circle cx="170" cy="160" r="2" stroke-width="0.6" opacity="0.5"/>
+        <circle cx="45" cy="155" r="1.5" stroke-width="0.5" opacity="0.4"/>
+        <circle cx="195" cy="155" r="1.5" stroke-width="0.5" opacity="0.4"/>
+        
+        <!-- Base fill: rhythmic small stars -->
+        <polygon points="55,258 60,268 70,268 62,275 65,285 55,279 45,285 48,275 40,268 50,268" stroke-width="0.9"/>
+        <polygon points="120,258 125,268 135,268 127,275 130,285 120,279 110,285 113,275 105,268 115,268" stroke-width="0.9"/>
+        <polygon points="185,258 190,268 200,268 192,275 195,285 185,279 175,285 178,275 170,268 180,268" stroke-width="0.9"/>
+        <!-- Connecting lines between base stars -->
+        <line x1="70" y1="272" x2="105" y2="272" stroke-width="0.6"/>
+        <line x1="135" y1="272" x2="170" y2="272" stroke-width="0.6"/>
+      </g>
+      
+      <path d="M20,320 L20,180 Q20,20 120,20 Q220,20 220,180 L220,320 Z" fill="none" stroke="#3a3a3a" stroke-width="2"/>
+      <rect x="20" y="295" width="200" height="25" fill="#f5f0e8" opacity="0.85"/>
+      <text x="120" y="311" text-anchor="middle" fill="#5a4a35" font-size="8" letter-spacing="1" font-family="Georgia">PARAMETRIC · VARIABLE n ROSETTES · GENERATIVE</text>
+    </svg>
+  </div>
+
+</div>
+
+<div style="text-align:center; margin-top: 18px; color: #4a3a28; font-size: 9px; letter-spacing: 2px;">
+  MIHRAB LOWER NICHE · PATTERN RESEARCH · SEVEN HEAVENS STUDIO
+</div>
+
+</body>
+</html>
