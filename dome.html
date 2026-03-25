@@ -597,63 +597,53 @@ var STEPS = [
       }
     }},
   // 9: Crown arch
-  { name:'CROWN ARCH', panelPos:'br', formula:'R = span/√2 = '+crownR.toFixed(0), dur:1.04,
-    bbox:[cx-crownHalfSpan,crownPeakY,cx+crownHalfSpan,crownSpringY],
+  { name:'SELJUK DOME', panelPos:'br', formula:'ribbed dome + windows', dur:1.2,
+    bbox:[bandL,crownPeakY,bandR,crownSpringY],
     draw: function(p) {
-      // COMPASS SWEEP for crown — same theta approach, upward
-      // Crown sweep angle: asin(crownH / crownR)
-      var crSweep = Math.asin(Math.min(1, (crownSpringY - crownPeakY) / crownR));
-      
-      if (p <= 0.45) {
-        // LEFT sweep — center crownC2x
-        var t = p / 0.45;
-        var theta = crSweep * t;
-        brush.set('2H','#5a5248',2.2);
-        var arcPts = [];
-        var steps = Math.max(3, Math.round(t * 30));
-        for (var i = 0; i <= steps; i++) {
-          var th = crSweep * t * i / steps;
-          arcPts.push([crownC2x - crownR * Math.cos(th), crownSpringY - crownR * Math.sin(th), 0.5]);
-        }
-        if (arcPts.length >= 2) brush.spline(arcPts, 0.3);
-        var tipX = crownC2x - crownR * Math.cos(theta);
-        var tipY = crownSpringY - crownR * Math.sin(theta);
-        brush.set('2H','#a09888',0.6);
-        brush.line(crownC2x, crownSpringY, tipX, tipY);
-        brush.circle(crownC2x, crownSpringY, 5);
-        return [tipX, tipY];
+      var domeW = bandR - bandL + 40;
+      var domeL = cx - domeW/2;
+      var domeR = cx + domeW/2;
+      var domeH = crownSpringY - crownPeakY;
+      var drumH = domeH * 0.22;
+      var drumTop = crownSpringY - drumH;
+      var nRibs = 7, nWins = 5;
+      brush.set('2H','#5a5248',1.8);
+      if (p <= 0.25) {
+        var t = p/0.25;
+        return drawSegments([{from:[domeL,crownSpringY],to:[domeL,drumTop]},{from:[domeL,drumTop],to:[domeR,drumTop]},{from:[domeR,drumTop],to:[domeR,crownSpringY]}], t);
+      } else if (p <= 0.55) {
+        brush.line(domeL,crownSpringY,domeL,drumTop);brush.line(domeL,drumTop,domeR,drumTop);brush.line(domeR,drumTop,domeR,crownSpringY);
+        var t=(p-0.25)/0.3;
+        brush.set('2H','#5a5248',2.0);
+        var domePts=[];var n=Math.max(3,Math.round(t*30));
+        for(var i=0;i<=n;i++){var tt=i/n*t;var x=domeL+domeW*tt;domePts.push([x,drumTop-(domeH-drumH)*Math.sin(Math.PI*tt),0.5]);}
+        if(domePts.length>=2)brush.spline(domePts,0.3);
+        var lp=domePts[domePts.length-1];return[lp[0],lp[1]];
+      } else if (p <= 0.8) {
+        brush.line(domeL,crownSpringY,domeL,drumTop);brush.line(domeL,drumTop,domeR,drumTop);brush.line(domeR,drumTop,domeR,crownSpringY);
+        brush.set('2H','#5a5248',2.0);
+        var fd=[];for(var i=0;i<=30;i++){var tt=i/30;fd.push([domeL+domeW*tt,drumTop-(domeH-drumH)*Math.sin(Math.PI*tt),0.5]);}
+        brush.spline(fd,0.3);
+        var t=(p-0.55)/0.25;brush.set('2H','#8a8278',0.7);
+        var rc=Math.max(1,Math.round(t*nRibs));
+        for(var r=0;r<rc;r++){var rt=(r+1)/(nRibs+1);brush.line(cx,crownPeakY,domeL+domeW*rt,drumTop);}
+        return[cx,crownPeakY];
       } else {
-        // Full left + RIGHT sweep — center crownC1x
-        brush.set('2H','#5a5248',2.2);
-        brush.spline(crownPtsL, 0.3);
-        var t = (p - 0.45) / 0.55;
-        if (t < 1) {
-          var theta = crSweep * t;
-          var arcPts = [];
-          var steps = Math.max(3, Math.round(t * 30));
-          for (var i = 0; i <= steps; i++) {
-            var th = crSweep * t * i / steps;
-            arcPts.push([crownC1x + crownR * Math.cos(th), crownSpringY - crownR * Math.sin(th), 0.5]);
-          }
-          if (arcPts.length >= 2) brush.spline(arcPts, 0.3);
-          var tipX = crownC1x + crownR * Math.cos(theta);
-          var tipY = crownSpringY - crownR * Math.sin(theta);
-          brush.set('2H','#a09888',0.6);
-          brush.line(crownC1x, crownSpringY, tipX, tipY);
-          brush.circle(crownC1x, crownSpringY, 5);
-          brush.circle(crownC2x, crownSpringY, 4);
-          return [tipX, tipY];
-        } else {
-          brush.spline(crownPtsR, 0.3);
-          brush.set('2H','#a09888',0.5);
-          brush.circle(crownC1x, crownSpringY, 4);
-          brush.circle(crownC2x, crownSpringY, 4);
-          return [cx, crownPeakY];
-        }
+        brush.line(domeL,crownSpringY,domeL,drumTop);brush.line(domeL,drumTop,domeR,drumTop);brush.line(domeR,drumTop,domeR,crownSpringY);
+        brush.set('2H','#5a5248',2.0);
+        var fd=[];for(var i=0;i<=30;i++){var tt=i/30;fd.push([domeL+domeW*tt,drumTop-(domeH-drumH)*Math.sin(Math.PI*tt),0.5]);}
+        brush.spline(fd,0.3);
+        brush.set('2H','#8a8278',0.7);
+        for(var r=0;r<nRibs;r++){var rt=(r+1)/(nRibs+1);brush.line(cx,crownPeakY,domeL+domeW*rt,drumTop);}
+        var t=(p-0.8)/0.2;brush.set('2H','#5a5248',1.0);
+        var wc=Math.max(1,Math.round(t*nWins));var winW=domeW*0.08;var winH=drumH*0.7;var winY=drumTop+drumH*0.15;
+        for(var w=0;w<wc;w++){var wt=(w+1)/(nWins+1);var wcx=domeL+domeW*wt;var wL=wcx-winW/2,wR2=wcx+winW/2;
+        brush.line(wL,winY+winH,wL,winY+winH*0.3);brush.line(wR2,winY+winH,wR2,winY+winH*0.3);
+        var ap=[];for(var a=0;a<=8;a++){var at2=a/8;ap.push([wL+winW*at2,winY+winH*0.3-winH*0.3*Math.sin(Math.PI*at2),0.3]);}
+        brush.spline(ap,0.3);brush.line(wL,winY+winH,wR2,winY+winH);}
+        return[cx,crownPeakY];
       }
     }},
-  // 10: Star
-  // Impost line — horizontal divider across arch at springing height
   { name:'IMPOST LINE', formula:'y = springY', dur:0.37,
     bbox:[cx-halfSpan,springY-5,cx+halfSpan,springY+5],
     draw: function(p) {
