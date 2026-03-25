@@ -112,7 +112,7 @@ var crownPeakY = crownSpringY - crownH;
 if (crownPeakY < margin_top) { crownH = crownSpringY-margin_top; crownPeakY = margin_top; crownR = Math.sqrt(crownHalfSpan*crownHalfSpan+crownH*crownH); }
 var crownC1x = cx-crownHalfSpan, crownC2x = cx+crownHalfSpan;
 // Star sits inside the niche arch, between peak and springing line
-var starCx = cx, starCy = peakY + (springY - peakY) * 0.42;
+var starCx = cx, starCy = peakY + (springY - peakY) * 0.5;
 var starR_val = (springY - peakY) * 0.38;
 var bw = colWidth * PHI / ROOT2;
 
