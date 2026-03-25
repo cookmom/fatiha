@@ -559,6 +559,37 @@ var STEPS = [
       }
     }},
   // 8: Inscription band
+  { name:'IMPOST LINE', formula:'y = springY', dur:0.37,
+    bbox:[cx-halfSpan,springY-5,cx+halfSpan,springY+5],
+    draw: function(p) {
+      brush.set('2H','#5a5248',1.8);
+      return drawSegments([{from:[cx-halfSpan,springY],to:[cx+halfSpan,springY]}], p);
+    }},
+  { name:'12-FOLD STAR', panelPos:'bl', formula:'{12/5} — scales: r, r/φ, r/φ², r/φ³', dur:0.93,
+    bbox:[starCx-starR_val-15,starCy-starR_val-15,starCx+starR_val+15,starCy+starR_val+15],
+    draw: function(p) {
+      var scales=[starR_val,starR_val/PHI,starR_val/(PHI*PHI),starR_val/(PHI*PHI*PHI)];
+      var layerP = p * scales.length;
+      var numLayers = Math.min(scales.length, Math.ceil(layerP));
+      var tipX = starCx, tipY = starCy;
+      for (var si=0; si < numLayers; si++) {
+        var r = scales[si];
+        var verts = [];
+        for (var k=0;k<12;k++){var a=k*Math.PI/6-Math.PI/2;verts.push([starCx+r*Math.cos(a),starCy+r*Math.sin(a)]);}
+        // How many of the 12 lines in this layer?
+        var thisLayerP = si < numLayers-1 ? 1 : (layerP - si);
+        var numLines = Math.max(1, Math.round(thisLayerP * 12));
+        brush.set('2H','#6a6258',1.0);
+        for (var k=0;k<numLines;k++){var k2=(k+5)%12;brush.line(verts[k][0],verts[k][1],verts[k2][0],verts[k2][1]);tipX=verts[k2][0];tipY=verts[k2][1];}
+        if (thisLayerP >= 1) {
+          if(si<2){brush.set('2H','#8a8278',0.5);for(var k=0;k<12;k++){var k2=(k+4)%12;brush.line(verts[k][0],verts[k][1],verts[k2][0],verts[k2][1]);}}
+          if(si===0){brush.set('2H','#6a6258',1.0);for(var k=0;k<12;k++){var k2=(k+1)%12;brush.line(verts[k][0],verts[k][1],verts[k2][0],verts[k2][1]);}
+          brush.set('2H','#9a9288',0.4);for(var k=0;k<12;k++)brush.line(starCx,starCy,verts[k][0],verts[k][1]);}
+        }
+      }
+      if (p >= 0.95) { brush.set('2H','#8a8278',0.6); brush.circle(starCx,starCy,starR_val*0.15); brush.circle(starCx,starCy,starR_val/PHI); }
+      return [tipX, tipY];
+    }},
   { name:'INSCRIPTION BAND', panelPos:'tr', formula:'h = U/φ = '+bandHeight_v.toFixed(0)+'px', dur:0.69,
     bbox:[bandL,bandTop_y,bandR,bandBot_y],
     draw: function(p) {
@@ -644,37 +675,6 @@ var STEPS = [
         brush.spline(ap,0.3);brush.line(wL,winY+winH,wR2,winY+winH);}
         return[cx,crownPeakY];
       }
-    }},
-  { name:'IMPOST LINE', formula:'y = springY', dur:0.37,
-    bbox:[cx-halfSpan,springY-5,cx+halfSpan,springY+5],
-    draw: function(p) {
-      brush.set('2H','#5a5248',1.8);
-      return drawSegments([{from:[cx-halfSpan,springY],to:[cx+halfSpan,springY]}], p);
-    }},
-  { name:'12-FOLD STAR', panelPos:'bl', formula:'{12/5} — scales: r, r/φ, r/φ², r/φ³', dur:0.93,
-    bbox:[starCx-starR_val-15,starCy-starR_val-15,starCx+starR_val+15,starCy+starR_val+15],
-    draw: function(p) {
-      var scales=[starR_val,starR_val/PHI,starR_val/(PHI*PHI),starR_val/(PHI*PHI*PHI)];
-      var layerP = p * scales.length;
-      var numLayers = Math.min(scales.length, Math.ceil(layerP));
-      var tipX = starCx, tipY = starCy;
-      for (var si=0; si < numLayers; si++) {
-        var r = scales[si];
-        var verts = [];
-        for (var k=0;k<12;k++){var a=k*Math.PI/6-Math.PI/2;verts.push([starCx+r*Math.cos(a),starCy+r*Math.sin(a)]);}
-        // How many of the 12 lines in this layer?
-        var thisLayerP = si < numLayers-1 ? 1 : (layerP - si);
-        var numLines = Math.max(1, Math.round(thisLayerP * 12));
-        brush.set('2H','#6a6258',1.0);
-        for (var k=0;k<numLines;k++){var k2=(k+5)%12;brush.line(verts[k][0],verts[k][1],verts[k2][0],verts[k2][1]);tipX=verts[k2][0];tipY=verts[k2][1];}
-        if (thisLayerP >= 1) {
-          if(si<2){brush.set('2H','#8a8278',0.5);for(var k=0;k<12;k++){var k2=(k+4)%12;brush.line(verts[k][0],verts[k][1],verts[k2][0],verts[k2][1]);}}
-          if(si===0){brush.set('2H','#6a6258',1.0);for(var k=0;k<12;k++){var k2=(k+1)%12;brush.line(verts[k][0],verts[k][1],verts[k2][0],verts[k2][1]);}
-          brush.set('2H','#9a9288',0.4);for(var k=0;k<12;k++)brush.line(starCx,starCy,verts[k][0],verts[k][1]);}
-        }
-      }
-      if (p >= 0.95) { brush.set('2H','#8a8278',0.6); brush.circle(starCx,starCy,starR_val*0.15); brush.circle(starCx,starCy,starR_val/PHI); }
-      return [tipX, tipY];
     }},
   // 11: Gold star center — flat wash, no glow
   // 11: Niche wash — deep lapis
@@ -818,7 +818,7 @@ var STEPS = [
 
 // Compute frame timeline — pauses between pencil steps, no pause between washes
 var PAUSE_S = 0.14;
-var WASH_START = 12; // step index where washes begin (gold + fills)
+var WASH_START = 13; // step index where washes begin (gold + fills)
 var frameStarts = [], frameEnds = [];
 var f = 0;
 for (var i = 0; i < STEPS.length; i++) {
