@@ -87,8 +87,8 @@ var archSpan = U*2, halfSpan = U;
 var colWidth = U/PHI/PHI, colGap = colWidth/PHI, bandOverhang = colWidth/2;
 var colLx = cx - halfSpan - colGap - colWidth/2;
 var colRx = cx + halfSpan + colGap + colWidth/2;
-var bandL = colLx - colWidth/2 - bandOverhang;
-var bandR = colRx + colWidth/2 + bandOverhang;
+var bandL = 0;
+var bandR = W;
 var bandW = bandR - bandL;
 var crownSpan = bandW * Math.sqrt(PHI), crownHalfSpan = crownSpan/2;
 var margin_top = U/PHI/PHI, margin_bot = margin_top + 55; // extra 55px at bottom for annotation rows
