@@ -553,29 +553,82 @@ var STEPS = [
       brush.set('2H','#5a5248',1.8);
       return drawSegments([{from:[cx-halfSpan,springY],to:[cx+halfSpan,springY]}], p);
     }},
-  { name:'12-FOLD STAR', panelPos:'bl', formula:'{12/5} — scales: r, r/φ, r/φ², r/φ³', dur:0.93,
-    bbox:[starCx-starR_val-15,starCy-starR_val-15,starCx+starR_val+15,starCy+starR_val+15],
+  { name:'12-FOLD STAR', panelPos:'bl', formula:'{12/5} radiating to arch boundary', dur:1.2,
+    bbox:[cx-halfSpan,peakY,cx+halfSpan,springY],
     draw: function(p) {
-      var scales=[starR_val,starR_val/PHI,starR_val/(PHI*PHI),starR_val/(PHI*PHI*PHI)];
-      var layerP = p * scales.length;
-      var numLayers = Math.min(scales.length, Math.ceil(layerP));
-      var tipX = starCx, tipY = starCy;
-      for (var si=0; si < numLayers; si++) {
-        var r = scales[si];
-        var verts = [];
-        for (var k=0;k<12;k++){var a=k*Math.PI/6-Math.PI/2;verts.push([starCx+r*Math.cos(a),starCy+r*Math.sin(a)]);}
-        // How many of the 12 lines in this layer?
-        var thisLayerP = si < numLayers-1 ? 1 : (layerP - si);
-        var numLines = Math.max(1, Math.round(thisLayerP * 12));
-        brush.set('2H','#6a6258',1.0);
-        for (var k=0;k<numLines;k++){var k2=(k+5)%12;brush.line(verts[k][0],verts[k][1],verts[k2][0],verts[k2][1]);tipX=verts[k2][0];tipY=verts[k2][1];}
-        if (thisLayerP >= 1) {
-          if(si<2){brush.set('2H','#8a8278',0.5);for(var k=0;k<12;k++){var k2=(k+4)%12;brush.line(verts[k][0],verts[k][1],verts[k2][0],verts[k2][1]);}}
-          if(si===0){brush.set('2H','#6a6258',1.0);for(var k=0;k<12;k++){var k2=(k+1)%12;brush.line(verts[k][0],verts[k][1],verts[k2][0],verts[k2][1]);}
-          brush.set('2H','#9a9288',0.4);for(var k=0;k<12;k++)brush.line(starCx,starCy,verts[k][0],verts[k][1]);}
+      // Star lines radiate from center and extend until they hit
+      // the arch curve (above) or the impost line (below)
+      var sCx = starCx, sCy = starCy;
+      
+      // Function: find where a ray from center hits the arch or impost
+      function rayHit(angle) {
+        var dx = Math.cos(angle), dy = Math.sin(angle);
+        // Step along ray until we hit boundary
+        for (var t = 1; t < 800; t += 2) {
+          var px = sCx + dx*t, py = sCy + dy*t;
+          // Hit impost line (bottom boundary)
+          if (py >= springY) return [sCx + dx*((springY-sCy)/dy), springY];
+          // Hit arch curve — check if point is outside arch
+          if (py < springY) {
+            var archYatX;
+            if (px <= cx) {
+              var ddx = px - C2x;
+              archYatX = springY - Math.sqrt(Math.max(0, archR*archR - ddx*ddx));
+            } else {
+              var ddx = px - C1x;
+              archYatX = springY - Math.sqrt(Math.max(0, archR*archR - ddx*ddx));
+            }
+            if (py <= archYatX) return [px, py];
+          }
+          // Hit sides
+          if (px <= cx - halfSpan || px >= cx + halfSpan) {
+            var bx = px < cx ? cx-halfSpan : cx+halfSpan;
+            return [bx, sCy + dy*((bx-sCx)/dx)];
+          }
+        }
+        return [sCx + dx*300, sCy + dy*300];
+      }
+      
+      var nSpokes = 24; // 12 primary + 12 secondary
+      var totalLines = nSpokes;
+      var drawn = Math.max(1, Math.round(p * totalLines));
+      var tipX = sCx, tipY = sCy;
+      
+      // Draw spokes radiating outward
+      for (var k = 0; k < Math.min(drawn, 12); k++) {
+        var angle = k * Math.PI/6 - Math.PI/2;
+        var hit = rayHit(angle);
+        // Animate: line grows from center to boundary
+        var lineP = Math.min(1, (drawn - k) / 2);
+        var ex = sCx + (hit[0]-sCx)*lineP;
+        var ey = sCy + (hit[1]-sCy)*lineP;
+        brush.set('2H','#6a6258',0.8);
+        brush.line(sCx, sCy, ex, ey);
+        tipX = ex; tipY = ey;
+      }
+      
+      // {12/5} connections at various scales
+      if (p > 0.3) {
+        var connP = (p - 0.3) / 0.7;
+        var scales = [0.85, 0.55, 0.35, 0.2];
+        var nScales = Math.max(1, Math.round(connP * scales.length));
+        for (var si = 0; si < nScales; si++) {
+          var r = 200 * scales[si]; // max radius for connections
+          brush.set('2H', si < 2 ? '#6a6258' : '#8a8278', si < 2 ? 0.7 : 0.4);
+          for (var k = 0; k < 12; k++) {
+            var a1 = k*Math.PI/6 - Math.PI/2;
+            var a2 = ((k+5)%12)*Math.PI/6 - Math.PI/2;
+            var hit1 = rayHit(a1), hit2 = rayHit(a2);
+            var d1 = Math.sqrt((hit1[0]-sCx)*(hit1[0]-sCx)+(hit1[1]-sCy)*(hit1[1]-sCy));
+            var d2 = Math.sqrt((hit2[0]-sCx)*(hit2[0]-sCx)+(hit2[1]-sCy)*(hit2[1]-sCy));
+            var r1 = Math.min(r, d1*0.95), r2 = Math.min(r, d2*0.95);
+            brush.line(sCx+r1*Math.cos(a1), sCy+r1*Math.sin(a1), sCx+r2*Math.cos(a2), sCy+r2*Math.sin(a2));
+          }
         }
       }
-      if (p >= 0.95) { brush.set('2H','#8a8278',0.6); brush.circle(starCx,starCy,starR_val*0.15); brush.circle(starCx,starCy,starR_val/PHI); }
+      
+      // Center dot
+      if (p > 0.1) { brush.set('2H','#8a8278',0.5); brush.circle(sCx, sCy, 4); }
       return [tipX, tipY];
     }},
   { name:'INSCRIPTION BAND', panelPos:'tr', formula:'h = U/φ = '+bandHeight_v.toFixed(0)+'px', dur:0.69,
