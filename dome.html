@@ -638,6 +638,14 @@ var STEPS = [
         var t=(p-0.8)/0.2;brush.set('2H','#5a5248',1.0);
         var wc=Math.max(1,Math.round(t*nWins));var winW=domeW*0.08;var winH=drumH*0.7;var winY=drumTop+drumH*0.15;
         for(var w=0;w<wc;w++){var wt=(w+1)/(nWins+1);var wcx=domeL+domeW*wt;var wL=wcx-winW/2,wR2=wcx+winW/2;
+        // Blue fill inside window
+        randomSeed(3001+w);
+        brush.noStroke();brush.fill('#0c3a6a',80);brush.fillBleed(0.001);brush.fillTexture(0,0);
+        var wp=[];for(var a=0;a<=8;a++){var at2=a/8;wp.push([wL+winW*at2,winY+winH*0.3-winH*0.3*Math.sin(Math.PI*at2)]);}
+        wp.push([wR2,winY+winH],[wL,winY+winH]);
+        brush.polygon(wp);brush.noFill();
+        // Window outline
+        brush.set('2H','#5a5248',1.0);
         brush.line(wL,winY+winH,wL,winY+winH*0.3);brush.line(wR2,winY+winH,wR2,winY+winH*0.3);
         var ap=[];for(var a=0;a<=8;a++){var at2=a/8;ap.push([wL+winW*at2,winY+winH*0.3-winH*0.3*Math.sin(Math.PI*at2),0.3]);}
         brush.spline(ap,0.3);brush.line(wL,winY+winH,wR2,winY+winH);}
