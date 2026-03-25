@@ -694,21 +694,27 @@ var STEPS = [
       return [cx, springY];
     }},
   // 12: Crown wash — lighter blue
-  { name:'CROWN WASH', formula:'azure #1a4a8a α=28', dur:0.05,
-    bbox:[cx-crownHalfSpan,crownPeakY,cx+crownHalfSpan,crownSpringY],
+  { name:'DOME WASH', formula:'magenta #5a1a4a α=60', dur:0.05,
+    bbox:[bandL-20,crownPeakY,bandR+20,crownSpringY],
     draw: function(p) {
       if (p >= 0) {
         randomSeed(1002);
+        var domeW = bandR - bandL + 40;
+        var domeL = cx - domeW/2;
+        var drumH = (crownSpringY - crownPeakY) * 0.22;
+        var drumTop = crownSpringY - drumH;
+        var domeH = crownSpringY - crownPeakY;
         brush.noStroke();
-        brush.fill('#0a2a4a', 80);
+        brush.fill('#5a1a4a', 60);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         var poly=[];
-        for(var i=0;i<=40;i++){var t=i/40;var x=(cx-crownHalfSpan)+crownHalfSpan*t;var dx=x-crownC2x;poly.push([x,crownSpringY-Math.sqrt(Math.max(0,crownR*crownR-dx*dx))]);}
-        for(var i=0;i<=40;i++){var t=i/40;var x=cx+crownHalfSpan*t;var dx=x-crownC1x;poly.push([x,crownSpringY-Math.sqrt(Math.max(0,crownR*crownR-dx*dx))]);}
-        poly.push([cx+crownHalfSpan,crownSpringY],[cx-crownHalfSpan,crownSpringY]);
+        // Dome arc
+        for(var i=0;i<=30;i++){var tt=i/30;poly.push([domeL+domeW*tt,drumTop-(domeH-drumH)*Math.sin(Math.PI*tt)]);}
+        // Drum sides down
+        poly.push([domeL+domeW,crownSpringY],[domeL,crownSpringY]);
         brush.polygon(poly); brush.noFill();
       }
-      return [cx, starCy];
+      return [cx, crownPeakY];
     }},
   // 13: Inscription band wash — muted magenta
   { name:'BAND WASH', formula:'amethyst #4a1a3a α=30', dur:0.05,
