@@ -685,7 +685,7 @@ var STEPS = [
       if (p >= 0) {
         randomSeed(1001);
         brush.noStroke();
-        brush.fill('#0c3a6a', 35);
+        brush.fill('#081e3a', 70);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         var poly=[];
         for(var i=0;i<=60;i++){var t=i/60;var x=(cx-halfSpan)+halfSpan*t;var dx=x-C2x;poly.push([x,springY-Math.sqrt(Math.max(0,archR*archR-dx*dx))]);}
@@ -702,7 +702,7 @@ var STEPS = [
       if (p >= 0) {
         randomSeed(1002);
         brush.noStroke();
-        brush.fill('#1a4a8a', 28);
+        brush.fill('#0a2a4a', 55);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         var poly=[];
         for(var i=0;i<=40;i++){var t=i/40;var x=(cx-crownHalfSpan)+crownHalfSpan*t;var dx=x-crownC2x;poly.push([x,crownSpringY-Math.sqrt(Math.max(0,crownR*crownR-dx*dx))]);}
@@ -719,7 +719,7 @@ var STEPS = [
       if (p >= 0) {
         randomSeed(1003);
         brush.noStroke();
-        brush.fill('#4a1a3a', 30);
+        brush.fill('#c8a870', 35);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         brush.rect(bandL+4,bandTop_y+4,bandR-bandL-8,bandBot_y-bandTop_y-8);
         brush.noFill();
@@ -731,15 +731,15 @@ var STEPS = [
     bbox:[colLx-bw/2,colBot,colRx+bw/2,baseBot],
     draw: function(p) {
       if (p >= 0) {
-        var a = 25;
+        var a = 50;
         randomSeed(1004);
         brush.noStroke();
-        brush.fill('#1a2a3a', a);
+        brush.fill('#0a1020', a);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         brush.rect(colLx-bw/2+2,colBot+2,bw-4,baseBot-colBot-4);
         brush.noFill();
         randomSeed(1014);
-        brush.fill('#1a2a3a', a);
+        brush.fill('#0a1020', a);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         brush.rect(colRx-bw/2+2,colBot+2,bw-4,baseBot-colBot-4);
         brush.noFill();
@@ -751,7 +751,7 @@ var STEPS = [
     bbox:[colLx-capW*0.6,capTop,colRx+capW*0.6,capBot],
     draw: function(p) {
       if (p >= 0) {
-        var a = 45;
+        var a = 80;
         randomSeed(1005);
         brush.noStroke();
         brush.fill('#5a1a4a', a);
