@@ -638,13 +638,6 @@ var STEPS = [
         var t=(p-0.8)/0.2;brush.set('2H','#5a5248',1.0);
         var wc=Math.max(1,Math.round(t*nWins));var winW=domeW*0.08;var winH=drumH*0.7;var winY=drumTop+drumH*0.15;
         for(var w=0;w<wc;w++){var wt=(w+1)/(nWins+1);var wcx=domeL+domeW*wt;var wL=wcx-winW/2,wR2=wcx+winW/2;
-        // Blue fill inside window
-        randomSeed(3001+w);
-        brush.noStroke();brush.fill('#0c3a6a',80);brush.fillBleed(0.001);brush.fillTexture(0,0);
-        var wp=[];for(var a=0;a<=8;a++){var at2=a/8;wp.push([wL+winW*at2,winY+winH*0.3-winH*0.3*Math.sin(Math.PI*at2)]);}
-        wp.push([wR2,winY+winH],[wL,winY+winH]);
-        brush.polygon(wp);brush.noFill();
-        // Window outline
         brush.set('2H','#5a5248',1.0);
         brush.line(wL,winY+winH,wL,winY+winH*0.3);brush.line(wR2,winY+winH,wR2,winY+winH*0.3);
         var ap=[];for(var a=0;a<=8;a++){var at2=a/8;ap.push([wL+winW*at2,winY+winH*0.3-winH*0.3*Math.sin(Math.PI*at2),0.3]);}
@@ -724,7 +717,36 @@ var STEPS = [
       }
       return [cx, crownPeakY];
     }},
-  // 13: Inscription band wash — muted magenta
+  // Window fills — blue inside each dome window
+  { name:'WINDOW FILLS', formula:'lapis #0c3a6a α=80', dur:0.05,
+    bbox:[bandL,crownSpringY-80,bandR,crownSpringY],
+    draw: function(p) {
+      if (p >= 0) {
+        var domeW = bandR - bandL + 40;
+        var domeL = cx - domeW/2;
+        var domeH = crownSpringY - crownPeakY;
+        var drumH = domeH * 0.22;
+        var drumTop = crownSpringY - drumH;
+        var nWins = 5;
+        var winW = domeW*0.08, winH = drumH*0.7, winY = drumTop+drumH*0.15;
+        brush.noStroke();
+        for (var w = 0; w < nWins; w++) {
+          randomSeed(3001+w);
+          brush.fill('#0c3a6a', 80);
+          brush.fillBleed(0.001); brush.fillTexture(0,0);
+          var wt = (w+1)/(nWins+1);
+          var wcx = domeL + domeW*wt;
+          var wL = wcx-winW/2, wR2 = wcx+winW/2;
+          var wp = [];
+          for (var a=0;a<=8;a++){var at2=a/8;wp.push([wL+winW*at2,winY+winH*0.3-winH*0.3*Math.sin(Math.PI*at2)]);}
+          wp.push([wR2,winY+winH],[wL,winY+winH]);
+          brush.polygon(wp);
+          brush.noFill();
+        }
+      }
+      return [cx, crownSpringY];
+    }},
+  // Inscription band wash
   { name:'BAND WASH', formula:'amethyst #4a1a3a α=30', dur:0.05,
     bbox:[bandL,bandTop_y,bandR,bandBot_y],
     draw: function(p) {
