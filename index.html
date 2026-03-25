@@ -90,7 +90,7 @@ var colRx = cx + halfSpan + colGap + colWidth/2;
 var bandL = colLx - colWidth/2 - bandOverhang;
 var bandR = colRx + colWidth/2 + bandOverhang;
 var bandW = bandR - bandL;
-var crownSpan = bandW * Math.sqrt(PHI) * 1.5, crownHalfSpan = crownSpan/2;
+var crownSpan = bandW * Math.sqrt(PHI), crownHalfSpan = crownSpan/2;
 var margin_top = U/PHI/PHI, margin_bot = margin_top + 55; // extra 55px at bottom for annotation rows
 var baseHeight = colWidth/PHI;
 var baseBot = H - margin_bot, baseTop = baseBot - baseHeight;
@@ -105,13 +105,7 @@ var capBot = colTop, capTop = capBot - capHeight;
 var bandGap = U/(PHI*PHI*PHI), bandBot_y = peakY - bandGap;
 var bandHeight_v = U/PHI, bandTop_y = bandBot_y - bandHeight_v;
 var crownSpringY = bandTop_y;
-// R calculated to keep same peak height with wider base
-var _origCrownSpan = bandW * Math.sqrt(PHI);
-var _origHalf = _origCrownSpan/2;
-var _origR = _origCrownSpan * ROOT2/2;
-var _origH = Math.sqrt(_origR*_origR - _origHalf*_origHalf);
-// New R: same height, wider halfSpan
-var crownR = Math.sqrt(crownHalfSpan*crownHalfSpan + _origH*_origH);
+var crownR = crownSpan * ROOT2/2;
 var crownH_sq = crownR*crownR - crownHalfSpan*crownHalfSpan;
 var crownH = crownH_sq > 0 ? Math.sqrt(crownH_sq) : crownSpan*ROOT3/2;
 var crownPeakY = crownSpringY - crownH;
