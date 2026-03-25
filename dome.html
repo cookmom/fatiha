@@ -600,7 +600,7 @@ var STEPS = [
   { name:'SELJUK DOME', panelPos:'br', formula:'ribbed dome + windows', dur:1.2,
     bbox:[bandL,crownPeakY,bandR,crownSpringY],
     draw: function(p) {
-      var domeW = bandR - bandL + 40;
+      var domeW = (colRx + colWidth/2 + colWidth/2) - (colLx - colWidth/2 - colWidth/2) + 40;
       var domeL = cx - domeW/2;
       var domeR = cx + domeW/2;
       var domeH = crownSpringY - crownPeakY;
@@ -700,7 +700,7 @@ var STEPS = [
     draw: function(p) {
       if (p >= 0) {
         randomSeed(1002);
-        var domeW = bandR - bandL + 40;
+        var domeW = (colRx + colWidth/2 + colWidth/2) - (colLx - colWidth/2 - colWidth/2) + 40;
         var domeL = cx - domeW/2;
         var drumH = (crownSpringY - crownPeakY) * 0.22;
         var drumTop = crownSpringY - drumH;
@@ -722,7 +722,7 @@ var STEPS = [
     bbox:[bandL,crownSpringY-80,bandR,crownSpringY],
     draw: function(p) {
       if (p >= 0) {
-        var domeW = bandR - bandL + 40;
+        var domeW = (colRx + colWidth/2 + colWidth/2) - (colLx - colWidth/2 - colWidth/2) + 40;
         var domeL = cx - domeW/2;
         var domeH = crownSpringY - crownPeakY;
         var drumH = domeH * 0.22;
