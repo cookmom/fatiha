@@ -294,15 +294,39 @@ function drawAnnotations(stepIdx) {
   }
 
   // === BOTTOM HORIZONTAL DIMENSIONS (2 rows) ===
-  // Row 1: column width (smallest, closest)
-  drawHDim(colLx-colWidth/2, colLx+colWidth/2, botRow1, 'U/\u03c6\u00b2 = '+colWidth.toFixed(0), 3, stepIdx);
-  // Row 2: arch span (larger, further)
-  drawHDim(cx-halfSpan, cx+halfSpan, botRow2, '2U = '+archSpan.toFixed(0), 7, stepIdx);
+  drawHDim(colLx-colWidth/2, colLx+colWidth/2, botRow1, 'U/φ² = '+colWidth.toFixed(0), 3, stepIdx);
+  drawHDim(cx-halfSpan, cx+halfSpan, botRow2, '2U = '+archSpan.toFixed(0), 8, stepIdx);
 
-  // Crown span — centered text inside the band area (no room for bottom row 3)
-  if (stepIdx >= 9) {
-    addDimText(cx, crownSpringY + 6, 'crown = bandW\u00d7\u221a\u03c6 = '+crownSpan.toFixed(0), 'center');
+  // === LEFT VERTICAL DIMENSIONS ===
+  drawVDim(capTop, capBot, ltRow1, 'colW×φ', 6, stepIdx, 'left');
+  drawVDim(bandTop_y, bandBot_y, ltRow1, 'U/φ', 11, stepIdx, 'left');
+  drawVDim(colTop, colBot, ltRow2, Math.round(colBot-colTop)+'px', 4, stepIdx, 'left');
+  drawVDim(peakY, springY, ltRow3, 'U√3 = '+archH.toFixed(0), 8, stepIdx, 'left');
+
+  // === INSIDE: Radius callout (arch only) ===
+  drawRCallout(C2x, springY, cx, peakY, 'R = 2U', 8, stepIdx);
+
+  // === DOME annotation ===
+  if (stepIdx >= 12) {
+    addDimText(cx, crownPeakY - ANNOT_FONT - 4, 'Seljuk ribbed dome', 'center');
   }
+
+  // === STAR annotation (inside niche arch) ===
+  if (stepIdx >= 10) {
+    brush.set('2H','#b0a898',0.4);
+    brush.line(starCx, starCy, starCx, starCy - starR_val);
+    brush.circle(starCx, starCy, 4);
+    addDimText(starCx, starCy - starR_val - ANNOT_FONT - 6, '{12/5}  r='+starR_val.toFixed(0), 'center');
+    addDimText(starCx, starCy - starR_val - 2, 'r, r/φ, r/φ², r/φ³', 'center');
+  }
+
+  // === BASE UNIT LEGEND ===
+  if (stepIdx >= 0) {
+    addDimText(cx, baseBot - ANNOT_FONT * 3, 'U = W/(2φ+2) = '+U.toFixed(1), 'center');
+    addDimText(cx, baseBot - ANNOT_FONT * 1.5, 'φ=1.618  √3=1.732  √2=1.414', 'center');
+  }
+}
+
 
   // === LEFT VERTICAL DIMENSIONS (all on left side) ===
   // Row 1 (closest): capital height, band height
@@ -312,24 +336,6 @@ function drawAnnotations(stepIdx) {
   drawVDim(colTop, colBot, ltRow2, Math.round(colBot-colTop)+'px', 4, stepIdx, 'left');
   // Row 3: arch height (largest, outermost)
   drawVDim(peakY, springY, ltRow3, 'U\u221a3 = '+archH.toFixed(0), 7, stepIdx, 'left');
-
-  // === INSIDE: Radius callouts ===
-  drawRCallout(C2x, springY, cx, peakY, 'R = 2U', 7, stepIdx);
-  if (stepIdx >= 9) {
-    var crMidX = cx - crownHalfSpan*0.5;
-    var crMidDx = crMidX - crownC2x;
-    var crMidY = crownSpringY - Math.sqrt(Math.max(0, crownR*crownR - crMidDx*crMidDx));
-    drawRCallout(crownC2x, crownSpringY, crMidX, crMidY, 'R = span/\u221a2', 9, stepIdx);
-  }
-
-  // === STAR annotation (inside crown) ===
-  if (stepIdx >= 10) {
-    brush.set('2H','#b0a898',0.4);
-    brush.line(starCx, starCy, starCx, starCy - starR_val);
-    brush.circle(starCx, starCy, 4);
-    addDimText(starCx, starCy - starR_val - ANNOT_FONT - 6, '{12/5}  r='+starR_val.toFixed(0), 'center');
-    addDimText(starCx, starCy - starR_val - 2, 'r, r/\u03c6, r/\u03c6\u00b2, r/\u03c6\u00b3', 'center');
-  }
 
   // === BASE UNIT LEGEND (inside niche, bottom area over wash) ===
   if (stepIdx >= 0) {
