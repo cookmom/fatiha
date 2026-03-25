@@ -111,8 +111,9 @@ var crownH = crownH_sq > 0 ? Math.sqrt(crownH_sq) : crownSpan*ROOT3/2;
 var crownPeakY = crownSpringY - crownH;
 if (crownPeakY < margin_top) { crownH = crownSpringY-margin_top; crownPeakY = margin_top; crownR = Math.sqrt(crownHalfSpan*crownHalfSpan+crownH*crownH); }
 var crownC1x = cx-crownHalfSpan, crownC2x = cx+crownHalfSpan;
-var starCx = cx, starCy = crownPeakY + crownH/PHI;
-var starR_val = Math.min(crownH/(2*PHI), crownHalfSpan/(PHI*PHI));
+// Star sits inside the niche arch, between peak and springing line
+var starCx = cx, starCy = peakY + (springY - peakY) * 0.42;
+var starR_val = (springY - peakY) * 0.38;
 var bw = colWidth * PHI / ROOT2;
 
 // =============================================
@@ -652,6 +653,13 @@ var STEPS = [
       }
     }},
   // 10: Star
+  // Impost line — horizontal divider across arch at springing height
+  { name:'IMPOST LINE', formula:'y = springY', dur:0.37,
+    bbox:[cx-halfSpan,springY-5,cx+halfSpan,springY+5],
+    draw: function(p) {
+      brush.set('2H','#5a5248',1.8);
+      return drawSegments([{from:[cx-halfSpan,springY],to:[cx+halfSpan,springY]}], p);
+    }},
   { name:'12-FOLD STAR', panelPos:'bl', formula:'{12/5} — scales: r, r/φ, r/φ², r/φ³', dur:0.93,
     bbox:[starCx-starR_val-15,starCy-starR_val-15,starCx+starR_val+15,starCy+starR_val+15],
     draw: function(p) {
@@ -784,7 +792,7 @@ var STEPS = [
 
 // Compute frame timeline — pauses between pencil steps, no pause between washes
 var PAUSE_S = 0.14;
-var WASH_START = 11; // step index where washes begin (gold + fills)
+var WASH_START = 12; // step index where washes begin (gold + fills)
 var frameStarts = [], frameEnds = [];
 var f = 0;
 for (var i = 0; i < STEPS.length; i++) {
