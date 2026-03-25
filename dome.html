@@ -833,8 +833,9 @@ function createTrackBox(step) {
   var s = window._hudScale || 1;
   var r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
   var b = step.bbox, pad = 12 * s;
-  var bx=(b[0]*s)+r.left-pad,by=(b[1]*s)+r.top-pad,bwid=(b[2]-b[0])*s+pad*2,bh=(b[3]-b[1])*s+pad*2;
-    // No minimum size inflation — box wraps tightly around the element
+  // Clamp bbox to canvas bounds
+  var cb0=Math.max(0,b[0]),cb1=Math.max(0,b[1]),cb2=Math.min(W,b[2]),cb3=Math.min(H,b[3]);
+  var bx=(cb0*s)+r.left-pad,by=(cb1*s)+r.top-pad,bwid=(cb2-cb0)*s+pad*2,bh=(cb3-cb1)*s+pad*2;
   box.style.left=bx+'px';box.style.top=by+'px';
   box.style.width=bwid+'px';box.style.height=bh+'px';
   ['tl','tr','bl2','br2'].forEach(function(c){var ci=document.createElement('div');ci.className='corner-circ '+c;box.appendChild(ci);});
@@ -975,8 +976,9 @@ function draw() {
     var _r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
     var _s = window._hudScale || 1;
     var _b = STEPS[activeStep].bbox, _pad = 12 * _s;
-    trackBox.style.left = (_b[0]*_s + _r.left - _pad) + 'px';
-    trackBox.style.top = (_b[1]*_s + _r.top - _pad) + 'px';
+    var _cb0=Math.max(0,_b[0]),_cb1=Math.max(0,_b[1]);
+    trackBox.style.left = (_cb0*_s + _r.left - _pad) + 'px';
+    trackBox.style.top = (_cb1*_s + _r.top - _pad) + 'px';
   }
   
   if (tip) updatePencilDot(tip[0], tip[1]);
