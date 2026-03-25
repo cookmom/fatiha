@@ -87,8 +87,8 @@ var archSpan = U*2, halfSpan = U;
 var colWidth = U/PHI/PHI, colGap = colWidth/PHI, bandOverhang = colWidth/2;
 var colLx = cx - halfSpan - colGap - colWidth/2;
 var colRx = cx + halfSpan + colGap + colWidth/2;
-var bandL = 0;
-var bandR = W;
+var bandL = 4;
+var bandR = W - 4;
 var bandW = bandR - bandL;
 var crownSpan = bandW * Math.sqrt(PHI), crownHalfSpan = crownSpan/2;
 var margin_top = U/PHI/PHI, margin_bot = margin_top + 55; // extra 55px at bottom for annotation rows
@@ -315,8 +315,8 @@ function drawAnnotations(stepIdx) {
     brush.set('2H','#b0a898',0.4);
     brush.line(starCx, starCy, starCx + starR_val, starCy);
     brush.circle(starCx, starCy, 4);
-    addDimText((cx + halfSpan + colGap + colWidth + 15), (peakY+springY)/2 - ANNOT_FONT - 4, '{12/5}  r='+starR_val.toFixed(0));
-    addDimText((cx + halfSpan + colGap + colWidth + 15), (peakY+springY)/2, 'r, r/φ, r/φ², r/φ³');
+    addDimText((cx + halfSpan + colGap + colWidth + 15), (peakY+springY)/2 - ANNOT_FONT - 4, '{12/5}  r='+starR_val.toFixed(0), 'right');
+    addDimText((cx + halfSpan + colGap + colWidth + 15), (peakY+springY)/2, 'r, r/φ, r/φ², r/φ³', 'right');
   }
 
   // === BASE UNIT LEGEND ===
@@ -395,10 +395,10 @@ for(var i=0;i<=60;i++){var t=i/60;var x=bandL+50+(bandR-bandL-100)*t;calligPts.p
 var STEPS = [
   // 0: Ground line
   { name:'GROUND LINE', panelPos:'tl', formula:'y = H − U/φ²', dur:0.37,
-    bbox:[0,baseBot-15,W,baseBot+15],
+    bbox:[4,baseBot-15,W-4,baseBot+15],
     draw: function(p) {
       brush.set('2H','#5a5248',2.0);
-      return drawSegments([{from:[bandL-10,baseBot],to:[bandR+10,baseBot]}], p);
+      return drawSegments([{from:[4,baseBot],to:[W-4,baseBot]}], p);
     }},
   // 1: Left base
   { name:'LEFT BASE', panelPos:'tr', formula:'w = U/φ² × φ/√2 = '+bw.toFixed(0)+'px', dur:0.37,
