@@ -821,6 +821,12 @@ function createTrackBox(step) {
   // Drawing usually starts at bottom/center, so default top-right
   var _fs = Math.max(9, Math.round(ANNOT_FONT * (window._hudScale||1))) + 'px';
   var info=document.createElement('div');info.className='hud-info';
+  // If box top is near screen top, put info INSIDE the box instead of above
+  if (by < 50) {
+    info.style.bottom = 'auto';
+    info.style.top = '6px';
+    info.style.marginBottom = '0';
+  }
   var lbl=document.createElement('div');lbl.className='hud-label';lbl.style.fontSize=_fs;lbl.textContent=step.name;info.appendChild(lbl);
   var frm=document.createElement('div');frm.className='hud-formula';frm.style.fontSize=_fs;frm.textContent=step.formula;info.appendChild(frm);
   var crd=document.createElement('div');crd.className='hud-coords';crd.style.fontSize=_fs;crd.id='live-coords';crd.textContent='x:— y:—';info.appendChild(crd);
