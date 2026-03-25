@@ -328,23 +328,6 @@ function drawAnnotations(stepIdx) {
 }
 
 
-  // === LEFT VERTICAL DIMENSIONS (all on left side) ===
-  // Row 1 (closest): capital height, band height
-  drawVDim(capTop, capBot, ltRow1, 'colW\u00d7\u03c6', 5, stepIdx, 'left');
-  drawVDim(bandTop_y, bandBot_y, ltRow1, 'U/\u03c6', 8, stepIdx, 'left');
-  // Row 2: column height
-  drawVDim(colTop, colBot, ltRow2, Math.round(colBot-colTop)+'px', 4, stepIdx, 'left');
-  // Row 3: arch height (largest, outermost)
-  drawVDim(peakY, springY, ltRow3, 'U\u221a3 = '+archH.toFixed(0), 7, stepIdx, 'left');
-
-  // === BASE UNIT LEGEND (inside niche, bottom area over wash) ===
-  if (stepIdx >= 0) {
-    addDimText(cx, baseBot - ANNOT_FONT * 3, 'U = W/(2\u03c6+2) = '+U.toFixed(1), 'center');
-    addDimText(cx, baseBot - ANNOT_FONT * 1.5, '\u03c6=1.618  \u221a3=1.732  \u221a2=1.414', 'center');
-  }
-}
-
-
 // =============================================
 // PROGRESSIVE LINE DRAWING
 // Given an array of [x,y] segments and progress 0-1,
