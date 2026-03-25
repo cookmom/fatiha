@@ -719,7 +719,7 @@ var STEPS = [
       if (p >= 0) {
         randomSeed(1003);
         brush.noStroke();
-        brush.fill('#c8a870', 35);
+        brush.fill('#7a4a2a', 30);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         brush.rect(bandL+4,bandTop_y+4,bandR-bandL-8,bandBot_y-bandTop_y-8);
         brush.noFill();
@@ -887,7 +887,7 @@ function draw() {
     if (f >= frameStarts[i]) { activeStep = i; break; }
   }
   
-  // Draw ALL completed steps at full progress
+  // Draw completed steps
   for (var i = 0; i < activeStep; i++) {
     STEPS[i].draw(1);
   }
