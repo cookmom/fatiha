@@ -405,14 +405,14 @@ for(var i=0;i<=60;i++){var t=i/60;var x=bandL+50+(bandR-bandL-100)*t;calligPts.p
 
 var STEPS = [
   // 0: Ground line
-  { name:'GROUND LINE', panelPos:'tl', formula:'y = H − U/φ²', dur:0.44,
+  { name:'GROUND LINE', panelPos:'tl', formula:'y = H − U/φ²', dur:0.37,
     bbox:[bandL-10,baseBot-15,bandR+10,baseBot+15],
     draw: function(p) {
       brush.set('2H','#5a5248',2.0);
       return drawSegments([{from:[bandL-10,baseBot],to:[bandR+10,baseBot]}], p);
     }},
   // 1: Left base
-  { name:'LEFT BASE', panelPos:'tr', formula:'w = U/φ² × φ/√2 = '+bw.toFixed(0)+'px', dur:0.44,
+  { name:'LEFT BASE', panelPos:'tr', formula:'w = U/φ² × φ/√2 = '+bw.toFixed(0)+'px', dur:0.37,
     bbox:[colLx-bw/2,colBot,colLx+bw/2,baseBot],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -424,7 +424,7 @@ var STEPS = [
       ], p);
     }},
   // 2: Right base
-  { name:'RIGHT BASE', panelPos:'tl', formula:'mirror of left', dur:0.44,
+  { name:'RIGHT BASE', panelPos:'tl', formula:'mirror of left', dur:0.37,
     bbox:[colRx-bw/2,colBot,colRx+bw/2,baseBot],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -436,7 +436,7 @@ var STEPS = [
       ], p);
     }},
   // 3: Left column (draws upward)
-  { name:'LEFT COLUMN', panelPos:'tr', formula:'w = U/φ² = '+colWidth.toFixed(0)+' | h = '+Math.round(colBot-colTop), dur:0.67,
+  { name:'LEFT COLUMN', panelPos:'tr', formula:'w = U/φ² = '+colWidth.toFixed(0)+' | h = '+Math.round(colBot-colTop), dur:0.56,
     bbox:[colLx-colWidth/2,colTop,colLx+colWidth/2,colBot],
     draw: function(p) {
       brush.set('2H','#5a5248',2.0);
@@ -453,7 +453,7 @@ var STEPS = [
       return [colLx, endY];
     }},
   // 4: Right column
-  { name:'RIGHT COLUMN', panelPos:'tl', formula:'w = U/φ²', dur:0.67,
+  { name:'RIGHT COLUMN', panelPos:'tl', formula:'w = U/φ²', dur:0.56,
     bbox:[colRx-colWidth/2,colTop,colRx+colWidth/2,colBot],
     draw: function(p) {
       brush.set('2H','#5a5248',2.0);
@@ -468,7 +468,7 @@ var STEPS = [
       return [colRx, endY];
     }},
   // 5: Left capital
-  { name:'LEFT CAPITAL', panelPos:'tr', formula:'h = colW × φ = '+capHeight.toFixed(0)+'px', dur:0.44,
+  { name:'LEFT CAPITAL', panelPos:'tr', formula:'h = colW × φ = '+capHeight.toFixed(0)+'px', dur:0.37,
     bbox:[colLx-capW*0.62,capTop-6,colLx+capW*0.62,capBot],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -479,7 +479,7 @@ var STEPS = [
       ], p);
     }},
   // 6: Right capital
-  { name:'RIGHT CAPITAL', panelPos:'tl', formula:'h = colW × φ', dur:0.44,
+  { name:'RIGHT CAPITAL', panelPos:'tl', formula:'h = colW × φ', dur:0.37,
     bbox:[colRx-capW*0.62,capTop-6,colRx+capW*0.62,capBot],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -490,7 +490,7 @@ var STEPS = [
       ], p);
     }},
   // 7: Main arch (left then right arc as one step)
-  { name:'NICHE ARCH', panelPos:'br', formula:'R = 2U = '+archSpan.toFixed(0)+' | H = U√3 = '+archH.toFixed(0), dur:1.67,
+  { name:'NICHE ARCH', panelPos:'br', formula:'R = 2U = '+archSpan.toFixed(0)+' | H = U√3 = '+archH.toFixed(0), dur:1.39,
     bbox:[cx-halfSpan,peakY,cx+halfSpan,springY+20],
     draw: function(p) {
       // COMPASS SWEEP — radius line sweeps UPWARD from horizontal
@@ -558,7 +558,7 @@ var STEPS = [
       }
     }},
   // 8: Inscription band
-  { name:'INSCRIPTION BAND', panelPos:'tr', formula:'h = U/φ = '+bandHeight_v.toFixed(0)+'px', dur:0.83,
+  { name:'INSCRIPTION BAND', panelPos:'tr', formula:'h = U/φ = '+bandHeight_v.toFixed(0)+'px', dur:0.69,
     bbox:[bandL,bandTop_y,bandR,bandBot_y],
     draw: function(p) {
       brush.set('2H','#5a5248',1.8);
@@ -596,7 +596,7 @@ var STEPS = [
       }
     }},
   // 9: Crown arch
-  { name:'CROWN ARCH', panelPos:'br', formula:'R = span/√2 = '+crownR.toFixed(0), dur:1.25,
+  { name:'CROWN ARCH', panelPos:'br', formula:'R = span/√2 = '+crownR.toFixed(0), dur:1.04,
     bbox:[cx-crownHalfSpan,crownPeakY,cx+crownHalfSpan,crownSpringY],
     draw: function(p) {
       // COMPASS SWEEP for crown — same theta approach, upward
@@ -652,7 +652,7 @@ var STEPS = [
       }
     }},
   // 10: Star
-  { name:'12-FOLD STAR', panelPos:'bl', formula:'{12/5} — scales: r, r/φ, r/φ², r/φ³', dur:1.11,
+  { name:'12-FOLD STAR', panelPos:'bl', formula:'{12/5} — scales: r, r/φ, r/φ², r/φ³', dur:0.93,
     bbox:[starCx-starR_val-15,starCy-starR_val-15,starCx+starR_val+15,starCy+starR_val+15],
     draw: function(p) {
       var scales=[starR_val,starR_val/PHI,starR_val/(PHI*PHI),starR_val/(PHI*PHI*PHI)];
@@ -679,7 +679,7 @@ var STEPS = [
     }},
   // 11: Gold star center — flat wash, no glow
   // 11: Niche wash — deep lapis
-  { name:'NICHE WASH', formula:'lapis #0c3a6a α=35', dur:0.06,
+  { name:'NICHE WASH', formula:'lapis #0c3a6a α=35', dur:0.05,
     bbox:[cx-halfSpan,peakY,cx+halfSpan,baseBot],
     draw: function(p) {
       if (p >= 0) {
@@ -696,7 +696,7 @@ var STEPS = [
       return [cx, springY];
     }},
   // 12: Crown wash — lighter blue
-  { name:'CROWN WASH', formula:'azure #1a4a8a α=28', dur:0.06,
+  { name:'CROWN WASH', formula:'azure #1a4a8a α=28', dur:0.05,
     bbox:[cx-crownHalfSpan,crownPeakY,cx+crownHalfSpan,crownSpringY],
     draw: function(p) {
       if (p >= 0) {
@@ -713,7 +713,7 @@ var STEPS = [
       return [cx, starCy];
     }},
   // 13: Inscription band wash — muted magenta
-  { name:'BAND WASH', formula:'amethyst #4a1a3a α=30', dur:0.06,
+  { name:'BAND WASH', formula:'amethyst #4a1a3a α=30', dur:0.05,
     bbox:[bandL,bandTop_y,bandR,bandBot_y],
     draw: function(p) {
       if (p >= 0) {
@@ -727,7 +727,7 @@ var STEPS = [
       return [cx, bandBot_y];
     }},
   // 14: Column base tint — dark blue-grey
-  { name:'BASE TINT', formula:'slate #1a2a3a α=25', dur:0.06,
+  { name:'BASE TINT', formula:'slate #1a2a3a α=25', dur:0.05,
     bbox:[colLx-bw/2,colBot,colRx+bw/2,baseBot],
     draw: function(p) {
       if (p >= 0) {
@@ -747,7 +747,7 @@ var STEPS = [
       return [cx, baseBot];
     }},
   // 15: Capital accent — magenta touch
-  { name:'CAPITAL ACCENT', formula:'magenta #5a1a4a α=45', dur:0.06,
+  { name:'CAPITAL ACCENT', formula:'magenta #5a1a4a α=45', dur:0.05,
     bbox:[colLx-capW*0.6,capTop,colRx+capW*0.6,capBot],
     draw: function(p) {
       if (p >= 0) {
@@ -767,7 +767,7 @@ var STEPS = [
       return [cx, capTop];
     }},
   // LAST: Gold star center — the final payoff
-  { name:'STAR CENTER', formula:'lapis #0c3a6a α=120', dur:0.06,
+  { name:'STAR CENTER', formula:'lapis #0c3a6a α=120', dur:0.05,
     bbox:[starCx-starR_val/PHI-5,starCy-starR_val/PHI-5,starCx+starR_val/PHI+5,starCy+starR_val/PHI+5],
     draw: function(p) {
       if (p >= 0) {
@@ -783,7 +783,7 @@ var STEPS = [
 ];
 
 // Compute frame timeline — pauses between pencil steps, no pause between washes
-var PAUSE_S = 0.17;
+var PAUSE_S = 0.14;
 var WASH_START = 11; // step index where washes begin (gold + fills)
 var frameStarts = [], frameEnds = [];
 var f = 0;
