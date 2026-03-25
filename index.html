@@ -766,65 +766,7 @@ var STEPS = [
       }
       return [cx, capTop];
     }},
-  // Arch peak shadow — dark triangle at apex
-  { name:'APEX SHADOW', formula:'deep #061e3a α=25', dur:0.05,
-    bbox:[cx-60,peakY,cx+60,peakY+80],
-    draw: function(p) {
-      if (p >= 0) {
-        randomSeed(2001);
-        brush.noStroke();
-        brush.fill('#061e3a', 25);
-        brush.fillBleed(0.001); brush.fillTexture(0,0);
-        brush.polygon([[cx,peakY+5],[cx-55,peakY+75],[cx+55,peakY+75]]);
-        brush.noFill();
-      }
-      return [cx, peakY];
-    }},
-  // Base shadow — dark strip along ground (single fill)
-  { name:'BASE SHADOW', formula:'ground #0a1a2a α=30', dur:0.05,
-    bbox:[bandL,baseBot-20,bandR,baseBot],
-    draw: function(p) {
-      if (p >= 0) {
-        randomSeed(2003);
-        brush.noStroke();
-        brush.fill('#0a1a2a', 30);
-        brush.fillBleed(0.001); brush.fillTexture(0,0);
-        brush.rect(colLx-bw/2, baseBot-18, colRx-colLx+bw, 16);
-        brush.noFill();
-      }
-      return [cx, baseBot];
-    }},
-  // Crown interior darken — upper third
-  { name:'CROWN DEPTH', formula:'deep #0a2a4a α=20', dur:0.05,
-    bbox:[cx-crownHalfSpan*0.6,crownPeakY,cx+crownHalfSpan*0.6,crownPeakY+(crownSpringY-crownPeakY)*0.4],
-    draw: function(p) {
-      if (p >= 0) {
-        randomSeed(2004);
-        brush.noStroke();
-        brush.fill('#0a2a4a', 20);
-        brush.fillBleed(0.001); brush.fillTexture(0,0);
-        var cTopY = crownPeakY + 10;
-        var cMidY = crownPeakY + (crownSpringY-crownPeakY)*0.4;
-        brush.polygon([[cx-crownHalfSpan*0.4,cMidY],[cx,cTopY],[cx+crownHalfSpan*0.4,cMidY]]);
-        brush.noFill();
-      }
-      return [cx, crownPeakY];
-    }},
-  // Band highlight — warm wash to separate from blue
-  { name:'BAND WARM', formula:'parchment #d4b888 α=18', dur:0.05,
-    bbox:[bandL,bandTop_y,bandR,bandBot_y],
-    draw: function(p) {
-      if (p >= 0) {
-        randomSeed(2005);
-        brush.noStroke();
-        brush.fill('#d4b888', 18);
-        brush.fillBleed(0.001); brush.fillTexture(0,0);
-        brush.rect(bandL+6, bandTop_y+6, bandR-bandL-12, bandBot_y-bandTop_y-12);
-        brush.noFill();
-      }
-      return [cx, (bandTop_y+bandBot_y)/2];
-    }},
-  // LAST: Blue star center — the final payoff
+  // LAST: Gold star center — the final payoff
   { name:'STAR CENTER', formula:'lapis #0c3a6a α=120', dur:0.05,
     bbox:[starCx-starR_val/PHI-5,starCy-starR_val/PHI-5,starCx+starR_val/PHI+5,starCy+starR_val/PHI+5],
     draw: function(p) {
