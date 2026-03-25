@@ -396,7 +396,7 @@ for(var i=0;i<=60;i++){var t=i/60;var x=bandL+50+(bandR-bandL-100)*t;calligPts.p
 var STEPS = [
   // 0: Ground line
   { name:'GROUND LINE', panelPos:'tl', formula:'y = H − U/φ²', dur:0.37,
-    bbox:[bandL-10,baseBot-15,bandR+10,baseBot+15],
+    bbox:[0,baseBot-15,W,baseBot+15],
     draw: function(p) {
       brush.set('2H','#5a5248',2.0);
       return drawSegments([{from:[bandL-10,baseBot],to:[bandR+10,baseBot]}], p);
@@ -685,7 +685,7 @@ var STEPS = [
     }},
   // 12: Crown wash — lighter blue
   { name:'DOME WASH', formula:'magenta #5a1a4a α=60', dur:0.05,
-    bbox:[bandL-20,crownPeakY,bandR+20,crownSpringY],
+    bbox:[0,crownPeakY,W,crownSpringY],
     draw: function(p) {
       if (p >= 0) {
         randomSeed(1002);
@@ -845,8 +845,8 @@ function createTrackBox(step) {
   // Drawing usually starts at bottom/center, so default top-right
   var _fs = Math.max(9, Math.round(ANNOT_FONT * (window._hudScale||1))) + 'px';
   var info=document.createElement('div');info.className='hud-info';
-  // If box top is near screen top, put info INSIDE the box instead of above
-  if (by < 50) {
+  // If box top is near screen top, put info INSIDE the box
+  if (by < 60) {
     info.style.bottom = 'auto';
     info.style.top = '6px';
     info.style.marginBottom = '0';
