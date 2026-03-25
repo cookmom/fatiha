@@ -111,8 +111,9 @@ var crownH = crownH_sq > 0 ? Math.sqrt(crownH_sq) : crownSpan*ROOT3/2;
 var crownPeakY = crownSpringY - crownH;
 if (crownPeakY < margin_top) { crownH = crownSpringY-margin_top; crownPeakY = margin_top; crownR = Math.sqrt(crownHalfSpan*crownHalfSpan+crownH*crownH); }
 var crownC1x = cx-crownHalfSpan, crownC2x = cx+crownHalfSpan;
-var starCx = cx, starCy = crownPeakY + crownH/PHI;
-var starR_val = Math.min(crownH/(2*PHI), crownHalfSpan/(PHI*PHI));
+// Star inside the TOP of the niche arch (not in the crown)
+var starCx = cx, starCy = peakY + archH * 0.35;
+var starR_val = archSpan * 0.22;
 var bw = colWidth * PHI / ROOT2;
 
 // =============================================
