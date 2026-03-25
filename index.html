@@ -874,9 +874,10 @@ function setup() {
   });
 }
 
+var _inFillPhase = false;
+
 function draw() {
   translate(-width/2, -height/2);
-  background(242, 234, 218);
   
   var f = frameCount - 1;
   if (f >= totalAnimFrames) f = totalAnimFrames - 1;
@@ -887,9 +888,21 @@ function draw() {
     if (f >= frameStarts[i]) { activeStep = i; break; }
   }
   
-  // Draw completed steps
-  for (var i = 0; i < activeStep; i++) {
-    STEPS[i].draw(1);
+  if (activeStep < WASH_START) {
+    // PENCIL PHASE — normal redraw everything
+    _inFillPhase = false;
+    background(242, 234, 218);
+    for (var i = 0; i < activeStep; i++) STEPS[i].draw(1);
+  } else {
+    if (!_inFillPhase) {
+      // First frame of fill phase — draw all pencil steps one last time
+      background(242, 234, 218);
+      for (var i = 0; i < WASH_START; i++) STEPS[i].draw(1);
+      drawAnnotations(WASH_START - 1);
+      _inFillPhase = true;
+    }
+    // Fill phase — NO background clear, just layer fills on top
+    // Only draw the current fill step (previous fills are already on canvas)
   }
   
   // Draw current step at partial progress
@@ -898,8 +911,8 @@ function draw() {
   var progress = Math.min(1, stepFrame / stepDurFrames);
   var tip = STEPS[activeStep].draw(progress);
   
-  // Annotations on top of everything
-  drawAnnotations(activeStep - 1);
+  // Annotations — only during pencil phase (already drawn at fill transition)
+  if (!_inFillPhase) drawAnnotations(activeStep - 1);
   
   // Update HUD — draw transition line between boxes, then snap
   if (activeStep !== lastHudStep) {
