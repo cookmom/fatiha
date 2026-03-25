@@ -311,12 +311,12 @@ function drawAnnotations(stepIdx) {
   }
 
   // === STAR annotation (right side, outside arch) ===
-  if (stepIdx >= 10) {
+  if (stepIdx >= 9) {
     brush.set('2H','#b0a898',0.4);
     brush.line(starCx, starCy, starCx + starR_val, starCy);
     brush.circle(starCx, starCy, 4);
-    addDimText(cx + halfSpan + 15, starCy - ANNOT_FONT, '{12/5}  r='+starR_val.toFixed(0));
-    addDimText(cx + halfSpan + 15, starCy + 4, 'r, r/φ, r/φ², r/φ³');
+    addDimText((cx + halfSpan + colGap + colWidth + 15), starCy - ANNOT_FONT, '{12/5}  r='+starR_val.toFixed(0));
+    addDimText((cx + halfSpan + colGap + colWidth + 15), starCy + 4, 'r, r/φ, r/φ², r/φ³');
   }
 
   // === BASE UNIT LEGEND ===
