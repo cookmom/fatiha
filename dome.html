@@ -833,7 +833,7 @@ function createTrackBox(step) {
   var r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
   var b = step.bbox, pad = 12 * s;
   // Clamp bbox to canvas bounds
-  var cb0=Math.max(0,b[0]),cb1=Math.max(0,b[1]),cb2=Math.min(W,b[2]),cb3=Math.min(H,b[3]);
+  var cb0=Math.max(4,b[0]),cb1=Math.max(4,b[1]),cb2=Math.min(W-4,b[2]),cb3=Math.min(H-4,b[3]);
   var bx=(cb0*s)+r.left-pad,by=(cb1*s)+r.top-pad,bwid=(cb2-cb0)*s+pad*2,bh=(cb3-cb1)*s+pad*2;
   box.style.left=bx+'px';box.style.top=by+'px';
   box.style.width=bwid+'px';box.style.height=bh+'px';
@@ -975,7 +975,7 @@ function draw() {
     var _r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
     var _s = window._hudScale || 1;
     var _b = STEPS[activeStep].bbox, _pad = 12 * _s;
-    var _cb0=Math.max(0,_b[0]),_cb1=Math.max(0,_b[1]);
+    var _cb0=Math.max(4,_b[0]),_cb1=Math.max(4,_b[1]);
     trackBox.style.left = (_cb0*_s + _r.left - _pad) + 'px';
     trackBox.style.top = (_cb1*_s + _r.top - _pad) + 'px';
   }
