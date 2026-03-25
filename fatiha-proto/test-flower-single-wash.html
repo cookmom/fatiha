@@ -1,0 +1,83 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+<style>* { margin:0; } body { background:#f2eada; }</style>
+</head>
+<body>
+<script>
+function makePetal(bx, by, ang, len, wid) {
+  var pts = [], steps = 12;
+  for (var i = 0; i <= steps; i++) {
+    var t = i/steps, r = wid * Math.sin(Math.PI * t), along = len * t;
+    pts.push([bx + Math.cos(ang)*along - Math.sin(ang)*r, by + Math.sin(ang)*along + Math.cos(ang)*r]);
+  }
+  for (var i = steps; i >= 0; i--) {
+    var t = i/steps, r = -wid * Math.sin(Math.PI * t), along = len * t;
+    pts.push([bx + Math.cos(ang)*along - Math.sin(ang)*r, by + Math.sin(ang)*along + Math.cos(ang)*r]);
+  }
+  return pts;
+}
+
+function setup() {
+  createCanvas(1080, 1920, WEBGL);
+  brush.load();
+  translate(-width/2, -height/2);
+  background(242, 234, 218);
+
+  function drawFlower(fcx, fcy, scale, petalColor, centerColor) {
+    var centerR = 12 * scale;
+    var petalCount = 6;
+    var petalLen = 30 * scale;
+    var petalW = 20 * scale;
+
+    // STEP 1: Center circle FIRST — pencil outline
+    brush.noFill();
+    brush.set('2H', '#c0b8a8', 1.0);
+    brush.circle(fcx, fcy, centerR * 2);
+
+    // STEP 2: Petals radiating FROM the circle edge (not from center)
+    var petalPolys = [];
+    for (var p = 0; p < petalCount; p++) {
+      var angle = (p / petalCount) * Math.PI * 2 + (Math.random()-0.5)*0.12;
+      // Petal BASE starts at circle edge, not center
+      var baseX = fcx + Math.cos(angle) * centerR;
+      var baseY = fcy + Math.sin(angle) * centerR;
+      var pts = makePetal(baseX, baseY, angle, petalLen, petalW);
+      petalPolys.push(pts);
+    }
+
+    // NO petal outlines — just watercolor fills
+    brush.noStroke();
+    for (var p = 0; p < petalPolys.length; p++) {
+      brush.fill(petalColor, 85);
+      brush.fillBleed(0.25, 'in');
+      brush.fillTexture(0.4, 0.25);
+      brush.polygon(petalPolys[p]);
+    }
+    brush.noFill();
+
+    // STEP 5: Center circle fill — contrasting color
+    brush.noStroke();
+    brush.fill(centerColor, 150);
+    brush.fillBleed(0.15, 'out');
+    brush.fillTexture(0.3, 0.2);
+    brush.circle(fcx, fcy, centerR * 2);
+    brush.noFill();
+  }
+
+  // Large flowers
+  drawFlower(270, 450, 3.0, '#8a1828', '#c4a040');
+  drawFlower(540, 380, 3.5, '#a02040', '#e8c060');
+  drawFlower(810, 450, 2.8, '#6a1020', '#c4a040');
+
+  // Medium
+  drawFlower(400, 850, 2.2, '#c06080', '#e8c060');
+  drawFlower(680, 850, 2.0, '#d080a0', '#c4a040');
+}
+</script>
+</body>
+</html>

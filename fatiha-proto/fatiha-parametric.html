@@ -99,120 +99,130 @@ function makeSazLeafPoly(bx, by, ang, len, wid, curv) {
   return pts;
 }
 
-var flowerElements = [], flowerIdx = 0;
-var flowerGroups = [], flowerGroupIdx = 0;
-// CHANGE 1: washes 30-58, pencil starts 60, flowers start 100, reach peak ~400
-var PENCIL_END = 360, FLOWER_START = 100, FLOWER_INTERVAL = 19;
-var setupDone = false;
-
-// CHANGE 2: Growth paths — bottom center splits left+right, climbs frame, meets at peak
-function leftPathPos(t) {
-  // t=0: bottom of left jamb, t~0.65: left spring, t=1: arch peak
-  if (t < 0.65) {
-    var jt = t / 0.65;
-    return {x: doorX - 5, y: bot - jt * (bot - archSpringY)};
-  } else {
-    var at = (t - 0.65) / 0.35;
-    var idx = Math.min(20, Math.floor(at * 20));
-    return {x: archPts[idx][0], y: archPts[idx][1] - 10};
+function samplePathEvenly(pts, n) {
+  var dists = [0];
+  for (var i = 1; i < pts.length; i++) {
+    var dx = pts[i][0] - pts[i-1][0], dy = pts[i][1] - pts[i-1][1];
+    dists.push(dists[i-1] + Math.sqrt(dx*dx + dy*dy));
   }
-}
-function rightPathPos(t) {
-  if (t < 0.65) {
-    var jt = t / 0.65;
-    return {x: doorX + doorW + 5, y: bot - jt * (bot - archSpringY)};
-  } else {
-    var at = (t - 0.65) / 0.35;
-    var idx = Math.max(20, 40 - Math.floor(at * 20));
-    return {x: archPts[idx][0], y: archPts[idx][1] - 10};
+  var total = dists[dists.length - 1], result = [];
+  for (var si = 0; si < n; si++) {
+    var target = (si / Math.max(1, n - 1)) * total, seg = 0;
+    for (var j = 1; j < dists.length; j++) { if (dists[j] >= target) { seg = j - 1; break; } }
+    if (seg >= pts.length - 1) seg = pts.length - 2;
+    var segLen = dists[seg+1] - dists[seg];
+    var t = segLen > 0 ? (target - dists[seg]) / segLen : 0;
+    result.push({x: pts[seg][0] + t * (pts[seg+1][0] - pts[seg][0]), y: pts[seg][1] + t * (pts[seg+1][1] - pts[seg][1])});
   }
+  return result;
 }
 
-function buildRose(px, py, s, cols) {
-  var roseGroup = [];
-  // APPROVED RECIPE: 3 rings (5+5+4), from CENTER (no gap), fillBleed 'in'
-  var rings = [
-    {count:5, len:45*s, w:14*s, color:cols.outer, opacity:100},
-    {count:5, len:35*s, w:12*s, color:cols.mid, opacity:110},
-    {count:4, len:25*s, w:10*s, color:cols.inner, opacity:120},
-  ];
+function buildRoseGroup(fcx, fcy, s) {
+  var group = [], rings = [
+    {count:5, len:45*s, w:14*s, color:'#6a1020', opacity:100},
+    {count:5, len:35*s, w:12*s, color:'#a02040', opacity:110},
+    {count:4, len:25*s, w:10*s, color:'#e06080', opacity:120}
+  ], baseAngle = Math.random() * Math.PI * 2;
   for (var r = 0; r < rings.length; r++) {
-    var ring = rings[r], angleOff = r * 0.3;
+    var ring = rings[r], angleOff = r * 0.3 + baseAngle;
     for (var p = 0; p < ring.count; p++) {
       var angle = (p / ring.count) * Math.PI * 2 + angleOff + (Math.random()-0.5)*0.15;
-      var pts = makePetalPoly(px, py, angle, ring.len, ring.w, 0.3);
-      var el = {color: ring.color, opacity: ring.opacity, polygon: pts, bleedDir: 'in'};
-      flowerElements.push(el);
-      roseGroup.push(el);
+      var pts = makePetalPoly(fcx, fcy, angle, ring.len, ring.w, 0.3);
+      group.push({color: ring.color, opacity: ring.opacity, polygon: pts, bleedDir: 'in'});
     }
   }
-  var centerPoly = makePetalPoly(px, py, Math.random()*Math.PI*2, 12*s, 8*s, 0.4);
-  var centerEl = {color:'#c4a040', opacity:170, polygon: centerPoly, bleedDir:'out'};
-  flowerElements.push(centerEl);
-  roseGroup.push(centerEl);
-  return roseGroup;
+  var cp = makePetalPoly(fcx, fcy, Math.random()*Math.PI*2, 12*s, 8*s, 0.4);
+  group.push({color:'#c4a040', opacity:170, polygon: cp, bleedDir:'out'});
+  return group;
 }
 
-function buildLeaf(px, py, ang, s) {
-  var pts = makeSazLeafPoly(px, py, ang, 65*s, 16*s, 0.5);
-  var el = {color:'#1a4a2e', opacity:100, polygon:pts, bleedDir:'in'};
-  flowerElements.push(el);
-  return [el];
+function buildStarFlower(fcx, fcy, s) {
+  var group = [], n = 6 + Math.floor(Math.random()*3), baseAngle = Math.random()*Math.PI*2;
+  for (var p = 0; p < n; p++) {
+    var angle = (p/n)*Math.PI*2 + baseAngle + (Math.random()-0.5)*0.1;
+    var pts = makePetalPoly(fcx, fcy, angle, 28*s, 10*s, 0.3);
+    group.push({color:'#c04060', opacity:120, polygon:pts, bleedDir:'in'});
+  }
+  var cp = makePetalPoly(fcx, fcy, Math.random()*Math.PI*2, 10*s, 7*s, 0.3);
+  group.push({color:'#c4a040', opacity:170, polygon:cp, bleedDir:'out'});
+  return group;
 }
 
-function buildFlowers() {
-  // Growth path: flowers placed along left+right paths, ordered bottom→top
-  // Interleaved: left→right→left→right climbing the frame
-  var rc1 = {outer:'#6a1020', mid:'#a02040', inner:'#e06080'};
-  var rc2 = {outer:'#7a1828', mid:'#b03050', inner:'#e87090'};
+function buildLeafGroup(lx, ly, angle, s) {
+  var pts = makeSazLeafPoly(lx, ly, angle, 65*s, 16*s, 0.5);
+  return [{color:'#1a4a2e', opacity:100, polygon:pts, bleedDir:'in'}];
+}
 
-  // 1. Bottom center rose
-  flowerGroups.push(buildRose(cx, bot + 10, 0.9, rc1));
+var flowerGroups = [], flowerGroupIdx = 0, washSchedule = [], washIdx = 0;
+var PENCIL_END = 360, FLOWER_START = 9999, FLOWER_SPACING = 18, PO = 59, setupDone = false;
 
-  // 2-3. Bottom leaves splitting left and right
-  flowerGroups.push(buildLeaf(cx - 100, bot + 15, -1.2, 0.75));
-  flowerGroups.push(buildLeaf(cx + 100, bot + 15, Math.PI + 1.2, 0.75));
+var leftVinePath = [], rightVinePath = [], vineSegIdx = 0;
+var leafPositions = [], flowerPositions = [];
+var leafDrawIdx = 0, flowerDrawIdx = 0;
+var VINE_START = 80, LEAF_START = 120, FLOWER_BLOOM_START = 170;
 
-  // 4-5. Lower roses (t=0.15 — about 1/3 up the jambs)
-  var lp1 = leftPathPos(0.15), rp1 = rightPathPos(0.15);
-  flowerGroups.push(buildRose(lp1.x, lp1.y, 0.7, rc1));
-  flowerGroups.push(buildRose(rp1.x, rp1.y, 0.7, rc2));
+function buildVinePaths() {
+  var leftRaw = [], rightRaw = [];
+  var m = 35;
+  var dcy = (archPts[20][1] + panelBot) / 2;
+  // Split: bottom center to edges
+  for (var i = 0; i <= 6; i++) {
+    var t = i / 6;
+    leftRaw.push([cx*(1-t) + (doorX+m)*t, panelBot - 4*Math.sin(t*Math.PI)]);
+    rightRaw.push([cx*(1-t) + (doorX+doorW-m)*t, panelBot - 4*Math.sin(t*Math.PI)]);
+  }
+  // Climb jambs with organic wobble
+  for (var i = 1; i <= 20; i++) {
+    var t = i/20, y = panelBot*(1-t) + archSpringY*t;
+    var wobble = Math.sin(t*7) * 10;
+    leftRaw.push([doorX + m + wobble, y]);
+    rightRaw.push([doorX + doorW - m - wobble, y]);
+  }
+  // Along arch (inset toward door center)
+  for (var i = 1; i <= 20; i++) {
+    var ax = archPts[i][0], ay = archPts[i][1];
+    var dx = cx - ax, dy = dcy - ay, d = Math.sqrt(dx*dx+dy*dy);
+    if (d > 0) leftRaw.push([ax + dx/d*m, ay + dy/d*m]);
+    else leftRaw.push([ax, ay + m]);
+  }
+  for (var i = 39; i >= 20; i--) {
+    var ax = archPts[i][0], ay = archPts[i][1];
+    var dx = cx - ax, dy = dcy - ay, d = Math.sqrt(dx*dx+dy*dy);
+    if (d > 0) rightRaw.push([ax + dx/d*m, ay + dy/d*m]);
+    else rightRaw.push([ax, ay + m]);
+  }
+  leftVinePath = samplePathEvenly(leftRaw, 80);
+  rightVinePath = samplePathEvenly(rightRaw, 80);
 
-  // 6-7. Lower leaves (t=0.3)
-  var ll1 = leftPathPos(0.3), rl1 = rightPathPos(0.3);
-  flowerGroups.push(buildLeaf(ll1.x - 10, ll1.y, -0.5, 0.7));
-  flowerGroups.push(buildLeaf(rl1.x + 10, rl1.y, Math.PI + 0.5, 0.7));
+  // Pre-compute leaf positions along vine
+  leafPositions = [];
+  for (var i = 6; i < 75; i += 3 + Math.floor(Math.random()*2)) {
+    var lp = leftVinePath[i], rp = rightVinePath[i];
+    var lNext = leftVinePath[Math.min(i+1,79)], rNext = rightVinePath[Math.min(i+1,79)];
+    var lAng = Math.atan2(lNext.y-lp.y, lNext.x-lp.x) + (i%2===0 ? -1.2 : 1.2);
+    var rAng = Math.atan2(rNext.y-rp.y, rNext.x-rp.x) + (i%2===0 ? 1.2 : -1.2);
+    var s = 0.5 + Math.random()*0.3;
+    leafPositions.push({x:lp.x, y:lp.y, angle:lAng, scale:s});
+    leafPositions.push({x:rp.x, y:rp.y, angle:rAng, scale:s});
+  }
 
-  // 8-9. Mid roses (t=0.45 — about 2/3 up the jambs)
-  var lp2 = leftPathPos(0.45), rp2 = rightPathPos(0.45);
-  flowerGroups.push(buildRose(lp2.x, lp2.y, 0.8, rc2));
-  flowerGroups.push(buildRose(rp2.x, rp2.y, 0.8, rc1));
-
-  // 10-11. Upper leaves (t=0.6 — near arch spring)
-  var ll2 = leftPathPos(0.6), rl2 = rightPathPos(0.6);
-  flowerGroups.push(buildLeaf(ll2.x - 10, ll2.y, -0.3, 0.8));
-  flowerGroups.push(buildLeaf(rl2.x + 10, rl2.y, Math.PI + 0.3, 0.8));
-
-  // 12-13. Arch roses (t=0.8 — climbing the arch)
-  var lp3 = leftPathPos(0.8), rp3 = rightPathPos(0.8);
-  flowerGroups.push(buildRose(lp3.x, lp3.y, 0.85, rc1));
-  flowerGroups.push(buildRose(rp3.x, rp3.y, 0.85, rc2));
-
-  // 14-15. Arch leaves near peak (t=0.92)
-  var ll3 = leftPathPos(0.92), rl3 = rightPathPos(0.92);
-  flowerGroups.push(buildLeaf(ll3.x, ll3.y - 10, -0.8, 0.9));
-  flowerGroups.push(buildLeaf(rl3.x, rl3.y - 10, 0.8, 0.9));
-
-  // 16. Peak rose
-  flowerGroups.push(buildRose(cx, archPts[20][1] - 30, 1.0, rc1));
-
-  // Compute interval: spread 16 groups from FLOWER_START to ~frame 400
-  FLOWER_INTERVAL = Math.max(1, Math.floor((400 - FLOWER_START) / flowerGroups.length));
+  // Pre-compute flower positions along vine
+  flowerPositions = [];
+  for (var i = 10; i < 75; i += 5 + Math.floor(Math.random()*3)) {
+    var lp = leftVinePath[i], rp = rightVinePath[i];
+    var lNext = leftVinePath[Math.min(i+1,79)], rNext = rightVinePath[Math.min(i+1,79)];
+    var lPerp = Math.atan2(lNext.y-lp.y, lNext.x-lp.x) - Math.PI/2;
+    var rPerp = Math.atan2(rNext.y-rp.y, rNext.x-rp.x) + Math.PI/2;
+    var off = 15 + Math.random()*15;
+    var s = 0.6 + Math.random()*0.3, type = Math.random()<0.6 ? 'rose' : 'star';
+    flowerPositions.push({x:lp.x+Math.cos(lPerp)*off, y:lp.y+Math.sin(lPerp)*off, scale:s, type:type});
+    flowerPositions.push({x:rp.x+Math.cos(rPerp)*off, y:rp.y+Math.sin(rPerp)*off, scale:s, type:type});
+  }
+  console.log('Vine: '+leftVinePath.length+' pts | Leaves: '+leafPositions.length+' | Flowers: '+flowerPositions.length);
 }
 
 function buildWashes() {
-  // CHANGE 1: washes start at frame 30, spaced ~7 frames apart (30-58)
-  return [
+  washSchedule = [
     {frame:30, color:'#0D3B8E', opacity:80, bleed:0.5, x:doorX+20, y:doorY-10, w:doorW-40, h:archSpringY-doorY+80},
     {frame:37, color:'#B8860B', opacity:70, bleed:0.45, x:doorX+30, y:archSpringY-30, w:doorW-60, h:300},
     {frame:44, color:'#0E4D2E', opacity:80, bleed:0.5, x:doorX+20, y:archSpringY+350, w:doorW-40, h:panelBot-archSpringY-320},
@@ -221,27 +231,43 @@ function buildWashes() {
   ];
 }
 
-var washSchedule, washIdx = 0;
+function buildFlowerPath() {
+  var leftRaw = [], rightRaw = [], nBot = 8;
+  for (var i = 0; i <= nBot; i++) { leftRaw.push([cx - (i/nBot)*halfDW, bot]); rightRaw.push([cx + (i/nBot)*halfDW, bot]); }
+  var nJamb = 15;
+  for (var i = 1; i <= nJamb; i++) { leftRaw.push([doorX, bot - (i/nJamb)*(bot-archSpringY)]); rightRaw.push([doorX+doorW, bot - (i/nJamb)*(bot-archSpringY)]); }
+  for (var i = 0; i <= 20; i++) leftRaw.push([archPts[i][0], archPts[i][1]]);
+  for (var i = 40; i >= 20; i--) rightRaw.push([archPts[i][0], archPts[i][1]]);
+  var nSamples = 8, leftS = samplePathEvenly(leftRaw, nSamples), rightS = samplePathEvenly(rightRaw, nSamples);
+  var dcx = cx, dcy = (archPts[20][1] + bot) / 2, off = 40;
+  flowerGroups = [];
+  for (var i = 0; i < nSamples; i++) {
+    var lp = leftS[i], rp = rightS[i];
+    var ldx = lp.x-dcx, ldy = lp.y-dcy, ll = Math.sqrt(ldx*ldx+ldy*ldy);
+    var lox = ll>0 ? lp.x+(ldx/ll)*off : lp.x-off, loy = ll>0 ? lp.y+(ldy/ll)*off : lp.y;
+    var rdx = rp.x-dcx, rdy = rp.y-dcy, rl = Math.sqrt(rdx*rdx+rdy*rdy);
+    var rox = rl>0 ? rp.x+(rdx/rl)*off : rp.x+off, roy = rl>0 ? rp.y+(rdy/rl)*off : rp.y;
+    if (i%2===0) { var s=0.75+Math.random()*0.2; flowerGroups.push(buildRoseGroup(lox,loy,s)); flowerGroups.push(buildRoseGroup(rox,roy,s)); }
+    else { var la=Math.atan2(ldy,ldx)+(Math.random()-0.5)*0.4, ra=Math.atan2(rdy,rdx)+(Math.random()-0.5)*0.4, ls=0.7+Math.random()*0.2;
+      flowerGroups.push(buildLeafGroup(lox,loy,la,ls)); flowerGroups.push(buildLeafGroup(rox,roy,ra,ls)); }
+  }
+  FLOWER_SPACING = Math.max(1, Math.floor((400 - FLOWER_START) / flowerGroups.length));
+  console.log('Flower groups: '+flowerGroups.length+' | Spacing: '+FLOWER_SPACING+' | Range: '+FLOWER_START+'-'+(FLOWER_START+(flowerGroups.length-1)*FLOWER_SPACING));
+}
 
 function setup() {
   createCanvas(W, H, WEBGL); brush.load(); frameRate(30);
   brush.addField('meditative', function(t, field) {
-    for (var i = 0; i < field.length; i++)
-      for (var j = 0; j < field[i].length; j++)
-        field[i][j] = 100*Math.sin(i*0.012+t*0.4)+50*Math.cos(j*0.008+t*0.25)+30*Math.sin((i+j)*0.006+t*0.15);
+    for (var i = 0; i < field.length; i++) for (var j = 0; j < field[i].length; j++)
+      field[i][j] = 100*Math.sin(i*0.012+t*0.4)+50*Math.cos(j*0.008+t*0.25)+30*Math.sin((i+j)*0.006+t*0.15);
     return field;
   });
-  translate(-width/2, -height/2);
-  background(242, 234, 218);
-  washSchedule = buildWashes();
-  buildFlowers();
-  console.log('Flower groups: '+flowerGroups.length+' | Interval: '+FLOWER_INTERVAL+' | Start: '+FLOWER_START+' | End: '+(FLOWER_START+flowerGroups.length*FLOWER_INTERVAL));
-  brush.noFill(); setupDone = true;
+  translate(-width/2, -height/2); background(242, 234, 218);
+  buildWashes(); buildFlowerPath(); buildVinePaths(); brush.noFill(); setupDone = true;
   loadAudio().then(function() {
     document.getElementById('tap').addEventListener('click', function() {
       document.getElementById('tap').style.display = 'none';
-      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-      startAudio();
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); startAudio();
     });
   });
 }
@@ -254,7 +280,6 @@ function draw() {
   var amp = isPlaying ? smoothAmp : 0.015 + 0.008 * sin(f * 0.003);
   brush.field('meditative'); brush.refreshField(f * 0.0015); brush.wiggle(0.3 + amp * 2);
 
-  // CHANGE 1: Frames 1-29 = blank cream paper. Washes fade in from frame 30.
   if (washIdx < washSchedule.length && f >= washSchedule[washIdx].frame) {
     var wash = washSchedule[washIdx];
     brush.noStroke(); brush.fill(wash.color, wash.opacity);
@@ -262,73 +287,79 @@ function draw() {
     brush.rect(wash.x, wash.y, wash.w, wash.h); brush.noFill(); washIdx++;
   }
 
-  // PENCIL STAGE 1 (60-180) — shifted +59 from original
-  if (f >= 60 && f <= 180) {
-    var PO = 59; // pencil offset
-    if (f>=1+PO&&f<=30+PO){var t=(f-1-PO)/29; brush.set('HB','#2A2215',3.5+amp*3); brush.line(doorX,lerp(archSpringY,bot,t),doorX,lerp(archSpringY,bot,min(1,t+0.04)));}
-    if (f>=10+PO&&f<=40+PO){var t=(f-10-PO)/29; brush.set('HB','#2A2215',3.5+amp*3); brush.line(doorX+doorW,lerp(archSpringY,bot,t),doorX+doorW,lerp(archSpringY,bot,min(1,t+0.04)));}
-    if (f>=20+PO&&f<=45+PO){var t=(f-20-PO)/24; brush.set('HB','#2A2215',3.5+amp*3); brush.line(lerp(doorX,doorX+doorW,t),bot,lerp(doorX,doorX+doorW,min(1,t+0.05)),bot);}
-    if (f>=30+PO&&f<=70+PO){var idx=Math.floor(((f-30-PO)/40)*20); if(idx<20&&idx>=0){brush.set('HB','#3A3020',3.0+amp*2); brush.line(archPts[idx][0],archPts[idx][1],archPts[idx+1][0],archPts[idx+1][1]);}}
-    if (f>=50+PO&&f<=90+PO){var idx=20+Math.floor(((f-50-PO)/40)*20); if(idx<40&&idx>=20){brush.set('HB','#3A3020',3.0+amp*2); brush.line(archPts[idx][0],archPts[idx][1],archPts[idx+1][0],archPts[idx+1][1]);}}
-    if (f>=70+PO&&f<=100+PO){var t=(f-70-PO)/29; brush.set('HB','#2A2215',3.0+amp*2); brush.line(cx,lerp(panelTop,panelBot,t),cx,lerp(panelTop,panelBot,min(1,t+0.04)));}
-    if (f>=85+PO&&f<=105+PO){var t=(f-85-PO)/19; brush.set('HB','#3A3020',2.5+amp*2); brush.line(lerp(doorX,doorX+doorW,t),archSpringY,lerp(doorX,doorX+doorW,min(1,t+0.06)),archSpringY);}
+  if (f>=60&&f<=180) {
+    if(f>=1+PO&&f<=30+PO){var t=(f-1-PO)/29;brush.set('HB','#2A2215',3.5+amp*3);brush.line(doorX,lerp(archSpringY,bot,t),doorX,lerp(archSpringY,bot,min(1,t+0.04)));}
+    if(f>=10+PO&&f<=40+PO){var t=(f-10-PO)/29;brush.set('HB','#2A2215',3.5+amp*3);brush.line(doorX+doorW,lerp(archSpringY,bot,t),doorX+doorW,lerp(archSpringY,bot,min(1,t+0.04)));}
+    if(f>=20+PO&&f<=45+PO){var t=(f-20-PO)/24;brush.set('HB','#2A2215',3.5+amp*3);brush.line(lerp(doorX,doorX+doorW,t),bot,lerp(doorX,doorX+doorW,min(1,t+0.05)),bot);}
+    if(f>=30+PO&&f<=70+PO){var idx=Math.floor(((f-30-PO)/40)*20);if(idx<20&&idx>=0){brush.set('HB','#3A3020',3.0+amp*2);brush.line(archPts[idx][0],archPts[idx][1],archPts[idx+1][0],archPts[idx+1][1]);}}
+    if(f>=50+PO&&f<=90+PO){var idx=20+Math.floor(((f-50-PO)/40)*20);if(idx<40&&idx>=20){brush.set('HB','#3A3020',3.0+amp*2);brush.line(archPts[idx][0],archPts[idx][1],archPts[idx+1][0],archPts[idx+1][1]);}}
+    if(f>=70+PO&&f<=100+PO){var t=(f-70-PO)/29;brush.set('HB','#2A2215',3.0+amp*2);brush.line(cx,lerp(panelTop,panelBot,t),cx,lerp(panelTop,panelBot,min(1,t+0.04)));}
+    if(f>=85+PO&&f<=105+PO){var t=(f-85-PO)/19;brush.set('HB','#3A3020',2.5+amp*2);brush.line(lerp(doorX,doorX+doorW,t),archSpringY,lerp(doorX,doorX+doorW,min(1,t+0.06)),archSpringY);}
   }
 
-  // PENCIL STAGE 2 (140-260)
-  if (f>=140&&f<=260) {
-    var PO = 59;
-    var lx=doorX+25,lw=cx-25-lx,rx=cx+25,rw=doorX+doorW-25-rx,py=panelTop+20,ph=panelH-40;
-    if (f>=80+PO&&f<=130+PO&&f%2===0){var seg=Math.floor((f-80-PO)/2)%25; brush.set('2B','#3A3525',2.0+amp*2);
-      if(seg<7)brush.line(lx+lw*(seg/6),py,lx+lw*((seg+1)/6),py);
-      else if(seg<13){var s=(seg-7)/5;brush.line(lx+lw,py+ph*s,lx+lw,py+ph*(s+1/5));}
-      else if(seg<19){var s=(seg-13)/5;brush.line(lx+lw*(1-s),py+ph,lx+lw*(1-s-1/5),py+ph);}
-      else{var s=(seg-19)/5;brush.line(lx,py+ph*(1-s),lx,py+ph*(1-s-1/5));}
-    }
-    if (f>=100+PO&&f<=150+PO&&f%2===0){var seg=Math.floor((f-100-PO)/2)%25; brush.set('2B','#3A3525',2.0+amp*2);
-      if(seg<7)brush.line(rx+rw*(seg/6),py,rx+rw*((seg+1)/6),py);
-      else if(seg<13){var s=(seg-7)/5;brush.line(rx+rw,py+ph*s,rx+rw,py+ph*(s+1/5));}
-      else if(seg<19){var s=(seg-13)/5;brush.line(rx+rw*(1-s),py+ph,rx+rw*(1-s-1/5),py+ph);}
-      else{var s=(seg-19)/5;brush.line(rx,py+ph*(1-s),rx,py+ph*(1-s-1/5));}
-    }
-    if (f>=140+PO&&f<=180+PO&&f%5===0){brush.set('2B','#4A4535',1.5+amp);var which=Math.floor((f-140-PO)/5);
-      if(which<4){var yOff=py+ph*0.2+(which*ph*0.2),xMid=lx+lw/2;brush.line(xMid-30,yOff-20,xMid+30,yOff+20);brush.line(xMid+30,yOff-20,xMid-30,yOff+20);}
-      else{var idx2=which-4,yOff=py+ph*0.2+(idx2*ph*0.2),xMid=rx+rw/2;brush.line(xMid-30,yOff-20,xMid+30,yOff+20);brush.line(xMid+30,yOff-20,xMid-30,yOff+20);}
-    }
-    if (f>=160+PO&&f<=200+PO&&f%8===0){var which=Math.floor((f-160-PO)/8);brush.set('HB','#3A3525',1.8+amp);
-      if(which===0)brush.line(lx,py+ph/3,lx+lw,py+ph/3);if(which===1)brush.line(lx,py+ph*2/3,lx+lw,py+ph*2/3);
-      if(which===2)brush.line(rx,py+ph/3,rx+rw,py+ph/3);if(which===3)brush.line(rx,py+ph*2/3,rx+rw,py+ph*2/3);
-      if(which===4)brush.line(lx,py+ph/2,lx+lw,py+ph/2);if(which===5)brush.line(rx,py+ph/2,rx+rw,py+ph/2);
+  if(f>=80+PO&&f<=200+PO){var lx=doorX+25,lw=cx-25-lx,rx=cx+25,rw=doorX+doorW-25-rx,py=panelTop+20,ph=panelH-40;
+    if(f>=80+PO&&f<=130+PO&&f%2===0){var seg=Math.floor((f-80-PO)/2)%25;brush.set('2B','#3A3525',2.0+amp*2);if(seg<7)brush.line(lx+lw*(seg/6),py,lx+lw*((seg+1)/6),py);else if(seg<13){var s=(seg-7)/5;brush.line(lx+lw,py+ph*s,lx+lw,py+ph*(s+1/5));}else if(seg<19){var s=(seg-13)/5;brush.line(lx+lw*(1-s),py+ph,lx+lw*(1-s-1/5),py+ph);}else{var s=(seg-19)/5;brush.line(lx,py+ph*(1-s),lx,py+ph*(1-s-1/5));}}
+    if(f>=100+PO&&f<=150+PO&&f%2===0){var seg=Math.floor((f-100-PO)/2)%25;brush.set('2B','#3A3525',2.0+amp*2);if(seg<7)brush.line(rx+rw*(seg/6),py,rx+rw*((seg+1)/6),py);else if(seg<13){var s=(seg-7)/5;brush.line(rx+rw,py+ph*s,rx+rw,py+ph*(s+1/5));}else if(seg<19){var s=(seg-13)/5;brush.line(rx+rw*(1-s),py+ph,rx+rw*(1-s-1/5),py+ph);}else{var s=(seg-19)/5;brush.line(rx,py+ph*(1-s),rx,py+ph*(1-s-1/5));}}
+    if(f>=140+PO&&f<=180+PO&&f%5===0){brush.set('2B','#4A4535',1.5+amp);var which=Math.floor((f-140-PO)/5);if(which<4){var yOff=py+ph*0.2+(which*ph*0.2),xMid=lx+lw/2;brush.line(xMid-30,yOff-20,xMid+30,yOff+20);brush.line(xMid+30,yOff-20,xMid-30,yOff+20);}else{var idx2=which-4,yOff=py+ph*0.2+(idx2*ph*0.2),xMid=rx+rw/2;brush.line(xMid-30,yOff-20,xMid+30,yOff+20);brush.line(xMid+30,yOff-20,xMid-30,yOff+20);}}
+    if(f>=160+PO&&f<=200+PO&&f%8===0){var which=Math.floor((f-160-PO)/8);brush.set('HB','#3A3525',1.8+amp);if(which===0)brush.line(lx,py+ph/3,lx+lw,py+ph/3);if(which===1)brush.line(lx,py+ph*2/3,lx+lw,py+ph*2/3);if(which===2)brush.line(rx,py+ph/3,rx+rw,py+ph/3);if(which===3)brush.line(rx,py+ph*2/3,rx+rw,py+ph*2/3);if(which===4)brush.line(lx,py+ph/2,lx+lw,py+ph/2);if(which===5)brush.line(rx,py+ph/2,rx+rw,py+ph/2);}
+  }
+
+  if(f>=150+PO&&f<=280+PO){var lx=doorX+25,lw=cx-25-lx,rx=cx+25,rw=doorX+doorW-25-rx,py=panelTop+20,ph=panelH-40;
+    if(f>=150+PO&&f<=180+PO&&f%10===0){try{brush.hatch(12,45+sin(f*0.02)*8,{rand:0.1});brush.hatchStyle('2H','#5A5040',0.8);brush.rect(lx+10,py+10,lw-20,ph/3-10);brush.noHatch();}catch(e){}}
+    if(f>=180+PO&&f<=210+PO&&f%10===0){try{brush.hatch(14,-30+sin(f*0.015)*5,{rand:0.12});brush.hatchStyle('2H','#5A5040',0.8);brush.rect(rx+10,py+ph*2/3+5,rw-20,ph/3-10);brush.noHatch();}catch(e){}}
+    if(f>=180+PO&&f%5===0){brush.set('charcoal','#2A2215',1.5+amp*2);brush.flowLine(doorX+40+random(0,doorW-80),panelTop+40+random(0,panelH-80),random(40,80),random(0,TWO_PI));}
+  }
+
+  if(f>=200+PO&&f<=PENCIL_END){var lx=doorX+25,lw=cx-25-lx,rx=cx+25,rw=doorX+doorW-25-rx,py=panelTop+20,ph=panelH-40;
+    if(f>=200+PO&&f<=240+PO&&f%6===0){var which=Math.floor((f-200-PO)/6);brush.set('HB','#4A3A20',1.5+amp);if(which<3)brush.circle(lx+lw/2,py+ph/2,30+which*25);else brush.circle(rx+rw/2,py+ph/2,30+(which-3)*25);}
+    if(f>=240+PO&&f<=280+PO&&f%4===0){var which=Math.floor((f-240-PO)/4);brush.set('2H','#5A4A30',1.2+amp);var angle=(which%8)*(TWO_PI/8);if(which<8)brush.line(lx+lw/2,py+ph/2,lx+lw/2+cos(angle)*55,py+ph/2+sin(angle)*55);if(which>=8&&which<16)brush.line(rx+rw/2,py+ph/2,rx+rw/2+cos(angle)*55,py+ph/2+sin(angle)*55);}
+  }
+
+  // Step 5: Vine grows along door frame
+  if (f >= VINE_START && vineSegIdx < leftVinePath.length - 1) {
+    var targetSeg = Math.min(Math.floor((f - VINE_START) / 2), leftVinePath.length - 2);
+    while (vineSegIdx <= targetSeg) {
+      brush.set('marker', '#0d3318', 6 + amp * 3);
+      brush.line(leftVinePath[vineSegIdx].x, leftVinePath[vineSegIdx].y,
+                 leftVinePath[vineSegIdx+1].x, leftVinePath[vineSegIdx+1].y);
+      brush.line(rightVinePath[vineSegIdx].x, rightVinePath[vineSegIdx].y,
+                 rightVinePath[vineSegIdx+1].x, rightVinePath[vineSegIdx+1].y);
+      vineSegIdx++;
     }
   }
 
-  // PENCIL STAGE 3 (210-340) — reduced flow lines
-  if (f>=210&&f<=340) {
-    var PO = 59;
-    var lx=doorX+25,lw=cx-25-lx,rx=cx+25,rw=doorX+doorW-25-rx,py=panelTop+20,ph=panelH-40;
-    if (f>=150+PO&&f<=180+PO&&f%10===0){try{brush.hatch(12,45+sin(f*0.02)*8,{rand:0.1});brush.hatchStyle('2H','#5A5040',0.8);brush.rect(lx+10,py+10,lw-20,ph/3-10);brush.noHatch();}catch(e){}}
-    if (f>=180+PO&&f<=210+PO&&f%10===0){try{brush.hatch(14,-30+sin(f*0.015)*5,{rand:0.12});brush.hatchStyle('2H','#5A5040',0.8);brush.rect(rx+10,py+ph*2/3+5,rw-20,ph/3-10);brush.noHatch();}catch(e){}}
-    if (f>=180+PO&&f%5===0){brush.set('charcoal','#2A2215',1.5+amp*2);brush.flowLine(doorX+40+random(0,doorW-80),panelTop+40+random(0,panelH-80),random(40,80),random(0,TWO_PI));}
+  // Step 6: Leaves sprout from vine
+  if (f >= LEAF_START && leafDrawIdx < leafPositions.length) {
+    var targetLeaf = Math.min(Math.floor((f - LEAF_START) / 3), leafPositions.length - 1);
+    while (leafDrawIdx <= targetLeaf) {
+      var lf = leafPositions[leafDrawIdx];
+      var pts = makeSazLeafPoly(lf.x, lf.y, lf.angle, 100*lf.scale, 25*lf.scale, 0.5);
+      // Light pencil outline
+      brush.set('2H', '#c0b8a8', 0.08);
+      brush.polygon(pts);
+      // Fill
+      brush.noStroke();
+      brush.fill('#1a4a2e', 100);
+      brush.fillBleed(0.3, 'in');
+      brush.fillTexture(0.45, 0.3);
+      brush.polygon(pts);
+      brush.noFill();
+      leafDrawIdx++;
+    }
   }
 
-  // PENCIL STAGE 4 (260-360)
-  if (f>=260&&f<=PENCIL_END) {
-    var PO = 59;
-    var lx=doorX+25,lw=cx-25-lx,rx=cx+25,rw=doorX+doorW-25-rx,py=panelTop+20,ph=panelH-40;
-    if (f>=200+PO&&f<=240+PO&&f%6===0){var which=Math.floor((f-200-PO)/6);brush.set('HB','#4A3A20',1.5+amp);if(which<3)brush.circle(lx+lw/2,py+ph/2,30+which*25);else brush.circle(rx+rw/2,py+ph/2,30+(which-3)*25);}
-    if (f>=240+PO&&f<=280+PO&&f%4===0){var which=Math.floor((f-240-PO)/4);brush.set('2H','#5A4A30',1.2+amp);var angle=(which%8)*(TWO_PI/8);if(which<8)brush.line(lx+lw/2,py+ph/2,lx+lw/2+cos(angle)*55,py+ph/2+sin(angle)*55);if(which>=8&&which<16)brush.line(rx+rw/2,py+ph/2,rx+rw/2+cos(angle)*55,py+ph/2+sin(angle)*55);}
-  }
-
-  // FLOWERS: one group per FLOWER_INTERVAL frames, growing along path bottom→top
-  if (f >= FLOWER_START && flowerGroupIdx < flowerGroups.length) {
-    var nextFrame = FLOWER_START + flowerGroupIdx * FLOWER_INTERVAL;
-    if (f >= nextFrame) {
-      var group = flowerGroups[flowerGroupIdx];
-      // Pass 1: all pencil outlines
+  // Step 7: Flowers bloom
+  if (f >= FLOWER_BLOOM_START && flowerDrawIdx < flowerPositions.length) {
+    var targetFlower = Math.min(Math.floor((f - FLOWER_BLOOM_START) / 7), flowerPositions.length - 1);
+    while (flowerDrawIdx <= targetFlower) {
+      var fp = flowerPositions[flowerDrawIdx];
+      var group = fp.type === 'rose' ? buildRoseGroup(fp.x, fp.y, fp.scale) : buildStarFlower(fp.x, fp.y, fp.scale);
+      // Pencil outline first
       for (var gi = 0; gi < group.length; gi++) {
         brush.set('2H', '#c0b8a8', 0.08);
         brush.polygon(group[gi].polygon);
       }
-      // Pass 2: all watercolor fills
+      // Fill petals
       for (var gi = 0; gi < group.length; gi++) {
         var el = group[gi];
         brush.noStroke();
@@ -338,6 +369,45 @@ function draw() {
         brush.polygon(el.polygon);
         brush.noFill();
       }
+      flowerDrawIdx++;
+    }
+  }
+
+  // Step 8: Dense bouquet — extra buds and leaves fill gaps
+  if (f >= 260 && f <= 350 && f % 3 === 0) {
+    var bIdx = Math.floor((f - 260) / 3);
+    var segL = (3 + bIdx * 3) % (leftVinePath.length - 1);
+    var segR = segL;
+    // Small buds
+    var lp = leftVinePath[segL], rp = rightVinePath[segR];
+    var budAng = random(0, TWO_PI), budOff = random(8, 22);
+    var bx = lp.x + cos(budAng)*budOff, by = lp.y + sin(budAng)*budOff;
+    var budPts = makePetalPoly(bx, by, budAng, 15, 9, 0.3);
+    brush.noStroke(); brush.fill('#d05070', 100); brush.fillBleed(0.3, 'in');
+    brush.fillTexture(0.4, 0.3); brush.polygon(budPts); brush.noFill();
+    budAng = random(0, TWO_PI); budOff = random(8, 22);
+    bx = rp.x + cos(budAng)*budOff; by = rp.y + sin(budAng)*budOff;
+    budPts = makePetalPoly(bx, by, budAng, 15, 9, 0.3);
+    brush.noStroke(); brush.fill('#d05070', 100); brush.fillBleed(0.3, 'in');
+    brush.fillTexture(0.4, 0.3); brush.polygon(budPts); brush.noFill();
+    // Extra small leaves
+    if (bIdx % 2 === 0 && segL < leftVinePath.length - 2) {
+      var lNext = leftVinePath[segL+1], rNext = rightVinePath[segR+1];
+      var la = Math.atan2(lNext.y-lp.y, lNext.x-lp.x) + (bIdx%4<2 ? 1.3 : -1.3);
+      var ra = Math.atan2(rNext.y-rp.y, rNext.x-rp.x) + (bIdx%4<2 ? -1.3 : 1.3);
+      var lpts = makeSazLeafPoly(lp.x, lp.y, la, 55, 14, 0.4);
+      brush.noStroke(); brush.fill('#1a4a2e', 80); brush.fillBleed(0.25, 'in');
+      brush.fillTexture(0.4, 0.3); brush.polygon(lpts); brush.noFill();
+      var rpts = makeSazLeafPoly(rp.x, rp.y, ra, 55, 14, 0.4);
+      brush.noStroke(); brush.fill('#1a4a2e', 80); brush.fillBleed(0.25, 'in');
+      brush.fillTexture(0.4, 0.3); brush.polygon(rpts); brush.noFill();
+    }
+  }
+
+  if(flowerGroupIdx < flowerGroups.length){var targetFrame = FLOWER_START + flowerGroupIdx * FLOWER_SPACING;
+    if(f >= targetFrame){var group = flowerGroups[flowerGroupIdx];
+      for(var gi=0;gi<group.length;gi++){brush.set('2H','#c0b8a8',0.08);brush.polygon(group[gi].polygon);}
+      for(var gi=0;gi<group.length;gi++){var el=group[gi];brush.noStroke();brush.fill(el.color,el.opacity);brush.fillBleed(0.35,el.bleedDir||'in');brush.fillTexture(0.45,0.3);brush.polygon(el.polygon);brush.noFill();}
       flowerGroupIdx++;
     }
   }

@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
 <style>
 * { margin:0; }
-body { background:#f2eada; overflow:hidden; margin:0; padding:0; }
+body { background:#ebdec8; overflow:hidden; margin:0; padding:0; }
 canvas { object-fit:contain !important; display:block; }
 #hud {
   position:absolute; top:0; left:0; width:100vw; height:100%;
@@ -851,7 +851,18 @@ function setup() {
 
 function draw() {
   translate(-width/2, -height/2);
-  background(242, 234, 218);
+  background(235, 222, 200);
+  // Parchment texture — native p5 (no brush.fill, no budget cost)
+  noStroke();
+  // Darker edges
+  fill(210, 195, 168, 18);
+  rect(0, 0, W*0.15, H);         // left edge
+  rect(0, H*0.82, W, H*0.18);    // bottom edge
+  fill(218, 202, 178, 12);
+  rect(W*0.85, 0, W*0.15, H);    // right edge subtle
+  // Warm center patch
+  fill(240, 228, 210, 15);
+  rect(W*0.2, H*0.15, W*0.6, H*0.5);
   
   var f = frameCount - 1;
   if (f >= totalAnimFrames) f = totalAnimFrames - 1;

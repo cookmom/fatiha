@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Mihrab Rebuild</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script>
+function setup() {
+  createCanvas(1080, 1920, WEBGL);
+  brush.load();
+  translate(-width / 2, -height / 2);
+  randomSeed(42);
+
+  background(240, 238, 232);
+  brush.scaleBrushes(2);
+
+  var W = 1080, H = 1920;
+  var cx = W / 2;
+
+  var archSpan = 580;
+  var halfSpan = archSpan / 2;
+  var archR = archSpan;
+  var springY = 1300;
+  var archApexH = archSpan * Math.sqrt(3) / 2;
+  var apexY = springY - archApexH;
+  var archL = cx - halfSpan;
+  var archRx = cx + halfSpan;
+
+  var frameL = 50, frameR = W - 50;
+  var frameT = 80, frameB = H - 60;
+  var floorY = springY + 250;
+
+  // Reference-matched colors: MEDIUM blue, not navy
+  var BLUE_DARK = '#0d4a7a';
+  var BLUE_MID = '#2870a8';
+  var BLUE_LIGHT = '#4a98c8';
+  var CREAM = '#f5f0e4';
+  var PENCIL_LIGHT = '#c8c0b0';
+  var FRAME_COL = '#b0a898';
+
+  function getArchPoints(nSteps, inset) {
+    var pts = [];
+    var R = archR - inset;
+    var lCx = archL + inset, rCx = archRx - inset;
+    for (var i = 0; i <= nSteps; i++) {
+      var a = (i / nSteps) * (Math.PI / 3);
+      pts.push([lCx + R * Math.cos(a), springY - R * Math.sin(a)]);
+    }
+    for (var i = 1; i <= nSteps; i++) {
+      var a = (2 * Math.PI / 3) + (i / nSteps) * (Math.PI / 3);
+      pts.push([rCx + R * Math.cos(a), springY - R * Math.sin(a)]);
+    }
+    return pts;
+  }
+
+  function archPolygon(inset) {
+    var pts = getArchPoints(24, inset);
+    pts.push([archRx - inset, springY]);
+    pts.push([archL + inset, springY]);
+    return pts;
+  }
+
+  function insideArch(px, py, inset) {
+    if (py > springY) return false;
+    var R = archR - inset;
+    var lCx = archL + inset, rCx = archRx - inset;
+    if (px <= cx) {
+      var dx = px - lCx, dy = springY - py;
+      return dx * dx + dy * dy <= R * R && px >= lCx;
+    } else {
+      var dx = px - rCx, dy = springY - py;
+      return dx * dx + dy * dy <= R * R && px <= rCx;
+    }
+  }
+
+  function ensureMinPts(poly, minPts) {
+    if (!minPts) minPts = 8;
+    while (poly.length < minPts) {
+      var expanded = [];
+      for (var i = 0; i < poly.length; i++) {
+        expanded.push(poly[i]);
+        var next = poly[(i + 1) % poly.length];
+        expanded.push([(poly[i][0] + next[0]) / 2, (poly[i][1] + next[1]) / 2]);
+      }
+      poly = expanded;
+    }
+    return poly;
+  }
+
+  function clipLineToArch(x1, y1, x2, y2, inset) {
+    var steps = 120;
+    if (!insideArch(x1, y1, inset) && !insideArch(x2, y2, inset)) {
+      var foundIn = false;
+      for (var i = 1; i < steps; i++) {
+        var t = i / steps;
+        if (insideArch(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, inset)) { foundIn = true; break; }
+      }
+      if (!foundIn) return null;
+    }
+    var tStart = 0, tEnd = 1;
+    for (var i = 0; i <= steps; i++) {
+      var t = i / steps;
+      if (insideArch(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, inset)) { tStart = t; break; }
+    }
+    for (var i = steps; i >= 0; i--) {
+      var t = i / steps;
+      if (insideArch(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, inset)) { tEnd = t; break; }
+    }
+    return [
+      x1 + (x2 - x1) * tStart, y1 + (y2 - y1) * tStart,
+      x1 + (x2 - x1) * tEnd, y1 + (y2 - y1) * tEnd
+    ];
+  }
+
+  // 1. OUTER FRAMES
+  brush.noFill(); brush.noHatch();
+  brush.set('2H', FRAME_COL, 1.2); brush.wiggle(1.5);
+  var dd;
+  for (dd of [0, 4]) {
+    brush.line(frameL+dd, frameT+dd, frameR-dd, frameT+dd);
+    brush.line(frameR-dd, frameT+dd, frameR-dd, frameB-dd);
+    brush.line(frameR-dd, frameB-dd, frameL+dd, frameB-dd);
+    brush.line(frameL+dd, frameB-dd, frameL+dd, frameT+dd);
+  }
+  var f2 = 35;
+  brush.set('2H', FRAME_COL, 1.0);
+  for (dd of [0, 4]) {
+    brush.line(frameL+f2+dd, frameT+f2+dd, frameR-f2-dd, frameT+f2+dd);
+    brush.line(frameR-f2-dd, frameT+f2+dd, frameR-f2-dd, frameB-f2-dd);
+    brush.line(frameR-f2-dd, frameB-f2-dd, frameL+f2+dd, frameB-f2-dd);
+    brush.line(frameL+f2+dd, frameB-f2-dd, frameL+f2+dd, frameT+f2+dd);
+  }
+  var f3 = 65;
+  brush.set('2H', FRAME_COL, 0.9);
+  for (dd of [0, 3]) {
+    brush.line(frameL+f3+dd, frameT+f3+dd, frameR-f3-dd, frameT+f3+dd);
+    brush.line(frameR-f3-dd, frameT+f3+dd, frameR-f3-dd, frameB-f3-dd);
+    brush.line(frameR-f3-dd, frameB-f3-dd, frameL+f3+dd, frameB-f3-dd);
+    brush.line(frameL+f3+dd, frameB-f3-dd, frameL+f3+dd, frameT+f3+dd);
+  }
+
+  // 2. SPANDREL
+  brush.set('2H', PENCIL_LIGHT, 0.35); brush.wiggle(1.0);
+  var spR = 28, spSp = spR * 2.2;
+  for (var gy = frameT+f3+20; gy < springY; gy += spSp * Math.sqrt(3)/2) {
+    var row = Math.round((gy - frameT) / (spSp * Math.sqrt(3)/2));
+    var ox = (row % 2) * spSp / 2;
+    for (var gx = frameL+f3+20; gx < frameR-f3-20; gx += spSp) {
+      var sx = gx + ox;
+      if (insideArch(sx, gy, -15)) continue;
+      for (var si = 0; si < 6; si++) {
+        var a1 = si * Math.PI/3 - Math.PI/2;
+        var a2 = ((si+2)%6) * Math.PI/3 - Math.PI/2;
+        brush.line(sx+spR*Math.cos(a1), gy+spR*Math.sin(a1), sx+spR*Math.cos(a2), gy+spR*Math.sin(a2));
+      }
+    }
+  }
+
+  // 3. ARCH OUTLINE — drawn after pattern to cover strays
+
+  // 4. BLUE FILL — gradient: lighter top, darker bottom (like reference)
+  var fillInset = 20;
+  brush.noStroke();
+
+  // Base: medium blue
+  brush.fill(BLUE_MID, 255);
+  brush.fillBleed(0.03, 'out');
+  brush.fillTexture(0.3, 0.2);
+  brush.polygon(archPolygon(fillInset));
+
+  // Upper lighter wash
+  var upperPoly = [];
+  var upperArchPts2 = getArchPoints(24, fillInset);
+  var cutY = springY - archApexH * 0.45;
+  for (var ui = 0; ui < upperArchPts2.length; ui++) {
+    if (upperArchPts2[ui][1] < cutY) upperPoly.push(upperArchPts2[ui]);
+  }
+  if (upperPoly.length >= 3) {
+    upperPoly.push([upperPoly[upperPoly.length-1][0], cutY]);
+    upperPoly.push([upperPoly[0][0], cutY]);
+    brush.fill(BLUE_LIGHT, 140);
+    brush.fillBleed(0.02, 'out');
+    brush.fillTexture(0.25, 0.15);
+    brush.polygon(ensureMinPts(upperPoly));
+  }
+
+  // Lower darker wash
+  brush.fill(BLUE_DARK, 180);
+  brush.fillBleed(0.02, 'out');
+  brush.fillTexture(0.2, 0.1);
+  var lowerCutY = springY - archApexH * 0.3;
+  brush.polygon(ensureMinPts([
+    [archL+fillInset+30, lowerCutY],
+    [archRx-fillInset-30, lowerCutY],
+    [archRx-fillInset-5, springY-5],
+    [archL+fillInset+5, springY-5]
+  ]));
+
+  // 5. 12-FOLD STAR PATTERN — BOLD GEOMETRIC
+  brush.noFill(); brush.noHatch();
+
+  var archCenterY = (apexY + springY) / 2;
+  var allLines = [];
+
+  // Helper: add {n/k} star polygon lines
+  function addStar(scx, scy, r, n, k) {
+    for (var i = 0; i < n; i++) {
+      var a1 = (2*Math.PI*i)/n - Math.PI/2;
+      var a2 = (2*Math.PI*((i+k)%n))/n - Math.PI/2;
+      allLines.push([scx+r*Math.cos(a1), scy+r*Math.sin(a1), scx+r*Math.cos(a2), scy+r*Math.sin(a2)]);
+    }
+  }
+
+  function addPoly(scx, scy, r, n) {
+    for (var i = 0; i < n; i++) {
+      var a1 = (2*Math.PI*i)/n - Math.PI/2;
+      var a2 = (2*Math.PI*((i+1)%n))/n - Math.PI/2;
+      allLines.push([scx+r*Math.cos(a1), scy+r*Math.sin(a1), scx+r*Math.cos(a2), scy+r*Math.sin(a2)]);
+    }
+  }
+
+  // MAIN APPROACH: single large star pattern extending to arch edges
+  // The reference shows lines going from star center all the way to arch boundary
+
+  // Large central {12/5} star — r = 600 to extend past arch edges (will be clipped)
+  var hugeR = 600;
+  addStar(cx, archCenterY, hugeR, 12, 5);
+
+  // {12/4} at same huge radius — 3 overlapping squares
+  addStar(cx, archCenterY, hugeR, 12, 4);
+
+  // {12/3} at slightly smaller
+  addStar(cx, archCenterY, hugeR * 0.9, 12, 3);
+
+  // Medium {12/5} star
+  var medR = 300;
+  addStar(cx, archCenterY, medR, 12, 5);
+  addStar(cx, archCenterY, medR, 12, 4);
+  addPoly(cx, archCenterY, medR, 12);
+
+  // Small inner star
+  var smallR = 150;
+  addStar(cx, archCenterY, smallR, 12, 5);
+  addPoly(cx, archCenterY, smallR, 12);
+
+  // Core
+  var coreR = 70;
+  addStar(cx, archCenterY, coreR, 12, 5);
+  addPoly(cx, archCenterY, coreR, 12);
+
+  // Tiny center
+  var tinyR = 35;
+  addStar(cx, archCenterY, tinyR, 12, 5);
+  addPoly(cx, archCenterY, tinyR, 12);
+
+  // Inner dodecagons at intersection radii
+  var innerDR = (2 - Math.sqrt(3));
+  addPoly(cx, archCenterY, hugeR * innerDR, 12);
+  addPoly(cx, archCenterY, medR * innerDR, 12);
+  addPoly(cx, archCenterY, smallR * innerDR, 12);
+
+  // Radials from center to edge (12 directions)
+  for (var i = 0; i < 12; i++) {
+    var a = (2*Math.PI*i)/12 - Math.PI/2;
+    allLines.push([cx, archCenterY, cx+hugeR*Math.cos(a), archCenterY+hugeR*Math.sin(a)]);
+  }
+
+  // 24-fold radials in outer zone only
+  for (var i = 0; i < 24; i++) {
+    var a = (2*Math.PI*i)/24 - Math.PI/2;
+    allLines.push([cx+medR*Math.cos(a), archCenterY+medR*Math.sin(a),
+                   cx+hugeR*Math.cos(a), archCenterY+hugeR*Math.sin(a)]);
+  }
+
+  // Kite/petal connections between layers
+  for (var i = 0; i < 12; i++) {
+    var a1 = (2*Math.PI*i)/12 - Math.PI/2;
+    var a2 = (2*Math.PI*((i+1)%12))/12 - Math.PI/2;
+    var midA = (a1 + a2) / 2;
+    // Between huge and med
+    allLines.push([cx+medR*Math.cos(a1), archCenterY+medR*Math.sin(a1),
+                   cx+hugeR*0.65*Math.cos(midA), archCenterY+hugeR*0.65*Math.sin(midA)]);
+    allLines.push([cx+medR*Math.cos(a2), archCenterY+medR*Math.sin(a2),
+                   cx+hugeR*0.65*Math.cos(midA), archCenterY+hugeR*0.65*Math.sin(midA)]);
+    // Between small and med
+    allLines.push([cx+smallR*Math.cos(a1), archCenterY+smallR*Math.sin(a1),
+                   cx+medR*0.6*Math.cos(midA), archCenterY+medR*0.6*Math.sin(midA)]);
+    allLines.push([cx+smallR*Math.cos(a2), archCenterY+smallR*Math.sin(a2),
+                   cx+medR*0.6*Math.cos(midA), archCenterY+medR*0.6*Math.sin(midA)]);
+  }
+
+  // Additional {12/2} hexagonal at outer radius
+  addStar(cx, archCenterY, hugeR * 0.75, 12, 2);
+  addStar(cx, archCenterY, medR * 0.75, 12, 2);
+  // More dodecagons for uniform density
+  addPoly(cx, archCenterY, hugeR * 0.5, 12);
+  addPoly(cx, archCenterY, hugeR * 0.35, 12);
+
+  console.log('Total pattern lines: ' + allLines.length);
+
+  // Draw BOLD white lines clipped to arch
+  brush.set('HB', '#ffffff', 3.2);
+  brush.wiggle(1.2);
+  var clipIn = fillInset + 28;
+  var drawnCount = 0;
+  for (var li = 0; li < allLines.length; li++) {
+    var seg = allLines[li];
+    var clipped = clipLineToArch(seg[0], seg[1], seg[2], seg[3], clipIn);
+    if (clipped) {
+      // Extra safety: reject if any endpoint is outside arch bounds
+      if (clipped[1] < apexY + 5 || clipped[3] < apexY + 5) continue;
+      if (clipped[1] > springY - 2 || clipped[3] > springY - 2) continue;
+      var len = Math.sqrt((clipped[2]-clipped[0])*(clipped[2]-clipped[0]) + (clipped[3]-clipped[1])*(clipped[3]-clipped[1]));
+      if (len > 4) { brush.line(clipped[0], clipped[1], clipped[2], clipped[3]); drawnCount++; }
+    }
+  }
+  console.log('Pattern lines drawn: ' + drawnCount);
+
+  // 6. (Arch border drawn below after pattern)
+
+  // 6a. CREAM MASK over spandrels to cover stray pattern lines
+  brush.noStroke();
+  brush.fill('#ebe8e1', 255);
+  brush.fillBleed(0.0);
+  brush.fillTexture(0.0, 0.0);
+  // Left spandrel mask — follows arch curve
+  var leftMask = [[frameL+f3+5, frameT+f3+5], [cx, frameT+f3+5]];
+  // Follow arch curve from apex down to spring
+  var maskArchPts = getArchPoints(40, -3);
+  for (var mi = maskArchPts.length-1; mi >= 0; mi--) {
+    if (maskArchPts[mi][0] <= cx + 5) leftMask.push(maskArchPts[mi]);
+  }
+  leftMask.push([archL-3, springY+5]);
+  leftMask.push([frameL+f3+5, springY+5]);
+  brush.polygon(ensureMinPts(leftMask, 10));
+  // Right spandrel mask
+  var rightMask = [[cx, frameT+f3+5], [frameR-f3-5, frameT+f3+5], [frameR-f3-5, springY+5], [archRx+3, springY+5]];
+  for (var mi = 0; mi < maskArchPts.length; mi++) {
+    if (maskArchPts[mi][0] >= cx - 5) rightMask.push(maskArchPts[mi]);
+  }
+  brush.polygon(ensureMinPts(rightMask, 10));
+
+  // Top mask above arch apex  
+  brush.polygon(ensureMinPts([
+    [frameL+f3+5, frameT+f3+5],
+    [frameR-f3-5, frameT+f3+5],
+    [frameR-f3-5, apexY+10],
+    [cx, apexY-5],
+    [frameL+f3+5, apexY+10]
+  ], 10));
+
+  // Redraw spandrel stars on top of mask
+  brush.noFill(); brush.noHatch();
+  brush.set('2H', PENCIL_LIGHT, 0.35); brush.wiggle(1.0);
+  for (var gy2 = frameT+f3+20; gy2 < springY; gy2 += spSp * Math.sqrt(3)/2) {
+    var row2 = Math.round((gy2 - frameT) / (spSp * Math.sqrt(3)/2));
+    var ox2 = (row2 % 2) * spSp / 2;
+    for (var gx2 = frameL+f3+20; gx2 < frameR-f3-20; gx2 += spSp) {
+      var sx2 = gx2 + ox2;
+      if (insideArch(sx2, gy2, -15)) continue;
+      for (var si2 = 0; si2 < 6; si2++) {
+        var a12 = si2 * Math.PI/3 - Math.PI/2;
+        var a22 = ((si2+2)%6) * Math.PI/3 - Math.PI/2;
+        brush.line(sx2+spR*Math.cos(a12), gy2+spR*Math.sin(a12), sx2+spR*Math.cos(a22), gy2+spR*Math.sin(a22));
+      }
+    }
+  }
+
+  // 6b. ARCH OUTLINE — drawn AFTER pattern to mask stray clips
+  brush.noFill(); brush.noHatch();
+  brush.set('2H', FRAME_COL, 1.6); brush.wiggle(1.5);
+  var outerArchPts = getArchPoints(100, 0);
+  for (var ai = 0; ai < outerArchPts.length-1; ai++)
+    brush.line(outerArchPts[ai][0], outerArchPts[ai][1], outerArchPts[ai+1][0], outerArchPts[ai+1][1]);
+  brush.set('2H', FRAME_COL, 1.2);
+  var innerArchPts = getArchPoints(100, 10);
+  for (var ai = 0; ai < innerArchPts.length-1; ai++)
+    brush.line(innerArchPts[ai][0], innerArchPts[ai][1], innerArchPts[ai+1][0], innerArchPts[ai+1][1]);
+  // Columns
+  brush.set('2H', FRAME_COL, 1.3);
+  brush.line(archL, springY, archL, floorY);
+  brush.line(archL+10, springY, archL+10, floorY);
+  brush.line(archRx, springY, archRx, floorY);
+  brush.line(archRx-10, springY, archRx-10, floorY);
+  brush.line(frameL+f3+3, springY, archL, springY);
+  brush.line(archRx, springY, frameR-f3-3, springY);
+
+  // 7. FLOOR
+  brush.noStroke();
+  brush.fill('#d0ccc0', 80);
+  brush.fillBleed(0.05, 'out');
+  brush.fillTexture(0.3, 0.2);
+  brush.polygon(ensureMinPts([
+    [frameL+f3+3, floorY], [frameR-f3-3, floorY],
+    [frameR-f3-3, frameB-f3-3], [frameL+f3+3, frameB-f3-3]
+  ]));
+  brush.noFill(); brush.noHatch();
+  brush.set('2H', FRAME_COL, 0.8); brush.wiggle(1.5);
+  brush.line(frameL+f3+3, floorY, frameR-f3-3, floorY);
+
+  console.log('Mihrab rebuild complete');
+}
+</script>
+</body>
+</html>

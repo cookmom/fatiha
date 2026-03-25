@@ -136,6 +136,36 @@
   
   .empty { text-align: center; padding: 60px; color: rgba(232,224,208,0.3); }
   
+  /* Filmstrip — horizontal scroll for version steps */
+  .filmstrip {
+    display: flex; gap: 12px; overflow-x: auto; padding: 12px 0;
+    -webkit-overflow-scrolling: touch; scroll-snap-type: x mandatory;
+  }
+  .filmstrip::-webkit-scrollbar { height: 4px; }
+  .filmstrip::-webkit-scrollbar-thumb { background: rgba(200,168,76,0.3); border-radius: 2px; }
+  .filmstrip-frame {
+    flex-shrink: 0; scroll-snap-align: start; width: 180px;
+    border: 1px solid rgba(200,168,76,0.15); border-radius: 8px; overflow: hidden;
+    background: #14141c; cursor: pointer; transition: border-color 0.2s;
+  }
+  .filmstrip-frame:hover { border-color: rgba(200,168,76,0.5); }
+  .filmstrip-frame img { width: 100%; aspect-ratio: 9/16; object-fit: cover; }
+  .filmstrip-frame .label {
+    padding: 4px 8px; font-size: 10px; color: rgba(232,224,208,0.5);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .filmstrip-frame .label .step { color: #c8a84c; font-weight: 600; }
+  
+  .version-group {
+    margin-bottom: 24px; padding: 16px 20px;
+    border: 1px solid rgba(200,168,76,0.1); border-radius: 12px;
+    background: rgba(20,20,28,0.5);
+  }
+  .version-group h3 {
+    color: #c8a84c; font-size: 16px; font-weight: 300; margin-bottom: 8px;
+  }
+  .version-group .meta { font-size: 11px; color: rgba(232,224,208,0.3); margin-bottom: 10px; }
+  
   /* Chat thread */
   .chat-thread { margin-top: 10px; border-top: 1px solid rgba(200,168,76,0.1); padding-top: 8px; }
   .messages { max-height: 200px; overflow-y: auto; }
@@ -178,6 +208,7 @@
     <option value="newest">Newest First</option>
     <option value="highest">Highest Rated</option>
     <option value="unrated">Unrated First</option>
+    <option value="filmstrip">📽 Filmstrip (by version)</option>
   </select>
 </div>
 
@@ -245,6 +276,34 @@ function renderGallery() {
   
   const sort = document.getElementById('sortBy').value;
   let sorted = [...iterations];
+  
+  // Filmstrip mode — group by version prefix
+  if (sort === 'filmstrip') {
+    const groups = {};
+    for (const it of sorted) {
+      // Group by version prefix (e.g., "vine-1" → "vine", "m3" → "m")
+      const prefix = (it.version || it.id || '').replace(/[-_]?\d+$/, '') || 'ungrouped';
+      if (!groups[prefix]) groups[prefix] = [];
+      groups[prefix].push(it);
+    }
+    
+    gallery.innerHTML = Object.entries(groups).map(([name, items]) => `
+      <div class="version-group">
+        <h3>${name} (${items.length} steps)</h3>
+        <div class="meta">${items[0]?.generator || ''} · ${items[0]?.created || ''}</div>
+        <div class="filmstrip">
+          ${items.map((it, idx) => `
+            <div class="filmstrip-frame" onclick="openLightbox('${it.image}', '${it.id||idx}')">
+              <img src="${it.image}" alt="${it.title}" loading="lazy">
+              <div class="label"><span class="step">${it.version || idx+1}</span> ${it.title || ''}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `).join('');
+    return;
+  }
+  
   if (sort === 'highest') sorted.sort((a,b) => (b.humanScore||0) - (a.humanScore||0));
   else if (sort === 'unrated') sorted.sort((a,b) => (a.humanScore?1:0) - (b.humanScore?1:0));
   else sorted.sort((a,b) => new Date(b.created) - new Date(a.created));

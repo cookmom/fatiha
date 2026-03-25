@@ -144,7 +144,7 @@ function setup() {
   
   // Base fill — dark blue, full arch
   brush.fill('#0c3a6a', 160);
-  brush.fillBleed(0.1, 'out');
+  brush.fillBleed(0.001); brush.fillTexture(0, 0);
   brush.polygon(archPoly);
   
   // Upper region — slightly lighter, offset polygon
@@ -158,7 +158,7 @@ function setup() {
   upperPoly.push([cx + halfSpan * 0.7, peakY + archH * 0.5]);
   upperPoly.push([cx - halfSpan * 0.7, peakY + archH * 0.5]);
   brush.fill('#1a4a8a', 100);
-  brush.fillBleed(0.12, 'out');
+  brush.fillBleed(0.001); brush.fillTexture(0, 0);
   brush.polygon(upperPoly);
   
   // Mid-left wash blob
@@ -169,7 +169,7 @@ function setup() {
     [cx - halfSpan + 50, springY + 50],
   ];
   brush.fill('#0a3060', 90);
-  brush.fillBleed(0.15, 'out');
+  brush.fillBleed(0.001); brush.fillTexture(0, 0);
   brush.polygon(midLeftPoly);
   
   // Mid-right wash blob
@@ -180,7 +180,7 @@ function setup() {
     [cx + 60, springY - archH * 0.1],
   ];
   brush.fill('#0e3868', 85);
-  brush.fillBleed(0.15, 'out');
+  brush.fillBleed(0.001); brush.fillTexture(0, 0);
   brush.polygon(midRightPoly);
   
   // Lower deep pool
@@ -191,7 +191,7 @@ function setup() {
     [cx - halfSpan + 40, springY + 500],
   ];
   brush.fill('#08284a', 120);
-  brush.fillBleed(0.1, 'out');
+  brush.fillBleed(0.001); brush.fillTexture(0, 0);
   brush.polygon(lowerPoly);
   
   // Light highlight at arch peak
@@ -202,7 +202,7 @@ function setup() {
     [cx - 50, peakY + 120],
   ];
   brush.fill('#2a6aaa', 70);
-  brush.fillBleed(0.2, 'out');
+  brush.fillBleed(0.001); brush.fillTexture(0, 0);
   brush.polygon(peakHighlight);
   
   brush.noFill();

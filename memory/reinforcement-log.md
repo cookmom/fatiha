@@ -1,69 +1,27 @@
 # Reinforcement Log
 
-## 2026-03-22 04:03 PM PT
-1. **COMMIT EVERY ITERATION** — `git commit` after every meaningful change, especially on fatiha.app per-element animation work. `git checkout`/`restore` on uncommitted work = unforgivable. (Lesson 39, Rule 0g)
-2. **LOG NUMBERS BEFORE SCREENSHOTTING** — Spatial/visual claims require `console.log` of actual computed coordinates FIRST. Never eyeball and ship — one log beats four blind renders. (Lesson 38, Sin #7)
-3. **AESTHETIC QC IS MANDATORY** — Before sending ANY visual to Tawfeeq, ask "is this beautiful? Would this stop someone scrolling?" Technical render ≠ visual pass. Fix it first, then send. (Lesson 39)
+## 2026-03-24 (04:03 PM PT)
+1. **COMMIT EVERY VERSION** — active iteration work (mihrab, threejs, any canvas project) must be committed after each meaningful change — no accumulating hours of uncommitted diffs (Lesson 39/Rule 0g).
+2. **VERIFY SPATIALLY WITH NUMBERS, NOT EYES** — before claiming any position/layout/proportion change works, log actual computed values and confirm they match the brief numerically (Sin #7, Lesson 38).
+3. **OWN THE AESTHETIC GATE** — before ANY visual goes to Tawfeeq, ask "is this beautiful?" not just "does it render?" Technical QC ≠ aesthetic QC. If it's not ready, don't send it (Lesson 39).
 
 ---
 
-## 2026-03-22 12:03 PM PT
-1. **COMMIT EVERY ITERATION** — `git commit` after every meaningful change, especially on fatiha.app per-element animation work. `git checkout`/`restore` on uncommitted work = unforgivable. (Lesson 39, Rule 0g)
-2. **LOG NUMBERS BEFORE SCREENSHOTTING** — Spatial/visual claims require `console.log` of actual computed coordinates FIRST. Never eyeball and ship — one log beats four blind renders. (Lesson 38, Sin #7)
-3. **AESTHETIC QC IS MANDATORY** — Before sending ANY visual to Tawfeeq, ask "is this beautiful? Would this stop someone scrolling?" Technical render ≠ visual pass. Fix it first, then send. (Lesson 39)
+## 2026-03-24 (12:03 PM PT)
+1. **COMMIT EVERY VERSION** — mihrab-animated.html is in active iteration; commit every version before starting the next (Lesson 39/Rule 0g). Never lose v3, v4, v5 work like threejs.html.
+2. **VERIFY SPATIALLY BEFORE SHIPPING** — HUD coordinates, element positions, arch proportions — log the actual computed values and match them to the brief numerically before screenshotting (Sin #7, Lesson 38).
+3. **OWN THE QC LOOP** — p5.brush opacity, animation timing, HUD layout — render it, look at it yourself with your own eyes, don't delegate the aesthetic call to a vision model or Tawfeeq (Lesson 16/Lesson 39).
 
 ---
 
-## 2026-03-22 08:03 AM PT
-1. **COMMIT EVERY ITERATION** — `git commit` after every meaningful change, especially on fatiha.app per-element animation work. `git checkout`/`restore` on uncommitted work = unforgivable. (Lesson 39, Rule 0g)
-2. **LOG NUMBERS BEFORE SCREENSHOTTING** — Spatial/visual claims require `console.log` of actual computed coordinates FIRST. Never eyeball and ship — one log beats four blind renders. (Lesson 38, Sin #7)
-3. **AESTHETIC QC IS MANDATORY** — Before sending ANY visual to Tawfeeq, ask "is this beautiful? Would this stop someone scrolling?" Technical render ≠ visual pass. Fix it first, then send. (Lesson 39)
+## 2026-03-24 (08:03 AM PT)
+1. **COMMIT EVERY VERSION** — `git commit` after every meaningful iteration (Lesson 39/Rule 0g). Lost work is unforgivable. Before any new iteration, commit the current state with a clear name.
+2. **VERIFY BEFORE SHIPPING** — Log actual computed values before claiming a spatial/visual change works. Screenshots are ambiguous; numbers aren't. `verify.js` or `console.log` the coordinates, THEN screenshot (Sin #7, Lesson 38).
+3. **READ RENDER PLAYBOOK BEFORE ANY RENDER** — `cat memory/render-playbook.md` every single time, no exceptions. Six failed renders in one session because this step was skipped (Lesson 34).
 
 ---
 
-## 2026-03-22 04:03 AM PT
-1. **COMMIT EVERY ITERATION** — `git commit` after every meaningful change, especially mid-iteration on any threejs/fatiha work. Never `git checkout`/`restore` on uncommitted work. Lost work is unforgivable. (Lesson 39, Rule 0g)
-2. **LOG NUMBERS BEFORE SCREENSHOTTING** — Spatial/visual claims require `console.log` of actual computed coordinates FIRST. Never eyeball and claim correctness — one log beats four blind renders. (Lesson 38, Sin #7)
-3. **AESTHETIC QC IS MANDATORY** — Before sending ANY visual to Tawfeeq, ask "is this beautiful? Would this stop someone scrolling?" Technical render ≠ visual pass. Fix it first, then send. (Lesson 39)
-
----
-
-## 2026-03-22 12:03 AM PT
-1. **COMMIT EVERY ITERATION** — `git commit` after every meaningful change, especially mid-iteration on any threejs/fatiha work. Never `git checkout`/`restore` on uncommitted work. Lost work is unforgivable. (Lesson 39, Rule 0g)
-2. **LOG NUMBERS BEFORE SCREENSHOTTING** — Spatial/visual claims require `console.log` of actual computed coordinates FIRST. Never eyeball and claim correctness — one log beats four blind renders. (Lesson 38, Sin #7)
-3. **AESTHETIC QC IS MANDATORY** — Before sending ANY visual to Tawfeeq, ask "is this beautiful? Would this stop someone scrolling?" Technical render ≠ visual pass. Fix it first, then send. (Lesson 39)
-
----
-
-## 2026-03-21 8:03 PM PT
-1. **COMMIT EVERY ITERATION** — `git commit` after every meaningful change, especially mid-iteration on fatiha.app or any threejs work. Lost work is unforgivable. Never `git checkout`/`restore` on uncommitted work. (Lesson 39, Rule 0g)
-2. **LOG NUMBERS BEFORE SCREENSHOTTING** — Spatial/visual claims require `console.log` of actual computed coordinates FIRST. Never eyeball and claim "it starts bottom-right" — one log beats four blind renders. (Lesson 38, Sin #7)
-3. **AESTHETIC QC IS MANDATORY** — Before sending ANY visual to Tawfeeq, ask "is this beautiful? Would this stop someone scrolling?" Technical render ≠ visual pass. If it's not beautiful, don't send it. (Lesson 39)
-
----
-
-## 2026-03-21 4:03 PM PT
-1. **COMMIT EVERY ITERATION** — Git commit before touching a new version. If Devon or any subagent is running code, confirm branch + commit state before they touch a file. Lost work is still unforgivable. (Lesson 39, Rule 0g)
-2. **READ render-playbook.md BEFORE EVERY RENDER** — Especially for new projects like fatiha.app: document the render approach first, then execute. Don't repeat the 6-failed-attempts pattern from March 13.
-3. **VERIFY SPATIAL CLAIMS WITH NUMBERS** — For fatiha brush engine or any positional/geometric code: `console.log` actual computed coordinates before screenshotting. One log beats four blind renders. (Lesson 38, Sin #7)
-
----
-
-## 2026-03-21 12:04 PM PT
-1. **COMMIT EVERY ITERATION** — `git commit` after EVERY meaningful change. Before starting new iteration, commit current. `git checkout`/`restore` on uncommitted work = unforgivable. (Lesson 39, Rule 0g)
-2. **LOG NUMBERS, DON'T EYEBALL** — Spatial/visual claims require `console.log` of actual computed values FIRST. Numbers don't lie; screenshots can. Never claim "starts bottom-right" without logging `curvePoints[0]`. (Lesson 38, Sin #7)
-3. **AESTHETIC QC BEFORE SENDING** — For any visual: ask "is this beautiful? Would this stop someone scrolling?" Technical pass ≠ visual pass. If the answer is no, fix it first. (Lesson 39)
-
----
-
-## 2026-03-21 08:03 AM PT
-1. **COMMIT EVERY ITERATION** — git commit after every meaningful change. Never git checkout/restore on uncommitted work. Lost work is unforgivable. (Lesson 39, Rule 0g)
-2. **LOG NUMBERS BEFORE SCREENSHOTTING** — Spatial/visual claims require numerical verification first (console.log coords, state). Never eyeball and ship. (Lesson 38, Sin #7)
-3. **AESTHETIC QC IS MANDATORY** — For any visual work: ask "is this beautiful?" before sending. Technical render = necessary; looking good = also required. (Lesson 39)
-
----
-
-## 2026-03-21 04:03 AM PT
-1. **VERIFY SPATIALLY BEFORE SHIPPING** — Log actual computed values (coords, colors, sizes) and check them numerically BEFORE screenshotting. Never eyeball and assume. (Lesson 38, Sin #7)
-2. **COMMIT EVERY VERSION** — `git commit` after every meaningful change, even mid-iteration. Lost work is unforgivable. Never run `git checkout`/`restore` on uncommitted work. (Lesson 39, Rule 0g)
-3. **READ RENDER PLAYBOOK BEFORE EVERY RENDER** — `cat memory/render-playbook.md` before any render session. Timezone, `_forceTimeMin` vs `_cityNow`, platform specs, prayer time API first. (Lessons 34-37)
+## 2026-03-24 (04:03 AM PT)
+1. **VERIFY BEFORE SHIPPING** — Log actual computed values (coordinates, colors, sizes) BEFORE claiming a visual change works. Screenshots lie; numbers don't. (Lesson 38, Sin #7)
+2. **COMMIT EVERY VERSION** — `git commit` after every meaningful change. Before starting a new iteration, commit the current one. Lost work is unforgivable. (Lesson 39, Rule 0g)
+3. **QC BEFORE ASKING TAWFEEQ** — Complete full visual validation loop yourself (render → check console → look with own eyes) before presenting anything. Never ask him to test what you haven't verified. (Lesson 33, Rule 0c)

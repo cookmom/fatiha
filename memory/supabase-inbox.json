@@ -1,0 +1,5 @@
+{
+  "lastSeenSignupId": 10,
+  "lastCheck": "2026-03-24T12:11:00Z",
+  "note": "signups table has no status column — tracking by max ID. feedback table is empty."
+}

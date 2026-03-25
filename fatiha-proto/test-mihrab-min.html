@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Test minimal polygon</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+  <style>html, body { margin: 0; padding: 0; overflow: hidden; background: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; } canvas { display: block; }</style>
+</head>
+<body>
+<script>
+function setup() {
+  createCanvas(1080, 1920, WEBGL);
+  brush.load();
+  translate(-width / 2, -height / 2);
+  randomSeed(42);
+  background(245, 238, 225);
+  brush.scaleBrushes(1.8);
+
+  // Simple test: blue filled polygon
+  brush.noStroke();
+  brush.fill('#1a4a8a', 200);
+  brush.fillBleed(0.15, 'out');
+  brush.fillTexture(0.45, 0.35);
+  brush.polygon([[200, 400], [540, 200], [880, 400], [880, 1200], [540, 1400], [200, 1200]]);
+
+  // Simple pencil line
+  brush.noFill();
+  brush.set('HB', '#605040', 0.5);
+  brush.wiggle(1.5);
+  brush.line(100, 100, 980, 100);
+  brush.line(100, 100, 100, 1820);
+  brush.line(100, 1820, 980, 1820);
+  brush.line(980, 100, 980, 1820);
+
+  console.log('Minimal test complete');
+}
+</script>
+</body>
+</html>

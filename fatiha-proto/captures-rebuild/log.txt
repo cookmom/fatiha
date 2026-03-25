@@ -1,0 +1,14 @@
+Server on http://localhost:8769 — mode: verify
+PAGE: Flower pencil tasks: 138 fill tasks: 147
+PAGE: Failed to load resource: the server responded with a status of 404 (Not Found)
+PAGE: Failed to load resource: the server responded with a status of 404 (Not Found)
+p5 running
+Waiting for frame 5...
+  At frame 9, washIdx=5, pencilIdx=0/138, fillIdx=0/147
+  Captured f00005.png
+Waiting for frame 60...
+  At frame 60, washIdx=5, pencilIdx=111/138, fillIdx=0/147
+  Captured f00060.png
+Waiting for frame 300...
+  FAILED at frame 300: waitForFunction failed: frame got detached.
+DONE

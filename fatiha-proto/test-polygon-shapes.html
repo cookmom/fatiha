@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+</head><body><script>
+function makePetalPoly(bx, by, ang, len, wid, curv) {
+  var pts = [], n = 8, ca = Math.cos(ang), sa = Math.sin(ang);
+  for (var i = 0; i <= n; i++) {
+    var t = i/n, w = Math.sin(t * Math.PI);
+    var along = t * len, across = w * wid * 0.5;
+    var co = curv * Math.sin(t * Math.PI) * len * 0.08;
+    pts.push([bx + along*ca - (across+co)*sa, by + along*sa + (across+co)*ca]);
+  }
+  for (var i = n; i >= 0; i--) {
+    var t = i/n, w = Math.sin(t * Math.PI);
+    var along = t * len, across = -w * wid * 0.5;
+    var co = curv * Math.sin(t * Math.PI) * len * 0.08;
+    pts.push([bx + along*ca - (across+co)*sa, by + along*sa + (across+co)*ca]);
+  }
+  return pts;
+}
+function makeSazLeafPoly(bx, by, ang, len, wid, curv) {
+  var pts = [], n = 10, ca = Math.cos(ang), sa = Math.sin(ang);
+  for (var i = 0; i <= n; i++) {
+    var t = i/n, w;
+    if (t < 0.15) w = t / 0.15 * 0.4;
+    else if (t < 0.5) w = 0.4 + (t - 0.15) / 0.35 * 0.6;
+    else if (t < 0.85) w = 1.0 - (t - 0.5) * 1.0;
+    else w = Math.max(0, (1 - t) / 0.15 * 0.15);
+    w = Math.max(0, w + 0.05 * Math.sin(t * 6 * Math.PI));
+    var along = t * len, across = w * wid * 0.5;
+    var sc = curv * Math.sin(t * Math.PI * 1.2) * len * 0.06;
+    pts.push([bx + along*ca - (across+sc)*sa, by + along*sa + (across+sc)*ca]);
+  }
+  for (var i = n; i >= 0; i--) {
+    var t = i/n, w;
+    if (t < 0.15) w = t / 0.15 * 0.4;
+    else if (t < 0.5) w = 0.4 + (t - 0.15) / 0.35 * 0.6;
+    else if (t < 0.85) w = 1.0 - (t - 0.5) * 1.0;
+    else w = Math.max(0, (1 - t) / 0.15 * 0.15);
+    w = Math.max(0, w + 0.05 * Math.sin(t * 6 * Math.PI));
+    var along = t * len, across = -w * wid * 0.5;
+    var sc = curv * Math.sin(t * Math.PI * 1.2) * len * 0.06;
+    pts.push([bx + along*ca - (across+sc)*sa, by + along*sa + (across+sc)*ca]);
+  }
+  return pts;
+}
+
+function setup() {
+  createCanvas(800, 600);
+  background(242, 234, 218);
+  noLoop();
+  
+  // Draw a rose at center
+  var fcx = 250, fcy = 250;
+  var pColors = ['#C0392B','#8B2252','#D4456A'];
+  var rings = [{count:4, rad:20, pL:35, pW:22},{count:5, rad:40, pL:50, pW:30},{count:5, rad:65, pL:65, pW:35}];
+  
+  for (var ri = 0; ri < rings.length; ri++) {
+    var ring = rings[ri];
+    fill(pColors[ri]);
+    noStroke();
+    for (var p = 0; p < ring.count; p++) {
+      var angle = -Math.PI/2 + (p/ring.count)*Math.PI*2;
+      var px = fcx + Math.cos(angle)*ring.rad;
+      var py = fcy + Math.sin(angle)*ring.rad;
+      var pts = makePetalPoly(px, py, angle, ring.pL, ring.pW, 0.4);
+      beginShape();
+      for (var i = 0; i < pts.length; i++) vertex(pts[i][0], pts[i][1]);
+      endShape(CLOSE);
+    }
+  }
+  // Gold center
+  fill('#B8860B');
+  var cpts = makePetalPoly(fcx, fcy, 0, 18, 12, 0.5);
+  beginShape();
+  for (var i = 0; i < cpts.length; i++) vertex(cpts[i][0], cpts[i][1]);
+  endShape(CLOSE);
+  
+  // Saz leaf
+  fill('#0E4D2E');
+  var lpts = makeSazLeafPoly(fcx, fcy+70, Math.PI*0.8, 90, 30, 0.6);
+  beginShape();
+  for (var i = 0; i < lpts.length; i++) vertex(lpts[i][0], lpts[i][1]);
+  endShape(CLOSE);
+  
+  // Second rose
+  fcx = 550; fcy = 250;
+  for (var ri = 0; ri < rings.length; ri++) {
+    var ring = rings[ri];
+    fill(pColors[ri]);
+    for (var p = 0; p < ring.count; p++) {
+      var angle = (p/ring.count)*Math.PI*2 + 0.3;
+      var px = fcx + Math.cos(angle)*ring.rad;
+      var py = fcy + Math.sin(angle)*ring.rad;
+      var pts = makePetalPoly(px, py, angle, ring.pL, ring.pW, 0.3);
+      beginShape();
+      for (var i = 0; i < pts.length; i++) vertex(pts[i][0], pts[i][1]);
+      endShape(CLOSE);
+    }
+  }
+  fill('#B8860B');
+  cpts = makePetalPoly(fcx, fcy, 1.5, 18, 12, 0.5);
+  beginShape();
+  for (var i = 0; i < cpts.length; i++) vertex(cpts[i][0], cpts[i][1]);
+  endShape(CLOSE);
+  fill('#0E4D2E');
+  lpts = makeSazLeafPoly(fcx+30, fcy+60, Math.PI*0.6, 80, 25, 0.5);
+  beginShape();
+  for (var i = 0; i < lpts.length; i++) vertex(lpts[i][0], lpts[i][1]);
+  endShape(CLOSE);
+  
+  // Labels
+  fill(0); textSize(14);
+  text('Rose 1 - concentric petals', 150, 430);
+  text('Rose 2 - offset rotation', 450, 430);
+  text('makePetalPoly = almond shape', 250, 470);
+  text('makeSazLeafPoly = serrated leaf', 250, 490);
+  
+  // Individual shapes for inspection
+  fill('#C0392B');
+  var single = makePetalPoly(150, 530, 0, 80, 40, 0.4);
+  beginShape();
+  for (var i = 0; i < single.length; i++) vertex(single[i][0], single[i][1]);
+  endShape(CLOSE);
+  fill(0); text('Single petal', 120, 585);
+  
+  fill('#0E4D2E');
+  var singleL = makeSazLeafPoly(350, 530, 0, 100, 30, 0.6);
+  beginShape();
+  for (var i = 0; i < singleL.length; i++) vertex(singleL[i][0], singleL[i][1]);
+  endShape(CLOSE);
+  fill(0); text('Single saz leaf', 350, 585);
+  
+  console.log('Shape test rendered');
+}
+</script></body></html>
