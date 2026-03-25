@@ -283,7 +283,7 @@ function drawRCallout(cx_, cy_, px, py, label, stepIdx, curStep) {
   brush.line(cx_, cy_, px, py);
   brush.circle(cx_, cy_, 4);
   // Label at midpoint
-  addDimText((cx_+px)/2 + 12, (cy_+py)/2 - ANNOT_FONT - 2, label);
+  addDimText(cx_ - 60, cy_ - ANNOT_FONT - 8, label);
 }
 
 function drawAnnotations(stepIdx) {
@@ -311,13 +311,13 @@ function drawAnnotations(stepIdx) {
     addDimText(cx, crownPeakY - ANNOT_FONT - 4, 'Seljuk ribbed dome', 'center');
   }
 
-  // === STAR annotation (inside niche arch) ===
+  // === STAR annotation (right side, outside arch) ===
   if (stepIdx >= 10) {
     brush.set('2H','#b0a898',0.4);
-    brush.line(starCx, starCy, starCx, starCy - starR_val);
+    brush.line(starCx, starCy, starCx + starR_val, starCy);
     brush.circle(starCx, starCy, 4);
-    addDimText(starCx, starCy - starR_val - ANNOT_FONT - 6, '{12/5}  r='+starR_val.toFixed(0), 'center');
-    addDimText(starCx, starCy - starR_val - 2, 'r, r/φ, r/φ², r/φ³', 'center');
+    addDimText(cx + halfSpan + 15, starCy - ANNOT_FONT, '{12/5}  r='+starR_val.toFixed(0));
+    addDimText(cx + halfSpan + 15, starCy + 4, 'r, r/φ, r/φ², r/φ³');
   }
 
   // === BASE UNIT LEGEND ===
