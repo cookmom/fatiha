@@ -314,8 +314,8 @@ function drawAnnotations(stepIdx) {
     brush.set('2H','#b0a898',0.4);
     brush.line(starCx, starCy, starCx + starR_val, starCy);
     brush.circle(starCx, starCy, 4);
-    addDimText((cx + halfSpan + colGap + colWidth + 15), (peakY+springY)/2 - ANNOT_FONT - 4, '{12/5}  r='+starR_val.toFixed(0), 'right');
-    addDimText((cx + halfSpan + colGap + colWidth + 15), (peakY+springY)/2, 'r, r/φ, r/φ², r/φ³', 'right');
+    addDimText((cx + halfSpan + colGap + colWidth + 15), (peakY+springY)/2 - ANNOT_FONT - 4, '{12/5} × 24 spokes', 'right');
+    addDimText((cx + halfSpan + colGap + colWidth + 15), (peakY+springY)/2, '15° intervals → arch', 'right');
   }
 
   // === BASE UNIT LEGEND ===
