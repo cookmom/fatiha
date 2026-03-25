@@ -589,14 +589,14 @@ var STEPS = [
         return [sCx + dx*300, sCy + dy*300];
       }
       
-      var nSpokes = 24; // 12 primary + 12 secondary
+      var nSpokes = 48; // 12 primary + 12 secondary
       var totalLines = nSpokes;
       var drawn = Math.max(1, Math.round(p * totalLines));
       var tipX = sCx, tipY = sCy;
       
       // Draw spokes radiating outward
-      for (var k = 0; k < Math.min(drawn, 12); k++) {
-        var angle = k * Math.PI/6 - Math.PI/2;
+      for (var k = 0; k < Math.min(drawn, 24); k++) {
+        var angle = k * Math.PI/12 - Math.PI/2;
         var hit = rayHit(angle);
         // Animate: line grows from center to boundary
         var lineP = Math.min(1, (drawn - k) / 2);
