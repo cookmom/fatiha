@@ -780,26 +780,7 @@ var STEPS = [
       }
       return [cx, peakY];
     }},
-  // Column inner shadows — dark strips facing niche
-  { name:'COL SHADOW', formula:'shadow #1a1a2a α=20', dur:0.05,
-    bbox:[colLx,colTop,colRx,colBot],
-    draw: function(p) {
-      if (p >= 0) {
-        randomSeed(2002);
-        brush.noStroke();
-        brush.fill('#1a1a2a', 20);
-        brush.fillBleed(0.001); brush.fillTexture(0,0);
-        brush.rect(colLx+colWidth/2-8, colTop+10, 16, colBot-colTop-20);
-        brush.noFill();
-        randomSeed(2012);
-        brush.fill('#1a1a2a', 20);
-        brush.fillBleed(0.001); brush.fillTexture(0,0);
-        brush.rect(colRx-colWidth/2-8, colTop+10, 16, colBot-colTop-20);
-        brush.noFill();
-      }
-      return [cx, (colTop+colBot)/2];
-    }},
-  // Base shadow — dark strip along ground
+  // Base shadow — dark strip along ground (single fill)
   { name:'BASE SHADOW', formula:'ground #0a1a2a α=30', dur:0.05,
     bbox:[bandL,baseBot-20,bandR,baseBot],
     draw: function(p) {
