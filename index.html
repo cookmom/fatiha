@@ -903,8 +903,8 @@ function draw() {
   
   // Update HUD — draw transition line between boxes, then snap
   if (activeStep !== lastHudStep) {
-    // Draw transition line from old box center to new box center
-    if (lastHudStep >= 0 && trackBox) {
+    // Draw transition line — only for pencil steps, not fills
+    if (lastHudStep >= 0 && trackBox && activeStep < WASH_START) {
       var _s2 = window._hudScale || 1;
       var _r2 = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
       var oldB = STEPS[lastHudStep].bbox;
