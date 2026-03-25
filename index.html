@@ -866,7 +866,11 @@ function setup() {
   // Recalculate on viewport change (Safari fullscreen, orientation)
   window.addEventListener('resize', function() {
     window._hudScale = c.elt.getBoundingClientRect().width / W;
-    _lastAnnotStep = -1; // force re-layout of annotations
+    _lastAnnotStep = -1;
+  });
+  // When returning to tab, force annotation re-layout
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) { _lastDimStep = -1; }
   });
 }
 
@@ -947,6 +951,11 @@ function draw() {
     if (pencilDot) pencilDot.style.display = 'none';
     if (trackBox) trackBox.remove();
     trackBox = null;
+    // Clear annotations after hold, before reload
+    setTimeout(function() {
+      clearDimLabels();
+      _lastDimStep = -1;
+    }, 6500);
     setTimeout(function() {
       window.location.reload();
     }, 7000);
