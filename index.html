@@ -767,13 +767,13 @@ var STEPS = [
       return [cx, capTop];
     }},
   // LAST: Gold star center — the final payoff
-  { name:'STAR CENTER', formula:'gold #c8a832 α=35', dur:0.06,
+  { name:'STAR CENTER', formula:'lapis #0c3a6a α=120', dur:0.06,
     bbox:[starCx-starR_val/PHI-5,starCy-starR_val/PHI-5,starCx+starR_val/PHI+5,starCy+starR_val/PHI+5],
     draw: function(p) {
       if (p >= 0) {
         randomSeed(1006);
         brush.noStroke();
-        brush.fill('#c8a832', 35);
+        brush.fill('#0c3a6a', 120);
         brush.fillBleed(0.001); brush.fillTexture(0,0);
         brush.circle(starCx, starCy, starR_val/(PHI*PHI));
         brush.noFill();
