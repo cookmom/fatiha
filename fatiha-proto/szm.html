@@ -1,0 +1,1071 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+<style>
+* { margin:0; }
+body { background:#f2eada; overflow:hidden; margin:0; padding:0; }
+canvas { object-fit:contain !important; display:block; }
+#hud {
+  position:fixed; top:0; left:0; width:100vw; height:100%;
+  pointer-events:none; font-family:'SF Mono','Fira Code',monospace;
+  overflow:hidden;
+}
+.track-box {
+  position:absolute; transition: opacity 0.3s ease, left 0.4s ease, top 0.4s ease, width 0.4s ease, height 0.4s ease;
+  min-width:60px; min-height:60px; overflow:visible;
+}
+.track-box::before, .track-box::after,
+.track-box .bl::before, .track-box .br::before {
+  content:''; position:absolute; width:30px; height:30px;
+  border-color:#5a5248; border-style:solid; border-width:0;
+}
+.track-box::before { top:-2px; left:-2px; border-top-width:1.5px; border-left-width:1.5px; }
+.track-box::after  { top:-2px; right:-2px; border-top-width:1.5px; border-right-width:1.5px; }
+.track-box .bl::before { bottom:-2px; left:-2px; border-bottom-width:1.5px; border-left-width:1.5px; position:absolute; }
+.track-box .br::before { bottom:-2px; right:-2px; border-bottom-width:1.5px; border-right-width:1.5px; position:absolute; }
+.corner-circ {
+  position:absolute; width:4px; height:4px;
+  border:1px solid #5a5248; border-radius:50%;
+}
+.corner-circ.tl { top:-2px; left:-2px; }
+.corner-circ.tr { top:-2px; right:-2px; }
+.corner-circ.bl2 { bottom:-2px; left:-2px; }
+.corner-circ.br2 { bottom:-2px; right:-2px; }
+.hud-info {
+  position:absolute; bottom:100%; left:0; margin-bottom:4px;
+  background:rgba(242,234,218,0.88);
+  border:1px solid rgba(90,82,72,0.3);
+  border-radius:4px; padding:4px 8px;
+  white-space:nowrap;
+}
+.hud-label { color:#3a3430; font-weight:500; letter-spacing:0.3px; text-transform:uppercase; margin-bottom:3px; }
+.hud-formula { color:#5a5248; font-weight:normal; letter-spacing:0.3px; margin-bottom:2px; }
+.hud-coords { color:#8a8278; font-weight:normal; letter-spacing:0.3px; }
+.track-box.complete { animation: pulse-complete 0.5s ease; }
+@keyframes pulse-complete {
+  0% { filter: drop-shadow(0 0 4px rgba(90,82,72,0.6)); }
+  50% { filter: drop-shadow(0 0 12px rgba(90,82,72,0.8)); }
+  100% { filter: drop-shadow(0 0 2px rgba(90,82,72,0.1)); }
+}
+#pencil-dot {
+  position:absolute; width:14px; height:14px; pointer-events:none; z-index:15;
+}
+#pencil-dot::before {
+  content:''; position:absolute; left:6px; top:0; width:1px; height:14px; background:#5a5248;
+}
+#pencil-dot::after {
+  content:''; position:absolute; top:6px; left:0; width:14px; height:1px; background:#5a5248;
+}
+#pencil-dot .ch-circle {
+  position:absolute; top:4px; left:4px; width:6px; height:6px;
+  border:1px solid #5a5248; border-radius:50%;
+}
+</style>
+</head>
+<body>
+<div id="hud"><div id="pencil-dot" style="display:none"><div class="ch-circle"></div></div></div>
+<script>
+// =============================================
+// CONSTANTS — Sheikh Zayed Grand Mosque
+// =============================================
+var PHI = (1 + Math.sqrt(5)) / 2;
+var ROOT3 = Math.sqrt(3), ROOT2 = Math.sqrt(2);
+var W = 1080, H = 1920;
+var cx = W/2;
+var U = W / (2*PHI + 2);
+
+// =============================================
+// PROPORTIONAL SYSTEM — all derived from U
+// =============================================
+
+// Framing keyhole arch (foreground — we look through this)
+var archWallW = W * 0.18;
+var archInnerL = archWallW;
+var archInnerR = W - archWallW;
+var archInnerW = archInnerR - archInnerL;
+var archSpringY = H * 0.62;        // where horseshoe starts curving
+var archBaseY = H * 0.82;          // bottom of arch piers
+var archCircleCy = H * 0.32;       // center of horseshoe circle
+var archCircleR = archInnerW / 2 * 1.08; // >1 = horseshoe
+var archApexY = archCircleCy - archCircleR; // top of arch
+
+// Bottom cusps of keyhole — angled lines from horseshoe ends to pointed base
+var archCuspY = H * 0.78;          // where cusps meet at center
+
+// Main dome (background)
+var mainDomeCy = H * 0.26;
+var mainDomeR = archInnerW * 0.38;
+var mainDrumH = mainDomeR / (PHI * PHI);
+var mainDrumTop = mainDomeCy + mainDomeR * 0.2;
+var mainDrumBot = mainDrumTop + mainDrumH;
+
+// Crescent finial
+var finialTop = mainDomeCy - mainDomeR - U * 0.3;
+var finialBot = mainDomeCy - mainDomeR + 10;
+var finialCy = (finialTop + finialBot) / 2 - 15;
+
+// Secondary dome
+var secDomeR = mainDomeR / PHI;
+var secDomeCy = H * 0.40;
+var secDrumH = secDomeR / (PHI * PHI);
+var secDrumTop = secDomeCy + secDomeR * 0.15;
+var secDrumBot = secDrumTop + secDrumH;
+
+// Minor flanking domes
+var minorDomeR = secDomeR / PHI;
+var minorDomeCy = secDomeCy + secDomeR * 0.15;
+
+// Facade portal
+var portalTop = H * 0.50;
+var portalBot = H * 0.68;
+var portalW = archInnerW * 0.45;
+var portalL = cx - portalW / 2;
+var portalR = cx + portalW / 2;
+
+// Floor
+var floorY = H * 0.70;
+
+// Annotation system
+var ANNOT_FONT = Math.round(U / (PHI*PHI*PHI*PHI*1.15));
+var DIM_GAP = U / (PHI*PHI*PHI*PHI);
+var ROW_OFFSET = U / (PHI*PHI);
+var ROW_SPACE = U / (PHI*PHI*PHI);
+var EXT_OVERSHOOT = U / (PHI*PHI*PHI*PHI);
+var TICK_SIZE = U / (PHI*PHI*PHI*PHI);
+
+// =============================================
+// HELPER FUNCTIONS (from dome.html)
+// =============================================
+function drawSegments(segs, progress) {
+  var totalLen = 0, lens = [];
+  for (var i = 0; i < segs.length; i++) {
+    var dx = segs[i].to[0]-segs[i].from[0], dy = segs[i].to[1]-segs[i].from[1];
+    lens.push(Math.sqrt(dx*dx+dy*dy)); totalLen += lens[i];
+  }
+  var targetLen = progress * totalLen, drawn = 0;
+  var tipX = segs[0].from[0], tipY = segs[0].from[1];
+  for (var i = 0; i < segs.length; i++) {
+    if (drawn + lens[i] <= targetLen) {
+      brush.line(segs[i].from[0], segs[i].from[1], segs[i].to[0], segs[i].to[1]);
+      drawn += lens[i]; tipX = segs[i].to[0]; tipY = segs[i].to[1];
+    } else {
+      var t = (targetLen - drawn) / lens[i];
+      var px = segs[i].from[0] + (segs[i].to[0]-segs[i].from[0]) * t;
+      var py = segs[i].from[1] + (segs[i].to[1]-segs[i].from[1]) * t;
+      brush.line(segs[i].from[0], segs[i].from[1], px, py);
+      tipX = px; tipY = py; break;
+    }
+  }
+  return [tipX, tipY];
+}
+
+function drawSplinePartial(allPts, progress, tension) {
+  var n = Math.max(2, Math.floor(allPts.length * progress));
+  var pts = allPts.slice(0, n);
+  if (pts.length >= 2) brush.spline(pts, tension || 0.3);
+  var last = pts[pts.length-1];
+  return [last[0], last[1]];
+}
+
+// Annotation labels
+var _dimLabels = [];
+var _lastDimStep = -1;
+
+function clearDimLabels() {
+  for (var i=0;i<_dimLabels.length;i++) _dimLabels[i].remove();
+  _dimLabels = [];
+}
+
+function addDimText(canvasX, canvasY, txt, align) {
+  for (var i=0;i<_dimLabels.length;i++) if (_dimLabels[i]._t === txt) return;
+  var el = document.createElement('div');
+  el._t = txt;
+  var s = window._hudScale || 1;
+  var r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
+  el.style.cssText = 'position:absolute;color:#8a8278;font-family:SF Mono,Fira Code,monospace;font-size:'+Math.max(9,Math.round(ANNOT_FONT*s))+'px;white-space:nowrap;pointer-events:none;letter-spacing:0.3px;';
+  el.style.left = (canvasX * s + r.left) + 'px';
+  el.style.top = (canvasY * s + r.top) + 'px';
+  if (align === 'center') el.style.transform = 'translateX(-50%)';
+  else if (align === 'right') el.style.transform = 'translateX(-100%)';
+  el.textContent = txt;
+  document.getElementById('hud').appendChild(el);
+  _dimLabels.push(el);
+}
+
+function drawHDim(x1, x2, rowY, label, stepIdx, curStep) {
+  if (stepIdx > curStep) return;
+  brush.set('2H','#b0a898',0.4);
+  brush.line(x1, archBaseY + DIM_GAP, x1, rowY + EXT_OVERSHOOT);
+  brush.line(x2, archBaseY + DIM_GAP, x2, rowY + EXT_OVERSHOOT);
+  brush.line(x1, rowY, x2, rowY);
+  brush.line(x1, rowY - TICK_SIZE, x1, rowY + TICK_SIZE);
+  brush.line(x2, rowY - TICK_SIZE, x2, rowY + TICK_SIZE);
+  addDimText((x1+x2)/2, rowY - ANNOT_FONT - 4, label, 'center');
+}
+
+function drawVDim(y1, y2, rowX, label, stepIdx, curStep) {
+  if (stepIdx > curStep) return;
+  brush.set('2H','#b0a898',0.4);
+  brush.line(archInnerL - DIM_GAP, y1, rowX - EXT_OVERSHOOT, y1);
+  brush.line(archInnerL - DIM_GAP, y2, rowX - EXT_OVERSHOOT, y2);
+  brush.line(rowX, y1, rowX, y2);
+  brush.line(rowX - TICK_SIZE, y1, rowX + TICK_SIZE, y1);
+  brush.line(rowX - TICK_SIZE, y2, rowX + TICK_SIZE, y2);
+  addDimText(Math.max(5, rowX - 6), (y1+y2)/2 - ANNOT_FONT/2, label, 'left');
+}
+
+// Annotation row positions
+var botRow1 = archBaseY + ROW_OFFSET * 0.6;
+var botRow2 = botRow1 + ROW_SPACE * 0.7;
+var ltRow1 = archInnerL - ROW_OFFSET;
+var ltRow2 = ltRow1 - ROW_SPACE;
+var ltRow3 = ltRow2 - ROW_SPACE;
+
+function drawAnnotations(stepIdx) {
+  if (stepIdx !== _lastDimStep) { clearDimLabels(); _lastDimStep = stepIdx; }
+  // Bottom horizontal dims
+  drawHDim(archInnerL, archInnerR, botRow1, 'innerW = '+(archInnerW).toFixed(0), 3, stepIdx);
+  drawHDim(0, archWallW, botRow2, 'wall = '+archWallW.toFixed(0), 1, stepIdx);
+  // Left vertical dims
+  drawVDim(mainDomeCy - mainDomeR, mainDomeCy + mainDomeR*0.2, ltRow1, 'R = '+mainDomeR.toFixed(0), 4, stepIdx);
+  drawVDim(portalTop, portalBot, ltRow2, 'portal', 11, stepIdx);
+  drawVDim(archApexY, archSpringY, ltRow3, 'arch H', 3, stepIdx);
+  // Base unit legend
+  if (stepIdx >= 0) {
+    addDimText(cx, archBaseY + ROW_OFFSET * 2.5, 'U = W/(2\u03C6+2) = '+U.toFixed(1), 'center');
+    addDimText(cx, archBaseY + ROW_OFFSET * 2.5 + ANNOT_FONT * 1.5, '\u03C6=1.618  \u221A3=1.732  \u221A2=1.414', 'center');
+  }
+}
+
+// =============================================
+// Pre-compute arch curves
+// =============================================
+// Horseshoe arch points: arc from springY on left, over the top, to springY on right
+// Center at (cx, archCircleCy), radius archCircleR
+// Horseshoe goes past 180° — springing points are BELOW the center
+var archPtsAll = [];
+var archStartAngle = Math.asin((archSpringY - archCircleCy) / archCircleR); // angle below horizontal at springing
+var archSweepTotal = Math.PI + 2 * archStartAngle; // > PI for horseshoe
+for (var i = 0; i <= 60; i++) {
+  var t = i / 60;
+  // Sweep from right-springing (clockwise over top to left-springing)
+  var angle = (Math.PI/2 + archStartAngle) - archSweepTotal * t;
+  var px = cx + archCircleR * Math.cos(angle);
+  var py = archCircleCy - archCircleR * Math.sin(angle);
+  archPtsAll.push([px, py, 0.3 + 0.7 * Math.sin(Math.PI * t)]);
+}
+
+// Dome hemisphere points
+function domeArcPts(domeCx, domeCy, domeR, nPts) {
+  var pts = [];
+  for (var i = 0; i <= nPts; i++) {
+    var t = i / nPts;
+    var angle = Math.PI * (1 - t); // left to right
+    pts.push([domeCx + domeR * Math.cos(angle), domeCy - domeR * Math.sin(angle), 0.3 + 0.7 * Math.sin(Math.PI * t)]);
+  }
+  return pts;
+}
+
+var mainDomePts = domeArcPts(cx, mainDomeCy, mainDomeR, 40);
+var secDomePts = domeArcPts(cx, secDomeCy, secDomeR, 30);
+
+// Small pointed arch helper
+function drawSmallArch(ax, ay, aw, ah, p) {
+  var halfW = aw/2;
+  var aR = aw; // equilateral pointed arch
+  // Left arc
+  var pts = [];
+  var steps = 12;
+  for (var i = 0; i <= steps; i++) {
+    var t = i / steps * p;
+    var angle = Math.PI/3 * t; // 60° sweep
+    pts.push([ax + halfW - aR * Math.cos(angle), ay + ah - aR * Math.sin(angle)]);
+  }
+  if (pts.length >= 2) {
+    for (var i = 1; i < pts.length; i++) brush.line(pts[i-1][0], pts[i-1][1], pts[i][0], pts[i][1]);
+  }
+  // Right arc (mirror)
+  pts = [];
+  for (var i = 0; i <= steps; i++) {
+    var t = i / steps * p;
+    var angle = Math.PI - Math.PI/3 * t;
+    pts.push([ax - halfW + aR * Math.cos(Math.PI - angle), ay + ah - aR * Math.sin(Math.PI - angle)]);
+  }
+  if (pts.length >= 2) {
+    for (var i = 1; i < pts.length; i++) brush.line(pts[i-1][0], pts[i-1][1], pts[i][0], pts[i][1]);
+  }
+}
+
+// =============================================
+// STEP DEFINITIONS
+// =============================================
+var FPS = 30;
+
+var STEPS = [
+  // 0: Ground line / base of arch piers
+  { name:'GROUND LINE', formula:'y = H × 0.82', dur:0.4,
+    bbox:[30, archBaseY-10, W-30, archBaseY+10],
+    draw: function(p) {
+      brush.set('2H','#5a5248',2.0);
+      return drawSegments([{from:[30,archBaseY],to:[W-30,archBaseY]}], p);
+    }},
+
+  // 1: Left pier (thick masonry wall)
+  { name:'LEFT PIER', formula:'w = W×0.18 = '+archWallW.toFixed(0), dur:0.6,
+    bbox:[0, archSpringY, archWallW+10, archBaseY],
+    draw: function(p) {
+      brush.set('2H','#5a5248',2.0);
+      var endY = archBaseY - (archBaseY - archSpringY) * p;
+      // Outer edge (canvas edge)
+      brush.line(10, archBaseY, 10, endY);
+      // Inner edge
+      brush.line(archInnerL, archBaseY, archInnerL, endY);
+      // Ashlar stone blocks (subtle)
+      if (p > 0.2) {
+        brush.set('2H','#c0b8a8',0.3);
+        var blockH = (archBaseY - archSpringY) / 8;
+        var drawn = archBaseY - (archBaseY - archSpringY) * Math.min(1, (p-0.1)/0.9);
+        for (var by = archBaseY - blockH; by > drawn; by -= blockH) {
+          brush.line(15, by, archInnerL - 5, by);
+        }
+      }
+      return [archInnerL, endY];
+    }},
+
+  // 2: Right pier
+  { name:'RIGHT PIER', formula:'mirror of left', dur:0.6,
+    bbox:[archInnerR-10, archSpringY, W, archBaseY],
+    draw: function(p) {
+      brush.set('2H','#5a5248',2.0);
+      var endY = archBaseY - (archBaseY - archSpringY) * p;
+      brush.line(W-10, archBaseY, W-10, endY);
+      brush.line(archInnerR, archBaseY, archInnerR, endY);
+      if (p > 0.2) {
+        brush.set('2H','#c0b8a8',0.3);
+        var blockH = (archBaseY - archSpringY) / 8;
+        var drawn = archBaseY - (archBaseY - archSpringY) * Math.min(1, (p-0.1)/0.9);
+        for (var by = archBaseY - blockH; by > drawn; by -= blockH) {
+          brush.line(archInnerR + 5, by, W - 15, by);
+        }
+      }
+      return [archInnerR, endY];
+    }},
+
+  // 3: Keyhole arch — horseshoe top + pointed cusps at bottom
+  { name:'KEYHOLE ARCH', formula:'R = '+archCircleR.toFixed(0)+' (horseshoe)', dur:1.8,
+    bbox:[archInnerL-20, archApexY-20, archInnerR+20, archCuspY+20],
+    draw: function(p) {
+      brush.set('2H','#5a5248',2.5);
+      if (p <= 0.6) {
+        // Horseshoe arc — compass sweep
+        var t = p / 0.6;
+        var nPts = Math.max(3, Math.round(t * 60));
+        var pts = archPtsAll.slice(0, nPts + 1);
+        if (pts.length >= 2) brush.spline(pts, 0.3);
+        // Compass arm
+        var tip = pts[pts.length - 1];
+        brush.set('2H','#a09888',0.6);
+        brush.line(cx, archCircleCy, tip[0], tip[1]);
+        brush.circle(cx, archCircleCy, 5);
+        return [tip[0], tip[1]];
+      } else if (p <= 0.8) {
+        // Full horseshoe + left cusp line
+        brush.spline(archPtsAll, 0.3);
+        brush.set('2H','#a09888',0.5);
+        brush.circle(cx, archCircleCy, 4);
+        var t = (p - 0.6) / 0.2;
+        brush.set('2H','#5a5248',2.0);
+        // Left cusp: from left springing point down to center cusp
+        var lsx = archPtsAll[archPtsAll.length-1][0];
+        var lsy = archPtsAll[archPtsAll.length-1][1];
+        var ex = lsx + (cx - lsx) * t;
+        var ey = lsy + (archCuspY - lsy) * t;
+        brush.line(lsx, lsy, ex, ey);
+        return [ex, ey];
+      } else {
+        // Full horseshoe + both cusps
+        brush.spline(archPtsAll, 0.3);
+        brush.set('2H','#a09888',0.5);
+        brush.circle(cx, archCircleCy, 4);
+        brush.set('2H','#5a5248',2.0);
+        // Left cusp
+        var lsx = archPtsAll[archPtsAll.length-1][0];
+        var lsy = archPtsAll[archPtsAll.length-1][1];
+        brush.line(lsx, lsy, cx, archCuspY);
+        // Right cusp
+        var t = (p - 0.8) / 0.2;
+        var rsx = archPtsAll[0][0];
+        var rsy = archPtsAll[0][1];
+        var ex = rsx + (cx - rsx) * t;
+        var ey = rsy + (archCuspY - rsy) * t;
+        brush.line(rsx, rsy, ex, ey);
+        return [ex, ey];
+      }
+    }},
+
+  // 4: Main dome — compass sweep
+  { name:'MAIN DOME', formula:'R = innerW×0.38 = '+mainDomeR.toFixed(0), dur:1.4,
+    bbox:[cx-mainDomeR-10, mainDomeCy-mainDomeR-10, cx+mainDomeR+10, mainDomeCy+mainDomeR*0.3],
+    draw: function(p) {
+      if (p <= 0.7) {
+        // Dome hemisphere — compass sweep
+        var t = p / 0.7;
+        brush.set('2H','#5a5248',2.0);
+        var nPts = Math.max(3, Math.round(t * 40));
+        var pts = mainDomePts.slice(0, nPts + 1);
+        if (pts.length >= 2) brush.spline(pts, 0.3);
+        var tip = pts[pts.length - 1];
+        // Compass arm
+        brush.set('2H','#a09888',0.6);
+        brush.line(cx, mainDomeCy, tip[0], tip[1]);
+        brush.circle(cx, mainDomeCy, 5);
+        return [tip[0], tip[1]];
+      } else {
+        // Full dome + tile grid lines
+        brush.set('2H','#5a5248',2.0);
+        brush.spline(mainDomePts, 0.3);
+        brush.set('2H','#a09888',0.5);
+        brush.circle(cx, mainDomeCy, 4);
+        // Tile grid lines — subtle horizontal bands
+        var t = (p - 0.7) / 0.3;
+        brush.set('2H','#c0b8a8',0.35);
+        var nLines = Math.max(1, Math.round(t * 5));
+        for (var li = 0; li < nLines; li++) {
+          var frac = (li + 1) / 6; // fraction from top
+          var gridY = mainDomeCy - mainDomeR + mainDomeR * frac;
+          if (gridY < mainDomeCy) {
+            var dx = Math.sqrt(mainDomeR*mainDomeR - (gridY-mainDomeCy)*(gridY-mainDomeCy));
+            brush.line(cx - dx, gridY, cx + dx, gridY);
+          }
+        }
+        return [cx + mainDomeR, mainDomeCy];
+      }
+    }},
+
+  // 5: Main drum — rectangular base with blind arched windows
+  { name:'MAIN DRUM', formula:'h = R/\u03C6\u00B2 = '+mainDrumH.toFixed(0), dur:0.8,
+    bbox:[cx-mainDomeR-5, mainDrumTop-5, cx+mainDomeR+5, mainDrumBot+5],
+    draw: function(p) {
+      brush.set('2H','#5a5248',1.8);
+      var drumL = cx - mainDomeR * 0.85;
+      var drumR = cx + mainDomeR * 0.85;
+      if (p <= 0.4) {
+        var t = p / 0.4;
+        return drawSegments([
+          {from:[drumL, mainDrumTop], to:[drumR, mainDrumTop]},
+          {from:[drumR, mainDrumTop], to:[drumR, mainDrumBot]},
+          {from:[drumR, mainDrumBot], to:[drumL, mainDrumBot]},
+          {from:[drumL, mainDrumBot], to:[drumL, mainDrumTop]}
+        ], t);
+      } else {
+        // Full drum + blind windows
+        brush.line(drumL, mainDrumTop, drumR, mainDrumTop);
+        brush.line(drumR, mainDrumTop, drumR, mainDrumBot);
+        brush.line(drumR, mainDrumBot, drumL, mainDrumBot);
+        brush.line(drumL, mainDrumBot, drumL, mainDrumTop);
+        var t = (p - 0.4) / 0.6;
+        brush.set('2H','#8a8278',0.7);
+        var nWins = 5;
+        var wc = Math.max(1, Math.round(t * nWins));
+        var winW = (drumR - drumL) * 0.08;
+        var winH = mainDrumH * 0.7;
+        var winY = mainDrumTop + mainDrumH * 0.15;
+        for (var w = 0; w < wc; w++) {
+          var wt = (w + 1) / (nWins + 1);
+          var wcx = drumL + (drumR - drumL) * wt;
+          brush.line(wcx - winW/2, winY + winH, wcx - winW/2, winY + winH*0.3);
+          brush.line(wcx + winW/2, winY + winH, wcx + winW/2, winY + winH*0.3);
+          // Small pointed arch top
+          var ap = [];
+          for (var a = 0; a <= 8; a++) {
+            var at2 = a/8;
+            ap.push([wcx - winW/2 + winW*at2, winY + winH*0.3 - winH*0.25*Math.sin(Math.PI*at2), 0.3]);
+          }
+          brush.spline(ap, 0.3);
+          brush.line(wcx - winW/2, winY + winH, wcx + winW/2, winY + winH);
+        }
+        return [cx, mainDrumBot];
+      }
+    }},
+
+  // 6: Crescent finial
+  { name:'CRESCENT FINIAL', formula:'top of main dome', dur:0.5,
+    bbox:[cx-30, finialTop-10, cx+30, finialBot+10],
+    draw: function(p) {
+      brush.set('2H','#5a5248',1.8);
+      if (p <= 0.5) {
+        // Spire line
+        var t = p / 0.5;
+        var endY = finialBot - (finialBot - finialTop) * t;
+        brush.line(cx, finialBot, cx, endY);
+        return [cx, endY];
+      } else {
+        // Spire + crescent
+        brush.line(cx, finialBot, cx, finialTop);
+        var t = (p - 0.5) / 0.5;
+        brush.set('2H','#5a5248',1.5);
+        // Crescent: two overlapping circles
+        var cR = 12;
+        var nPts = Math.max(3, Math.round(t * 16));
+        var crescPts = [];
+        for (var i = 0; i <= nPts; i++) {
+          var a = -Math.PI/2 + Math.PI * (i / 16);
+          crescPts.push([cx + 5 + cR * Math.cos(a), finialCy + cR * Math.sin(a), 0.5]);
+        }
+        if (crescPts.length >= 2) brush.spline(crescPts, 0.3);
+        // Inner circle cutout (smaller, offset)
+        if (t > 0.5) {
+          var t2 = (t - 0.5) / 0.5;
+          var n2 = Math.max(3, Math.round(t2 * 16));
+          var innPts = [];
+          for (var i = 0; i <= n2; i++) {
+            var a = -Math.PI/2 + Math.PI * (i / 16);
+            innPts.push([cx + 10 + cR*0.75 * Math.cos(a), finialCy + cR*0.75 * Math.sin(a), 0.3]);
+          }
+          if (innPts.length >= 2) brush.spline(innPts, 0.3);
+        }
+        return [cx, finialTop];
+      }
+    }},
+
+  // 7: Secondary dome
+  { name:'SECONDARY DOME', formula:'R = mainR/\u03C6 = '+secDomeR.toFixed(0), dur:1.0,
+    bbox:[cx-secDomeR-10, secDomeCy-secDomeR-5, cx+secDomeR+10, secDomeCy+secDomeR*0.2+5],
+    draw: function(p) {
+      brush.set('2H','#5a5248',1.8);
+      var nPts = Math.max(3, Math.round(p * 30));
+      var pts = secDomePts.slice(0, nPts + 1);
+      if (pts.length >= 2) brush.spline(pts, 0.3);
+      var tip = pts[pts.length - 1];
+      brush.set('2H','#a09888',0.6);
+      brush.line(cx, secDomeCy, tip[0], tip[1]);
+      brush.circle(cx, secDomeCy, 4);
+      return [tip[0], tip[1]];
+    }},
+
+  // 8: Secondary drum
+  { name:'SECONDARY DRUM', formula:'colonnade arches', dur:0.6,
+    bbox:[cx-secDomeR*0.85-5, secDrumTop-5, cx+secDomeR*0.85+5, secDrumBot+5],
+    draw: function(p) {
+      brush.set('2H','#5a5248',1.5);
+      var sL = cx - secDomeR * 0.85;
+      var sR = cx + secDomeR * 0.85;
+      if (p <= 0.4) {
+        var t = p / 0.4;
+        return drawSegments([
+          {from:[sL, secDrumTop], to:[sR, secDrumTop]},
+          {from:[sR, secDrumTop], to:[sR, secDrumBot]},
+          {from:[sR, secDrumBot], to:[sL, secDrumBot]},
+          {from:[sL, secDrumBot], to:[sL, secDrumTop]}
+        ], t);
+      } else {
+        brush.line(sL, secDrumTop, sR, secDrumTop);
+        brush.line(sR, secDrumTop, sR, secDrumBot);
+        brush.line(sR, secDrumBot, sL, secDrumBot);
+        brush.line(sL, secDrumBot, sL, secDrumTop);
+        // 3 small arched windows
+        var t = (p - 0.4) / 0.6;
+        brush.set('2H','#8a8278',0.7);
+        var nW = 3;
+        var wc = Math.max(1, Math.round(t * nW));
+        var wW = (sR - sL) * 0.12;
+        var wH = secDrumH * 0.7;
+        var wY = secDrumTop + secDrumH * 0.15;
+        for (var w = 0; w < wc; w++) {
+          var wt = (w + 1) / (nW + 1);
+          var wcx = sL + (sR - sL) * wt;
+          brush.line(wcx - wW/2, wY + wH, wcx - wW/2, wY + wH*0.3);
+          brush.line(wcx + wW/2, wY + wH, wcx + wW/2, wY + wH*0.3);
+          var ap = [];
+          for (var a = 0; a <= 8; a++) {
+            var at2 = a/8;
+            ap.push([wcx - wW/2 + wW*at2, wY + wH*0.3 - wH*0.25*Math.sin(Math.PI*at2), 0.3]);
+          }
+          brush.spline(ap, 0.3);
+          brush.line(wcx - wW/2, wY + wH, wcx + wW/2, wY + wH);
+        }
+        return [cx, secDrumBot];
+      }
+    }},
+
+  // 9: Left minor domes (3 small domes on colonnade)
+  { name:'LEFT MINOR DOMES', formula:'R = secR/\u03C6 = '+minorDomeR.toFixed(0), dur:0.6,
+    bbox:[archInnerL, minorDomeCy-minorDomeR-5, cx-secDomeR*0.85, minorDomeCy+minorDomeR*0.2+5],
+    draw: function(p) {
+      brush.set('2H','#8a8278',1.2);
+      var nDomes = 3;
+      var dc = Math.max(1, Math.round(p * nDomes));
+      var startX = archInnerL + 30;
+      var endX = cx - secDomeR * 0.85 - 10;
+      var tipX = startX, tipY = minorDomeCy;
+      for (var d = 0; d < dc; d++) {
+        var dcx = startX + (endX - startX) * (d + 0.5) / nDomes;
+        var pts = domeArcPts(dcx, minorDomeCy, minorDomeR, 12);
+        brush.spline(pts, 0.3);
+        // Tiny drum line
+        brush.line(dcx - minorDomeR * 0.8, minorDomeCy, dcx + minorDomeR * 0.8, minorDomeCy);
+        tipX = dcx + minorDomeR; tipY = minorDomeCy;
+      }
+      // Colonnade line connecting them
+      if (p > 0.5) {
+        brush.set('2H','#b0a898',0.5);
+        brush.line(startX, minorDomeCy + minorDomeR * 0.1, endX, minorDomeCy + minorDomeR * 0.1);
+      }
+      return [tipX, tipY];
+    }},
+
+  // 10: Right minor domes
+  { name:'RIGHT MINOR DOMES', formula:'mirror of left', dur:0.6,
+    bbox:[cx+secDomeR*0.85, minorDomeCy-minorDomeR-5, archInnerR, minorDomeCy+minorDomeR*0.2+5],
+    draw: function(p) {
+      brush.set('2H','#8a8278',1.2);
+      var nDomes = 3;
+      var dc = Math.max(1, Math.round(p * nDomes));
+      var startX = cx + secDomeR * 0.85 + 10;
+      var endX = archInnerR - 30;
+      var tipX = startX, tipY = minorDomeCy;
+      for (var d = 0; d < dc; d++) {
+        var dcx = startX + (endX - startX) * (d + 0.5) / nDomes;
+        var pts = domeArcPts(dcx, minorDomeCy, minorDomeR, 12);
+        brush.spline(pts, 0.3);
+        brush.line(dcx - minorDomeR * 0.8, minorDomeCy, dcx + minorDomeR * 0.8, minorDomeCy);
+        tipX = dcx + minorDomeR; tipY = minorDomeCy;
+      }
+      if (p > 0.5) {
+        brush.set('2H','#b0a898',0.5);
+        brush.line(startX, minorDomeCy + minorDomeR * 0.1, endX, minorDomeCy + minorDomeR * 0.1);
+      }
+      return [tipX, tipY];
+    }},
+
+  // 11: Portal arch — large pointed arch entrance
+  { name:'PORTAL ARCH', formula:'w = innerW×0.45 = '+portalW.toFixed(0), dur:1.0,
+    bbox:[portalL-10, portalTop-10, portalR+10, portalBot+10],
+    draw: function(p) {
+      brush.set('2H','#5a5248',1.8);
+      if (p <= 0.6) {
+        // Draw pointed arch
+        var t = p / 0.6;
+        var archH_p = portalBot - portalTop;
+        var pR = portalW;
+        // Left arc
+        var lPts = [];
+        var steps = Math.max(3, Math.round(t * 20));
+        for (var i = 0; i <= steps; i++) {
+          var tt = i / 20;
+          if (tt > t) break;
+          var angle = Math.PI/3 * tt;
+          lPts.push([portalR - pR * Math.cos(angle), portalBot - pR * Math.sin(angle)]);
+        }
+        for (var i = 1; i < lPts.length; i++) brush.line(lPts[i-1][0], lPts[i-1][1], lPts[i][0], lPts[i][1]);
+        // Right arc (mirror)
+        var rPts = [];
+        for (var i = 0; i <= steps; i++) {
+          var tt = i / 20;
+          if (tt > t) break;
+          var angle = Math.PI - Math.PI/3 * tt;
+          rPts.push([portalL + pR * Math.cos(Math.PI - angle), portalBot - pR * Math.sin(Math.PI - angle)]);
+        }
+        for (var i = 1; i < rPts.length; i++) brush.line(rPts[i-1][0], rPts[i-1][1], rPts[i][0], rPts[i][1]);
+        var last = lPts.length > 0 ? lPts[lPts.length-1] : [portalL, portalBot];
+        return [last[0], last[1]];
+      } else {
+        // Full arch + legs
+        var pR = portalW;
+        var lPts = [];
+        for (var i = 0; i <= 20; i++) {
+          var angle = Math.PI/3 * (i/20);
+          lPts.push([portalR - pR * Math.cos(angle), portalBot - pR * Math.sin(angle)]);
+        }
+        for (var i = 1; i < lPts.length; i++) brush.line(lPts[i-1][0], lPts[i-1][1], lPts[i][0], lPts[i][1]);
+        var rPts = [];
+        for (var i = 0; i <= 20; i++) {
+          var angle = Math.PI - Math.PI/3 * (i/20);
+          rPts.push([portalL + pR * Math.cos(Math.PI - angle), portalBot - pR * Math.sin(Math.PI - angle)]);
+        }
+        for (var i = 1; i < rPts.length; i++) brush.line(rPts[i-1][0], rPts[i-1][1], rPts[i][0], rPts[i][1]);
+        // Legs
+        var t = (p - 0.6) / 0.4;
+        var legEnd = portalBot + (archCuspY - portalBot) * 0.3 * t;
+        brush.line(portalL, portalBot, portalL, legEnd);
+        brush.line(portalR, portalBot, portalR, legEnd);
+        return [portalR, legEnd];
+      }
+    }},
+
+  // 12: Nested inner arches (2 concentric receding)
+  { name:'NESTED ARCHES', formula:'receding perspective', dur:0.6,
+    bbox:[portalL+15, portalTop+20, portalR-15, portalBot-10],
+    draw: function(p) {
+      brush.set('2H','#8a8278',1.0);
+      var scales = [0.82, 0.64];
+      var nArch = Math.max(1, Math.round(p * 2));
+      var tipX = cx, tipY = portalBot;
+      for (var ai = 0; ai < nArch; ai++) {
+        var sc = scales[ai];
+        var iW = portalW * sc;
+        var iL = cx - iW/2, iR = cx + iW/2;
+        var iBot = portalBot - (portalBot - portalTop) * (1-sc) * 0.3;
+        var iR2 = iW;
+        // Simplified arch lines
+        var pts = [];
+        for (var i = 0; i <= 16; i++) {
+          var t2 = i/16;
+          var angle = Math.PI * t2;
+          pts.push([iL + iW/2 + iW/2 * Math.cos(Math.PI - angle), iBot - iW*0.4 * Math.sin(angle)]);
+        }
+        for (var i = 1; i < pts.length; i++) brush.line(pts[i-1][0], pts[i-1][1], pts[i][0], pts[i][1]);
+        brush.line(iL, iBot, iL, iBot + 20);
+        brush.line(iR, iBot, iR, iBot + 20);
+        tipX = iR; tipY = iBot;
+      }
+      return [tipX, tipY];
+    }},
+
+  // 13: Geometric panels flanking portal
+  { name:'GEOMETRIC PANELS', formula:'decorative rectangles', dur:0.5,
+    bbox:[archInnerL+10, portalTop-10, archInnerR-10, portalBot+10],
+    draw: function(p) {
+      brush.set('2H','#8a8278',0.8);
+      // Left panel
+      var lpL = archInnerL + 15;
+      var lpR = portalL - 15;
+      var lpT = portalTop + 20;
+      var lpB = portalBot - 20;
+      if (p <= 0.5) {
+        var t = p / 0.5;
+        return drawSegments([
+          {from:[lpL,lpT],to:[lpR,lpT]},{from:[lpR,lpT],to:[lpR,lpB]},
+          {from:[lpR,lpB],to:[lpL,lpB]},{from:[lpL,lpB],to:[lpL,lpT]}
+        ], t);
+      } else {
+        // Left panel complete
+        brush.line(lpL,lpT,lpR,lpT); brush.line(lpR,lpT,lpR,lpB);
+        brush.line(lpR,lpB,lpL,lpB); brush.line(lpL,lpB,lpL,lpT);
+        // Geometric pattern inside left panel
+        brush.set('2H','#b0a898',0.4);
+        var gridN = 3;
+        for (var gi = 1; gi < gridN; gi++) {
+          var gx = lpL + (lpR-lpL) * gi/gridN;
+          var gy = lpT + (lpB-lpT) * gi/gridN;
+          brush.line(gx, lpT+5, gx, lpB-5);
+          brush.line(lpL+5, gy, lpR-5, gy);
+        }
+        // Right panel (mirror)
+        var rpL = portalR + 15;
+        var rpR = archInnerR - 15;
+        var t = (p - 0.5) / 0.5;
+        brush.set('2H','#8a8278',0.8);
+        return drawSegments([
+          {from:[rpL,lpT],to:[rpR,lpT]},{from:[rpR,lpT],to:[rpR,lpB]},
+          {from:[rpR,lpB],to:[rpL,lpB]},{from:[rpL,lpB],to:[rpL,lpT]}
+        ], t);
+      }
+    }},
+
+  // 14: Courtyard floor pattern
+  { name:'COURTYARD FLOOR', formula:'geometric inlay', dur:0.4,
+    bbox:[archInnerL+10, floorY-10, archInnerR-10, archCuspY+10],
+    draw: function(p) {
+      brush.set('2H','#b0a898',0.5);
+      // Horizontal lines
+      var nLines = 4;
+      var drawn = Math.max(1, Math.round(p * nLines));
+      var tipX = cx, tipY = floorY;
+      for (var li = 0; li < drawn; li++) {
+        var ly = floorY + (archCuspY - floorY) * li / nLines;
+        brush.line(archInnerL + 20, ly, archInnerR - 20, ly);
+        tipY = ly;
+      }
+      // Center perspective lines
+      if (p > 0.5) {
+        brush.set('2H','#c0b8a8',0.3);
+        brush.line(cx, floorY, archInnerL + 30, archCuspY);
+        brush.line(cx, floorY, archInnerR - 30, archCuspY);
+        brush.line(cx - 80, floorY, cx - 120, archCuspY);
+        brush.line(cx + 80, floorY, cx + 120, archCuspY);
+      }
+      return [tipX, tipY];
+    }},
+
+  // === WASHES ===
+  // 15: Sky wash (through arch opening)
+  { name:'SKY WASH', formula:'#87CEEB \u03B1=35', dur:0.05,
+    bbox:[archInnerL, archApexY, archInnerR, archCuspY],
+    draw: function(p) {
+      if (p >= 0) {
+        randomSeed(2001);
+        brush.noStroke();
+        brush.fill('#87CEEB', 35);
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        // Arch opening polygon — horseshoe top + cusp bottom
+        var poly = [];
+        for (var i = 0; i < archPtsAll.length; i++) poly.push([archPtsAll[i][0], archPtsAll[i][1]]);
+        // Left cusp
+        poly.push([cx, archCuspY]);
+        // Close back to right springing
+        brush.polygon(poly);
+        brush.noFill();
+      }
+      return [cx, archCircleCy];
+    }},
+
+  // 16: Dome wash
+  { name:'DOME WASH', formula:'warm grey \u03B1=15', dur:0.05,
+    bbox:[cx-mainDomeR, mainDomeCy-mainDomeR, cx+mainDomeR, mainDomeCy],
+    draw: function(p) {
+      if (p >= 0) {
+        randomSeed(2002);
+        brush.noStroke();
+        brush.fill('#D4C5B0', 25);
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        var poly = [];
+        for (var i = 0; i < mainDomePts.length; i++) poly.push([mainDomePts[i][0], mainDomePts[i][1]]);
+        poly.push([cx+mainDomeR, mainDomeCy+mainDomeR*0.1]);
+        poly.push([cx-mainDomeR, mainDomeCy+mainDomeR*0.1]);
+        brush.polygon(poly);
+        brush.noFill();
+      }
+      return [cx, mainDomeCy];
+    }},
+
+  // 17: Gold accents — crescent + portal trim
+  { name:'GOLD ACCENTS', formula:'#C4A35A \u03B1=50', dur:0.05,
+    bbox:[cx-30, finialTop, cx+30, finialBot],
+    draw: function(p) {
+      if (p >= 0) {
+        randomSeed(2003);
+        brush.noStroke();
+        brush.fill('#C4A35A', 50);
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        brush.circle(cx + 5, finialCy, 14);
+        brush.noFill();
+      }
+      return [cx, finialCy];
+    }},
+
+  // 18: Shadow wash — depth layers
+  { name:'SHADOW WASH', formula:'#4A5568 \u03B1=20', dur:0.05,
+    bbox:[archInnerL, portalTop, archInnerR, portalBot],
+    draw: function(p) {
+      if (p >= 0) {
+        randomSeed(2004);
+        brush.noStroke();
+        brush.fill('#4A5568', 20);
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        // Shadow behind portal
+        brush.rect(portalL + 5, portalTop + 5, portalW - 10, (portalBot - portalTop) - 10);
+        brush.noFill();
+      }
+      return [cx, portalBot];
+    }},
+
+  // 19: Floor wash
+  { name:'FLOOR WASH', formula:'marble #F0E8D8 \u03B1=20', dur:0.05,
+    bbox:[archInnerL, floorY, archInnerR, archCuspY],
+    draw: function(p) {
+      if (p >= 0) {
+        randomSeed(2005);
+        brush.noStroke();
+        brush.fill('#D4C5B0', 30);
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        brush.rect(archInnerL + 10, floorY, archInnerW - 20, archCuspY - floorY);
+        brush.noFill();
+      }
+      return [cx, archCuspY];
+    }},
+
+  // 20: Wall fill — sandstone on arch walls
+  { name:'WALL TINT', formula:'sandstone \u03B1=25', dur:0.05,
+    bbox:[0, archApexY, archWallW, archBaseY],
+    draw: function(p) {
+      if (p >= 0) {
+        randomSeed(2006);
+        brush.noStroke();
+        brush.fill('#C4B89A', 25);
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        // Left wall
+        brush.rect(5, archSpringY, archWallW - 10, archBaseY - archSpringY);
+        brush.noFill();
+        // Right wall
+        randomSeed(2007);
+        brush.fill('#C4B89A', 25);
+        brush.fillBleed(0.001); brush.fillTexture(0,0);
+        brush.rect(archInnerR + 5, archSpringY, archWallW - 10, archBaseY - archSpringY);
+        brush.noFill();
+      }
+      return [cx, archBaseY];
+    }}
+];
+
+// =============================================
+// TIMELINE COMPUTATION
+// =============================================
+var PAUSE_S = 0.14;
+var WASH_START = 15;
+var frameStarts = [], frameEnds = [];
+var f = 0;
+for (var i = 0; i < STEPS.length; i++) {
+  frameStarts.push(Math.round(f));
+  f += STEPS[i].dur * FPS;
+  frameEnds.push(Math.round(f));
+  if (i < STEPS.length-1 && i < WASH_START - 1) f += PAUSE_S * FPS;
+}
+var totalAnimFrames = Math.round(f);
+
+// =============================================
+// HUD
+// =============================================
+var trackBox = null;
+var pencilDot = null;
+
+function createTrackBox(step) {
+  var hud = document.getElementById('hud');
+  if (trackBox) trackBox.remove();
+  var box = document.createElement('div');
+  box.className = 'track-box';
+  var s = window._hudScale || 1;
+  var r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
+  var b = step.bbox, pad = 12 * s;
+  var cb0=Math.max(20,b[0]),cb1=Math.max(20,b[1]),cb2=Math.min(W-20,b[2]),cb3=Math.min(H-20,b[3]);
+  var bx=(cb0*s)+r.left-pad,by=(cb1*s)+r.top-pad,bwid=(cb2-cb0)*s+pad*2,bh=(cb3-cb1)*s+pad*2;
+  box.style.left=bx+'px';box.style.top=by+'px';
+  box.style.width=bwid+'px';box.style.height=bh+'px';
+  ['tl','tr','bl2','br2'].forEach(function(c){var ci=document.createElement('div');ci.className='corner-circ '+c;box.appendChild(ci);});
+  var bl=document.createElement('div');bl.className='bl';bl.style.cssText='position:absolute;bottom:0;left:0;width:100%;height:100%;pointer-events:none;';box.appendChild(bl);
+  var br=document.createElement('div');br.className='br';br.style.cssText='position:absolute;bottom:0;right:0;width:100%;height:100%;pointer-events:none;';box.appendChild(br);
+  var _fs = Math.max(9, Math.round(ANNOT_FONT * (window._hudScale||1))) + 'px';
+  var info=document.createElement('div');info.className='hud-info';
+  if (by < 80) { info.style.bottom = 'auto'; info.style.top = '6px'; info.style.marginBottom = '0'; }
+  var lbl=document.createElement('div');lbl.className='hud-label';lbl.style.fontSize=_fs;lbl.textContent=step.name;info.appendChild(lbl);
+  var frm=document.createElement('div');frm.className='hud-formula';frm.style.fontSize=_fs;frm.textContent=step.formula;info.appendChild(frm);
+  var crd=document.createElement('div');crd.className='hud-coords';crd.style.fontSize=_fs;crd.id='live-coords';crd.textContent='x:\u2014 y:\u2014';info.appendChild(crd);
+  box.appendChild(info);
+  hud.appendChild(box);
+  trackBox = box;
+}
+
+function updatePencilDot(x, y) {
+  if (!pencilDot) pencilDot = document.getElementById('pencil-dot');
+  pencilDot.style.display = 'block';
+  var s = window._hudScale || 1;
+  var r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
+  pencilDot.style.left = (x*s + r.left - 7) + 'px';
+  pencilDot.style.top = (y*s + r.top - 7) + 'px';
+  var el = document.getElementById('live-coords');
+  if (el) el.textContent = 'x:' + Math.round(x) + ' y:' + Math.round(y);
+}
+
+// =============================================
+// MAIN LOOP
+// =============================================
+var lastHudStep = -1;
+var _inFillPhase = false;
+
+function setup() {
+  var c = createCanvas(W, H, WEBGL);
+  pixelDensity(1);
+  c.elt.style.width = '100vw';
+  c.elt.style.height = (window.innerWidth / (W/H)) + 'px';
+  c.elt.style.display = 'block';
+  c.elt.style.margin = '0';
+  brush.load();
+  frameRate(FPS);
+  window._hudScale = c.elt.getBoundingClientRect().width / W;
+  window._canvasEl = c.elt;
+  window.addEventListener('resize', function() {
+    window._hudScale = c.elt.getBoundingClientRect().width / W;
+    _lastDimStep = -1;
+  });
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) { _lastDimStep = -1; }
+  });
+}
+
+function draw() {
+  translate(-width/2, -height/2);
+  var f = frameCount - 1;
+  if (f >= totalAnimFrames) f = totalAnimFrames - 1;
+
+  var activeStep = 0;
+  for (var i = STEPS.length-1; i >= 0; i--) {
+    if (f >= frameStarts[i]) { activeStep = i; break; }
+  }
+
+  if (activeStep < WASH_START) {
+    _inFillPhase = false;
+    background(242, 234, 218);
+    for (var i = 0; i < activeStep; i++) STEPS[i].draw(1);
+  } else {
+    if (!_inFillPhase) {
+      background(242, 234, 218);
+      for (var i = 0; i < WASH_START; i++) STEPS[i].draw(1);
+      drawAnnotations(WASH_START - 1);
+      _inFillPhase = true;
+    }
+  }
+
+  var stepFrame = f - frameStarts[activeStep];
+  var stepDurFrames = Math.max(1, frameEnds[activeStep] - frameStarts[activeStep]);
+  var progress = Math.min(1, stepFrame / stepDurFrames);
+  var tip = STEPS[activeStep].draw(progress);
+
+  if (!_inFillPhase) drawAnnotations(activeStep - 1);
+
+  if (activeStep !== lastHudStep) {
+    if (lastHudStep >= 0 && trackBox && activeStep < WASH_START) {
+      var _s2 = window._hudScale || 1;
+      var _r2 = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
+      var oldB = STEPS[lastHudStep].bbox;
+      var newB = STEPS[activeStep].bbox;
+      var _pad2 = 12 * _s2;
+      var oldCx = oldB[0]*_s2 + _r2.left - _pad2;
+      var oldCy = oldB[1]*_s2 + _r2.top - _pad2;
+      var newCx = newB[0]*_s2 + _r2.left - _pad2;
+      var newCy = newB[1]*_s2 + _r2.top - _pad2;
+      var ln = document.createElement('div');
+      ln.style.cssText = 'position:absolute;pointer-events:none;z-index:5;';
+      var dx = newCx-oldCx, dy = newCy-oldCy;
+      var len = Math.sqrt(dx*dx+dy*dy);
+      var ang = Math.atan2(dy,dx)*180/Math.PI;
+      ln.style.left = oldCx+'px'; ln.style.top = oldCy+'px';
+      ln.style.width = len+'px'; ln.style.height = '1.5px';
+      ln.style.background = '#5a5248';
+      ln.style.transformOrigin = '0 0';
+      ln.style.transform = 'rotate('+ang+'deg)';
+      ln.style.opacity = '0.7';
+      ln.style.transition = 'opacity 0.55s ease';
+      document.getElementById('hud').appendChild(ln);
+      setTimeout(function(){ln.style.opacity='0';},300);
+      setTimeout(function(){ln.remove();},900);
+    }
+    createTrackBox(STEPS[activeStep]);
+    lastHudStep = activeStep;
+  }
+  if (trackBox) {
+    var _r = window._canvasEl ? window._canvasEl.getBoundingClientRect() : {left:0,top:0};
+    var _s = window._hudScale || 1;
+    var _b = STEPS[activeStep].bbox, _pad = 12 * _s;
+    var _cb0=Math.max(20,_b[0]),_cb1=Math.max(20,_b[1]);
+    trackBox.style.left = (_cb0*_s + _r.left - _pad) + 'px';
+    trackBox.style.top = (_cb1*_s + _r.top - _pad) + 'px';
+  }
+
+  if (tip) updatePencilDot(tip[0], tip[1]);
+
+  if (f >= totalAnimFrames - 1) {
+    noLoop();
+    if (pencilDot) pencilDot.style.display = 'none';
+    if (trackBox) trackBox.remove();
+    trackBox = null;
+    setTimeout(function() { clearDimLabels(); _lastDimStep = -1; }, 6500);
+    setTimeout(function() { window.location.reload(); }, 7000);
+  }
+}
+</script>
+</body>
+</html>
