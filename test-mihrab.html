@@ -1,0 +1,327 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+<style>* { margin:0; } body { background:#f2eada; }</style>
+</head>
+<body>
+<script>
+var W = 1080, H = 1920;
+var cx = W/2;
+
+// Arch parameters — equilateral pointed arch
+var archSpan = 620;
+var halfSpan = archSpan / 2;
+var archR = archSpan; // R = S for equilateral
+var springY = 1300;
+var archH = archSpan * Math.sqrt(3)/2; // = S * √3/2
+var peakY = springY - archH;
+// Centers at springing points
+var C1x = cx - halfSpan, C2x = cx + halfSpan;
+
+// Inner frame dimensions (current frame around the pointed arch)
+var frameL = cx - halfSpan - 80;
+var frameR = cx + halfSpan + 80;
+var frameT = peakY - 120;
+var frameB = H - 80;
+
+// Outer dome — POINTED arch (same style as inner, just bigger)
+var outerDomeSpan = (frameR - frameL) - 60; // smaller so it doesn't overlap crown star
+var outerDomeHalfSpan = outerDomeSpan / 2;
+var outerDomeR = outerDomeSpan; // R = S for equilateral pointed arch
+var outerDomeSpringY = springY - 50;
+var outerDomeH = outerDomeSpan * Math.sqrt(3) / 2;
+var outerDomePeakY = outerDomeSpringY - outerDomeH;
+// Centers for outer pointed arch
+var outerC1x = cx - outerDomeHalfSpan;
+var outerC2x = cx + outerDomeHalfSpan;
+
+// Outer frame — encompasses the dome
+var outerFrameL = cx - outerDomeHalfSpan - 50;
+var outerFrameR = cx + outerDomeHalfSpan + 50;
+var outerFrameT = outerDomePeakY - 500; // room for crown arch above
+var outerFrameB = frameB + 40;
+
+function archY(x) {
+  // Left arc or right arc
+  if (x <= cx) {
+    var dx = x - C2x; // left side uses RIGHT center
+    return springY - Math.sqrt(Math.max(0, archR*archR - dx*dx));
+  } else {
+    var dx = x - C1x; // right side uses LEFT center
+    return springY - Math.sqrt(Math.max(0, archR*archR - dx*dx));
+  }
+}
+
+function setup() {
+  createCanvas(W, H, WEBGL);
+  brush.load();
+  translate(-width/2, -height/2);
+  background(242, 234, 218);
+  randomSeed(42);
+  brush.wiggle(1.2);
+
+  // Inner frames REMOVED — only outer dome frame + crown
+  brush.noFill();
+  
+  // =============================================
+  // OUTERMOST FRAME + DOME (wraps around everything)
+  // =============================================
+  
+  // Outer frames REMOVED
+  
+  // Dome arc — POINTED arch (equilateral, same style as inner)
+  brush.set('2H', '#8a8070', 2.0);
+  // Left arc of outer pointed arch
+  var domePtsL = [];
+  for (var i = 0; i <= 30; i++) {
+    var t = i / 30;
+    var x = (cx - outerDomeHalfSpan) + outerDomeHalfSpan * t;
+    var dx = x - outerC2x;
+    var y = outerDomeSpringY - Math.sqrt(Math.max(0, outerDomeR*outerDomeR - dx*dx));
+    domePtsL.push([x, y, 0.3 + 0.7 * Math.sin(Math.PI * t)]);
+  }
+  brush.spline(domePtsL, 0.3);
+  // Right arc
+  var domePtsR = [];
+  for (var i = 0; i <= 30; i++) {
+    var t = i / 30;
+    var x = cx + outerDomeHalfSpan * t;
+    var dx = x - outerC1x;
+    var y = outerDomeSpringY - Math.sqrt(Math.max(0, outerDomeR*outerDomeR - dx*dx));
+    domePtsR.push([x, y, 0.3 + 0.7 * Math.sin(Math.PI * t)]);
+  }
+  brush.spline(domePtsR, 0.3);
+  
+  // Dome vertical sides down to bottom
+  brush.line(cx - outerDomeHalfSpan, outerDomeSpringY, cx - outerDomeHalfSpan, outerFrameB - 25);
+  brush.line(cx + outerDomeHalfSpan, outerDomeSpringY, cx + outerDomeHalfSpan, outerFrameB - 25);
+  
+  // Spandrel stars REMOVED
+  
+  // Outer border bands REMOVED (no frame)
+  
+  // Column lines flanking arch
+  brush.set('2H', '#b0a898', 1.2);
+  brush.line(cx - halfSpan, springY, cx - halfSpan, frameB - 55);
+  brush.line(cx + halfSpan, springY, cx + halfSpan, frameB - 55);
+  // Double columns
+  brush.set('2H', '#c0b8a8', 0.6);
+  brush.line(cx - halfSpan - 12, springY, cx - halfSpan - 12, frameB - 55);
+  brush.line(cx + halfSpan + 12, springY, cx + halfSpan + 12, frameB - 55);
+  
+  // =============================================
+  // LAYER 2: BLUE FILL INSIDE ARCH
+  // =============================================
+  // Build arch polygon (interior shape)
+  var archPoly = [];
+  var steps = 60;
+  // Left arc
+  for (var i = 0; i <= steps; i++) {
+    var t = i / steps;
+    var x = (cx - halfSpan) + halfSpan * t;
+    var dx = x - C2x;
+    var y = springY - Math.sqrt(Math.max(0, archR*archR - dx*dx));
+    archPoly.push([x, y]);
+  }
+  // Right arc
+  for (var i = 0; i <= steps; i++) {
+    var t = i / steps;
+    var x = cx + halfSpan * t;
+    var dx = x - C1x;
+    var y = springY - Math.sqrt(Math.max(0, archR*archR - dx*dx));
+    archPoly.push([x, y]);
+  }
+  // Bottom line
+  archPoly.push([cx + halfSpan, springY + 600]);
+  archPoly.push([cx - halfSpan, springY + 600]);
+  
+  // Multiple large polygon fills layered for rich watercolor effect
+  brush.noStroke();
+  
+  // Base fill — dark blue, full arch
+  brush.fill('#0c3a6a', 160);
+  brush.fillBleed(0.001); brush.fillTexture(0, 0);
+  brush.polygon(archPoly);
+  
+  // Upper region — slightly lighter, offset polygon
+  var upperPoly = [];
+  for (var i = 0; i <= 40; i++) {
+    var t = i / 40;
+    var x = (cx - halfSpan * 0.85) + halfSpan * 1.7 * t;
+    var clampX = Math.max(cx - halfSpan + 15, Math.min(cx + halfSpan - 15, x));
+    upperPoly.push([clampX, archY(clampX) + 8]);
+  }
+  upperPoly.push([cx + halfSpan * 0.7, peakY + archH * 0.5]);
+  upperPoly.push([cx - halfSpan * 0.7, peakY + archH * 0.5]);
+  brush.fill('#1a4a8a', 100);
+  brush.fillBleed(0.001); brush.fillTexture(0, 0);
+  brush.polygon(upperPoly);
+  
+  // Mid-left wash blob
+  var midLeftPoly = [
+    [cx - halfSpan + 30, springY - archH * 0.3],
+    [cx - 40, springY - archH * 0.5],
+    [cx - 60, springY - archH * 0.15],
+    [cx - halfSpan + 50, springY + 50],
+  ];
+  brush.fill('#0a3060', 90);
+  brush.fillBleed(0.001); brush.fillTexture(0, 0);
+  brush.polygon(midLeftPoly);
+  
+  // Mid-right wash blob
+  var midRightPoly = [
+    [cx + 40, springY - archH * 0.45],
+    [cx + halfSpan - 30, springY - archH * 0.25],
+    [cx + halfSpan - 50, springY + 80],
+    [cx + 60, springY - archH * 0.1],
+  ];
+  brush.fill('#0e3868', 85);
+  brush.fillBleed(0.001); brush.fillTexture(0, 0);
+  brush.polygon(midRightPoly);
+  
+  // Lower deep pool
+  var lowerPoly = [
+    [cx - halfSpan + 20, springY + 100],
+    [cx + halfSpan - 20, springY + 100],
+    [cx + halfSpan - 40, springY + 500],
+    [cx - halfSpan + 40, springY + 500],
+  ];
+  brush.fill('#08284a', 120);
+  brush.fillBleed(0.001); brush.fillTexture(0, 0);
+  brush.polygon(lowerPoly);
+  
+  // Light highlight at arch peak
+  var peakHighlight = [
+    [cx - 80, peakY + 20],
+    [cx + 80, peakY + 20],
+    [cx + 50, peakY + 120],
+    [cx - 50, peakY + 120],
+  ];
+  brush.fill('#2a6aaa', 70);
+  brush.fillBleed(0.001); brush.fillTexture(0, 0);
+  brush.polygon(peakHighlight);
+  
+  brush.noFill();
+  
+  // =============================================
+  // (Star pattern moved to LAYER 6 — drawn LAST on top of everything)
+  
+  // =============================================
+  // LAYER 3: ARCH OUTLINE (pencil)
+  // =============================================
+  brush.noFill();
+  brush.set('2H', '#8a8070', 1.8);
+  
+  // Left arc
+  var archLinePts = [];
+  for (var i = 0; i <= 40; i++) {
+    var t = i / 40;
+    var x = (cx - halfSpan) + halfSpan * t;
+    var dx = x - C2x;
+    var y = springY - Math.sqrt(Math.max(0, archR*archR - dx*dx));
+    archLinePts.push([x, y, 0.3 + 0.7 * Math.sin(Math.PI * t)]);
+  }
+  brush.spline(archLinePts, 0.3);
+  
+  // Right arc
+  archLinePts = [];
+  for (var i = 0; i <= 40; i++) {
+    var t = i / 40;
+    var x = cx + halfSpan * t;
+    var dx = x - C1x;
+    var y = springY - Math.sqrt(Math.max(0, archR*archR - dx*dx));
+    archLinePts.push([x, y, 0.3 + 0.7 * Math.sin(Math.PI * t)]);
+  }
+  brush.spline(archLinePts, 0.3);
+  
+  // =============================================
+  // Inner zigzag borders REMOVED
+  // =============================================
+  // LAYER 6: 12-FOLD STAR PATTERN — TOPMOST LAYER
+  // Formula: {12/5} star polygon
+  // P_k = (cx + r * cos(k*π/6 - π/2), cy + r * sin(k*π/6 - π/2))
+  // Connect P_k to P_{(k+5) mod 12}
+  // =============================================
+  // Star sits ABOVE the dome peak, in its own space
+  var starCx = cx;
+  var starCy = outerDomePeakY - 280; // higher above the dome peak
+  
+  // THIRD ARCH — wraps around JUST the star pattern
+  var crownSpan = 500;
+  var crownHalfSpan = crownSpan / 2;
+  var crownR = crownSpan;
+  var crownSpringY = outerDomePeakY - 130; // higher
+  var crownH = crownSpan * Math.sqrt(3) / 2;
+  var crownPeakY = crownSpringY - crownH;
+  var crownC1x = cx - crownHalfSpan, crownC2x = cx + crownHalfSpan;
+  
+  // Draw crown arch
+  brush.set('2H', '#8a8070', 1.5);
+  var crownPtsL = [];
+  for (var i = 0; i <= 30; i++) {
+    var t = i/30;
+    var x = (cx - crownHalfSpan) + crownHalfSpan * t;
+    var dx = x - crownC2x;
+    var y = crownSpringY - Math.sqrt(Math.max(0, crownR*crownR - dx*dx));
+    crownPtsL.push([x, y, 0.3 + 0.7 * Math.sin(Math.PI * t)]);
+  }
+  brush.spline(crownPtsL, 0.3);
+  var crownPtsR = [];
+  for (var i = 0; i <= 30; i++) {
+    var t = i/30;
+    var x = cx + crownHalfSpan * t;
+    var dx = x - crownC1x;
+    var y = crownSpringY - Math.sqrt(Math.max(0, crownR*crownR - dx*dx));
+    crownPtsR.push([x, y, 0.3 + 0.7 * Math.sin(Math.PI * t)]);
+  }
+  brush.spline(crownPtsR, 0.3);
+  
+  // Crown vertical sides
+  brush.line(cx - crownHalfSpan, crownSpringY, cx - crownHalfSpan, outerDomePeakY + 10);
+  brush.line(cx + crownHalfSpan, crownSpringY, cx + crownHalfSpan, outerDomePeakY + 10);
+  
+  brush.set('2H', '#e8e0d0', 0.6);
+  
+  var scales = [200, 130, 80, 45];
+  for (var si = 0; si < scales.length; si++) {
+    var r = scales[si];
+    var verts = [];
+    for (var k = 0; k < 12; k++) {
+      var angle = k * Math.PI / 6 - Math.PI / 2;
+      verts.push([starCx + r * Math.cos(angle), starCy + r * Math.sin(angle)]);
+    }
+    for (var k = 0; k < 12; k++) {
+      var k2 = (k + 5) % 12;
+      brush.line(verts[k][0], verts[k][1], verts[k2][0], verts[k2][1]);
+    }
+    if (si < 2) {
+      brush.set('2H', '#d8d0c0', 0.4);
+      for (var k = 0; k < 12; k++) {
+        var k2 = (k + 4) % 12;
+        brush.line(verts[k][0], verts[k][1], verts[k2][0], verts[k2][1]);
+      }
+      brush.set('2H', '#e8e0d0', 0.6);
+    }
+    if (si === 0) {
+      for (var k = 0; k < 12; k++) {
+        var k2 = (k + 1) % 12;
+        brush.line(verts[k][0], verts[k][1], verts[k2][0], verts[k2][1]);
+      }
+      brush.set('2H', '#d0c8b8', 0.3);
+      for (var k = 0; k < 12; k++) {
+        brush.line(starCx, starCy, verts[k][0], verts[k][1]);
+      }
+      brush.set('2H', '#e8e0d0', 0.6);
+    }
+  }
+  brush.set('2H', '#d8d0c0', 0.4);
+  brush.circle(starCx, starCy, 40);
+  brush.circle(starCx, starCy, 100);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>p5.brush — Fill+Polygon Test Grid</title>
+  <script src="p5.min.js"></script>
+  <script src="p5.brush.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #f2eada; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script>
+const W = 1400, H = 1000;
+
+// Helper: almond/petal shape
+function almondPetal(cx, cy, w, h, nPts) {
+  nPts = nPts || 30;
+  let pts = [];
+  for (let i = 0; i < nPts; i++) {
+    let t = (i / nPts) * TWO_PI;
+    let r = w * 0.5 * Math.cos(t);
+    let ry = h * 0.5 * Math.sin(t);
+    let squeeze = Math.pow(Math.abs(Math.sin(t)), 0.6);
+    pts.push([cx + r, cy + ry * squeeze * Math.sign(Math.sin(t))]);
+  }
+  return pts;
+}
+
+// Helper: pointed petal
+function petalShape(cx, cy, length, maxWidth, nPts) {
+  nPts = nPts || 24;
+  let pts = [];
+  for (let i = 0; i < nPts; i++) {
+    let t = (i / nPts) * TWO_PI;
+    // Egg-ish petal: one pointed end, one rounded end
+    let sinT = Math.sin(t);
+    let cosT = Math.cos(t);
+    let widthFactor = Math.pow(Math.abs(sinT), 0.7) * maxWidth;
+    let heightFactor = length * (0.5 + 0.5 * cosT);
+    // Taper one end more
+    if (cosT < 0) heightFactor *= 0.7;
+    let x = cx + widthFactor * Math.sign(sinT);
+    let y = cy - heightFactor;
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
+const labels = [
+  "ROW 1: brush.polygon() — bleed 0.0 / 0.15 / 0.3 / 0.5 / 0.8",
+  "ROW 2: brush.beginShape+vertex+endShape — same bleeds",
+  "ROW 3: Petal shapes | leaf | petal+stroke | 'in' bleed | 5-petal flower"
+];
+
+function setup() {
+  createCanvas(W, H, WEBGL);
+  brush.load();
+  translate(-width / 2, -height / 2);
+  randomSeed(42);
+  background(242, 234, 218);
+
+  let bleeds = [0.0, 0.15, 0.3, 0.5, 0.8];
+  let colors = ["#c94040", "#3a7ebf", "#5a9e4f", "#d4943a", "#8855aa"];
+
+  // ═══════════ ROW 1: brush.polygon() with varying fillBleed ═══════════
+  for (let i = 0; i < bleeds.length; i++) {
+    let cx = 100 + i * 230;
+    let cy = 160;
+    let pts = almondPetal(cx, cy, 160, 200, 24);
+
+    brush.noStroke();
+    brush.fill(colors[i], 130);
+    brush.fillBleed(bleeds[i], "out");
+    brush.fillTexture(0.5, 0.4);
+    brush.polygon(pts);
+  }
+
+  // Label bleed values
+  // (done via DOM below)
+
+  // ═══════════ ROW 2: beginShape/vertex/endShape — same shapes ═══════════
+  for (let i = 0; i < bleeds.length; i++) {
+    let cx = 100 + i * 230;
+    let cy = 490;
+    let pts = almondPetal(cx, cy, 160, 200, 24);
+
+    brush.noStroke();
+    brush.fill(colors[i], 130);
+    brush.fillBleed(bleeds[i], "out");
+    brush.fillTexture(0.5, 0.4);
+    brush.beginShape(0.15);
+    for (let p of pts) {
+      brush.vertex(p[0], p[1]);
+    }
+    brush.endShape(true);
+  }
+
+  // ═══════════ ROW 3: Practical petal/leaf tests ═══════════
+
+  // Test A: Petal with low bleed
+  {
+    let pts = petalShape(100, 800, 100, 45, 20);
+    brush.noStroke();
+    brush.fill("#e06080", 120);
+    brush.fillBleed(0.2, "out");
+    brush.fillTexture(0.45, 0.3);
+    brush.polygon(pts);
+  }
+
+  // Test B: Petal with high bleed
+  {
+    let pts = petalShape(300, 800, 100, 45, 20);
+    brush.noStroke();
+    brush.fill("#e06080", 100);
+    brush.fillBleed(0.55, "out");
+    brush.fillTexture(0.6, 0.5);
+    brush.polygon(pts);
+  }
+
+  // Test C: Leaf shape (elongated)
+  {
+    let pts = [];
+    let n = 30;
+    for (let i = 0; i < n; i++) {
+      let t = (i / n) * TWO_PI;
+      // Asymmetric leaf
+      let len = 110 * (0.5 + 0.5 * Math.cos(t));
+      let wid = 30 * Math.sin(t);
+      pts.push([500 + wid, 800 - len]);
+    }
+    brush.noStroke();
+    brush.fill("#3a7040", 130);
+    brush.fillBleed(0.2, "out");
+    brush.fillTexture(0.4, 0.3);
+    brush.polygon(pts);
+  }
+
+  // Test D: Petal with stroke outline
+  {
+    let pts = petalShape(700, 800, 100, 45, 24);
+    brush.set("rotring", "#4a2030", 0.5);
+    brush.fill("#d48090", 110);
+    brush.fillBleed(0.3, "out");
+    brush.fillTexture(0.5, 0.4);
+    brush.polygon(pts);
+  }
+
+  // Test E: "in" direction bleed
+  {
+    let pts = petalShape(900, 800, 100, 45, 20);
+    brush.noStroke();
+    brush.fill("#5070c0", 130);
+    brush.fillBleed(0.4, "in");
+    brush.fillTexture(0.5, 0.3);
+    brush.polygon(pts);
+  }
+
+  // Test F: Five-petal flower composition
+  {
+    let flowerCx = 1150;
+    let flowerCy = 800;
+    let petalLen = 65;
+    let petalWid = 28;
+    for (let p = 0; p < 5; p++) {
+      let angle = (p / 5) * TWO_PI - HALF_PI;
+      let pcx = flowerCx + Math.cos(angle) * 40;
+      let pcy = flowerCy + Math.sin(angle) * 40;
+
+      // Generate petal then rotate
+      let raw = petalShape(0, 0, petalLen, petalWid, 16);
+      let cos_a = Math.cos(angle + HALF_PI);
+      let sin_a = Math.sin(angle + HALF_PI);
+      let pts = raw.map(r => [
+        pcx + r[0] * cos_a - r[1] * sin_a,
+        pcy + r[0] * sin_a + r[1] * cos_a
+      ]);
+
+      brush.noStroke();
+      brush.fill("#e8607a", 85 + p * 10);
+      brush.fillBleed(0.25, "out");
+      brush.fillTexture(0.45, 0.35);
+      brush.polygon(pts);
+    }
+    // Center dot
+    brush.fill("#f0c040", 160);
+    brush.fillBleed(0.15);
+    brush.fillTexture(0.3, 0.2);
+    brush.circle(flowerCx, flowerCy, 14);
+  }
+
+  // Right edge: fillBleed comparison chart label
+  addLabels();
+}
+
+function addLabels() {
+  let ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;display:flex;justify-content:center;align-items:center;';
+  let inner = document.createElement('div');
+  inner.style.cssText = 'position:relative;width:' + W + 'px;height:' + H + 'px;';
+  ov.appendChild(inner);
+
+  function lbl(x, y, text, size) {
+    let d = document.createElement('div');
+    d.style.cssText = 'position:absolute;left:' + x + 'px;top:' + y + 'px;font:bold ' + (size || 13) + 'px monospace;color:#333;background:rgba(242,234,218,0.85);padding:2px 6px;border-radius:3px;white-space:nowrap;';
+    d.textContent = text;
+    inner.appendChild(d);
+  }
+
+  lbl(10, 5, 'ROW 1: brush.polygon() — fillBleed varies', 14);
+  lbl(10, 335, 'ROW 2: brush.beginShape/vertex/endShape — same shapes', 14);
+  lbl(10, 660, 'ROW 3: Petals, leaf, stroke outline, "in" bleed, flower', 14);
+
+  let bleeds = [0.0, 0.15, 0.3, 0.5, 0.8];
+  for (let i = 0; i < bleeds.length; i++) {
+    lbl(80 + i * 230, 28, 'bleed=' + bleeds[i], 11);
+    lbl(80 + i * 230, 358, 'bleed=' + bleeds[i], 11);
+  }
+
+  let row3Labels = ['petal b=0.2', 'petal b=0.55', 'leaf b=0.2', 'petal+stroke', '"in" b=0.4', '5-petal flower'];
+  let row3X = [60, 250, 450, 650, 850, 1070];
+  for (let i = 0; i < row3Labels.length; i++) {
+    lbl(row3X[i], 680, row3Labels[i], 11);
+  }
+
+  document.body.appendChild(ov);
+}
+</script>
+</body>
+</html>

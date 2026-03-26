@@ -1,0 +1,2782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TAWAF ENGINE // MASJID AL-HARAM</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#2a2a2e;overflow-x:hidden;overflow-y:auto;font-family:'JetBrains Mono',monospace;color:#E0E0E0;width:100%;max-width:430px;min-height:100vh;margin:0 auto;position:relative}
+
+/* TOP BAR */
+#top-bar{position:absolute;top:0;left:0;right:0;height:28px;display:flex;align-items:center;justify-content:space-between;padding:0 10px;z-index:10}
+#top-bar .title{font-size:8px;font-weight:500;letter-spacing:3px;color:#00FFFF;text-transform:uppercase}
+#top-bar .status{display:flex;align-items:center;gap:6px;font-size:7px;color:#666;letter-spacing:1px;text-transform:uppercase}
+#top-bar .status .dot{width:5px;height:5px;border-radius:50%;background:#00FF88;box-shadow:0 0 4px #00FF88}
+#top-bar .status .dot.amber{background:#d4af37;box-shadow:0 0 4px #d4af37}
+#top-bar .status .dot.green{background:#00FF88;box-shadow:0 0 4px #00FF88}
+
+/* MAKKAH TIME BAR */
+#time-bar{position:absolute;top:28px;left:0;right:0;height:18px;display:flex;align-items:center;justify-content:space-between;padding:0 10px;z-index:10}
+#time-bar .makkah-time{font-size:8px;color:#00FFFF;letter-spacing:1.5px;font-variant-numeric:tabular-nums}
+#time-bar .next-prayer{font-size:7px;color:#666;letter-spacing:1px;text-transform:uppercase}
+
+/* LEFT PANEL — BAYESIAN MODEL */
+#left-panel{position:absolute;top:50px;left:6px;width:100px;z-index:10}
+#left-panel .panel-header{font-size:7px;font-weight:700;letter-spacing:2.5px;color:#00FFFF;text-transform:uppercase;margin-bottom:6px}
+.bayes-formula{font-size:7px;color:#666;line-height:1.6;letter-spacing:0.3px}
+.bayes-formula .highlight{color:#00FFFF}
+.bayes-formula .value{color:#00FF88;font-variant-numeric:tabular-nums}
+.bayes-divider{width:90%;height:1px;background:#1a1a1a;margin:5px 0}
+.bayes-metrics{font-size:7px;color:#666;line-height:1.7;letter-spacing:0.3px}
+.bayes-metrics .label{color:#444;text-transform:uppercase;letter-spacing:1px}
+.bayes-metrics .val{color:#E0E0E0;font-variant-numeric:tabular-nums}
+.confidence-bar{display:flex;gap:1px;margin-top:3px}
+.confidence-bar .seg{width:8px;height:3px;background:#1a1a1a}
+.confidence-bar .seg.filled{background:#00FF88;box-shadow:0 0 2px #00FF88}
+
+/* RIGHT PANEL — DEMOGRAPHICS */
+#right-panel{position:absolute;top:50px;right:6px;width:90px;z-index:10;text-align:right;overflow:hidden}
+#right-panel .panel-header{font-size:7px;font-weight:700;letter-spacing:2.5px;color:#00FFFF;text-transform:uppercase;margin-bottom:6px}
+.demo-row{display:flex;align-items:center;justify-content:flex-end;gap:4px;margin-bottom:3px;font-size:7px;line-height:1.4}
+.demo-row .dot{width:4px;height:4px;border-radius:50%;flex-shrink:0}
+.demo-row .name{color:#666;text-transform:uppercase;letter-spacing:0.5px}
+.demo-row .pct{color:#E0E0E0;font-variant-numeric:tabular-nums;min-width:22px;text-align:right}
+.demo-row .bar-bg{width:30px;height:2px;background:#111;position:relative;flex-shrink:0}
+.demo-row .bar-fill{height:2px;position:absolute;left:0;top:0}
+
+/* CENTER STATS OVERLAY */
+#center-stats{position:absolute;top:50px;left:110px;right:110px;z-index:10;display:flex;justify-content:space-between}
+.cstat{text-align:center}
+.cstat .val{font-size:12px;font-weight:300;color:#00FF88;font-variant-numeric:tabular-nums}
+.cstat .lbl{font-size:6px;color:#444;text-transform:uppercase;letter-spacing:1.5px;margin-top:1px}
+
+/* PRAYER / PHASE INDICATOR */
+#phase-indicator{position:absolute;top:80px;left:50%;transform:translateX(-50%);z-index:10;text-align:center}
+#phase-indicator .phase-name{font-size:9px;font-weight:500;letter-spacing:3px;color:#d4af37;text-transform:uppercase}
+#phase-indicator .phase-sub{font-size:7px;color:#444;letter-spacing:1px;margin-top:2px}
+
+/* BOTTOM LEFT — EVENT LOG */
+#event-log{position:absolute;bottom:60px;left:6px;width:170px;height:110px;z-index:10;overflow:hidden}
+#event-log .panel-header{font-size:7px;font-weight:700;letter-spacing:2.5px;color:#00FFFF;text-transform:uppercase;margin-bottom:4px}
+#event-log .log-entries{font-size:6.5px;color:#444;line-height:1.5;overflow:hidden;height:96px}
+.log-entry{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.log-entry .timestamp{color:#333}
+.log-entry .event-type{color:#00FFFF}
+.log-entry .event-detail{color:#555}
+.log-entry.circuit{color:#00FF88}
+.log-entry.arrival{color:#555}
+.log-entry.prayer{color:#d4af37}
+
+/* BOTTOM RIGHT — DENSITY CHART */
+#density-panel{position:absolute;bottom:60px;right:6px;width:140px;height:110px;z-index:10}
+#density-panel .panel-header{font-size:7px;font-weight:700;letter-spacing:2.5px;color:#00FFFF;text-transform:uppercase;margin-bottom:4px}
+#density-chart{width:135px;height:80px;background:transparent}
+
+/* BOTTOM STATS BAR */
+#bottom-bar{position:absolute;bottom:8px;left:0;right:0;z-index:10;display:flex;justify-content:space-around;padding:0 8px}
+.bstat{text-align:center}
+.bstat .val{font-size:10px;font-weight:300;color:#E0E0E0;font-variant-numeric:tabular-nums}
+.bstat .lbl{font-size:6px;color:#333;text-transform:uppercase;letter-spacing:1.5px;margin-top:1px}
+
+/* RESEARCH MODE PANEL */
+#research-toggle{position:absolute;top:2px;right:70px;z-index:20;font-size:7px;color:#333;letter-spacing:1px;cursor:pointer;padding:2px 6px;border:1px solid #222;text-transform:uppercase;font-family:'JetBrains Mono',monospace;background:transparent}
+#research-toggle.active{color:#FF4444;border-color:#FF4444;box-shadow:0 0 4px rgba(255,68,68,0.3)}
+#research-badge{display:none;position:absolute;top:14px;right:6px;z-index:20;font-size:6px;color:#FF4444;letter-spacing:2px;text-transform:uppercase;animation:researchPulse 2s infinite}
+#research-badge.visible{display:block}
+@keyframes researchPulse{0%,100%{opacity:1}50%{opacity:0.4}}
+#research-panel{display:none;position:absolute;top:50px;left:50%;transform:translateX(-50%);width:280px;z-index:20;background:rgba(0,0,0,0.92);border:1px solid #222;padding:8px;font-size:6.5px;color:#666;line-height:1.6;max-height:300px;overflow-y:auto}
+#research-panel.visible{display:block}
+#research-panel .rp-header{font-size:7px;font-weight:700;letter-spacing:2px;color:#FF4444;text-transform:uppercase;margin-bottom:4px}
+#research-panel .rp-section{margin-bottom:6px;border-bottom:1px solid #111;padding-bottom:4px}
+#research-panel .rp-label{color:#444;text-transform:uppercase;letter-spacing:1px}
+#research-panel .rp-val{color:#E0E0E0;font-variant-numeric:tabular-nums}
+#research-panel .rp-export{cursor:pointer;color:#00FFFF;border:1px solid #00FFFF33;padding:2px 8px;font-size:7px;letter-spacing:1px;background:transparent;font-family:'JetBrains Mono',monospace;text-transform:uppercase}
+#research-panel .rp-export:hover{background:#00FFFF11}
+
+/* BLACK STONE MARKER */
+.bs-marker{position:absolute;z-index:5;pointer-events:none}
+
+/* MAIN CANVAS */
+canvas#c{position:absolute;top:0;left:0;z-index:1}
+
+/* MOBILE RESPONSIVE */
+@media (max-width: 440px) {
+  body{width:100vw;max-width:100vw;overflow-y:auto}
+  #top-bar .title{font-size:7px;letter-spacing:2px}
+  #top-bar .status{font-size:6px}
+  #time-bar .makkah-time{font-size:7px}
+  #time-bar .next-prayer{font-size:6px}
+  #left-panel{width:85px;left:4px;top:48px}
+  #left-panel .panel-header{font-size:6px;letter-spacing:2px}
+  .bayes-formula{font-size:6px}
+  .bayes-metrics{font-size:6px}
+  #right-panel{width:85px;right:2px;top:48px}
+  #right-panel .panel-header{font-size:6px;letter-spacing:2px}
+  .demo-row{font-size:6px;gap:2px}
+  .demo-row .bar-bg{width:20px}
+  .demo-row .pct{min-width:18px}
+  #center-stats{left:92px;right:92px;top:48px}
+  .cstat .val{font-size:10px}
+  .cstat .lbl{font-size:5px}
+  #phase-indicator{top:72px}
+  #phase-indicator .phase-name{font-size:8px;letter-spacing:2px}
+  #phase-indicator .phase-sub{font-size:6px}
+  #event-log{bottom:52px;left:4px;width:55%;height:90px}
+  #event-log .panel-header{font-size:6px}
+  #event-log .log-entries{font-size:5.5px;height:78px}
+  #density-panel{bottom:52px;right:4px;width:38%}
+  #density-panel .panel-header{font-size:6px}
+  #density-chart{width:100%;height:70px}
+  #bottom-bar{bottom:6px;padding:0 4px}
+  .bstat .val{font-size:8px}
+  .bstat .lbl{font-size:5px;letter-spacing:1px}
+  canvas#c{width:100vw!important;height:100vh!important}
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="top-bar">
+  <div class="title">TAWAF ENGINE // MASJID AL-HARAM</div>
+  <div class="status">
+    <div class="dot" id="status-dot"></div>
+    <span id="status-text">LIVE</span>
+  </div>
+</div>
+
+<!-- TIME BAR -->
+<div id="time-bar">
+  <div class="makkah-time" id="makkah-time">00:00:00</div>
+  <div class="next-prayer" id="next-prayer">—</div>
+</div>
+
+<!-- LEFT PANEL: BAYESIAN MODEL -->
+<div id="left-panel">
+  <div class="panel-header">BAYESIAN MODEL</div>
+  <div class="bayes-formula">
+    <span class="highlight">P(H|D)</span> = <span class="highlight">P(D|H)</span> × <span class="highlight">P(H)</span> / <span class="highlight">P(D)</span>
+  </div>
+  <div class="bayes-divider"></div>
+  <div class="bayes-metrics">
+    <div><span class="label">P(H)   </span> <span class="val" id="b-prior">0.000</span></div>
+    <div><span class="label">P(D|H) </span> <span class="val" id="b-likelihood">0.000</span></div>
+    <div><span class="label">P(D)   </span> <span class="val" id="b-evidence">0.000</span></div>
+    <div><span class="label">P(H|D) </span> <span class="val" id="b-posterior" style="color:#00FF88">0.000</span></div>
+  </div>
+  <div class="bayes-divider"></div>
+  <div class="bayes-metrics">
+    <div><span class="label">PRED   </span> <span class="val" id="b-predicted">0</span></div>
+    <div><span class="label">ACTUAL </span> <span class="val" id="b-actual">0</span></div>
+    <div><span class="label">ERR    </span> <span class="val" id="b-error">0%</span></div>
+  </div>
+  <div class="confidence-bar" id="conf-bar">
+    <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+    <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+  </div>
+</div>
+
+<!-- RIGHT PANEL: DEMOGRAPHICS -->
+<div id="right-panel">
+  <div class="panel-header">DEMOGRAPHICS</div>
+  <div id="demo-list"></div>
+</div>
+
+<!-- CENTER STATS -->
+<div id="center-stats">
+  <div class="cstat"><div class="val" id="s-agents">0</div><div class="lbl">AGENTS</div></div>
+  <div class="cstat"><div class="val" id="s-capacity">0%</div><div class="lbl">CAPACITY</div></div>
+  <div class="cstat"><div class="val" id="s-circuits">0</div><div class="lbl">TAWAF</div></div>
+</div>
+
+<!-- PHASE INDICATOR -->
+<div id="phase-indicator">
+  <div class="phase-name" id="phase-name">INITIALIZING</div>
+  <div class="phase-sub" id="phase-sub"></div>
+</div>
+
+<!-- EVENT LOG -->
+<div id="event-log">
+  <div class="panel-header">EVENT STREAM</div>
+  <div class="log-entries" id="log-entries"></div>
+</div>
+
+<!-- DENSITY CHART -->
+<div id="density-panel">
+  <div class="panel-header">CROWD DENSITY</div>
+  <canvas id="density-chart" width="270" height="160"></canvas>
+</div>
+
+<!-- BOTTOM STATS -->
+<div id="bottom-bar">
+  <div class="bstat"><div class="val" id="s-circhr">0</div><div class="lbl">CIRC/HR</div></div>
+  <div class="bstat"><div class="val" id="s-avgtime">0s</div><div class="lbl">AVG CIRC</div></div>
+  <div class="bstat"><div class="val" id="s-density">0.0</div><div class="lbl">PPL/M²</div></div>
+  <div class="bstat"><div class="val" id="s-countdown">—</div><div class="lbl">NEXT SALAH</div></div>
+</div>
+
+<!-- RESEARCH MODE -->
+<button id="research-toggle" onclick="toggleResearch()">RESEARCH</button>
+<div id="research-badge">● RESEARCH MODE</div>
+<div id="research-panel">
+  <div class="rp-header">AUTORESEARCH // DATA LOG</div>
+  <div class="rp-section" id="rp-params"></div>
+  <div class="rp-section" id="rp-flow"></div>
+  <div class="rp-section" id="rp-accuracy"></div>
+  <div class="rp-section"><button class="rp-export" onclick="exportResearchData()">EXPORT JSON</button> <span id="rp-export-status" style="color:#00FF88"></span></div>
+</div>
+
+<canvas id="c"></canvas>
+
+<script>
+// --- CONFIG ---
+const W = Math.min(430, window.innerWidth);
+const H = Math.min(932, window.innerHeight);
+const CX = W / 2, CY = H / 2 + 10;
+
+// === REAL-WORLD MATAF DIMENSIONS (sources below) ===
+// Ka'bah: 11.03m × 12.86m × 13.1m height [Wikipedia; Madain Project]
+// Mataf ground floor area: ~14,000 sq m [Saudi Gazette; Madain Project]
+// Mataf inner radius: ~15m from Ka'bah center (outside Hijr Ismail)
+// Mataf outer radius: ~68m from Ka'bah center (post-2024 expansion)
+// Pixel scale: ~2.6 px/m (fits 430px-wide mobile viewport)
+const REAL_KAABAH_W = 11.03;   // meters (north-south wall)
+const REAL_KAABAH_L = 12.86;   // meters (east-west wall)
+const REAL_MATAF_INNER_R = 15;  // meters from Ka'bah center
+const REAL_MATAF_OUTER_R = 68;  // meters from Ka'bah center (ground floor, expanded)
+const REAL_MATAF_AREA = 14000;  // sq meters, ground floor [Saudi Gazette]
+const PX_PER_METER = Math.min(175, W * 0.41) / REAL_MATAF_OUTER_R; // ~2.57 px/m
+const KAABAH_SIZE = Math.round(((REAL_KAABAH_W + REAL_KAABAH_L) / 2) * PX_PER_METER); // ~31px
+const MATAF_INNER = Math.round(REAL_MATAF_INNER_R * PX_PER_METER);  // ~39px
+const MATAF_OUTER = Math.min(175, W * 0.41);                        // ~175px
+
+// === HIJR ISMAIL (semi-circular wall NW of Ka'bah) ===
+// Real dimensions: ~12m radius semi-circle on the NW side
+// Angle: roughly centered at ~2.36 rad (135° from east, i.e. NW)
+const HIJR_RADIUS = Math.round(12 * PX_PER_METER);  // ~31px
+const HIJR_CENTER_ANGLE = Math.PI * 0.75;            // NW direction (135°)
+const HIJR_CX = CX + Math.cos(HIJR_CENTER_ANGLE) * (KAABAH_SIZE / 2 + HIJR_RADIUS * 0.45);
+const HIJR_CY = CY + Math.sin(HIJR_CENTER_ANGLE) * (KAABAH_SIZE / 2 + HIJR_RADIUS * 0.45);
+const HIJR_ARC_HALF = Math.PI * 0.55; // semi-circle angular span
+
+function isInHijrIsmail(x, y) {
+  const dx = x - HIJR_CX, dy = y - HIJR_CY;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist > HIJR_RADIUS) return false;
+  // Check angular span — only the semi-circle facing Ka'bah
+  const ang = Math.atan2(dy, dx);
+  let dAng = ang - (HIJR_CENTER_ANGLE + Math.PI); // facing inward
+  while (dAng > Math.PI) dAng -= 2 * Math.PI;
+  while (dAng < -Math.PI) dAng += 2 * Math.PI;
+  return Math.abs(dAng) < HIJR_ARC_HALF;
+}
+
+// === CLUSTER BEHAVIOR — 7 organic clumps with dark gaps ===
+const NUM_CLUSTERS = 7;
+const clusterAngle = new Float32Array(NUM_CLUSTERS);
+const clusterDist = new Float32Array(NUM_CLUSTERS);  // distance from center
+const clusterSize = new Float32Array(NUM_CLUSTERS);   // radius of influence
+const clusterDrift = new Float32Array(NUM_CLUSTERS);  // slow angular drift speed
+(function initClusters() {
+  for (let c = 0; c < NUM_CLUSTERS; c++) {
+    // Uneven angular spacing creates natural asymmetry
+    clusterAngle[c] = (c / NUM_CLUSTERS) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+    // Vary radial distance — some inner, some outer
+    clusterDist[c] = MATAF_INNER + Math.random() * (MATAF_OUTER - MATAF_INNER - 15);
+    clusterSize[c] = 20 + Math.random() * 25; // tighter clusters = more visible gaps
+    clusterDrift[c] = (0.00005 + Math.random() * 0.00015) * (Math.random() < 0.5 ? 1 : -1);
+  }
+})();
+
+// Per-agent cluster assignment (-1 = no cluster) — initialized after MAX_AGENTS
+let acluster; // set in initClusterArrays()
+
+function assignCluster(i) {
+  // 80% chance of being drawn to a cluster (stronger clumping)
+  if (Math.random() > 0.80) { acluster[i] = -1; return; }
+  // Pick closest cluster to current position
+  let bestC = 0, bestD = Infinity;
+  for (let c = 0; c < NUM_CLUSTERS; c++) {
+    const cx = CX + Math.cos(clusterAngle[c]) * clusterDist[c];
+    const cy = CY + Math.sin(clusterAngle[c]) * clusterDist[c];
+    const d = Math.sqrt((ax[i]-cx)*(ax[i]-cx) + (ay[i]-cy)*(ay[i]-cy));
+    if (d < bestD) { bestD = d; bestC = c; }
+  }
+  acluster[i] = bestC;
+}
+
+// === CAPACITY MODEL ===
+// Total Mataf throughput: 107,000 pilgrims/hr across all levels
+//   [General Authority for Affairs of Two Holy Mosques, SPA.gov.sa, 2025]
+// Levels: ground floor, 1st floor, 1st mezzanine, 2nd mezzanine, rooftop
+// Ground floor instantaneous max: ~28,000 people [estimated from 14,000 sq m × 2 ppl/sq m avg]
+// Peak density near Ka'bah: 6-8 ppl/sq m; at 40m out: ~1 ppl/sq m [G.K. Still / ResearchGate]
+// Walking speed: 0.3 m/s (inner, dense) to 1.1 m/s (outer, sparse) [ResearchGate crowd studies]
+const MATAF_HOURLY_CAPACITY = 107000;       // all levels combined [SPA.gov.sa]
+const MATAF_GROUND_MAX = 28000;             // instantaneous ground floor max
+const PEOPLE_PER_AGENT = 8;                 // each dot ≈ 8 real people
+const MAX_AGENTS = 3500;                    // performance cap → 3500 × 8 = 28,000 people
+acluster = new Int8Array(MAX_AGENTS).fill(-1); // cluster assignment array
+
+// --- DEMOGRAPHICS ---
+// Sources: Saudi GASTAT Hajj data 2024; Frontiers in Public Health (Iranian Hajj cohort)
+// Male 52% / Female 48%; ages 75% between 35-64; wheelchair/disabled ~3-5%
+// Most foreign pilgrims use licensed tour operators (mandatory for Hajj)
+const TYPE_SOLO_M = 0, TYPE_SOLO_F = 1, TYPE_FAMILY = 2, TYPE_ELDERLY = 3, TYPE_TOUR = 4, TYPE_CHILD = 5;
+const TYPE_WEIGHTS = [0.25, 0.12, 0.25, 0.10, 0.22, 0.06];
+// Solo M 25%, Solo F 12%, Family 25%, Elderly/wheelchair 10%, Tour group 22%, Children 6%
+const TYPE_CUMULATIVE = [];
+{ let s = 0; for (const w of TYPE_WEIGHTS) { s += w; TYPE_CUMULATIVE.push(s); } }
+
+const TYPE_NAMES = ['SOLO M','SOLO F','FAMILY','ELDERLY','TOUR','CHILD'];
+const TYPE_COLORS_CSS = ['#dce4ec','#c8a0e0','#4ddb8a','#d4af37','#40c8ff','#ffb088'];
+
+// Speed multipliers calibrated to real tawaf speeds:
+// Inner ring: ~0.3 m/s, outer ring: ~1.1 m/s [ResearchGate crowd density studies]
+// 7-circuit tawaf time: 25-45 min (inner=shorter path but slower; outer=longer but faster)
+const TYPE_CONFIG = {
+  [TYPE_SOLO_M]:  { speedMul: 1.3, sizeMin: 0.8, sizeMax: 1.2, ringMin: 0.0,  ringMax: 0.7 },
+  [TYPE_SOLO_F]:  { speedMul: 1.0, sizeMin: 0.7, sizeMax: 1.1, ringMin: 0.0,  ringMax: 0.8 },
+  [TYPE_FAMILY]:  { speedMul: 0.55, sizeMin: 0.7, sizeMax: 1.1, ringMin: 0.05, ringMax: 0.9 },
+  [TYPE_ELDERLY]: { speedMul: 0.25, sizeMin: 1.0, sizeMax: 1.4, ringMin: 0.1,  ringMax: 0.6 },
+  [TYPE_TOUR]:    { speedMul: 0.7, sizeMin: 0.7, sizeMax: 1.0, ringMin: 0.1,  ringMax: 0.8 },
+  [TYPE_CHILD]:   { speedMul: 0.8, sizeMin: 0.4, sizeMax: 0.6, ringMin: 0.05, ringMax: 0.9 },
+};
+
+// === SOCIAL FORCE MODEL (Helbing & Molnar 1995) ===
+// Standard pedestrian dynamics model used in Hajj crowd safety research
+// Parameters tuned for pixel-space sim (~2.57 px/m)
+const SFM_AGENT_R = 0.65;         // agent radius px (~0.25m shoulder half-width)
+const SFM_TAU = 8;                // velocity relaxation time (frames, ~0.5s at 60fps)
+const SFM_A = 0.3;                // social repulsion strength
+const SFM_B = 1.5;                // social repulsion range (px)
+const SFM_K = 3.0;                // body compression stiffness (contact only)
+const SFM_KAPPA = 1.5;            // sliding friction coefficient (contact only)
+const SFM_WALL_A = 1.0;           // wall repulsion strength
+const SFM_WALL_B = 2.5;           // wall repulsion range (px)
+const SFM_WALL_RANGE = 10;        // max distance for wall force calc
+const SFM_INTERACT_R2 = 64;       // agent interaction range² (8px ≈ 3m)
+
+// Gravitational pull toward Ka'bah — direct radial force per agent (px/frame²)
+// Everyone wants to be as close as possible; inner rings packed, outer exist because inner is full.
+// When an inner agent completes 7 circuits and exits, agents behind shift inward.
+const SFM_RADIAL_PULL = [
+  0.030,  // SOLO_M  — aggressive, push through crowd
+  0.022,  // SOLO_F  — moderate inward desire
+  0.015,  // FAMILY  — careful, don't crush kids
+  0.012,  // ELDERLY — wants proximity but gentle
+  0.020,  // TOUR    — guided, moderate push
+  0.010,  // CHILD   — follows family, weakest pull
+];
+
+function typeColor(type) {
+  let r, g, b, a;
+  const v = () => (Math.random() - 0.5) * 18;
+  switch (type) {
+    case TYPE_SOLO_M: r = 220+v(); g = 230+v(); b = 245+v(); a = 200+Math.random()*55; break; // ice white
+    case TYPE_SOLO_F: r = 200+v(); g = 100+v(); b = 240+v(); a = 190+Math.random()*55; break; // purple/magenta
+    case TYPE_FAMILY: r = 40+v();  g = 220+v(); b = 100+v(); a = 195+Math.random()*50; break; // green
+    case TYPE_ELDERLY: r = 240+v(); g = 180+v(); b = 40+v();  a = 200+Math.random()*45; break; // amber/gold
+    case TYPE_TOUR: { // Compound palette: cyan, teal, blue, with some red/pink outliers
+      const sub = Math.random();
+      if (sub < 0.55) { r = 30+v(); g = 200+v(); b = 240+v(); } // cyan
+      else if (sub < 0.75) { r = 50+v(); g = 180+v(); b = 200+v(); } // teal
+      else if (sub < 0.88) { r = 60+v(); g = 100+v(); b = 240+v(); } // blue
+      else if (sub < 0.95) { r = 220+v(); g = 70+v(); b = 90+v(); } // red/coral
+      else { r = 200+v(); g = 200+v(); b = 210+v(); } // gray-white
+      a = 195+Math.random()*50;
+      break;
+    }
+    case TYPE_CHILD:  r = 245+v(); g = 130+v(); b = 80+v(); a = 190+Math.random()*50; break; // warm orange
+  }
+  r = Math.max(0, Math.min(255, r)) | 0;
+  g = Math.max(0, Math.min(255, g)) | 0;
+  b = Math.max(0, Math.min(255, b)) | 0;
+  a = Math.max(80, Math.min(255, a)) | 0;
+  return (a << 24) | (b << 16) | (g << 8) | r;
+}
+
+function pickType() {
+  const r = Math.random();
+  for (let i = 0; i < TYPE_CUMULATIVE.length; i++) {
+    if (r < TYPE_CUMULATIVE[i]) return i;
+  }
+  return TYPE_SOLO_M;
+}
+
+// --- CANVAS ---
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const trailCanvas = document.createElement('canvas');
+trailCanvas.width = W; trailCanvas.height = H;
+const tctx = trailCanvas.getContext('2d');
+canvas.width = W; canvas.height = H;
+canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+
+// --- PRAYER TIMES ---
+let prayerTimes = null;
+let prayerSchedule = [];
+let targetAgentCount = 1500;
+
+async function fetchPrayerTimes() {
+  try {
+    const today = new Date();
+    const dd = String(today.getDate()).padStart(2,'0');
+    const mm = String(today.getMonth()+1).padStart(2,'0');
+    const yyyy = today.getFullYear();
+    const res = await fetch(`https://api.aladhan.com/v1/timingsByCity/${dd}-${mm}-${yyyy}?city=Makkah&country=Saudi+Arabia&method=4`);
+    const data = await res.json();
+    prayerTimes = data.data.timings;
+  } catch(e) {
+    // Fallback: Makkah prayer times for ~16 Mar 2026 (27 Ramadan 1447), Umm al-Qura method
+    // [aladhan.com/calendar/Makkah; islamicfinder.org Makkah prayer times]
+    prayerTimes = {Fajr:'05:13',Sunrise:'06:29',Dhuhr:'12:30',Asr:'15:54',Maghrib:'18:31',Isha:'20:31'};
+  }
+  buildSchedule();
+}
+
+function buildSchedule() {
+  const names = ['Fajr','Dhuhr','Asr','Maghrib','Isha'];
+  prayerSchedule = names.map(n => {
+    const [h,m] = prayerTimes[n].split(':').map(Number);
+    return {name: n, hour: h, min: m, totalMin: h*60+m};
+  });
+}
+
+function getMakkahTime() {
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+  return new Date(utc + 3 * 3600000);
+}
+
+function getNextPrayerInfo() {
+  if (!prayerSchedule.length) return {next:'—',nextIn:'',nextInSec:99999};
+  const makkah = getMakkahTime();
+  const nowSec = (makkah.getHours() * 60 + makkah.getMinutes()) * 60 + makkah.getSeconds();
+  for (let i = 0; i < prayerSchedule.length; i++) {
+    const pSec = prayerSchedule[i].totalMin * 60;
+    if (pSec > nowSec) {
+      return {next: prayerSchedule[i].name, nextIn: formatTime(pSec - nowSec), nextInSec: pSec - nowSec};
+    }
+  }
+  const fSec = prayerSchedule[0].totalMin * 60;
+  const rem = 86400 - nowSec + fSec;
+  return {next: prayerSchedule[0].name, nextIn: formatTime(rem), nextInSec: rem};
+}
+
+// Late Ramadan tawaf crowd model (27th night = one of busiest of the year)
+// 2025 data: 2.5M+ worshippers on 27th Ramadan night at entire Haram [Khaleej Times]
+// 4.1M on 29th night [The Islamic Information]. Ground floor Mataf is a fraction of total.
+// Agent counts × PEOPLE_PER_AGENT (8) = estimated real people on ground floor Mataf
+function getTargetAgentCountForTime() {
+  const makkah = getMakkahTime();
+  const h = makkah.getHours();
+  let target = 2200;                         // default ~17,600 real people
+  if (h >= 22 || h < 2)  target = 3200;      // post-Taraweeh peak tawaf: ~25,600
+  else if (h >= 2 && h < 4)  target = 2800;  // Tahajjud/late night: ~22,400
+  else if (h >= 4 && h < 6)  target = 2200;  // pre-Fajr: ~17,600
+  else if (h >= 6 && h < 9)  target = 1500;  // post-Fajr rest: ~12,000
+  else if (h >= 9 && h < 12) target = 1800;  // morning: ~14,400
+  else if (h >= 12 && h < 15) target = 2200; // Dhuhr-Asr: ~17,600
+  else if (h >= 15 && h < 18) target = 2500; // afternoon surge: ~20,000
+  else if (h >= 18 && h < 20) target = 2800; // Maghrib/Isha: ~22,400
+  else if (h >= 20 && h < 22) target = 1800; // Taraweeh (most praying, fewer tawaf): ~14,400
+  return target;
+}
+
+function formatTime(sec) {
+  const h = Math.floor(sec/3600);
+  const m = Math.floor((sec%3600)/60);
+  const s = Math.floor(sec%60);
+  if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m`;
+  return `${m}m ${String(s).padStart(2,'0')}s`;
+}
+
+// --- PRAYER MODE STATE MACHINE ---
+const PRAYER_RAKAT = {Fajr:2, Dhuhr:4, Asr:4, Maghrib:3, Isha:4};
+const POSE_ORDER = ['standing','ruku','standing2','sujud1','sitting','sujud2'];
+const POSE_DURATION = {standing:40, ruku:12, standing2:5, sujud1:15, sitting:5, sujud2:15};
+// total per rakat = 92s
+
+const prayerMode = {
+  phase: 'tawaf', // tawaf | adhan | iqamah | praying | salam | resuming
+  prayerName: '',
+  rakatTotal: 0,
+  rakatCurrent: 1,
+  poseIndex: 0,
+  phaseStart: 0,   // Date.now() when phase started
+  poseStart: 0,
+  rowsComputed: false,
+  adhanTriggeredFor: '', // prevent re-triggering same prayer
+  // Bayesian prayer transition model
+  bayesTrans: {
+    priorMs: 20000,        // expected transition time
+    observations: [],
+    posteriorMs: 20000,
+    predictedDuration: 0,  // predicted total prayer duration (s)
+    actualDuration: 0,
+    confidence: 0
+  }
+};
+
+// Per-agent prayer targets
+const aprayerTX = new Float32Array(MAX_AGENTS);
+const aprayerTY = new Float32Array(MAX_AGENTS);
+const aprayerAssigned = new Uint8Array(MAX_AGENTS);
+
+// --- CIRCULAR ROW COMPUTATION ---
+function computePrayerRows() {
+  const ROW_SPACING = 6.5;
+  const ARC_SPACING = 3.8;
+  const startDist = KAABAH_SIZE / 2 + 14;
+  const maxDist = MATAF_OUTER + 30;
+  const rows = [];
+
+  for (let r = startDist; r < maxDist; r += ROW_SPACING) {
+    const circumference = 2 * Math.PI * r;
+    const count = Math.floor(circumference / ARC_SPACING);
+    const positions = [];
+    for (let j = 0; j < count; j++) {
+      const a = (j / count) * Math.PI * 2;
+      positions.push({x: CX + Math.cos(a) * r, y: CY + Math.sin(a) * r});
+    }
+    rows.push({dist: r, positions, capacity: positions.length, filled: 0});
+  }
+  return rows;
+}
+
+function assignAgentsToRows() {
+  const rows = computePrayerRows();
+  aprayerAssigned.fill(0);
+
+  // Build sorted agent indices by distance from center (inner first)
+  const indices = [];
+  for (let i = 0; i < agentCount; i++) {
+    const dx = ax[i] - CX, dy = ay[i] - CY;
+    indices.push({i, dist: Math.sqrt(dx*dx + dy*dy)});
+  }
+  indices.sort((a,b) => a.dist - b.dist);
+
+  // For each agent, find nearest row with capacity, then nearest position in that row
+  const rowFillIdx = new Int32Array(rows.length); // next position to assign per row
+
+  for (const ag of indices) {
+    const idx = ag.i;
+    const dx = ax[idx] - CX, dy = ay[idx] - CY;
+    const dist = ag.dist;
+    const angle = Math.atan2(dy, dx);
+
+    // Find nearest row with capacity
+    let bestRow = -1, bestRDist = Infinity;
+    for (let r = 0; r < rows.length; r++) {
+      if (rows[r].filled >= rows[r].capacity) continue;
+      const rd = Math.abs(dist - rows[r].dist);
+      if (rd < bestRDist) { bestRDist = rd; bestRow = r; }
+    }
+    if (bestRow < 0) {
+      // All rows full — overflow, just stay in place
+      aprayerTX[idx] = ax[idx];
+      aprayerTY[idx] = ay[idx];
+      aprayerAssigned[idx] = 1;
+      continue;
+    }
+
+    const row = rows[bestRow];
+    // Find nearest position in this row to agent's current position
+    let bestP = 0, bestPDist = Infinity;
+    for (let p = 0; p < row.positions.length; p++) {
+      const pdx = ax[idx] - row.positions[p].x;
+      const pdy = ay[idx] - row.positions[p].y;
+      const pd = pdx*pdx + pdy*pdy;
+      if (pd < bestPDist) { bestPDist = pd; bestP = p; }
+    }
+
+    aprayerTX[idx] = row.positions[bestP].x;
+    aprayerTY[idx] = row.positions[bestP].y;
+    aprayerAssigned[idx] = 1;
+    // Remove this position so no one else gets it
+    row.positions.splice(bestP, 1);
+    row.capacity--;
+    row.filled++;
+  }
+
+  prayerMode.rowsComputed = true;
+}
+
+function getPoseLabel() {
+  const pose = POSE_ORDER[prayerMode.poseIndex];
+  if (pose === 'standing' || pose === 'standing2') return 'QIYAM';
+  if (pose === 'ruku') return 'RUKU';
+  if (pose === 'sujud1' || pose === 'sujud2') return 'SUJUD';
+  if (pose === 'sitting') return 'JULOOS';
+  return '';
+}
+
+function getPoseSizeMul() {
+  const pose = POSE_ORDER[prayerMode.poseIndex];
+  if (pose === 'standing' || pose === 'standing2') return 1.0;
+  if (pose === 'ruku') return 0.6;
+  if (pose === 'sujud1' || pose === 'sujud2') return 0.3;
+  if (pose === 'sitting') return 0.55;
+  return 1.0;
+}
+
+function updatePrayerStateMachine() {
+  const now = Date.now();
+  const makkah = getMakkahTime();
+  const nowSec = makkah.getHours() * 3600 + makkah.getMinutes() * 60 + makkah.getSeconds();
+
+  if (prayerMode.phase === 'tawaf') {
+    // Check if adhan should start (120s before any prayer)
+    for (const p of prayerSchedule) {
+      const pSec = p.totalMin * 60;
+      let diff = pSec - nowSec;
+      if (diff < 0) diff += 86400;
+      if (diff > 0 && diff <= 120 && prayerMode.adhanTriggeredFor !== p.name) {
+        prayerMode.phase = 'adhan';
+        prayerMode.prayerName = p.name;
+        prayerMode.rakatTotal = PRAYER_RAKAT[p.name];
+        prayerMode.rakatCurrent = 1;
+        prayerMode.poseIndex = 0;
+        prayerMode.phaseStart = now;
+        prayerMode.rowsComputed = false;
+        prayerMode.adhanTriggeredFor = p.name;
+        prayerMode.bayesTrans.predictedDuration = prayerMode.rakatTotal * 92;
+        addEvent('prayer', `${p.name} adhan — tawaf slowing`);
+        break;
+      }
+    }
+    return;
+  }
+
+  if (prayerMode.phase === 'adhan') {
+    const elapsed = (now - prayerMode.phaseStart) / 1000;
+    if (elapsed >= 120) {
+      prayerMode.phase = 'iqamah';
+      prayerMode.phaseStart = now;
+      assignAgentsToRows();
+      addEvent('prayer', `iqamah — forming rows for ${prayerMode.prayerName}`);
+    }
+    return;
+  }
+
+  if (prayerMode.phase === 'iqamah') {
+    const elapsed = (now - prayerMode.phaseStart) / 1000;
+    // Track transition Bayesian
+    prayerMode.bayesTrans.actualDuration = elapsed;
+    if (elapsed >= 45) {
+      // Update Bayesian transition model
+      const actualMs = elapsed * 1000;
+      prayerMode.bayesTrans.observations.push(actualMs);
+      const obs = prayerMode.bayesTrans.observations;
+      const n = obs.length;
+      const mean = obs.reduce((s,v)=>s+v,0)/n;
+      const prior = prayerMode.bayesTrans.priorMs;
+      const weight = Math.min(n / 5, 1);
+      prayerMode.bayesTrans.posteriorMs = prior * (1-weight) + mean * weight;
+      prayerMode.bayesTrans.confidence = Math.min(n / 8, 1);
+
+      prayerMode.phase = 'praying';
+      prayerMode.phaseStart = now;
+      prayerMode.poseStart = now;
+      prayerMode.poseIndex = 0;
+      prayerMode.rakatCurrent = 1;
+      addEvent('prayer', `${prayerMode.prayerName} salah — rakat 1/${prayerMode.rakatTotal}`);
+    }
+    return;
+  }
+
+  if (prayerMode.phase === 'praying') {
+    const poseElapsed = (now - prayerMode.poseStart) / 1000;
+    const currentPose = POSE_ORDER[prayerMode.poseIndex];
+    const dur = POSE_DURATION[currentPose];
+
+    if (poseElapsed >= dur) {
+      prayerMode.poseIndex++;
+      prayerMode.poseStart = now;
+
+      if (prayerMode.poseIndex >= POSE_ORDER.length) {
+        // Rakat complete
+        prayerMode.rakatCurrent++;
+        prayerMode.poseIndex = 0;
+        if (prayerMode.rakatCurrent > prayerMode.rakatTotal) {
+          // Prayer complete — salam
+          prayerMode.phase = 'salam';
+          prayerMode.phaseStart = now;
+          addEvent('prayer', `${prayerMode.prayerName} — assalamu alaikum`);
+        } else {
+          addEvent('prayer', `rakat ${prayerMode.rakatCurrent}/${prayerMode.rakatTotal}`);
+        }
+      }
+    }
+    return;
+  }
+
+  if (prayerMode.phase === 'salam') {
+    const elapsed = (now - prayerMode.phaseStart) / 1000;
+    if (elapsed >= 20) {
+      prayerMode.phase = 'resuming';
+      prayerMode.phaseStart = now;
+      prayerMode.rowsComputed = false;
+      addEvent('prayer', `tawaf resuming — post-${prayerMode.prayerName}`);
+    }
+    return;
+  }
+
+  if (prayerMode.phase === 'resuming') {
+    const elapsed = (now - prayerMode.phaseStart) / 1000;
+    if (elapsed >= 60) {
+      prayerMode.phase = 'tawaf';
+      prayerMode.prayerName = '';
+      addEvent('system', 'tawaf fully resumed');
+    }
+    return;
+  }
+}
+
+function getPrayerPhaseLabel() {
+  const pm = prayerMode;
+  if (pm.phase === 'adhan') return 'ADHAN';
+  if (pm.phase === 'iqamah') return 'IQAMAH';
+  if (pm.phase === 'praying') {
+    return `RAKAT ${pm.rakatCurrent}/${pm.rakatTotal} — ${getPoseLabel()}`;
+  }
+  if (pm.phase === 'salam') return 'SALAM';
+  if (pm.phase === 'resuming') return 'TAWAF RESUMING';
+  return '';
+}
+
+// --- AGENTS (SoA) ---
+const ax = new Float32Array(MAX_AGENTS);
+const ay = new Float32Array(MAX_AGENTS);
+const avx = new Float32Array(MAX_AGENTS);
+const avy = new Float32Array(MAX_AGENTS);
+const aspeed = new Float32Array(MAX_AGENTS);
+const asize = new Float32Array(MAX_AGENTS);
+const acolor = new Uint32Array(MAX_AGENTS);
+const acircuits = new Uint8Array(MAX_AGENTS);
+const aangleAccum = new Float32Array(MAX_AGENTS);
+const alastAngle = new Float32Array(MAX_AGENTS);
+const atype = new Uint8Array(MAX_AGENTS);
+const agroupId = new Int16Array(MAX_AGENTS);
+const agroupLeader = new Int16Array(MAX_AGENTS);
+const agroupOffX = new Float32Array(MAX_AGENTS);
+const agroupOffY = new Float32Array(MAX_AGENTS);
+let agentCount = 0;
+let totalTawaf = 0;
+let nextGroupId = 0;
+
+// === INNER RING ZONES ===
+// Hajar al-Aswad (Black Stone) is at the eastern corner of Ka'bah
+// Multazam is the wall between the door and Black Stone (SE wall)
+const BLACK_STONE_ANGLE = -Math.PI / 4; // NE corner in screen coords
+const BLACK_STONE_X = CX + KAABAH_SIZE / 2;
+const BLACK_STONE_Y = CY - KAABAH_SIZE / 2;
+const MULTAZAM_ANGLE_START = BLACK_STONE_ANGLE;
+const MULTAZAM_ANGLE_END = BLACK_STONE_ANGLE + Math.PI / 4; // quarter wall toward door
+const TOUCH_RING_DIST = KAABAH_SIZE / 2 + 2 * PX_PER_METER; // ~2m from Ka'bah wall
+const ZONE_SEEKER_PCT = 0.15; // 15% of agents attempt to touch
+const ZONE_ARC_TRIGGER = Math.PI / 5; // how close in angle before zone behavior activates
+
+// Zone arrays — 0=normal orbit, 1=black stone seeker, 2=multazam seeker
+const azoneIntent = new Uint8Array(MAX_AGENTS);
+// Zone state — 0=orbiting, 1=approaching, 2=at zone (stopped), 3=departing
+const azoneState = new Uint8Array(MAX_AGENTS);
+const azoneTimer = new Float32Array(MAX_AGENTS);
+const azoneDuration = new Float32Array(MAX_AGENTS); // seconds to stay at zone
+
+// === TOUCHING LAYER (agents pressed against Ka'bah walls, making du'a) ===
+// In reality the innermost ring is NOT tawaf. People are pressed against the Kiswah,
+// completely stationary, facing inward. The tawaf flow goes AROUND them.
+const KAABAH_WALL_R = KAABAH_SIZE / 2 + 1;                   // hard wall (building edge)
+const TOUCHING_INNER_R = KAABAH_SIZE / 2 + 1 * PX_PER_METER; // ~1m from wall
+const TOUCHING_OUTER_R = KAABAH_SIZE / 2 + 2 * PX_PER_METER; // ~2m from wall
+const SQUEEZE_OUTER_R = KAABAH_SIZE / 2 + 5 * PX_PER_METER;  // squeeze zone outer edge (~5m)
+const TOUCHING_AGENTS_TARGET = 150;  // target agents in touching ring (dense solid ring)
+const TOUCHING_MIN_SEC = 30;         // min seconds pressed against wall
+const TOUCHING_MAX_SEC = 120;        // max before crowd pushes them out
+
+// Per-agent touching state: 0=normal tawaf, 1=touching (stationary at wall), 2=releasing (pushed out)
+const atouchState = new Uint8Array(MAX_AGENTS);
+const atouchTimer = new Float32Array(MAX_AGENTS);
+const atouchDuration = new Float32Array(MAX_AGENTS);
+
+// --- EVENT LOG ---
+const eventLog = [];
+const MAX_LOG = 18;
+let logEl = null;
+
+function addEvent(type, msg) {
+  const makkah = getMakkahTime();
+  const ts = makkah.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+  eventLog.unshift({ts, type, msg});
+  if (eventLog.length > MAX_LOG) eventLog.pop();
+}
+
+function renderLog() {
+  if (!logEl) logEl = document.getElementById('log-entries');
+  let html = '';
+  for (const e of eventLog) {
+    const cls = e.type === 'circuit' ? 'circuit' : e.type === 'prayer' ? 'prayer' : 'arrival';
+    html += `<div class="log-entry ${cls}"><span class="timestamp">${e.ts}</span> <span class="event-type">${e.type.toUpperCase()}</span> ${e.msg}</div>`;
+  }
+  logEl.innerHTML = html;
+}
+
+// --- DENSITY HISTORY ---
+const densityHistory = new Float32Array(135);
+let densityIdx = 0;
+let densityFull = false;
+
+function recordDensity() {
+  const d = agentCount / MAX_AGENTS;
+  densityHistory[densityIdx] = d;
+  densityIdx = (densityIdx + 1) % densityHistory.length;
+  if (densityIdx === 0) densityFull = true;
+}
+
+function drawDensityChart() {
+  const c = document.getElementById('density-chart');
+  const cx = c.getContext('2d');
+  const w = c.width, h = c.height;
+  cx.clearRect(0, 0, w, h);
+
+  cx.strokeStyle = '#111';
+  cx.lineWidth = 0.5;
+  for (let y = 0; y < h; y += h/4) {
+    cx.beginPath(); cx.moveTo(0, y); cx.lineTo(w, y); cx.stroke();
+  }
+
+  const len = densityFull ? densityHistory.length : densityIdx;
+  if (len < 2) return;
+
+  let maxVal = 0;
+  for (let i = 0; i < len; i++) maxVal = Math.max(maxVal, densityHistory[i]);
+  maxVal = Math.max(maxVal, 0.1);
+
+  cx.beginPath();
+  cx.strokeStyle = '#00FFFF';
+  cx.lineWidth = 1;
+  cx.shadowColor = '#00FFFF';
+  cx.shadowBlur = 3;
+
+  const startIdx = densityFull ? densityIdx : 0;
+  for (let i = 0; i < len; i++) {
+    const idx = (startIdx + i) % densityHistory.length;
+    const x = (i / (len - 1)) * w;
+    const y = h - (densityHistory[idx] / maxVal) * (h - 10) - 5;
+    if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+  }
+  cx.stroke();
+  cx.shadowBlur = 0;
+
+  const lastX = w;
+  const lastIdx = (startIdx + len - 1) % densityHistory.length;
+  const lastY = h - (densityHistory[lastIdx] / maxVal) * (h - 10) - 5;
+  cx.lineTo(lastX, h);
+  cx.lineTo(0, h);
+  cx.closePath();
+  cx.fillStyle = 'rgba(0,255,255,0.03)';
+  cx.fill();
+
+  const current = densityHistory[(densityIdx - 1 + densityHistory.length) % densityHistory.length];
+  cx.fillStyle = '#00FFFF';
+  cx.font = '9px JetBrains Mono';
+  cx.textAlign = 'right';
+  cx.fillText((current * 100).toFixed(0) + '%', w - 2, lastY - 4);
+}
+
+// --- CIRCUIT TRACKING ---
+let circuitsThisMinute = 0;
+let circuitsPerHour = 0;
+let circuitTimes = [];
+let lastCircuitReset = Date.now();
+
+function spawnAgent(distributed, forceType, groupId, leaderIdx, offX, offY) {
+  if (agentCount >= MAX_AGENTS) return -1;
+  const i = agentCount++;
+  const type = forceType !== undefined ? forceType : pickType();
+  atype[i] = type;
+  const cfg = TYPE_CONFIG[type];
+
+  const range = MATAF_OUTER - SQUEEZE_OUTER_R;
+  let ring;
+  if (distributed) {
+    const bandMin = SQUEEZE_OUTER_R + cfg.ringMin * range;
+    const bandMax = SQUEEZE_OUTER_R + cfg.ringMax * range;
+    const t = Math.pow(Math.random(), 2.5); // strong inner bias (gravitational packing)
+    ring = bandMin + t * (bandMax - bandMin);
+  } else {
+    // New arrivals enter from the outer edge — gravity pulls them inward over time
+    ring = MATAF_OUTER - 3 - Math.random() * 15;
+  }
+  const angle = Math.random() * Math.PI * 2;
+  ax[i] = CX + Math.cos(angle) * ring;
+  ay[i] = CY + Math.sin(angle) * ring;
+
+  const baseSpeed = 0.06 + Math.random() * 0.05;
+  const spd = baseSpeed * cfg.speedMul;
+  avx[i] = -Math.sin(angle) * spd;
+  avy[i] = Math.cos(angle) * spd;
+  aspeed[i] = spd;
+  // Compound particle sizes: mostly sub-pixel to 1px, rare hubs
+  const sizeRoll = Math.random();
+  if (sizeRoll < 0.60) {
+    asize[i] = 0.3 + Math.random() * 0.3; // sub-pixel 0.3-0.6px (60%)
+  } else if (sizeRoll < 0.82) {
+    asize[i] = 0.6 + Math.random() * 0.4; // tiny 0.6-1.0px (22%)
+  } else if (sizeRoll < 0.93) {
+    asize[i] = 1.0 + Math.random() * 0.8; // small 1.0-1.8px (11%)
+  } else if (sizeRoll < 0.98) {
+    asize[i] = 1.8 + Math.random() * 1.2; // medium hub 1.8-3.0px (5%)
+  } else {
+    asize[i] = 3.0 + Math.random() * 2.0; // focal hub 3-5px (2%)
+  }
+  acolor[i] = typeColor(type);
+  acircuits[i] = 0;
+  aangleAccum[i] = Math.random() * Math.PI * 2;
+  alastAngle[i] = angle;
+  aprayerAssigned[i] = 0;
+
+  // Zone intent: ~15% seek Black Stone, ~5% seek Multazam (subset of seekers)
+  const zoneRoll = Math.random();
+  if (zoneRoll < ZONE_SEEKER_PCT * 0.7) {
+    azoneIntent[i] = 1; // black stone seeker
+    azoneDuration[i] = 10 + Math.random() * 20; // 10-30s at stone
+  } else if (zoneRoll < ZONE_SEEKER_PCT) {
+    azoneIntent[i] = 2; // multazam seeker
+    azoneDuration[i] = 15 + Math.random() * 25; // 15-40s at wall
+  } else {
+    azoneIntent[i] = 0;
+  }
+  azoneState[i] = 0;
+  azoneTimer[i] = 0;
+
+  atouchState[i] = 0;
+  atouchTimer[i] = 0;
+  atouchDuration[i] = 0;
+
+  agroupId[i] = groupId !== undefined ? groupId : -1;
+  agroupLeader[i] = leaderIdx !== undefined ? leaderIdx : -1;
+  agroupOffX[i] = offX || 0;
+  agroupOffY[i] = offY || 0;
+
+  // Cluster assignment
+  assignCluster(i);
+
+  // Hijr Ismail avoidance on spawn
+  if (isInHijrIsmail(ax[i], ay[i])) {
+    const ang = Math.atan2(ay[i] - HIJR_CY, ax[i] - HIJR_CX);
+    ax[i] = HIJR_CX + Math.cos(ang) * (HIJR_RADIUS + 3);
+    ay[i] = HIJR_CY + Math.sin(ang) * (HIJR_RADIUS + 3);
+  }
+
+  return i;
+}
+
+function spawnFamilyCluster() {
+  const gid = nextGroupId++;
+  const count = 3 + Math.floor(Math.random() * 3);
+  const leaderIdx = spawnAgent(true, TYPE_FAMILY, gid, -1, 0, 0);
+  if (leaderIdx < 0) return;
+  asize[leaderIdx] = 2.5 + Math.random() * 1.5; // family leader hub dot
+  if (Math.random() < 0.15) addEvent('arrival', `family grp ${gid} (${count})`);
+  for (let m = 1; m < count; m++) {
+    const offAngle = (m / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+    const offDist = 3 + Math.random() * 4;
+    const ox = Math.cos(offAngle) * offDist;
+    const oy = Math.sin(offAngle) * offDist;
+    const memberType = Math.random() < 0.3 ? TYPE_CHILD : TYPE_FAMILY;
+    const mi = spawnAgent(true, memberType, gid, leaderIdx, ox, oy);
+    if (mi >= 0) {
+      ax[mi] = ax[leaderIdx] + ox;
+      ay[mi] = ay[leaderIdx] + oy;
+    }
+  }
+}
+
+function spawnTourGroup() {
+  const gid = nextGroupId++;
+  const count = 10 + Math.floor(Math.random() * 11);
+  const leaderIdx = spawnAgent(true, TYPE_TOUR, gid, -1, 0, 0);
+  if (leaderIdx < 0) return;
+  if (Math.random() < 0.3) addEvent('arrival', `tour grp ${gid} (${count})`);
+  asize[leaderIdx] = 2.5 + Math.random() * 1.5; // tour leader hub dot
+  const lr = (acolor[leaderIdx] & 0xFF);
+  const lg = ((acolor[leaderIdx] >> 8) & 0xFF);
+  const lb = ((acolor[leaderIdx] >> 16) & 0xFF);
+  acolor[leaderIdx] = (220 << 24) | (Math.min(255, lb + 30) << 16) | (Math.min(255, lg + 30) << 8) | Math.min(255, lr + 30);
+
+  const ldx = ax[leaderIdx] - CX, ldy = ay[leaderIdx] - CY;
+  const leaderDist = Math.sqrt(ldx * ldx + ldy * ldy);
+  const leaderAngle = Math.atan2(ldy, ldx);
+
+  for (let m = 1; m < count; m++) {
+    const arcOffset = m * 3.5 / leaderDist;
+    const memberAngle = leaderAngle + arcOffset;
+    const radialJitter = (Math.random() - 0.5) * 4;
+    const mx = CX + Math.cos(memberAngle) * (leaderDist + radialJitter);
+    const my = CY + Math.sin(memberAngle) * (leaderDist + radialJitter);
+
+    const offX = Math.cos(arcOffset) * 3 * m * 0.15;
+    const offY = Math.sin(arcOffset) * 3 * m * 0.15;
+    const mi = spawnAgent(true, TYPE_TOUR, gid, leaderIdx, offX, offY);
+    if (mi >= 0) {
+      ax[mi] = mx;
+      ay[mi] = my;
+    }
+  }
+}
+
+function removeAgent(i) {
+  agentCount--;
+  if (i < agentCount) {
+    ax[i] = ax[agentCount]; ay[i] = ay[agentCount];
+    avx[i] = avx[agentCount]; avy[i] = avy[agentCount];
+    aspeed[i] = aspeed[agentCount]; asize[i] = asize[agentCount];
+    acolor[i] = acolor[agentCount]; acircuits[i] = acircuits[agentCount];
+    aangleAccum[i] = aangleAccum[agentCount]; alastAngle[i] = alastAngle[agentCount];
+    atype[i] = atype[agentCount];
+    agroupId[i] = agroupId[agentCount]; agroupLeader[i] = agroupLeader[agentCount];
+    agroupOffX[i] = agroupOffX[agentCount]; agroupOffY[i] = agroupOffY[agentCount];
+    aprayerTX[i] = aprayerTX[agentCount]; aprayerTY[i] = aprayerTY[agentCount];
+    aprayerAssigned[i] = aprayerAssigned[agentCount];
+    azoneIntent[i] = azoneIntent[agentCount]; azoneState[i] = azoneState[agentCount];
+    azoneTimer[i] = azoneTimer[agentCount]; azoneDuration[i] = azoneDuration[agentCount];
+    atouchState[i] = atouchState[agentCount]; atouchTimer[i] = atouchTimer[agentCount];
+    atouchDuration[i] = atouchDuration[agentCount];
+    acluster[i] = acluster[agentCount];
+    for (let j = 0; j < agentCount; j++) {
+      if (agroupLeader[j] === agentCount) agroupLeader[j] = i;
+    }
+  }
+}
+
+function smartSpawn() {
+  const type = pickType();
+  if (type === TYPE_FAMILY) {
+    spawnFamilyCluster();
+  } else if (type === TYPE_TOUR) {
+    spawnTourGroup();
+  } else {
+    spawnAgent(false, type);
+    if (Math.random() < 0.03) addEvent('arrival', `${TYPE_NAMES[type].toLowerCase()} entered mataf`);
+  }
+}
+
+// --- TOUCHING LAYER MANAGEMENT ---
+function spawnTouchingAgent() {
+  if (agentCount >= MAX_AGENTS) return -1;
+  const i = agentCount++;
+  const type = pickType();
+  atype[i] = type;
+  const cfg = TYPE_CONFIG[type];
+
+  // Place in a tight ring around Ka'bah
+  const ring = TOUCHING_INNER_R + Math.random() * (TOUCHING_OUTER_R - TOUCHING_INNER_R);
+  const angle = Math.random() * Math.PI * 2;
+  ax[i] = CX + Math.cos(angle) * ring;
+  ay[i] = CY + Math.sin(angle) * ring;
+
+  // Stationary
+  avx[i] = 0; avy[i] = 0;
+  aspeed[i] = 0.06 * cfg.speedMul;
+  // Touching agents are LARGER and more visible than tawaf agents
+  const touchSizeRoll = Math.random();
+  if (touchSizeRoll < 0.40) asize[i] = 0.8 + Math.random() * 0.7;
+  else if (touchSizeRoll < 0.75) asize[i] = 1.5 + Math.random() * 1.0;
+  else if (touchSizeRoll < 0.92) asize[i] = 2.5 + Math.random() * 1.5;
+  else asize[i] = 4.0 + Math.random() * 2.0;
+
+  // Warm gold color for touching agents — visually distinct from tawaf flow
+  acolor[i] = (240 << 24) | (55 << 16) | (195 << 8) | 235;  // warm gold rgba(235,195,55,0.94)
+
+  acircuits[i] = Math.floor(Math.random() * 7);
+  aangleAccum[i] = Math.random() * Math.PI * 2;
+  alastAngle[i] = angle;
+  aprayerAssigned[i] = 0;
+  azoneIntent[i] = 0; azoneState[i] = 0; azoneTimer[i] = 0; azoneDuration[i] = 0;
+  agroupId[i] = -1; agroupLeader[i] = -1; agroupOffX[i] = 0; agroupOffY[i] = 0;
+
+  // Touching state
+  atouchState[i] = 1; // touching wall
+  atouchTimer[i] = 0;
+  atouchDuration[i] = TOUCHING_MIN_SEC + Math.random() * (TOUCHING_MAX_SEC - TOUCHING_MIN_SEC);
+
+  return i;
+}
+
+function countTouchingAgents() {
+  let count = 0;
+  for (let i = 0; i < agentCount; i++) {
+    if (atouchState[i] === 1) count++;
+  }
+  return count;
+}
+
+function manageTouchingLayer(dt) {
+  const phase = prayerMode.phase;
+  if (phase === 'iqamah' || phase === 'praying' || phase === 'salam') return;
+
+  let touchCount = 0;
+  for (let i = 0; i < agentCount; i++) {
+    if (atouchState[i] === 1) {
+      touchCount++;
+      // Update timer
+      atouchTimer[i] += dt * 16.67 / 1000;
+      if (atouchTimer[i] >= atouchDuration[i]) {
+        // Time's up — crowd pushes them out
+        atouchState[i] = 2; // releasing
+        touchCount--;
+      }
+    } else if (atouchState[i] === 2) {
+      // Releasing: check if they've moved far enough out
+      const dx = ax[i] - CX, dy = ay[i] - CY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > SQUEEZE_OUTER_R + 5) {
+        atouchState[i] = 0; // back to normal tawaf
+      }
+    }
+  }
+
+  // Replenish touching layer
+  if (touchCount < TOUCHING_AGENTS_TARGET) {
+    const deficit = TOUCHING_AGENTS_TARGET - touchCount;
+    // Try to pull in nearby squeeze-zone agents first
+    let pulled = 0;
+    for (let i = 0; i < agentCount && pulled < Math.min(deficit, 3); i++) {
+      if (atouchState[i] !== 0) continue;
+      const dx = ax[i] - CX, dy = ay[i] - CY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < SQUEEZE_OUTER_R && dist > TOUCHING_OUTER_R) {
+        // Pull this agent into touching layer
+        const angle = Math.atan2(dy, dx);
+        const newR = TOUCHING_INNER_R + Math.random() * (TOUCHING_OUTER_R - TOUCHING_INNER_R);
+        ax[i] = CX + Math.cos(angle) * newR;
+        ay[i] = CY + Math.sin(angle) * newR;
+        avx[i] = 0; avy[i] = 0;
+        atouchState[i] = 1;
+        atouchTimer[i] = 0;
+        atouchDuration[i] = TOUCHING_MIN_SEC + Math.random() * (TOUCHING_MAX_SEC - TOUCHING_MIN_SEC);
+        // Warm gold for touching agents
+        acolor[i] = (240 << 24) | (55 << 16) | (195 << 8) | 235;
+        // Touching agents get larger sizes
+        asize[i] = Math.max(asize[i] * 1.2, 1.0);
+        pulled++;
+      }
+    }
+    // Spawn fresh if not enough pulled in
+    for (let s = pulled; s < Math.min(deficit, 2); s++) {
+      spawnTouchingAgent();
+    }
+  }
+}
+
+// --- PRAYER ENERGY VORTEX ---
+// Collective tawaf generates spiritual energy spiraling upward from Ka'bah
+// In top-down view: particles expand outward from center with CCW rotation, fading as they go
+const VORTEX_MAX = 200;
+const vortexX = new Float32Array(VORTEX_MAX);
+const vortexY = new Float32Array(VORTEX_MAX);
+const vortexR = new Float32Array(VORTEX_MAX);      // current radius from center
+const vortexAngle = new Float32Array(VORTEX_MAX);   // angular position
+const vortexLife = new Float32Array(VORTEX_MAX);     // 0-1 life remaining
+const vortexSpeed = new Float32Array(VORTEX_MAX);    // radial expansion speed
+const vortexSize = new Float32Array(VORTEX_MAX);
+let vortexCount = 0;
+let vortexPhase = 0; // rotating phase for the whole system
+
+function spawnVortexParticle() {
+  if (vortexCount >= VORTEX_MAX) return;
+  const i = vortexCount++;
+  vortexAngle[i] = Math.random() * Math.PI * 2;
+  vortexR[i] = KAABAH_SIZE / 2 + Math.random() * 3;
+  vortexLife[i] = 1.0;
+  vortexSpeed[i] = 0.15 + Math.random() * 0.25;
+  vortexSize[i] = 0.5 + Math.random() * 1.5;
+  vortexX[i] = CX + Math.cos(vortexAngle[i]) * vortexR[i];
+  vortexY[i] = CY + Math.sin(vortexAngle[i]) * vortexR[i];
+}
+
+function updateVortex(dt) {
+  const crowdFrac = agentCount / MAX_AGENTS;
+  const isPraying = prayerMode.phase === 'praying' || prayerMode.phase === 'salam';
+  const intensity = isPraying ? crowdFrac * 1.5 + 0.3 : crowdFrac;
+
+  // Spawn rate scales with crowd density and prayer state
+  const spawnRate = Math.floor(intensity * 3 + 0.5);
+  for (let s = 0; s < spawnRate; s++) spawnVortexParticle();
+
+  // CCW rotation speed for the whole vortex field
+  vortexPhase += 0.008 * dt;
+  if (vortexPhase > Math.PI * 2) vortexPhase -= Math.PI * 2;
+
+  for (let i = 0; i < vortexCount; i++) {
+    // Expand outward (simulating upward energy in top-down view)
+    vortexR[i] += vortexSpeed[i] * dt;
+    // CCW angular drift (tighter spiral near center, looser at edge)
+    const angularSpeed = 0.012 / (1 + vortexR[i] * 0.008);
+    vortexAngle[i] -= angularSpeed * dt; // negative = CCW
+    // Update position
+    vortexX[i] = CX + Math.cos(vortexAngle[i] + vortexPhase * 0.3) * vortexR[i];
+    vortexY[i] = CY + Math.sin(vortexAngle[i] + vortexPhase * 0.3) * vortexR[i];
+    // Decay life based on radius
+    const maxR = MATAF_OUTER + 20;
+    vortexLife[i] -= (0.004 + vortexR[i] / maxR * 0.008) * dt;
+
+    if (vortexLife[i] <= 0 || vortexR[i] > maxR) {
+      // Remove by swap
+      vortexCount--;
+      if (i < vortexCount) {
+        vortexX[i] = vortexX[vortexCount]; vortexY[i] = vortexY[vortexCount];
+        vortexR[i] = vortexR[vortexCount]; vortexAngle[i] = vortexAngle[vortexCount];
+        vortexLife[i] = vortexLife[vortexCount]; vortexSpeed[i] = vortexSpeed[vortexCount];
+        vortexSize[i] = vortexSize[vortexCount];
+      }
+      i--;
+    }
+  }
+}
+
+function drawVortex() {
+  if (vortexCount === 0) return;
+  const crowdFrac = agentCount / MAX_AGENTS;
+  const isPraying = prayerMode.phase === 'praying' || prayerMode.phase === 'salam';
+  const baseAlpha = isPraying ? 0.25 : 0.12;
+  const pulse = 0.85 + 0.15 * Math.sin(Date.now() / 1500 + crowdFrac * 4);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter'; // additive blending
+
+  // Central glow — pulses with crowd density
+  const glowR = KAABAH_SIZE + 10 + crowdFrac * 15;
+  const centralAlpha = (baseAlpha * 0.6 * pulse * crowdFrac) ;
+  if (centralAlpha > 0.005) {
+    const cGlow = ctx.createRadialGradient(CX, CY, KAABAH_SIZE / 3, CX, CY, glowR);
+    cGlow.addColorStop(0, `rgba(180, 255, 255, ${centralAlpha * 0.5})`);
+    cGlow.addColorStop(0.4, `rgba(100, 240, 255, ${centralAlpha * 0.3})`);
+    cGlow.addColorStop(1, 'rgba(0, 200, 255, 0)');
+    ctx.fillStyle = cGlow;
+    ctx.beginPath();
+    ctx.arc(CX, CY, glowR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Vortex particles
+  for (let i = 0; i < vortexCount; i++) {
+    const life = vortexLife[i];
+    const r = vortexR[i];
+    const fadeDist = 1.0 - Math.min(1, r / (MATAF_OUTER + 10));
+    const alpha = life * fadeDist * baseAlpha * pulse * crowdFrac;
+    if (alpha < 0.003) continue;
+
+    const sz = vortexSize[i] * (0.5 + life * 0.5);
+    // Color: cyan-white near center, fading to deep cyan at edge
+    const whiteness = Math.max(0, 1 - r / (MATAF_OUTER * 0.5));
+    const cr = Math.round(100 + 155 * whiteness);
+    const cg = Math.round(220 + 35 * whiteness);
+    const cb = 255;
+
+    ctx.beginPath();
+    ctx.arc(vortexX[i], vortexY[i], sz, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${cr},${cg},${cb},${alpha.toFixed(3)})`;
+    ctx.fill();
+  }
+
+  // Concentric pulse rings (expanding ripples of energy)
+  const now = Date.now();
+  const ringCount = isPraying ? 4 : 2;
+  for (let r = 0; r < ringCount; r++) {
+    const phase = ((now / (3000 + r * 700)) + r * 0.25) % 1;
+    const ringR = KAABAH_SIZE / 2 + phase * (MATAF_OUTER - KAABAH_SIZE / 2 + 20);
+    const ringAlpha = (1 - phase) * baseAlpha * 0.3 * pulse * crowdFrac;
+    if (ringAlpha < 0.003) continue;
+    ctx.beginPath();
+    ctx.arc(CX, CY, ringR, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(150, 255, 255, ${ringAlpha.toFixed(3)})`;
+    ctx.lineWidth = 1.0 - phase * 0.5;
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// --- SPATIAL HASH ---
+const CELL = 10;
+const GW = Math.ceil(W / CELL);
+const GH = Math.ceil(H / CELL);
+const gridHead = new Int32Array(GW * GH);
+const gridNext = new Int32Array(MAX_AGENTS);
+
+function buildGrid() {
+  gridHead.fill(-1);
+  for (let i = 0; i < agentCount; i++) {
+    const gx = (ax[i] / CELL) | 0;
+    const gy = (ay[i] / CELL) | 0;
+    if (gx < 0 || gx >= GW || gy < 0 || gy >= GH) continue;
+    const k = gy * GW + gx;
+    gridNext[i] = gridHead[k];
+    gridHead[k] = i;
+  }
+}
+
+// --- PHYSICS ---
+function updateAgents(dt) {
+  buildGrid();
+  const phase = prayerMode.phase;
+  const now = Date.now();
+
+  for (let i = 0; i < agentCount; i++) {
+    const dx = ax[i] - CX, dy = ay[i] - CY;
+    const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    const angle = Math.atan2(dy, dx);
+
+    // === ADHAN: agents gradually slow, some stop and face Ka'bah ===
+    if (phase === 'adhan') {
+      const elapsed = (now - prayerMode.phaseStart) / 1000;
+      const slowFactor = Math.max(0.05, 1.0 - elapsed / 120); // 1.0 → 0.05 over 120s
+      const stopChance = elapsed / 120; // more stop as time passes
+
+      // Some agents stop early and face Ka'bah
+      if (aprayerAssigned[i] === 2) {
+        // Already stopped — subtle sway toward Ka'bah
+        const swayX = (Math.random() - 0.5) * 0.01;
+        const swayY = (Math.random() - 0.5) * 0.01;
+        avx[i] *= 0.9; avy[i] *= 0.9;
+        avx[i] += swayX; avy[i] += swayY;
+        ax[i] += avx[i] * dt; ay[i] += avy[i] * dt;
+        continue;
+      }
+
+      // Randomly mark agents as "stopped" during adhan
+      if (Math.random() < stopChance * 0.002) {
+        aprayerAssigned[i] = 2; // mark as stopped-for-adhan
+        avx[i] = 0; avy[i] = 0;
+        continue;
+      }
+
+      // Otherwise slow tawaf drift
+      const tx_p = dy / dist;
+      const ty_p = -dx / dist;
+      const prayerSpeed = aspeed[i] * slowFactor;
+      const targetVx = tx_p * prayerSpeed;
+      const targetVy = ty_p * prayerSpeed;
+      avx[i] += (targetVx - avx[i]) * 0.05;
+      avy[i] += (targetVy - avy[i]) * 0.05;
+      ax[i] += avx[i] * dt; ay[i] += avy[i] * dt;
+
+      // Keep in bounds
+      const pDist = Math.sqrt((ax[i]-CX)*(ax[i]-CX) + (ay[i]-CY)*(ay[i]-CY));
+      const adhanInner = KAABAH_WALL_R + 2;
+      if (pDist < adhanInner) { ax[i] = CX + (ax[i]-CX)/pDist*(adhanInner+1); ay[i] = CY + (ay[i]-CY)/pDist*(adhanInner+1); }
+      if (pDist > MATAF_OUTER) { ax[i] = CX + (ax[i]-CX)/pDist*(MATAF_OUTER-1); ay[i] = CY + (ay[i]-CY)/pDist*(MATAF_OUTER-1); }
+      continue;
+    }
+
+    // === IQAMAH: agents move toward their assigned row positions ===
+    if (phase === 'iqamah') {
+      if (aprayerAssigned[i]) {
+        const tdx = aprayerTX[i] - ax[i];
+        const tdy = aprayerTY[i] - ay[i];
+        const tdist = Math.sqrt(tdx*tdx + tdy*tdy);
+        if (tdist > 0.5) {
+          const moveSpeed = Math.min(tdist * 0.08, 2.0);
+          avx[i] = (tdx / tdist) * moveSpeed;
+          avy[i] = (tdy / tdist) * moveSpeed;
+        } else {
+          avx[i] *= 0.8; avy[i] *= 0.8;
+        }
+        ax[i] += avx[i] * dt; ay[i] += avy[i] * dt;
+      }
+      continue;
+    }
+
+    // === PRAYING / SALAM: agents in rows, subtle breathing sway ===
+    if (phase === 'praying' || phase === 'salam') {
+      if (aprayerAssigned[i]) {
+        // Gently hold position with subtle breathing sway
+        const tdx = aprayerTX[i] - ax[i];
+        const tdy = aprayerTY[i] - ay[i];
+        const breathPhase = (now / 2000 + i * 0.1) % (Math.PI * 2);
+        const breathX = Math.sin(breathPhase) * 0.15;
+        const breathY = Math.cos(breathPhase * 0.7) * 0.1;
+        avx[i] = tdx * 0.15 + breathX;
+        avy[i] = tdy * 0.15 + breathY;
+        ax[i] += avx[i] * dt; ay[i] += avy[i] * dt;
+      }
+      continue;
+    }
+
+    // === RESUMING: agents gradually break from rows back to tawaf ===
+    if (phase === 'resuming') {
+      const elapsed = (now - prayerMode.phaseStart) / 1000;
+      const resumeFrac = Math.min(elapsed / 60, 1); // 0→1 over 60s
+      // Blend between holding position and tawaf orbit
+      const tx = dy / dist;
+      const ty = -dx / dist;
+      const tawafVx = tx * aspeed[i];
+      const tawafVy = ty * aspeed[i];
+      // Early: mostly hold; late: mostly tawaf
+      if (aprayerAssigned[i] && resumeFrac < 0.3) {
+        const tdx = aprayerTX[i] - ax[i];
+        const tdy = aprayerTY[i] - ay[i];
+        const holdVx = tdx * 0.05;
+        const holdVy = tdy * 0.05;
+        avx[i] += ((holdVx * (1-resumeFrac*3) + tawafVx * resumeFrac*3) - avx[i]) * 0.05;
+        avy[i] += ((holdVy * (1-resumeFrac*3) + tawafVy * resumeFrac*3) - avy[i]) * 0.05;
+      } else {
+        aprayerAssigned[i] = 0;
+        avx[i] += (tawafVx - avx[i]) * 0.04 * resumeFrac;
+        avy[i] += (tawafVy - avy[i]) * 0.04 * resumeFrac;
+      }
+      ax[i] += avx[i] * dt; ay[i] += avy[i] * dt;
+
+      const pDist = Math.sqrt((ax[i]-CX)*(ax[i]-CX) + (ay[i]-CY)*(ay[i]-CY));
+      const resInner = KAABAH_WALL_R + 2;
+      if (pDist < resInner) { ax[i] = CX + (ax[i]-CX)/pDist*(resInner+1); ay[i] = CY + (ay[i]-CY)/pDist*(resInner+1); }
+      if (pDist > MATAF_OUTER + 30) { ax[i] = CX + (ax[i]-CX)/pDist*(MATAF_OUTER-1); ay[i] = CY + (ay[i]-CY)/pDist*(MATAF_OUTER-1); }
+      continue;
+    }
+
+    // === TOUCHING LAYER: stationary agents pressed against Ka'bah ===
+    if (atouchState[i] === 1) {
+      // Completely still with tiny breathing motion, face inward
+      const breathX = (Math.random() - 0.5) * 0.008;
+      const breathY = (Math.random() - 0.5) * 0.008;
+      // Very gentle push toward Ka'bah (pressed against wall)
+      const pushStr = 0.005;
+      avx[i] = -dx / dist * pushStr + breathX;
+      avy[i] = -dy / dist * pushStr + breathY;
+      ax[i] += avx[i] * dt;
+      ay[i] += avy[i] * dt;
+      // Hard clamp: can't overlap Ka'bah building
+      const newDist2 = Math.sqrt((ax[i]-CX)*(ax[i]-CX) + (ay[i]-CY)*(ay[i]-CY));
+      if (newDist2 < KAABAH_WALL_R) {
+        ax[i] = CX + (ax[i]-CX)/newDist2 * KAABAH_WALL_R;
+        ay[i] = CY + (ay[i]-CY)/newDist2 * KAABAH_WALL_R;
+      }
+      alastAngle[i] = Math.atan2(ay[i] - CY, ax[i] - CX);
+      continue;
+    }
+
+    // === RELEASING: being pushed out from touching layer ===
+    if (atouchState[i] === 2) {
+      // Push outward and add tangential velocity to rejoin tawaf
+      const pushOut = 0.08;
+      const tanStr = 0.03;
+      avx[i] += (dx / dist) * pushOut + (dy / dist) * tanStr;
+      avy[i] += (dy / dist) * pushOut + (-dx / dist) * tanStr;
+      avx[i] *= 0.95; avy[i] *= 0.95;
+      ax[i] += avx[i] * dt;
+      ay[i] += avy[i] * dt;
+      const newAngle2 = Math.atan2(ay[i] - CY, ax[i] - CX);
+      alastAngle[i] = newAngle2;
+      continue;
+    }
+
+    // === NORMAL TAWAF PHYSICS ===
+    const type = atype[i];
+    const tx = dy / dist;
+    const ty = -dx / dist;
+
+    // --- INNER RING ZONE BEHAVIOR ---
+    const intent = azoneIntent[i];
+    if (intent > 0 && dist < MATAF_INNER + 30) {
+      // Normalize angle difference
+      let angleDiff;
+      if (intent === 1) {
+        angleDiff = angle - BLACK_STONE_ANGLE;
+      } else {
+        const multazamCenter = (MULTAZAM_ANGLE_START + MULTAZAM_ANGLE_END) / 2;
+        angleDiff = angle - multazamCenter;
+      }
+      while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+      while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+      const absAngleDiff = Math.abs(angleDiff);
+
+      if (azoneState[i] === 0 && absAngleDiff < ZONE_ARC_TRIGGER && dist < MATAF_INNER + 20) {
+        azoneState[i] = 1; // start approaching
+      }
+
+      if (azoneState[i] === 1) {
+        // Approaching zone: drift inward toward target
+        let targetX, targetY;
+        if (intent === 1) {
+          // Black Stone: crowd toward the corner with jitter
+          const jx = (Math.random() - 0.5) * 6;
+          const jy = (Math.random() - 0.5) * 6;
+          targetX = BLACK_STONE_X + jx;
+          targetY = BLACK_STONE_Y + jy;
+        } else {
+          // Multazam: press against the east wall of Ka'bah
+          const wallFrac = Math.random();
+          const wallAngle = MULTAZAM_ANGLE_START + wallFrac * (MULTAZAM_ANGLE_END - MULTAZAM_ANGLE_START);
+          const wallDist = KAABAH_SIZE / 2 + 3;
+          targetX = CX + Math.cos(wallAngle) * wallDist;
+          targetY = CY + Math.sin(wallAngle) * wallDist;
+        }
+
+        const tdx = targetX - ax[i], tdy = targetY - ay[i];
+        const tdist = Math.sqrt(tdx * tdx + tdy * tdy);
+        if (tdist > 3) {
+          const moveSpeed = Math.min(tdist * 0.04, 0.8);
+          avx[i] += (tdx / tdist * moveSpeed - avx[i]) * 0.08;
+          avy[i] += (tdy / tdist * moveSpeed - avy[i]) * 0.08;
+        } else {
+          azoneState[i] = 2; // arrived at zone
+          azoneTimer[i] = 0;
+        }
+        ax[i] += avx[i] * dt; ay[i] += avy[i] * dt;
+        // Update angle tracking
+        const newAngle2 = Math.atan2(ay[i] - CY, ax[i] - CX);
+        alastAngle[i] = newAngle2;
+        continue;
+      }
+
+      if (azoneState[i] === 2) {
+        // At zone: nearly stationary, subtle push toward Ka'bah
+        azoneTimer[i] += dt * 16.67 / 1000; // convert to seconds
+        const breathX = (Math.random() - 0.5) * 0.02;
+        const breathY = (Math.random() - 0.5) * 0.02;
+        // Gentle push toward Ka'bah
+        const pushStr = 0.01;
+        avx[i] = -dx / dist * pushStr + breathX;
+        avy[i] = -dy / dist * pushStr + breathY;
+        ax[i] += avx[i] * dt; ay[i] += avy[i] * dt;
+
+        // Keep outside Ka'bah
+        const newDist2 = Math.sqrt((ax[i]-CX)*(ax[i]-CX)+(ay[i]-CY)*(ay[i]-CY));
+        if (newDist2 < KAABAH_SIZE / 2 + 2) {
+          ax[i] = CX + (ax[i]-CX)/newDist2*(KAABAH_SIZE/2+2);
+          ay[i] = CY + (ay[i]-CY)/newDist2*(KAABAH_SIZE/2+2);
+        }
+
+        if (azoneTimer[i] >= azoneDuration[i]) {
+          azoneState[i] = 3; // departing
+        }
+        const newAngle2 = Math.atan2(ay[i] - CY, ax[i] - CX);
+        alastAngle[i] = newAngle2;
+        continue;
+      }
+
+      if (azoneState[i] === 3) {
+        // Departing: drift back outward to rejoin tawaf orbit
+        const prefDist2 = MATAF_INNER + 10;
+        if (dist < prefDist2 - 2) {
+          const pushOut = (prefDist2 - dist) * 0.03;
+          avx[i] += (dx / dist) * pushOut;
+          avy[i] += (dy / dist) * pushOut;
+        }
+        // Add tangential velocity to rejoin flow
+        avx[i] += (tx * aspeed[i] * 0.5 - avx[i]) * 0.05;
+        avy[i] += (ty * aspeed[i] * 0.5 - avy[i]) * 0.05;
+        ax[i] += avx[i] * dt; ay[i] += avy[i] * dt;
+
+        if (dist > MATAF_INNER + 5) {
+          azoneState[i] = 0;
+          azoneIntent[i] = 0; // done seeking — won't seek again this tawaf
+        }
+        const newAngle2 = Math.atan2(ay[i] - CY, ax[i] - CX);
+        let dAngle2 = newAngle2 - alastAngle[i];
+        if (dAngle2 > Math.PI) dAngle2 -= 2 * Math.PI;
+        if (dAngle2 < -Math.PI) dAngle2 += 2 * Math.PI;
+        if (dAngle2 < 0) aangleAccum[i] += -dAngle2;
+        alastAngle[i] = newAngle2;
+        continue;
+      }
+    }
+
+    // === SOCIAL FORCE MODEL (Helbing & Molnar 1995) ===
+    // Desired velocity: tangential (CCW orbit) + radial (toward Ka'bah)
+    // Repulsive force: exponential decay between nearby agents
+    // Body compression + friction: when agents closer than shoulder width
+    // Wall force: Ka'bah inner boundary and Mataf outer boundary
+
+    const ringFrac = Math.max(0, Math.min(1, (dist - SQUEEZE_OUTER_R) / (MATAF_OUTER - SQUEEZE_OUTER_R)));
+
+    // Continuous density gradient — no gap between touching layer and tawaf
+    // Speed: near-zero at Ka'bah walls → 0.3 m/s at 15m → 1.1 m/s at outer edge
+    let squeezeSlow = 1.0;
+    if (dist < TOUCHING_OUTER_R + 3) {
+      squeezeSlow = 0.06;
+    } else if (dist < SQUEEZE_OUTER_R) {
+      squeezeSlow = 0.10 + 0.20 * ((dist - TOUCHING_OUTER_R - 3) / Math.max(1, SQUEEZE_OUTER_R - TOUCHING_OUTER_R - 3));
+    } else if (dist < MATAF_INNER) {
+      squeezeSlow = 0.30 + 0.40 * ((dist - SQUEEZE_OUTER_R) / Math.max(1, MATAF_INNER - SQUEEZE_OUTER_R));
+    }
+    const inSqueezeZone = dist < SQUEEZE_OUTER_R;
+    // Inner rings slower due to density (real: 0.3 m/s inner, 1.1 m/s outer)
+    const ringSpeed = (0.15 + ringFrac * ringFrac * 0.85) * squeezeSlow;
+    const desiredSpeed = aspeed[i] * ringSpeed;
+
+    // 1. DESIRED VELOCITY — tangential CCW orbit
+    let desVx = tx * desiredSpeed;
+    let desVy = ty * desiredSpeed;
+
+    // Group cohesion: followers track their leader
+    const leader = agroupLeader[i];
+    if (leader >= 0 && leader < agentCount) {
+      const ldx = ax[leader] + agroupOffX[i] - ax[i];
+      const ldy = ay[leader] + agroupOffY[i] - ay[i];
+      const ldist = Math.sqrt(ldx * ldx + ldy * ldy);
+      if (ldist > 2) {
+        const pull = Math.min(ldist * 0.06, 0.8);
+        desVx += (ldx / ldist) * pull;
+        desVy += (ldy / ldist) * pull;
+      }
+      desVx += (avx[leader] - avx[i]) * 0.15;
+      desVy += (avy[leader] - avy[i]) * 0.15;
+    }
+
+    // Child random weaving
+    if (type === TYPE_CHILD) {
+      desVx += (Math.random() - 0.5) * 0.4;
+      desVy += (Math.random() - 0.5) * 0.4;
+    }
+
+    // 2. DRIVING FORCE: (v_desired - v_current) / tau
+    let fx = (desVx - avx[i]) / SFM_TAU;
+    let fy = (desVy - avy[i]) / SFM_TAU;
+
+    // 3. GRAVITATIONAL PULL TOWARD KA'BAH — everyone wants to be closer
+    // Radial inward force — resisted only by crowd pressure from agents already closer
+    const radX = -dx / dist;  // unit vector toward Ka'bah center
+    const radY = -dy / dist;
+    const pullForce = SFM_RADIAL_PULL[type];
+    fx += radX * pullForce;
+    fy += radY * pullForce;
+
+    // 4. AGENT-AGENT SOCIAL FORCES (Helbing & Molnar)
+    const gx0 = (ax[i] / CELL) | 0;
+    const gy0 = (ay[i] / CELL) | 0;
+
+    for (let dgy = -1; dgy <= 1; dgy++) {
+      for (let dgx = -1; dgx <= 1; dgx++) {
+        const gx = gx0 + dgx, gy = gy0 + dgy;
+        if (gx < 0 || gx >= GW || gy < 0 || gy >= GH) continue;
+        let j = gridHead[gy * GW + gx];
+        while (j >= 0) {
+          if (j !== i) {
+            const ndx = ax[i] - ax[j], ndy = ay[i] - ay[j];
+            const nd2 = ndx * ndx + ndy * ndy;
+            if (nd2 < SFM_INTERACT_R2 && nd2 > 0.001) {
+              const nd = Math.sqrt(nd2);
+              // Normal direction from j to i
+              const nix = ndx / nd, niy = ndy / nd;
+              // Gap between agent surfaces (negative = overlapping)
+              const rij = SFM_AGENT_R * 2;  // sum of radii
+              const gap = nd - rij;
+
+              // Social repulsion — exponential decay (always active)
+              const socialF = SFM_A * Math.exp(-gap / SFM_B);
+              fx += nix * socialF;
+              fy += niy * socialF;
+
+              // Body contact forces (only when overlapping)
+              if (gap < 0) {
+                const overlap = -gap;
+                // Compression force (normal — prevents overlap)
+                fx += nix * SFM_K * overlap;
+                fy += niy * SFM_K * overlap;
+                // Friction force (tangential — resists sliding)
+                const tix = -niy, tiy = nix;
+                const dvt = (avx[j] - avx[i]) * tix + (avy[j] - avy[i]) * tiy;
+                fx += tix * SFM_KAPPA * overlap * dvt;
+                fy += tiy * SFM_KAPPA * overlap * dvt;
+              }
+            }
+          }
+          j = gridNext[j];
+        }
+      }
+    }
+
+    // 5. WALL FORCES — Ka'bah boundary (continuous crowd, wall at building edge)
+    const wallBoundary = KAABAH_WALL_R;
+    const innerWallDist = dist - wallBoundary;
+    if (innerWallDist < SFM_WALL_RANGE) {
+      const wallGap = innerWallDist - SFM_AGENT_R;
+      const wallF = SFM_WALL_A * Math.exp(-wallGap / SFM_WALL_B);
+      fx += (dx / dist) * wallF;   // push outward
+      fy += (dy / dist) * wallF;
+      if (wallGap < 0) {
+        fx += (dx / dist) * SFM_K * (-wallGap);
+        fy += (dy / dist) * SFM_K * (-wallGap);
+      }
+    }
+    // Strong repulsion from touching layer — creates visible DARK GAP between touching ring and tawaf
+    if (atouchState[i] === 0 && dist < TOUCHING_OUTER_R + 8) {
+      const touchRepulse = (TOUCHING_OUTER_R + 8 - dist) * 0.12;
+      fx += (dx / dist) * touchRepulse;
+      fy += (dy / dist) * touchRepulse;
+    }
+
+    // Mataf outer boundary
+    const outerWallDist = MATAF_OUTER - dist;
+    if (outerWallDist < SFM_WALL_RANGE) {
+      const wallGap = outerWallDist - SFM_AGENT_R;
+      const wallF = SFM_WALL_A * Math.exp(-wallGap / SFM_WALL_B);
+      fx -= (dx / dist) * wallF;   // push inward
+      fy -= (dy / dist) * wallF;
+      if (wallGap < 0) {
+        fx -= (dx / dist) * SFM_K * (-wallGap);
+        fy -= (dy / dist) * SFM_K * (-wallGap);
+      }
+    }
+
+    // 6b. HIJR ISMAIL AVOIDANCE — strong repulsion from the semi-circular wall
+    {
+      const hdx = ax[i] - HIJR_CX, hdy = ay[i] - HIJR_CY;
+      const hDist = Math.sqrt(hdx * hdx + hdy * hdy);
+      if (hDist < HIJR_RADIUS + 5) {
+        const hAng = Math.atan2(hdy, hdx);
+        let hAngDiff = hAng - (HIJR_CENTER_ANGLE + Math.PI);
+        while (hAngDiff > Math.PI) hAngDiff -= 2 * Math.PI;
+        while (hAngDiff < -Math.PI) hAngDiff += 2 * Math.PI;
+        if (Math.abs(hAngDiff) < HIJR_ARC_HALF) {
+          const gap = HIJR_RADIUS - hDist;
+          if (gap > -5) {
+            const repulse = Math.max(0.5, (gap + 5) * 0.15);
+            fx += (hdx / hDist) * repulse;
+            fy += (hdy / hDist) * repulse;
+          }
+        }
+      }
+    }
+
+    // 6c. CLUSTER PULL — attraction toward assigned cluster center (creates visible clumps)
+    if (acluster[i] >= 0) {
+      const ci = acluster[i];
+      const ccx = CX + Math.cos(clusterAngle[ci]) * clusterDist[ci];
+      const ccy = CY + Math.sin(clusterAngle[ci]) * clusterDist[ci];
+      const cdx = ccx - ax[i], cdy = ccy - ay[i];
+      const cdist = Math.sqrt(cdx * cdx + cdy * cdy);
+      if (cdist > 3) {
+        // Stronger pull when far from cluster, weaker when close
+        const pull = Math.min(0.04, 0.008 * (cdist / clusterSize[ci]));
+        fx += (cdx / cdist) * pull;
+        fy += (cdy / cdist) * pull;
+      }
+    }
+
+    // Small noise for natural movement variation
+    const noiseMul = type === TYPE_ELDERLY ? 0.02 : (type === TYPE_FAMILY ? 0.03 : 0.05);
+    fx += (Math.random() - 0.5) * noiseMul;
+    fy += (Math.random() - 0.5) * noiseMul;
+
+    // 6. INTEGRATION
+    avx[i] += fx * dt;
+    avy[i] += fy * dt;
+
+    // Clamp velocity
+    const v = Math.sqrt(avx[i] * avx[i] + avy[i] * avy[i]);
+    const maxV = desiredSpeed * 1.5;
+    if (v > maxV && maxV > 0) {
+      avx[i] = (avx[i] / v) * maxV;
+      avy[i] = (avy[i] / v) * maxV;
+    }
+
+    ax[i] += avx[i] * dt;
+    ay[i] += avy[i] * dt;
+
+    // Circuit tracking (counterclockwise angle accumulation)
+    const newAngle = Math.atan2(ay[i] - CY, ax[i] - CX);
+    let dAngle = newAngle - alastAngle[i];
+    if (dAngle > Math.PI) dAngle -= 2 * Math.PI;
+    if (dAngle < -Math.PI) dAngle += 2 * Math.PI;
+    if (dAngle < 0) aangleAccum[i] += -dAngle;
+    alastAngle[i] = newAngle;
+
+    if (aangleAccum[i] >= Math.PI * 2) {
+      acircuits[i]++;
+      aangleAccum[i] -= Math.PI * 2;
+      circuitsThisMinute++;
+      if (acircuits[i] >= 7) {
+        totalTawaf++;
+        if (Math.random() < 0.08) addEvent('circuit', `${TYPE_NAMES[atype[i]].toLowerCase()} completed 7 circuits`);
+        removeAgent(i);
+        i--;
+        continue;
+      }
+    }
+
+    // Hard boundary enforcement (safety net)
+    const newDist = Math.sqrt((ax[i]-CX)*(ax[i]-CX) + (ay[i]-CY)*(ay[i]-CY));
+    if (newDist < KAABAH_WALL_R) {
+      ax[i] = CX + (ax[i]-CX) / newDist * (KAABAH_WALL_R + 1);
+      ay[i] = CY + (ay[i]-CY) / newDist * (KAABAH_WALL_R + 1);
+    }
+    if (newDist > MATAF_OUTER) {
+      ax[i] = CX + (ax[i]-CX) / newDist * (MATAF_OUTER - 1);
+      ay[i] = CY + (ay[i]-CY) / newDist * (MATAF_OUTER - 1);
+    }
+    // Hijr Ismail hard boundary
+    if (isInHijrIsmail(ax[i], ay[i])) {
+      const ha = Math.atan2(ay[i] - HIJR_CY, ax[i] - HIJR_CX);
+      ax[i] = HIJR_CX + Math.cos(ha) * (HIJR_RADIUS + 2);
+      ay[i] = HIJR_CY + Math.sin(ha) * (HIJR_RADIUS + 2);
+    }
+  }
+}
+
+// --- BAYESIAN CROWD MODEL ---
+const bayesModel = {
+  priors: new Float32Array(24),
+  observations: new Float32Array(24),
+  counts: new Uint16Array(24),
+  confidence: 0,
+  lastUpdate: 0,
+  predictionError: 0,
+  lastPrior: 0,
+  lastLikelihood: 0,
+  lastEvidence: 0,
+  lastPosterior: 0,
+};
+
+// Late Ramadan crowd profile (27th night pattern — peak is post-Taraweeh through Tahajjud)
+(function initBayes() {
+  //                          00   01   02   03   04   05   06   07   08   09   10   11   12   13   14   15   16   17   18   19   20   21   22   23
+  const hourProfile =       [0.90,0.88,0.80,0.75,0.63,0.55,0.43,0.40,0.42,0.50,0.55,0.60,0.63,0.60,0.65,0.72,0.78,0.80,0.82,0.78,0.52,0.55,0.92,0.95];
+  for (let h = 0; h < 24; h++) bayesModel.priors[h] = hourProfile[h];
+})();
+
+function updateBayesModel() {
+  const makkah = getMakkahTime();
+  const hour = makkah.getHours();
+  const now = Date.now();
+
+  if (now - bayesModel.lastUpdate < 30000) return;
+  bayesModel.lastUpdate = now;
+
+  const observed = agentCount / MAX_AGENTS;
+  const predicted = bayesModel.priors[hour];
+
+  const alpha = 0.05;
+  bayesModel.observations[hour] = observed;
+  bayesModel.counts[hour]++;
+  const n = Math.min(bayesModel.counts[hour], 20);
+  const weight = alpha * n;
+
+  bayesModel.lastPrior = predicted;
+  bayesModel.lastLikelihood = Math.exp(-Math.pow(observed - predicted, 2) / (2 * 0.1));
+  bayesModel.lastEvidence = bayesModel.lastLikelihood * predicted + (1 - bayesModel.lastLikelihood) * (1 - predicted);
+  if (bayesModel.lastEvidence < 0.001) bayesModel.lastEvidence = 0.001;
+  bayesModel.lastPosterior = (bayesModel.lastLikelihood * predicted) / bayesModel.lastEvidence;
+
+  // During prayer, also update Bayesian prayer transition model
+  if (prayerMode.phase === 'iqamah' || prayerMode.phase === 'praying') {
+    const bt = prayerMode.bayesTrans;
+    const prayerObs = agentCount / MAX_AGENTS;
+    const prayerPred = 0.1; // expect low density during prayer
+    bt.predictedDuration = prayerMode.rakatTotal * 92;
+  }
+
+  bayesModel.priors[hour] = predicted * (1 - weight) + observed * weight;
+  bayesModel.priors[hour] = Math.max(0.1, Math.min(1.0, bayesModel.priors[hour]));
+
+  bayesModel.predictionError = Math.abs(predicted - observed);
+
+  const totalObs = bayesModel.counts.reduce((s, c) => s + c, 0);
+  const errorFactor = Math.max(0, 1 - bayesModel.predictionError * 3);
+  bayesModel.confidence = Math.min(1, (totalObs / 50) * errorFactor);
+}
+
+function renderBayesUI() {
+  document.getElementById('b-prior').textContent = bayesModel.lastPrior.toFixed(3);
+  document.getElementById('b-likelihood').textContent = bayesModel.lastLikelihood.toFixed(3);
+  document.getElementById('b-evidence').textContent = bayesModel.lastEvidence.toFixed(3);
+  document.getElementById('b-posterior').textContent = bayesModel.lastPosterior.toFixed(3);
+
+  const makkah = getMakkahTime();
+  const hour = makkah.getHours();
+  document.getElementById('b-predicted').textContent = (bayesModel.priors[hour] * MATAF_GROUND_MAX).toFixed(0);
+  document.getElementById('b-actual').textContent = (agentCount * PEOPLE_PER_AGENT).toLocaleString();
+  document.getElementById('b-error').textContent = (bayesModel.predictionError * 100).toFixed(1) + '%';
+
+  const conf = bayesModel.confidence;
+  const filled = Math.round(conf * 10);
+  const segs = document.getElementById('conf-bar').children;
+  for (let i = 0; i < segs.length; i++) {
+    segs[i].classList.toggle('filled', i < filled);
+  }
+}
+
+function renderDemographics() {
+  const counts = new Array(6).fill(0);
+  for (let i = 0; i < agentCount; i++) counts[atype[i]]++;
+  const el = document.getElementById('demo-list');
+  let html = '';
+  for (let t = 0; t < 6; t++) {
+    const pct = agentCount > 0 ? (counts[t] / agentCount * 100).toFixed(1) : '0.0';
+    const barW = agentCount > 0 ? (counts[t] / agentCount * 30) : 0;
+    html += `<div class="demo-row">
+      <span class="pct">${pct}%</span>
+      <span class="name">${TYPE_NAMES[t]}</span>
+      <div class="dot" style="background:${TYPE_COLORS_CSS[t]};box-shadow:0 0 3px ${TYPE_COLORS_CSS[t]}"></div>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+// --- RENDERING ---
+const kaabahImg = document.createElement('canvas');
+kaabahImg.width = KAABAH_SIZE + 20;
+kaabahImg.height = KAABAH_SIZE + 20;
+const kctx = kaabahImg.getContext('2d');
+const kOff = 10;
+kctx.shadowColor = '#d4af37';
+kctx.shadowBlur = 12;
+kctx.fillStyle = '#0a0a0a';
+kctx.fillRect(kOff, kOff, KAABAH_SIZE, KAABAH_SIZE);
+kctx.shadowBlur = 0;
+kctx.fillStyle = '#0e0e0e';
+kctx.fillRect(kOff, kOff, KAABAH_SIZE, KAABAH_SIZE);
+const bandY = kOff + KAABAH_SIZE * 0.58;
+kctx.fillStyle = '#d4af3788';
+kctx.fillRect(kOff, bandY, KAABAH_SIZE, 3);
+kctx.fillStyle = '#d4af3740';
+kctx.fillRect(kOff, bandY - 2, KAABAH_SIZE, 1);
+kctx.fillRect(kOff, bandY + 4, KAABAH_SIZE, 1);
+kctx.strokeStyle = '#d4af37cc';
+kctx.lineWidth = 1;
+kctx.strokeRect(kOff + 0.5, kOff + 0.5, KAABAH_SIZE - 1, KAABAH_SIZE - 1);
+kctx.fillStyle = '#d4af3733';
+kctx.fillRect(kOff + KAABAH_SIZE - 8, kOff + KAABAH_SIZE * 0.3, 5, 10);
+
+// Background
+const bgCanvas = document.createElement('canvas');
+bgCanvas.width = W; bgCanvas.height = H;
+const bgCtx = bgCanvas.getContext('2d');
+function renderBackground() {
+  bgCtx.fillStyle = '#2a2a2e';
+  bgCtx.fillRect(0, 0, W, H);
+  bgCtx.restore();
+}
+renderBackground();
+
+// --- SCATTERED OUTER PARTICLES (ambient depth dots at Mataf edge) ---
+const _outerParticles = [];
+{
+  const outerColors = ['#dce4ec','#c8a0e0','#4ddb8a','#d4af37','#40c8ff','#ffb088'];
+  for (let p = 0; p < 120; p++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = MATAF_OUTER + 5 + Math.random() * 35;
+    _outerParticles.push({
+      angle: angle,
+      dist: dist,
+      speed: (0.0001 + Math.random() * 0.0003) * (Math.random() < 0.5 ? 1 : -1),
+      size: 0.3 + Math.random() * 0.7,
+      alpha: 0.08 + Math.random() * 0.15,
+      color: outerColors[Math.floor(Math.random() * outerColors.length)]
+    });
+  }
+}
+
+// Draw prayer row guides during prayer phases
+function drawPrayerRowGuides() {
+  const phase = prayerMode.phase;
+  if (phase !== 'iqamah' && phase !== 'praying' && phase !== 'salam') return;
+
+  ctx.save();
+  const ROW_SPACING = 6.5;
+  const startDist = KAABAH_SIZE / 2 + 14;
+  const maxDist = MATAF_OUTER + 20;
+  ctx.globalAlpha = 0.035;
+  ctx.strokeStyle = '#d4af37';
+  ctx.lineWidth = 0.4;
+
+  for (let d = startDist; d < maxDist; d += ROW_SPACING) {
+    ctx.beginPath();
+    ctx.arc(CX, CY, d, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawAgentsCanvas() {
+  ctx.drawImage(bgCanvas, 0, 0);
+
+  const phase = prayerMode.phase;
+  const isPrayerActive = (phase === 'praying' || phase === 'salam');
+
+  // Draw row guides during prayer
+  drawPrayerRowGuides();
+
+  // Pose size multiplier for prayer
+  const poseSizeMul = isPrayerActive ? getPoseSizeMul() : 1.0;
+  const pulseFactor = isPrayerActive ? 0.95 + 0.05 * Math.sin(Date.now() / 800) : 1.0;
+
+  // --- COMPOUND PARTICLE CONNECTION LINES (proximity web mesh with distance falloff) ---
+  if (!isPrayerActive) {
+    const LINE_RANGE = 28;
+    const LINE_CELLS = Math.ceil(LINE_RANGE / CELL);
+    // Draw in 3 distance bands for natural falloff
+    const bands = [
+      { max: 10, style: 'rgba(170,180,195,0.22)', width: 0.4 },
+      { max: 18, style: 'rgba(150,160,175,0.12)', width: 0.3 },
+      { max: 28, style: 'rgba(140,150,165,0.06)', width: 0.2 },
+    ];
+    for (let b = 0; b < bands.length; b++) {
+      const band = bands[b];
+      const minD = b === 0 ? 2 : bands[b-1].max;
+      ctx.save();
+      ctx.lineWidth = band.width;
+      ctx.strokeStyle = band.style;
+      ctx.beginPath();
+      for (let i = 0; i < agentCount; i++) {
+        const xi = ax[i], yi = ay[i];
+        const gx = (xi / CELL) | 0;
+        const gy = (yi / CELL) | 0;
+        for (let dy = -LINE_CELLS; dy <= LINE_CELLS; dy++) {
+          for (let dx = -LINE_CELLS; dx <= LINE_CELLS; dx++) {
+            const nx = gx + dx, ny = gy + dy;
+            if (nx < 0 || nx >= GW || ny < 0 || ny >= GH) continue;
+            let j = gridHead[ny * GW + nx];
+            while (j >= 0) {
+              if (j > i) {
+                const ddx = xi - ax[j], ddy = yi - ay[j];
+                const dist = Math.sqrt(ddx*ddx + ddy*ddy);
+                if (dist >= minD && dist < band.max) {
+                  ctx.moveTo(xi, yi);
+                  ctx.lineTo(ax[j], ay[j]);
+                }
+              }
+              j = gridNext[j];
+            }
+          }
+        }
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Colored lines for group members
+    ctx.save();
+    ctx.lineWidth = 0.4;
+    for (let i = 0; i < agentCount; i++) {
+      const leader = agroupLeader[i];
+      if (leader < 0 || leader >= agentCount) continue;
+      const type = atype[i];
+      if (type !== TYPE_FAMILY && type !== TYPE_TOUR && type !== TYPE_CHILD) continue;
+      const ddx = ax[i] - ax[leader], ddy = ay[i] - ay[leader];
+      const dist = Math.sqrt(ddx*ddx + ddy*ddy);
+      if (dist > 35) continue;
+      const col = acolor[leader];
+      const cr = col & 0xFF, cg = (col >> 8) & 0xFF, cb = (col >> 16) & 0xFF;
+      const lineAlpha = Math.max(0.05, 0.15 * (1 - dist / 35));
+      ctx.strokeStyle = `rgba(${cr},${cg},${cb},${lineAlpha.toFixed(3)})`;
+      ctx.beginPath();
+      ctx.moveTo(ax[i], ay[i]);
+      ctx.lineTo(ax[leader], ay[leader]);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // --- Draw agents as crisp compound particles ---
+  for (let i = 0; i < agentCount; i++) {
+    const col = acolor[i];
+    const r = col & 0xFF;
+    const g = (col >> 8) & 0xFF;
+    const b = (col >> 16) & 0xFF;
+    const a = ((col >> 24) & 0xFF) / 255;
+    let sz = asize[i] * poseSizeMul * pulseFactor;
+    const px = ax[i], py = ay[i];
+
+    // Touching agents: gold dots, no glow
+    if (atouchState[i] === 1 && !isPrayerActive) {
+      ctx.beginPath();
+      ctx.arc(px, py, Math.max(sz * 0.8, 0.8), 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(245,200,65,0.9)';
+      ctx.fill();
+      continue;
+    }
+
+    if (isPrayerActive || phase === 'iqamah') {
+      const amberBlend = isPrayerActive ? 0.3 : (phase === 'iqamah' ? 0.15 : 0);
+      const fr = r * (1 - amberBlend) + 212 * amberBlend;
+      const fg = g * (1 - amberBlend) + 175 * amberBlend;
+      const fb = b * (1 - amberBlend) + 55 * amberBlend;
+      ctx.beginPath();
+      ctx.arc(px, py, Math.max(sz * 0.7, 0.4), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${fr|0},${fg|0},${fb|0},${a})`;
+      ctx.fill();
+      continue;
+    }
+
+    // Normal tawaf: crisp dot, no glow halo
+    ctx.beginPath();
+    ctx.arc(px, py, Math.max(sz, 0.4), 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+    ctx.fill();
+  }
+
+  // Hijr Ismail — subtle semi-circular wall outline
+  ctx.save();
+  ctx.strokeStyle = 'rgba(100,100,80,0.25)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(HIJR_CX, HIJR_CY, HIJR_RADIUS, HIJR_CENTER_ANGLE + Math.PI - HIJR_ARC_HALF, HIJR_CENTER_ANGLE + Math.PI + HIJR_ARC_HALF);
+  ctx.stroke();
+  ctx.restore();
+
+  // Ka'bah: dichroic glass cube (Three.js composite) or fallback gold rect
+  if (window._cubeCanvas && window._renderGlassCube) {
+    window._renderGlassCube(Date.now() / 1000);
+    const cubeDrawSize = KAABAH_SIZE + 12;
+    ctx.drawImage(window._cubeCanvas, CX - cubeDrawSize/2, CY - cubeDrawSize/2, cubeDrawSize, cubeDrawSize);
+  } else {
+    ctx.drawImage(kaabahImg, CX - KAABAH_SIZE/2 - 10, CY - KAABAH_SIZE/2 - 10);
+  }
+
+  // --- BLACK STONE MARKER (small crisp dot) ---
+  ctx.save();
+  const bsPulse = 0.6 + 0.4 * Math.sin(Date.now() / 500);
+  ctx.beginPath();
+  ctx.arc(BLACK_STONE_X, BLACK_STONE_Y, 2, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(255, 255, 255, ${bsPulse})`;
+  ctx.fill();
+  ctx.restore();
+
+  // Ka'bah glow pulse during prayer
+  if (isPrayerActive) {
+    const glowPulse = 0.04 + 0.03 * Math.sin(Date.now() / 1200);
+    ctx.save();
+    ctx.globalAlpha = glowPulse;
+    ctx.shadowColor = '#d4af37';
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = '#d4af37';
+    ctx.fillRect(CX - KAABAH_SIZE/2, CY - KAABAH_SIZE/2, KAABAH_SIZE, KAABAH_SIZE);
+    ctx.restore();
+  }
+}
+
+// --- UI UPDATE ---
+function updateUI() {
+  const makkah = getMakkahTime();
+  const timeStr = makkah.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
+  document.getElementById('makkah-time').textContent = 'MAKKAH ' + timeStr + ' +03';
+
+  const nextInfo = getNextPrayerInfo();
+  const nextEl = document.getElementById('next-prayer');
+  const phase = prayerMode.phase;
+
+  if (phase !== 'tawaf') {
+    const phaseLabel = getPrayerPhaseLabel();
+    nextEl.textContent = `${prayerMode.prayerName.toUpperCase()} // ${phaseLabel}`;
+    nextEl.style.color = '#d4af37';
+  } else {
+    nextEl.textContent = nextInfo.next !== '—' ? `NEXT: ${nextInfo.next.toUpperCase()} ${nextInfo.nextIn}` : '';
+    nextEl.style.color = '#666';
+  }
+
+  // Phase indicator
+  const phaseEl = document.getElementById('phase-name');
+  const phaseSub = document.getElementById('phase-sub');
+  const statusDot = document.getElementById('status-dot');
+  const statusText = document.getElementById('status-text');
+
+  if (phase === 'adhan') {
+    const elapsed = (Date.now() - prayerMode.phaseStart) / 1000;
+    phaseEl.textContent = prayerMode.prayerName.toUpperCase() + ' ADHAN';
+    phaseEl.style.color = '#d4af37';
+    phaseSub.textContent = `SLOWING — ${Math.max(0, 120 - elapsed | 0)}s TO IQAMAH`;
+    statusDot.className = 'dot amber';
+    statusText.textContent = 'ADHAN';
+  } else if (phase === 'iqamah') {
+    phaseEl.textContent = 'IQAMAH';
+    phaseEl.style.color = '#d4af37';
+    phaseSub.textContent = 'FORMING ROWS — SHOULDER TO SHOULDER';
+    statusDot.className = 'dot amber';
+    statusText.textContent = 'IQAMAH';
+  } else if (phase === 'praying') {
+    phaseEl.textContent = `RAKAT ${prayerMode.rakatCurrent}/${prayerMode.rakatTotal}`;
+    phaseEl.style.color = '#d4af37';
+    phaseSub.textContent = getPoseLabel();
+    statusDot.className = 'dot amber';
+    statusText.textContent = 'SALAH';
+  } else if (phase === 'salam') {
+    phaseEl.textContent = 'SALAM';
+    phaseEl.style.color = '#d4af37';
+    phaseSub.textContent = 'ASSALAMU ALAIKUM WA RAHMATULLAH';
+    statusDot.className = 'dot amber';
+    statusText.textContent = 'SALAM';
+  } else if (phase === 'resuming') {
+    const elapsed = (Date.now() - prayerMode.phaseStart) / 1000;
+    phaseEl.textContent = 'TAWAF RESUMING';
+    phaseEl.style.color = '#00FF88';
+    phaseSub.textContent = `POST-${prayerMode.prayerName.toUpperCase()} SURGE`;
+    statusDot.className = 'dot green';
+    statusText.textContent = 'RESUMING';
+  } else {
+    phaseEl.textContent = 'TAWAF ACTIVE';
+    phaseEl.style.color = '#00FFFF';
+    // Density thresholds based on real ppl/sq m: >2 = high, >1 = moderate
+    const pplSqM = (agentCount * PEOPLE_PER_AGENT) / REAL_MATAF_AREA;
+    phaseSub.textContent = pplSqM > 2.0 ? 'HIGH DENSITY' : pplSqM > 1.0 ? 'MODERATE' : 'LOW DENSITY';
+    statusDot.className = 'dot';
+    statusText.textContent = 'LIVE';
+  }
+
+  // Center stats
+  const realPeople = agentCount * PEOPLE_PER_AGENT;
+  document.getElementById('s-agents').textContent = realPeople.toLocaleString();
+  // Capacity % based on ground floor Mataf max (~28,000 simultaneous)
+  document.getElementById('s-capacity').textContent = ((realPeople / MATAF_GROUND_MAX) * 100).toFixed(0) + '%';
+  document.getElementById('s-circuits').textContent = totalTawaf.toLocaleString();
+
+  // Bottom stats
+  const now = Date.now();
+  const elapsed = (now - lastCircuitReset) / 1000;
+  if (elapsed > 60) {
+    circuitsPerHour = Math.round(circuitsThisMinute * (3600 / elapsed));
+    circuitsThisMinute = 0;
+    lastCircuitReset = now;
+  }
+  document.getElementById('s-circhr').textContent = circuitsPerHour.toLocaleString();
+
+  const avgSpeed = agentCount > 0 ? aspeed.subarray(0, agentCount).reduce((s,v) => s+v, 0) / agentCount : 0.08;
+  const avgCircumference = 2 * Math.PI * ((MATAF_INNER + MATAF_OUTER) / 2);
+  const avgCircuitFrames = avgSpeed > 0 ? avgCircumference / avgSpeed : 999;
+  const avgCircuitSec = Math.round(avgCircuitFrames * 16.67 / 1000);
+  document.getElementById('s-avgtime').textContent = avgCircuitSec + 's';
+
+  // Real density: people per sq meter on ground floor (14,000 sq m)
+  // Peak near Ka'bah can reach 6-8 ppl/sq m; average 1-3 ppl/sq m [G.K. Still; ResearchGate]
+  const realDensity = (realPeople / REAL_MATAF_AREA).toFixed(1);
+  document.getElementById('s-density').textContent = realDensity;
+
+  document.getElementById('s-countdown').textContent = phase !== 'tawaf' ? getPrayerPhaseLabel() : (nextInfo.nextIn || '—');
+
+  renderBayesUI();
+  renderDemographics();
+  renderLog();
+}
+
+// --- MAIN LOOP ---
+let lastTime = 0;
+let uiTimer = 0;
+let densityTimer = 0;
+
+function loop(timestamp) {
+  if (!lastTime) lastTime = timestamp;
+  const dt = Math.min((timestamp - lastTime) / 16.67, 3);
+  lastTime = timestamp;
+
+  // Update prayer state machine every frame
+  updatePrayerStateMachine();
+
+  const phase = prayerMode.phase;
+
+  // Determine target agent count based on prayer phase
+  if (phase === 'adhan') {
+    // During adhan: gradually reduce target (people finishing tawaf, fewer starting)
+    const elapsed = (Date.now() - prayerMode.phaseStart) / 1000;
+    const frac = elapsed / 120;
+    targetAgentCount = Math.round(getTargetAgentCountForTime() * (1 - frac * 0.3));
+  } else if (phase === 'iqamah' || phase === 'praying' || phase === 'salam') {
+    // During prayer: no spawning/removing (agents are in rows)
+    targetAgentCount = agentCount;
+  } else if (phase === 'resuming') {
+    // Post-prayer surge — everyone rushes back to tawaf
+    const pName = prayerMode.prayerName;
+    targetAgentCount = pName === 'Fajr' ? 2200 : 3200;
+  } else {
+    targetAgentCount = getTargetAgentCountForTime();
+  }
+
+  uiTimer++;
+  densityTimer++;
+  if (uiTimer >= 60) {
+    uiTimer = 0;
+    updateUI();
+    updateBayesModel();
+  }
+  if (densityTimer >= 120) {
+    densityTimer = 0;
+    recordDensity();
+    drawDensityChart();
+  }
+
+  // Spawn/remove agents (not during active prayer)
+  if (phase !== 'iqamah' && phase !== 'praying' && phase !== 'salam') {
+    const diff = targetAgentCount - agentCount;
+    if (diff > 0) {
+      const n = Math.min(diff, Math.max(15, (diff * 0.12) | 0));
+      for (let i = 0; i < n; i++) smartSpawn();
+    } else if (diff < -10) {
+      const n = Math.min(-diff, 6);
+      for (let i = 0; i < n; i++) {
+        if (agentCount > 0) removeAgent(agentCount - 1);
+      }
+    }
+  }
+
+  // Drift cluster centers slowly (organic movement)
+  for (let c = 0; c < NUM_CLUSTERS; c++) {
+    clusterAngle[c] += clusterDrift[c] * dt;
+  }
+
+  manageTouchingLayer(dt);
+  updateAgents(dt);
+  updateVortex(dt);
+  drawAgentsCanvas();
+
+  requestAnimationFrame(loop);
+}
+
+// --- INIT (STEADY STATE — looks like tuning into a live feed) ---
+fetchPrayerTimes().then(() => {
+  targetAgentCount = getTargetAgentCountForTime();
+
+  // Spawn all agents in steady-state positions
+  for (let i = 0; i < targetAgentCount; ) {
+    const type = pickType();
+    const before = agentCount;
+    if (type === TYPE_FAMILY) {
+      spawnFamilyCluster();
+    } else if (type === TYPE_TOUR) {
+      spawnTourGroup();
+    } else {
+      spawnAgent(true, type);
+    }
+    i += Math.max(1, agentCount - before);
+  }
+
+  // Give each agent a random circuit count (as if mid-tawaf)
+  for (let i = 0; i < agentCount; i++) {
+    acircuits[i] = Math.floor(Math.random() * 7);
+  }
+
+  // Spawn touching layer — solid ring of agents pressed against Ka'bah
+  for (let t = 0; t < TOUCHING_AGENTS_TARGET; t++) {
+    spawnTouchingAgent();
+  }
+
+  // Spawn dense inner crowd (2-15m zone) — continuous press from Ka'bah outward
+  const innerCrowdTarget = 250;
+  for (let ic = 0; ic < innerCrowdTarget; ic++) {
+    const type = pickType();
+    const idx = spawnAgent(true, type);
+    if (idx < 0) break;
+    // Place specifically in the gap zone between squeeze and tawaf ring
+    const innerR = SQUEEZE_OUTER_R + Math.pow(Math.random(), 0.7) * (MATAF_INNER - SQUEEZE_OUTER_R);
+    const ang = Math.random() * Math.PI * 2;
+    ax[idx] = CX + Math.cos(ang) * innerR;
+    ay[idx] = CY + Math.sin(ang) * innerR;
+  }
+
+  // Pre-seed totalTawaf: ~107,000 tawaf/hr across all levels → ground floor ~25,000/hr
+  // Each completed tawaf = 7 circuits by 1 person
+  const makkah = getMakkahTime();
+  const hourOfDay = makkah.getHours() + makkah.getMinutes() / 60;
+  totalTawaf = Math.round(hourOfDay * 2500 + Math.random() * 500);
+
+  // Pre-seed circuits/hr (ground floor estimate)
+  circuitsPerHour = Math.round(agentCount * PEOPLE_PER_AGENT * 0.4 + Math.random() * 200);
+  circuitsThisMinute = Math.round(circuitsPerHour / 60);
+
+  // Pre-fill density history so chart isn't empty
+  const baseDensity = agentCount / MAX_AGENTS;
+  for (let i = 0; i < densityHistory.length; i++) {
+    densityHistory[i] = baseDensity * (0.85 + Math.random() * 0.3);
+  }
+  densityFull = true;
+  densityIdx = 0;
+
+  // Check if we're currently in a prayer window and init prayer state
+  const nowSec = makkah.getHours() * 3600 + makkah.getMinutes() * 60 + makkah.getSeconds();
+  for (const p of prayerSchedule) {
+    const pSec = p.totalMin * 60;
+    const diff = nowSec - pSec;
+    // Within 2min before prayer → adhan phase
+    if (diff >= -120 && diff < 0) {
+      prayerMode.phase = 'adhan';
+      prayerMode.prayerName = p.name;
+      prayerMode.rakatTotal = PRAYER_RAKAT[p.name];
+      prayerMode.rakatCurrent = 1;
+      prayerMode.poseIndex = 0;
+      prayerMode.phaseStart = Date.now() - (120 + diff) * 1000;
+      prayerMode.adhanTriggeredFor = p.name;
+      break;
+    }
+    // 0-45s after prayer time → iqamah
+    if (diff >= 0 && diff < 45) {
+      prayerMode.phase = 'iqamah';
+      prayerMode.prayerName = p.name;
+      prayerMode.rakatTotal = PRAYER_RAKAT[p.name];
+      prayerMode.rakatCurrent = 1;
+      prayerMode.poseIndex = 0;
+      prayerMode.phaseStart = Date.now() - diff * 1000;
+      prayerMode.adhanTriggeredFor = p.name;
+      prayerMode.rowsComputed = false;
+      assignAgentsToRows();
+      break;
+    }
+    // 45s to (45 + rakatTotal*92)s → praying
+    const prayerDuration = PRAYER_RAKAT[p.name] * 92;
+    if (diff >= 45 && diff < 45 + prayerDuration) {
+      prayerMode.phase = 'praying';
+      prayerMode.prayerName = p.name;
+      prayerMode.rakatTotal = PRAYER_RAKAT[p.name];
+      prayerMode.adhanTriggeredFor = p.name;
+      // Figure out which rakat/pose we're in
+      const prayingElapsed = diff - 45;
+      const rakatDuration = 92; // sum of all pose durations
+      prayerMode.rakatCurrent = Math.min(prayerMode.rakatTotal, Math.floor(prayingElapsed / rakatDuration) + 1);
+      const inRakat = prayingElapsed % rakatDuration;
+      let cumulative = 0;
+      prayerMode.poseIndex = 0;
+      for (let pi = 0; pi < POSE_ORDER.length; pi++) {
+        cumulative += POSE_DURATION[POSE_ORDER[pi]];
+        if (inRakat < cumulative) { prayerMode.poseIndex = pi; break; }
+      }
+      prayerMode.phaseStart = Date.now() - (diff - 45) * 1000;
+      prayerMode.poseStart = Date.now() - (inRakat - (cumulative - POSE_DURATION[POSE_ORDER[prayerMode.poseIndex]])) * 1000;
+      prayerMode.rowsComputed = false;
+      assignAgentsToRows();
+      break;
+    }
+    // Post-prayer salam (20s)
+    if (diff >= 45 + prayerDuration && diff < 65 + prayerDuration) {
+      prayerMode.phase = 'salam';
+      prayerMode.prayerName = p.name;
+      prayerMode.rakatTotal = PRAYER_RAKAT[p.name];
+      prayerMode.phaseStart = Date.now() - (diff - 45 - prayerDuration) * 1000;
+      prayerMode.adhanTriggeredFor = p.name;
+      prayerMode.rowsComputed = false;
+      assignAgentsToRows();
+      break;
+    }
+    // Resuming (60s after salam)
+    if (diff >= 65 + prayerDuration && diff < 125 + prayerDuration) {
+      prayerMode.phase = 'resuming';
+      prayerMode.prayerName = p.name;
+      prayerMode.phaseStart = Date.now() - (diff - 65 - prayerDuration) * 1000;
+      prayerMode.adhanTriggeredFor = p.name;
+      break;
+    }
+  }
+
+  // Populate event log as if it's been running
+  const fakeEvents = [
+    {type:'system', msg:'telemetry stream active'},
+    {type:'circuit', msg:'solo m completed 7 circuits'},
+    {type:'circuit', msg:'family completed 7 circuits'},
+    {type:'arrival', msg:`tour grp ${nextGroupId-1} (${10+Math.floor(Math.random()*8)})`},
+    {type:'circuit', msg:'elderly completed 7 circuits'},
+    {type:'system', msg:`crowd density ${(agentCount*PEOPLE_PER_AGENT/MATAF_GROUND_MAX*100).toFixed(0)}% — ${(agentCount*PEOPLE_PER_AGENT).toLocaleString()} pilgrims`},
+    {type:'arrival', msg:'solo f entered mataf'},
+    {type:'circuit', msg:'tour completed 7 circuits'},
+    {type:'arrival', msg:`family grp ${Math.max(0,nextGroupId-3)} (${3+Math.floor(Math.random()*3)})`},
+    {type:'circuit', msg:'solo m completed 7 circuits'},
+  ];
+  const ts = makkah.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+  for (const e of fakeEvents) {
+    eventLog.push({ts, type: e.type, msg: e.msg});
+  }
+
+  tctx.clearRect(0, 0, W, H);
+  updateUI();
+  drawDensityChart();
+  requestAnimationFrame(loop);
+});
+
+// === AUTORESEARCH MODULE ===
+let researchMode = false;
+let researchLog = [];
+let researchLogInterval = null;
+let researchStartTime = null;
+let bayesErrorHistory = [];
+
+function toggleResearch() {
+  researchMode = !researchMode;
+  const btn = document.getElementById('research-toggle');
+  const badge = document.getElementById('research-badge');
+  const panel = document.getElementById('research-panel');
+  btn.classList.toggle('active', researchMode);
+  badge.classList.toggle('visible', researchMode);
+  panel.classList.toggle('visible', researchMode);
+
+  if (researchMode) {
+    researchStartTime = Date.now();
+    bayesErrorHistory = [];
+    addEvent('system', 'RESEARCH MODE activated — logging');
+    researchLogInterval = setInterval(logResearchSnapshot, 30000);
+    logResearchSnapshot(); // immediate first log
+  } else {
+    clearInterval(researchLogInterval);
+    researchLogInterval = null;
+    addEvent('system', 'RESEARCH MODE deactivated');
+  }
+}
+
+function getFlowRatesByRing() {
+  const rings = [
+    {name: 'TOUCH (0-2m)', min: 0, max: TOUCH_RING_DIST, count: 0, totalSpeed: 0},
+    {name: 'INNER (2-10m)', min: TOUCH_RING_DIST, max: MATAF_INNER + 25, count: 0, totalSpeed: 0},
+    {name: 'MID (10-30m)', min: MATAF_INNER + 25, max: MATAF_INNER + 80, count: 0, totalSpeed: 0},
+    {name: 'OUTER (30m+)', min: MATAF_INNER + 80, max: MATAF_OUTER + 50, count: 0, totalSpeed: 0},
+  ];
+  for (let i = 0; i < agentCount; i++) {
+    const dx = ax[i] - CX, dy = ay[i] - CY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const spd = Math.sqrt(avx[i] * avx[i] + avy[i] * avy[i]);
+    for (const r of rings) {
+      if (dist >= r.min && dist < r.max) {
+        r.count++;
+        r.totalSpeed += spd;
+        break;
+      }
+    }
+  }
+  return rings.map(r => ({
+    name: r.name,
+    agents: r.count,
+    people: r.count * PEOPLE_PER_AGENT,
+    avgSpeed: r.count > 0 ? (r.totalSpeed / r.count).toFixed(4) : '0',
+  }));
+}
+
+function getZoneStats() {
+  let bsSeekers = 0, bsStopped = 0, mzSeekers = 0, mzStopped = 0;
+  for (let i = 0; i < agentCount; i++) {
+    if (azoneIntent[i] === 1) { bsSeekers++; if (azoneState[i] === 2) bsStopped++; }
+    if (azoneIntent[i] === 2) { mzSeekers++; if (azoneState[i] === 2) mzStopped++; }
+  }
+  return {bsSeekers, bsStopped, mzSeekers, mzStopped};
+}
+
+function logResearchSnapshot() {
+  const makkah = getMakkahTime();
+  const ts = makkah.toISOString();
+  const elapsed = (Date.now() - researchStartTime) / 1000;
+  const flow = getFlowRatesByRing();
+  const zones = getZoneStats();
+
+  const snapshot = {
+    timestamp: ts,
+    elapsedSec: Math.round(elapsed),
+    phase: prayerMode.phase,
+    prayerName: prayerMode.prayerName || null,
+    agents: agentCount,
+    realPeople: agentCount * PEOPLE_PER_AGENT,
+    targetAgents: targetAgentCount,
+    totalTawaf: totalTawaf,
+    circuitsPerHour: circuitsPerHour,
+    densityPplSqM: parseFloat(((agentCount * PEOPLE_PER_AGENT) / REAL_MATAF_AREA).toFixed(2)),
+    bayesian: {
+      prior: parseFloat(bayesModel.lastPrior.toFixed(4)),
+      likelihood: parseFloat(bayesModel.lastLikelihood.toFixed(4)),
+      evidence: parseFloat(bayesModel.lastEvidence.toFixed(4)),
+      posterior: parseFloat(bayesModel.lastPosterior.toFixed(4)),
+      predictionError: parseFloat(bayesModel.predictionError.toFixed(4)),
+      confidence: parseFloat(bayesModel.confidence.toFixed(4)),
+    },
+    flowByRing: flow,
+    zones: zones,
+    config: {
+      pxPerMeter: PX_PER_METER,
+      matafInnerR: REAL_MATAF_INNER_R,
+      matafOuterR: REAL_MATAF_OUTER_R,
+      matafArea: REAL_MATAF_AREA,
+      peoplePerAgent: PEOPLE_PER_AGENT,
+      maxAgents: MAX_AGENTS,
+      zoneSeekerPct: ZONE_SEEKER_PCT,
+    }
+  };
+
+  researchLog.push(snapshot);
+  bayesErrorHistory.push({t: elapsed, error: bayesModel.predictionError});
+
+  // Update research panel UI
+  updateResearchPanel(snapshot);
+}
+
+function updateResearchPanel(snap) {
+  if (!snap) return;
+  const paramsEl = document.getElementById('rp-params');
+  paramsEl.innerHTML = `
+    <div><span class="rp-label">T </span><span class="rp-val">${snap.timestamp}</span></div>
+    <div><span class="rp-label">ELAPSED </span><span class="rp-val">${snap.elapsedSec}s</span></div>
+    <div><span class="rp-label">PHASE </span><span class="rp-val">${snap.phase}${snap.prayerName ? ' ('+snap.prayerName+')' : ''}</span></div>
+    <div><span class="rp-label">AGENTS </span><span class="rp-val">${snap.agents} (${snap.realPeople.toLocaleString()} ppl)</span></div>
+    <div><span class="rp-label">TARGET </span><span class="rp-val">${snap.targetAgents}</span></div>
+    <div><span class="rp-label">DENSITY </span><span class="rp-val">${snap.densityPplSqM} ppl/m²</span></div>
+    <div><span class="rp-label">CIRC/HR </span><span class="rp-val">${snap.circuitsPerHour}</span></div>
+  `;
+
+  const flowEl = document.getElementById('rp-flow');
+  let flowHtml = '<div style="color:#00FFFF;font-size:6px;letter-spacing:1.5px;margin-bottom:3px">FLOW BY RING</div>';
+  for (const r of snap.flowByRing) {
+    flowHtml += `<div><span class="rp-label">${r.name} </span><span class="rp-val">${r.people} ppl, v=${r.avgSpeed}</span></div>`;
+  }
+  flowHtml += `<div style="margin-top:3px"><span class="rp-label">BS ZONE </span><span class="rp-val">${snap.zones.bsStopped}/${snap.zones.bsSeekers} at stone</span></div>`;
+  flowHtml += `<div><span class="rp-label">MULTAZAM </span><span class="rp-val">${snap.zones.mzStopped}/${snap.zones.mzSeekers} at wall</span></div>`;
+  flowEl.innerHTML = flowHtml;
+
+  const accEl = document.getElementById('rp-accuracy');
+  const errTrend = bayesErrorHistory.length > 1 ?
+    (bayesErrorHistory[bayesErrorHistory.length-1].error < bayesErrorHistory[0].error ? '↓ CONVERGING' : '→ STABLE') : '...';
+  accEl.innerHTML = `
+    <div style="color:#00FFFF;font-size:6px;letter-spacing:1.5px;margin-bottom:3px">BAYESIAN ACCURACY</div>
+    <div><span class="rp-label">PRED ERR </span><span class="rp-val">${(snap.bayesian.predictionError * 100).toFixed(2)}%</span></div>
+    <div><span class="rp-label">CONF </span><span class="rp-val">${(snap.bayesian.confidence * 100).toFixed(1)}%</span></div>
+    <div><span class="rp-label">TREND </span><span class="rp-val" style="color:#00FF88">${errTrend}</span></div>
+    <div><span class="rp-label">SAMPLES </span><span class="rp-val">${researchLog.length}</span></div>
+  `;
+}
+
+function exportResearchData() {
+  const exportData = {
+    exportTime: new Date().toISOString(),
+    totalSnapshots: researchLog.length,
+    sessionDuration: researchStartTime ? Math.round((Date.now() - researchStartTime) / 1000) : 0,
+    bayesErrorConvergence: bayesErrorHistory,
+    snapshots: researchLog,
+  };
+  console.log('%c[TAWAF RESEARCH EXPORT]', 'color: #FF4444; font-weight: bold;', JSON.stringify(exportData, null, 2));
+  console.log('%cData object:', 'color: #00FFFF;', exportData);
+  const statusEl = document.getElementById('rp-export-status');
+  statusEl.textContent = `✓ ${researchLog.length} snapshots → console`;
+  setTimeout(() => statusEl.textContent = '', 3000);
+}
+</script>
+
+<!-- Three.js dichroic glass cube (Ka'bah) -->
+<script type="importmap">
+{"imports":{"three":"https://esm.sh/three@0.170.0"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const RES = 128;
+const cvs = document.createElement('canvas');
+cvs.width = RES; cvs.height = RES;
+
+const gl = new THREE.WebGLRenderer({
+  canvas: cvs, alpha: true, antialias: true, premultipliedAlpha: false
+});
+gl.setSize(RES, RES);
+gl.toneMapping = THREE.ACESFilmicToneMapping;
+gl.toneMappingExposure = 1.4;
+
+const scene = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(28, 1, 0.1, 50);
+cam.position.set(0, 4.5, 1.5);
+cam.lookAt(0, 0, 0);
+
+// Background texture — captures tawaf canvas area around Ka'bah for refraction
+const bgCvs = document.createElement('canvas');
+bgCvs.width = RES; bgCvs.height = RES;
+const bgCtx = bgCvs.getContext('2d');
+const bgTex = new THREE.CanvasTexture(bgCvs);
+bgTex.minFilter = THREE.LinearFilter;
+
+// Dichroic glass shader — per-channel IOR (R=1.14, G=1.18, B=1.23)
+const vert = `
+varying vec3 vN, vE, vWN;
+void main() {
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vN = normalize(normalMatrix * normal);
+  vE = normalize(-mv.xyz);
+  vWN = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+  gl_Position = projectionMatrix * mv;
+}`;
+
+const frag = `
+uniform float uTime, uIorR, uIorG, uIorB;
+uniform sampler2D uBg;
+uniform vec2 uRes;
+varying vec3 vN, vE, vWN;
+
+vec3 film(float c, float t) {
+  float p = 6.2832 * 5.0 * c + t * 0.25;
+  return vec3(.5+.5*cos(p), .5+.5*cos(p-2.094), .5+.5*cos(p+2.094));
+}
+
+void main() {
+  vec3 n = normalize(vN), e = normalize(vE);
+  float NdV = max(dot(n, e), .001);
+  float fres = pow(1.0 - NdV, 3.0);
+
+  // Per-channel refraction — dichroic IOR split
+  vec3 rR = refract(-e, n, 1.0/uIorR);
+  vec3 rG = refract(-e, n, 1.0/uIorG);
+  vec3 rB = refract(-e, n, 1.0/uIorB);
+
+  float ab = 0.14;
+  vec2 uv = gl_FragCoord.xy / uRes;
+  float R = texture2D(uBg, clamp(uv + rR.xy * ab, 0.0, 1.0)).r;
+  float G = texture2D(uBg, clamp(uv + rG.xy * ab, 0.0, 1.0)).g;
+  float B = texture2D(uBg, clamp(uv + rB.xy * ab, 0.0, 1.0)).b;
+  vec3 col = vec3(R, G, B) * vec3(.94, .97, 1.06) * 2.8;
+
+  // Thin-film iridescence (diagonal band)
+  vec3 ir = film(NdV, uTime);
+  float diag = abs(dot(vWN, normalize(vec3(1.0, 0.0, 1.0))));
+  col = mix(col, col * ir * 1.4, diag * .22);
+  col += ir * diag * fres * .12;
+
+  // Fresnel edge highlight
+  col += vec3(.80, .92, 1.0) * fres * .35;
+
+  // Side-face ambient fill
+  float side = 1.0 - abs(vWN.y);
+  col += vec3(.22, .28, .45) * side * .30;
+
+  // Top-face dichroic — thin-film interference
+  float top = smoothstep(.5, .92, vWN.y);
+  vec3 tir = film(NdV, uTime * .4);
+  col = mix(col, col * tir * 1.6 + tir * .18, top * .40);
+  col += vec3(.25, .15, .55) * pow(1.0 - NdV, 3.0) * top * .15;
+
+  // Sky reflection + edge catch rim
+  col += pow(max(vWN.y, 0.0), 1.8) * vec3(.90, .94, 1.0) * .38;
+  col += vec3(.70, .85, 1.0) * pow(1.0 - NdV, 5.0) * 1.8;
+
+  gl_FragColor = vec4(col, .88 + fres * .12);
+}`;
+
+const mat = new THREE.ShaderMaterial({
+  uniforms: {
+    uTime: { value: 0 },
+    uIorR: { value: 1.14 }, uIorG: { value: 1.18 }, uIorB: { value: 1.23 },
+    uBg:   { value: bgTex },
+    uRes:  { value: new THREE.Vector2(RES, RES) }
+  },
+  vertexShader: vert, fragmentShader: frag,
+  transparent: true, side: THREE.DoubleSide
+});
+
+const cube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
+scene.add(cube);
+
+// Lighting
+scene.add(new THREE.AmbientLight(0x334455, 0.5));
+const key = new THREE.DirectionalLight(0xffeedd, 3.5);
+key.position.set(2, 5, 1); scene.add(key);
+const rim = new THREE.DirectionalLight(0x8888ff, 1.2);
+rim.position.set(-2, 3, -2); scene.add(rim);
+const back = new THREE.DirectionalLight(0xaa88ff, 0.6);
+back.position.set(0, 2, -3); scene.add(back);
+
+// Expose to main script
+window._cubeCanvas = cvs;
+window._renderGlassCube = function(t) {
+  // Capture tawaf canvas area around Ka'bah for refraction background
+  const mc = document.getElementById('c');
+  if (mc) {
+    const cx = mc.width / 2, cy = mc.height / 2 + 10, half = 80;
+    bgCtx.drawImage(mc, cx - half, cy - half, half * 2, half * 2, 0, 0, RES, RES);
+    bgTex.needsUpdate = true;
+  }
+  cube.rotation.y = t * 0.12;
+  mat.uniforms.uTime.value = t;
+  gl.render(scene, cam);
+};
+</script>
+</body>
+</html>

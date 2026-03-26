@@ -1,0 +1,230 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>p5.brush Watercolor Rose — Pure fillBleed Test</title>
+<script src="https://cdn.jsdelivr.net/npm/p5@2/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.0-beta"></script>
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<script>
+// ============================================================
+// PURE p5.brush WATERCOLOR ROSE
+// Tests: fillBleed() + fillTexture() for petal painting
+// NO Tyler Hobbs polygon deformation — only p5.brush native fill
+// ============================================================
+
+function setup() {
+  createCanvas(430, 932, WEBGL);
+  brush.load();
+  translate(-width / 2, -height / 2);
+
+  randomSeed(777);
+
+  // --- Paper background ---
+  background(244, 237, 227);
+
+  // --- Color palette (same as watercolor-chris.html) ---
+  const COL_OUTER  = "#d73c5a";   // lighter pink outer
+  const COL_MID    = "#b91e3c";   // mid crimson
+  const COL_INNER  = "#911a2a";   // deep inner
+  const COL_CENTER = "#691e1e";   // dark center
+  const COL_LEAF   = "#266428";   // green
+  const COL_STEM   = "#2a5f26";   // stem green
+
+  const roseCx = width * 0.50;
+  const roseCy = height * 0.36;
+
+  // ============================================================
+  // STEM — single brushstroke
+  // ============================================================
+  brush.set("charcoal", COL_STEM, 2.5);
+  brush.line(roseCx, roseCy + 35, roseCx + 2, height * 0.78);
+
+  // Stem with watercolor fill for thickness
+  brush.noStroke();
+  brush.fill(COL_STEM, 80);
+  brush.fillBleed(0.3, "out");
+  brush.fillTexture(0.4, 0.2);
+  brush.rect(roseCx - 4, roseCy + 35, 8, height * 0.42);
+
+  // ============================================================
+  // LEAVES — watercolor filled shapes
+  // ============================================================
+  function drawLeaf(cx, cy, angle, len, w) {
+    push();
+    translate(cx, cy);
+    rotate(angle);
+
+    // Leaf body — watercolor fill
+    brush.noStroke();
+    brush.fill(COL_LEAF, 100);
+    brush.fillBleed(0.5, "out");
+    brush.fillTexture(0.5, 0.3);
+
+    // Leaf shape using beginShape
+    brush.beginShape(0.7);
+    brush.vertex(0, 0);
+    brush.vertex(len * 0.3, -w * 0.6);
+    brush.vertex(len * 0.6, -w * 0.8);
+    brush.vertex(len * 0.85, -w * 0.4);
+    brush.vertex(len, 0);
+    brush.vertex(len * 0.85, w * 0.3);
+    brush.vertex(len * 0.6, w * 0.5);
+    brush.vertex(len * 0.3, w * 0.4);
+    brush.endShape(true);
+
+    // Central vein
+    brush.noFill();
+    brush.set("rotring", "#1a4a1a", 0.3);
+    brush.line(2, 0, len - 5, 0);
+
+    // Side veins
+    brush.set("2H", "#1a4a1a", 0.2);
+    for (let i = 1; i <= 5; i++) {
+      let t = 0.15 + (i / 6) * 0.7;
+      let vx = len * t;
+      let vLen = w * 0.5 * (1 - Math.abs(t - 0.4));
+      brush.line(vx, 0, vx + vLen * 0.3, -vLen);
+      brush.line(vx, 0, vx + vLen * 0.2, vLen * 0.7);
+    }
+
+    pop();
+  }
+
+  // Left leaf
+  drawLeaf(roseCx - 10, height * 0.54, PI + 0.45, 100, 25);
+  // Right leaf
+  drawLeaf(roseCx + 10, height * 0.54, -0.35, 88, 22);
+
+  // ============================================================
+  // ROSE PETALS — Pure p5.brush watercolor fill
+  // Strategy: overlapping ellipses/circles with fillBleed
+  // ============================================================
+
+  // Helper: draw one petal as a watercolor-filled shape
+  function drawPetal(cx, cy, angle, length, maxW, color, opacity, bleed) {
+    push();
+    translate(cx, cy);
+    rotate(angle);
+
+    brush.noStroke();
+    brush.fill(color, opacity);
+    brush.fillBleed(bleed, random() > 0.5 ? "out" : "in");
+    brush.fillTexture(random(0.3, 0.6), random(0.2, 0.4));
+
+    // Ogee/almond petal shape
+    brush.beginShape(0.8);
+    brush.vertex(0, 0);
+    brush.vertex(length * 0.2, -maxW * 0.5);
+    brush.vertex(length * 0.35, -maxW * 0.8);
+    brush.vertex(length * 0.5, -maxW * 0.9);
+    brush.vertex(length * 0.7, -maxW * 0.6);
+    brush.vertex(length * 0.9, -maxW * 0.2);
+    brush.vertex(length, 0);
+    brush.vertex(length * 0.9, maxW * 0.15);
+    brush.vertex(length * 0.7, maxW * 0.4);
+    brush.vertex(length * 0.5, maxW * 0.5);
+    brush.vertex(length * 0.35, maxW * 0.45);
+    brush.vertex(length * 0.2, maxW * 0.3);
+    brush.endShape(true);
+
+    pop();
+  }
+
+  // OUTER RING: 6 large petals
+  for (let i = 0; i < 6; i++) {
+    let baseAngle = (i / 6) * TWO_PI + 0.2;
+    let startDist = random(18, 25);
+    let sx = roseCx + cos(baseAngle) * startDist;
+    let sy = roseCy + sin(baseAngle) * startDist;
+    let tangentAngle = baseAngle + HALF_PI + random(-0.15, 0.15);
+    drawPetal(sx, sy, tangentAngle, random(75, 95), random(38, 50),
+              COL_OUTER, random(60, 90), random(0.4, 0.7));
+  }
+
+  // MID RING: 7 medium petals
+  for (let i = 0; i < 7; i++) {
+    let baseAngle = (i / 7) * TWO_PI + 0.55;
+    let startDist = random(10, 16);
+    let sx = roseCx + cos(baseAngle) * startDist;
+    let sy = roseCy + sin(baseAngle) * startDist;
+    let tangentAngle = baseAngle + HALF_PI + random(-0.2, 0.2);
+    drawPetal(sx, sy, tangentAngle, random(50, 65), random(28, 40),
+              COL_MID, random(70, 110), random(0.3, 0.6));
+  }
+
+  // INNER RING: 5 tight petals
+  for (let i = 0; i < 5; i++) {
+    let baseAngle = (i / 5) * TWO_PI + random(-0.2, 0.5);
+    let startDist = random(4, 8);
+    let sx = roseCx + cos(baseAngle) * startDist;
+    let sy = roseCy + sin(baseAngle) * startDist;
+    let tangentAngle = baseAngle + HALF_PI + random(-0.25, 0.25);
+    drawPetal(sx, sy, tangentAngle, random(30, 42), random(20, 30),
+              COL_INNER, random(80, 130), random(0.2, 0.5));
+  }
+
+  // CENTER: 4 tight curls
+  for (let i = 0; i < 4; i++) {
+    let a = (i / 4) * TWO_PI + random(-0.3, 0.3);
+    let sx = roseCx + random(-3, 3);
+    let sy = roseCy + random(-3, 3);
+    drawPetal(sx, sy, a + HALF_PI * 0.4, random(15, 25), random(12, 20),
+              COL_CENTER, random(90, 140), random(0.15, 0.4));
+  }
+
+  // ============================================================
+  // EXTRA WASHES — layered watercolor circles for depth
+  // Stacking multiple transparent fills like Tyler's technique
+  // ============================================================
+  for (let i = 0; i < 8; i++) {
+    let angle = random(TWO_PI);
+    let dist = random(5, 40);
+    let x = roseCx + cos(angle) * dist;
+    let y = roseCy + sin(angle) * dist;
+    brush.noStroke();
+    brush.fill(random([COL_OUTER, COL_MID, COL_INNER]), random(15, 35));
+    brush.fillBleed(random(0.3, 0.8), "out");
+    brush.fillTexture(random(0.4, 0.7), random(0.2, 0.5));
+    brush.circle(x, y, random(15, 45));
+  }
+
+  // ============================================================
+  // PETAL OUTLINES — tahrir-style fine lines
+  // ============================================================
+  brush.noFill();
+  brush.set("rotring", "#5a1020", 0.25);
+  for (let i = 0; i < 6; i++) {
+    let baseAngle = (i / 6) * TWO_PI + 0.2;
+    let startDist = random(18, 25);
+    let sx = roseCx + cos(baseAngle) * startDist;
+    let sy = roseCy + sin(baseAngle) * startDist;
+    let tangentAngle = baseAngle + HALF_PI;
+
+    push();
+    translate(sx, sy);
+    rotate(tangentAngle);
+    let len = random(75, 95);
+    let w = random(38, 50);
+    brush.beginShape(0.8);
+    brush.vertex(0, 0);
+    brush.vertex(len * 0.35, -w * 0.8);
+    brush.vertex(len * 0.7, -w * 0.6);
+    brush.vertex(len, 0);
+    brush.vertex(len * 0.7, w * 0.4);
+    brush.vertex(len * 0.35, w * 0.45);
+    brush.endShape(true);
+    pop();
+  }
+
+  console.log("p5.brush watercolor rose complete");
+}
+</script>
+</body>
+</html>

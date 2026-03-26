@@ -1,0 +1,64 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+<style>* { margin:0; } body { background:#f2eada; }</style>
+</head>
+<body>
+<script>
+// Exact Alejandro pattern from his sketch
+var W = 800, H = 1200;
+
+function setup() {
+  createCanvas(W, H, WEBGL);
+  pixelDensity(1);
+  brush.load();
+}
+
+function draw() {
+  background("#e2e7dc");
+  translate(-width/2, -height/2);
+
+  // Coffee stain using EXACT Alejandro API
+  brush.fill("#a08060", 70);
+  brush.fillBleed(0.2);
+  brush.beginShape(0);
+  brush.vertex(150, 200);
+  brush.vertex(350, 180);
+  brush.vertex(400, 350);
+  brush.vertex(250, 420);
+  brush.vertex(100, 350);
+  randomSeed(42);
+  brush.endShape(CLOSE);
+
+  // Second stain
+  brush.fill("#8a6840", 50);
+  brush.fillBleed(0.3);
+  brush.beginShape(0);
+  brush.vertex(450, 500);
+  brush.vertex(650, 480);
+  brush.vertex(700, 700);
+  brush.vertex(500, 750);
+  brush.vertex(400, 650);
+  randomSeed(99);
+  brush.endShape(CLOSE);
+
+  // Test brush strokes after
+  brush.set('2H', '#5a5248', 2.0);
+  brush.line(100, 600, 700, 600);
+  
+  var archPts = [];
+  for (var i = 0; i <= 20; i++) {
+    var t = i/20;
+    archPts.push([100+600*t, 400+200*(1-4*t*(1-t)), 0.5]);
+  }
+  brush.spline(archPts, 0.3);
+
+  noLoop();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,489 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Ottoman Flowers — Final</title>
+  <script src="p5.min.js"></script>
+  <script src="p5.brush.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script>
+// ============================================================
+// 5 BEAUTIFUL OTTOMAN FLOWERS — HYBRID APPROACH
+// Tyler Hobbs watercolor for large petals (rich pigment)
+// p5.brush for leaves, outlines, gold centers
+// ============================================================
+
+// Seeded PRNG
+var _seed = 42;
+function sRand() { _seed = (_seed * 16807) % 2147483647; return (_seed - 1) / 2147483646; }
+function sGauss(m, s) { var u1 = sRand(), u2 = sRand(); return m + s * Math.sqrt(-2 * Math.log(u1 || 0.001)) * Math.cos(2 * Math.PI * u2); }
+
+// ============================================================
+// TYLER HOBBS WATERCOLOR ENGINE
+// ============================================================
+function deformOnce(poly, variances) {
+  var result = [], nv = [];
+  for (var i = 0; i < poly.length; i++) {
+    var a = poly[i], c = poly[(i + 1) % poly.length];
+    result.push([a[0], a[1]]);
+    var v = variances[i];
+    var mx = (a[0]+c[0])/2, my = (a[1]+c[1])/2;
+    var dx = c[0]-a[0], dy = c[1]-a[1];
+    var len = Math.sqrt(dx*dx+dy*dy);
+    if (len < 0.5) { result.push([mx,my]); nv.push(v,v); continue; }
+    var nx = -dy/len, ny = dx/len;
+    var off = sGauss(0, v * len);
+    result.push([mx+nx*off, my+ny*off]);
+    nv.push(v*(0.6+sRand()*0.6), v*(0.6+sRand()*0.6));
+  }
+  return { poly: result, variances: nv };
+}
+function deformN(poly, n, variance) {
+  var p = poly.map(function(pt) { return [pt[0], pt[1]]; });
+  var vars = poly.map(function() { return variance; });
+  for (var i = 0; i < n; i++) {
+    var r = deformOnce(p, vars);
+    p = r.poly; vars = r.variances;
+  }
+  return p;
+}
+
+var wcGfx; // 2D watercolor buffer
+var offCanvas, offCtx; // offscreen for texture masking
+
+// Pre-compute texture mask circles (same as watercolor-variations.html)
+var NUM_MASKS = 4;
+var maskData = [];
+
+function initMasks(w, h) {
+  for (var m = 0; m < NUM_MASKS; m++) {
+    var circles = [];
+    for (var j = 0; j < 300; j++) {
+      circles.push([sRand() * w, sRand() * h, Math.abs(sGauss(w * 0.06, w * 0.025))]);
+    }
+    maskData.push(circles);
+  }
+  offCanvas = document.createElement('canvas');
+  offCanvas.width = w;
+  offCanvas.height = h;
+  offCtx = offCanvas.getContext('2d');
+}
+
+function watercolorFill(polygon, r, g, b, layers, alpha, variance, opts) {
+  opts = opts || {};
+  var basePoly = deformN(polygon, 5, variance || 0.15);
+  var ctx = wcGfx.drawingContext;
+
+  // Compute bounding box for texture masking optimization
+  var minX = 9999, maxX = -9999, minY = 9999, maxY = -9999;
+  for (var k = 0; k < basePoly.length; k++) {
+    if (basePoly[k][0] < minX) minX = basePoly[k][0];
+    if (basePoly[k][0] > maxX) maxX = basePoly[k][0];
+    if (basePoly[k][1] < minY) minY = basePoly[k][1];
+    if (basePoly[k][1] > maxY) maxY = basePoly[k][1];
+  }
+  // Pad bounding box for deformed layers
+  minX -= 50; minY -= 50; maxX += 50; maxY += 50;
+
+  for (var i = 0; i < layers; i++) {
+    // More deformation rounds for outer layers → more organic edges
+    var deformRounds = 4 + Math.floor(sRand() * 2);
+    var lp = deformN(basePoly, deformRounds, (variance || 0.15) * (0.5 + sRand() * 0.7));
+
+    // Color jitter — stronger for watercolor variation
+    var jr = Math.max(0,Math.min(255,Math.round(r + sGauss(0,12))));
+    var jg = Math.max(0,Math.min(255,Math.round(g + sGauss(0,10))));
+    var jb = Math.max(0,Math.min(255,Math.round(b + sGauss(0,10))));
+
+    // Draw to offscreen with texture mask
+    var bx = Math.max(0, Math.floor(minX));
+    var by = Math.max(0, Math.floor(minY));
+    var bw = Math.min(offCanvas.width, Math.ceil(maxX)) - bx;
+    var bh = Math.min(offCanvas.height, Math.ceil(maxY)) - by;
+    if (bw <= 0 || bh <= 0) continue;
+
+    offCtx.clearRect(bx, by, bw, bh);
+    offCtx.globalCompositeOperation = 'source-over';
+    offCtx.globalAlpha = 1.0;
+    offCtx.fillStyle = 'rgb('+jr+','+jg+','+jb+')';
+    offCtx.beginPath();
+    offCtx.moveTo(lp[0][0], lp[0][1]);
+    for (var j = 1; j < lp.length; j++) offCtx.lineTo(lp[j][0], lp[j][1]);
+    offCtx.closePath();
+    offCtx.fill();
+
+    // Texture mask: punch out circles for paper grain
+    offCtx.globalCompositeOperation = 'destination-out';
+    offCtx.globalAlpha = 0.10 + sRand() * 0.06;
+    var circles = maskData[i % NUM_MASKS];
+    for (var ci = 0; ci < circles.length; ci++) {
+      var ccx = circles[ci][0], ccy = circles[ci][1], cr = circles[ci][2];
+      if (ccx + cr < minX || ccx - cr > maxX || ccy + cr < minY || ccy - cr > maxY) continue;
+      offCtx.beginPath();
+      offCtx.arc(ccx, ccy, cr, 0, Math.PI * 2);
+      offCtx.fill();
+    }
+
+    // Composite onto watercolor buffer
+    ctx.save();
+    ctx.globalAlpha = alpha / 255;
+    ctx.drawImage(offCanvas, bx, by, bw, bh, bx, by, bw, bh);
+    ctx.restore();
+  }
+
+  // Edge darkening — pigment pools at watercolor edges
+  if (opts.edgeDarken) {
+    var edgePoly = deformN(basePoly, 5, (variance || 0.15) * 1.1);
+    var dr = Math.max(0, Math.round(r * 0.6));
+    var dg = Math.max(0, Math.round(g * 0.6));
+    var db = Math.max(0, Math.round(b * 0.6));
+    ctx.save();
+    ctx.globalAlpha = 0.08;
+    ctx.strokeStyle = 'rgb('+dr+','+dg+','+db+')';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(edgePoly[0][0], edgePoly[0][1]);
+    for (var j = 1; j < edgePoly.length; j++) ctx.lineTo(edgePoly[j][0], edgePoly[j][1]);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// ============================================================
+// PETAL SHAPES
+// ============================================================
+
+// Elliptical petal — EXACT same geometry as ottoman-skill-test.html rosePetal()
+// Creates a fat ellipse centered at (px + len/2) from start point
+function rosePetal(px, py, angle, len, w) {
+  var pts = [], steps = 24;
+  var ca = Math.cos(angle), sa = Math.sin(angle), nx = -sa, ny = ca;
+  for (var s = 0; s <= steps; s++) {
+    var t = s / steps;
+    var theta = t * Math.PI * 2;
+    var along = Math.cos(theta) * len * 0.5;
+    var across = Math.sin(theta) * w * 0.6;
+    pts.push([
+      px + ca * (along + len * 0.5) + nx * across,
+      py + sa * (along + len * 0.5) + ny * across
+    ]);
+  }
+  return pts;
+}
+
+// Saz leaf polygon — curved S-shape like Ottoman saz leaves
+function sazLeaf(cx, cy, angle, len, wid) {
+  var pts = [], n = 28;
+  var ca = Math.cos(angle), sa = Math.sin(angle);
+  // Right side (going up)
+  for (var i = 0; i <= n; i++) {
+    var t = i / n;
+    // Width: fat at 1/3, tapers at tip with pointed end
+    var widthFactor = Math.sin(t * Math.PI) * Math.pow(1 - t, 0.25);
+    // Saz curve: slight S-bend along the leaf
+    var sCurve = Math.sin(t * Math.PI * 1.5) * wid * 0.08;
+    var along = t * len;
+    var across = widthFactor * wid * 0.5 + sCurve;
+    pts.push([cx + ca*along - sa*across,
+              cy + sa*along + ca*across]);
+  }
+  // Left side (going back down)
+  for (var i = n; i >= 0; i--) {
+    var t = i / n;
+    var widthFactor = Math.sin(t * Math.PI) * Math.pow(1 - t, 0.25);
+    var sCurve = Math.sin(t * Math.PI * 1.5) * wid * 0.08;
+    var along = t * len;
+    var across = -(widthFactor * wid * 0.5) + sCurve;
+    pts.push([cx + ca*along - sa*across,
+              cy + sa*along + ca*across]);
+  }
+  return pts;
+}
+
+function hexRgb(h) { return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]; }
+
+// Draw one Ottoman rose with Tyler Hobbs watercolor
+// Returns array of outer petal polygons for optional outline pass
+function drawRose(cx, cy, scale, palette) {
+  var centerR = 28 * scale;
+  var outerPetals = [];
+
+  // Ring 1 — Outer: 8 FAT elliptical petals with organic size variation + edge darkening
+  var outerC = hexRgb(palette.outer);
+  for (var i = 0; i < 8; i++) {
+    var a = (i / 8) * Math.PI * 2 + sGauss(0, 0.18);
+    var sv = 0.82 + sRand() * 0.36;
+    var px = cx + Math.cos(a) * centerR * 0.4;
+    var py = cy + Math.sin(a) * centerR * 0.4;
+    var petalPoly = rosePetal(px, py, a + sGauss(0, 0.1), 105*scale*sv, 95*scale*sv);
+    outerPetals.push(petalPoly);
+    watercolorFill(
+      petalPoly,
+      outerC[0], outerC[1], outerC[2], 38, 14, 0.18, { edgeDarken: true }
+    );
+  }
+
+  // Ring 2 — Mid: 8 petals offset, brighter
+  var midC = hexRgb(palette.mid);
+  for (var i = 0; i < 8; i++) {
+    var a = (i / 8) * Math.PI * 2 + Math.PI/8 + sGauss(0, 0.15);
+    var sv = 0.85 + sRand() * 0.3;
+    var px = cx + Math.cos(a) * centerR * 0.2;
+    var py = cy + Math.sin(a) * centerR * 0.2;
+    watercolorFill(
+      rosePetal(px, py, a + sGauss(0, 0.08), 68*scale*sv, 62*scale*sv),
+      midC[0], midC[1], midC[2], 34, 15, 0.14, { edgeDarken: true }
+    );
+  }
+
+  // Ring 3 — Inner: 6 tight petals
+  var innerC = hexRgb(palette.inner);
+  for (var i = 0; i < 6; i++) {
+    var a = (i / 6) * Math.PI * 2 + 0.25 + sGauss(0, 0.18);
+    var sv = 0.88 + sRand() * 0.24;
+    var px = cx + Math.cos(a) * centerR * 0.08;
+    var py = cy + Math.sin(a) * centerR * 0.08;
+    watercolorFill(
+      rosePetal(px, py, a + sGauss(0, 0.1), 42*scale*sv, 40*scale*sv),
+      innerC[0], innerC[1], innerC[2], 28, 16, 0.10, { edgeDarken: true }
+    );
+  }
+
+  // Core — 5 tiny dark petals
+  var coreC = hexRgb(palette.core);
+  for (var i = 0; i < 5; i++) {
+    var a = (i / 5) * Math.PI * 2 + sGauss(0, 0.35);
+    watercolorFill(
+      rosePetal(cx + Math.cos(a)*3, cy + Math.sin(a)*3, a, 26*scale, 24*scale),
+      coreC[0], coreC[1], coreC[2], 22, 17, 0.09
+    );
+  }
+  return outerPetals;
+}
+
+// Draw a small rosebud
+function drawBud(cx, cy, scale, palette) {
+  var c = hexRgb(palette.mid);
+  for (var i = 0; i < 3; i++) {
+    var a = (i / 3) * Math.PI * 2 + sGauss(0, 0.2) - Math.PI/2;
+    watercolorFill(
+      rosePetal(cx, cy, a, 30*scale, 26*scale),
+      c[0], c[1], c[2], 25, 14, 0.12
+    );
+  }
+  // Dark center
+  var dc = hexRgb(palette.core);
+  watercolorFill(
+    rosePetal(cx, cy, sRand()*Math.PI*2, 14*scale, 12*scale),
+    dc[0], dc[1], dc[2], 18, 16, 0.08
+  );
+}
+
+// Draw leaf with Tyler Hobbs watercolor — multi-tone for depth
+function drawLeaf(cx, cy, angle, len, wid, color) {
+  var c = hexRgb(color);
+  // Light underwash — wider, yellowish green
+  watercolorFill(
+    sazLeaf(cx, cy, angle, len * 1.04, wid * 1.08),
+    Math.min(255, c[0]+35), Math.min(255, c[1]+40), Math.min(255, c[2]+10),
+    16, 11, 0.20
+  );
+  // Main fill — rich green
+  watercolorFill(
+    sazLeaf(cx, cy, angle, len, wid),
+    c[0], c[1], c[2], 30, 13, 0.18, { edgeDarken: true }
+  );
+  // Dark center spine wash — narrow, darker
+  watercolorFill(
+    sazLeaf(cx, cy, angle, len * 0.85, wid * 0.3),
+    Math.max(0, c[0]-25), Math.max(0, c[1]-15), Math.max(0, c[2]-20),
+    12, 10, 0.10
+  );
+}
+
+function setup() {
+  createCanvas(1080, 1920, WEBGL);
+  brush.load();
+  translate(-width / 2, -height / 2);
+  randomSeed(42);
+  brush.scaleBrushes(2);
+
+  // Cream paper background
+  background(248, 242, 228);
+
+  // Create 2D buffer for watercolor
+  wcGfx = createGraphics(width, height);
+  wcGfx.background(248, 242, 228); // MUST match canvas background
+
+  // Add paper grain texture to watercolor buffer
+  var wCtx = wcGfx.drawingContext;
+  var imgData = wCtx.getImageData(0, 0, width, height);
+  var d = imgData.data;
+  for (var py = 0; py < height; py++) {
+    for (var px = 0; px < width; px++) {
+      var idx = (py * width + px) * 4;
+      var grain = sGauss(0, 3);
+      d[idx]     = Math.max(0, Math.min(255, d[idx] + grain));
+      d[idx + 1] = Math.max(0, Math.min(255, d[idx + 1] + grain));
+      d[idx + 2] = Math.max(0, Math.min(255, d[idx + 2] + grain - 1));
+    }
+  }
+  wCtx.putImageData(imgData, 0, 0);
+
+  // Initialize texture masks
+  initMasks(width, height);
+
+  // Palettes
+  var CRIMSON = {
+    outer: '#8a1525', mid: '#c41e3a', inner: '#d73c5a', core: '#6a1020',
+    centerGold: '#c4a040', centerBright: '#e0c060'
+  };
+  var PINK = {
+    outer: '#a04068', mid: '#d07090', inner: '#e898b0', core: '#803050',
+    centerGold: '#d4a850', centerBright: '#e8c870'
+  };
+
+  // ============================================================
+  // WATERCOLOR LAYER: All Tyler Hobbs fills on 2D buffer
+  // ============================================================
+
+  // Leaves — large, proportional to flowers
+  drawLeaf(50,  150, 2.2, 400, 105, '#266428');
+  drawLeaf(980, 200, Math.PI-0.4, 370, 95, '#1e5520');
+  drawLeaf(10,  660, 2.5, 390, 100, '#2a6830');
+  drawLeaf(1040, 610, Math.PI-0.6, 360, 92, '#266428');
+  drawLeaf(70,  1080, 2.0, 380, 98, '#1e5520');
+  drawLeaf(1010, 1020, Math.PI-0.3, 350, 88, '#2a6830');
+  drawLeaf(210, 1420, 2.3, 360, 92, '#266428');
+  drawLeaf(940, 1510, Math.PI-0.5, 330, 85, '#1e5520');
+  // Extra leaves between flowers for fullness
+  drawLeaf(380, 530, 2.6, 280, 72, '#1e5520');
+  drawLeaf(700, 900, Math.PI-0.7, 260, 68, '#266428');
+  drawLeaf(600, 1400, 2.1, 300, 78, '#2a6830');
+  drawLeaf(350, 1650, Math.PI-0.2, 280, 72, '#1e5520');
+  // Fill white space gaps
+  drawLeaf(820, 1200, Math.PI+0.3, 240, 62, '#2a6830');
+  drawLeaf(140, 1600, 1.8, 260, 65, '#266428');
+  drawLeaf(900, 1780, Math.PI-0.4, 220, 58, '#1e5520');
+
+  // 5 Roses — large, fill the canvas
+  var allOuterPetals = [];
+  allOuterPetals.push(drawRose(540, 380, 2.2, CRIMSON));
+  allOuterPetals.push(drawRose(200, 820, 1.85, PINK));
+  allOuterPetals.push(drawRose(870, 720, 2.0, CRIMSON));
+  allOuterPetals.push(drawRose(520, 1200, 1.9, PINK));
+  allOuterPetals.push(drawRose(740, 1560, 1.65, CRIMSON));
+
+  // Small buds for visual richness
+  drawBud(160, 450, 1.2, CRIMSON);
+  drawBud(920, 380, 1.0, PINK);
+  drawBud(100, 1300, 1.1, PINK);
+  drawBud(950, 1350, 0.9, CRIMSON);
+  drawBud(400, 1750, 1.0, PINK);
+
+  // ============================================================
+  // COMPOSITE: Watercolor buffer → WEBGL canvas
+  // ============================================================
+  image(wcGfx, 0, 0);
+
+  // ============================================================
+  // P5.BRUSH LAYER: Gold centers, outlines, veins
+  // ============================================================
+
+  // Gold centers for each flower — using p5.brush with high opacity
+  var roses = [
+    { cx: 540, cy: 380, r: 58 },
+    { cx: 200, cy: 820, r: 48 },
+    { cx: 870, cy: 720, r: 52 },
+    { cx: 520, cy: 1200, r: 50 },
+    { cx: 740, cy: 1560, r: 44 },
+  ];
+  for (var i = 0; i < roses.length; i++) {
+    var rose = roses[i];
+    // Dark gold halo - wider ring
+    brush.noStroke();
+    brush.fill('#8a6820', 180);
+    brush.fillBleed(0.25, 'out');
+    brush.fillTexture(0.3, 0.2);
+    brush.circle(rose.cx, rose.cy, rose.r * 1.35);
+    // Main gold body
+    brush.fill('#c8a030', 240);
+    brush.fillBleed(0.15, 'out');
+    brush.fillTexture(0.25, 0.15);
+    brush.circle(rose.cx, rose.cy, rose.r);
+    // Bright warm highlight
+    brush.fill('#e8c860', 220);
+    brush.fillBleed(0.1, 'out');
+    brush.fillTexture(0.2, 0.1);
+    brush.circle(rose.cx, rose.cy, rose.r * 0.55);
+    // Center sparkle
+    brush.fill('#f0d870', 200);
+    brush.fillBleed(0.06);
+    brush.circle(rose.cx - rose.r * 0.1, rose.cy - rose.r * 0.1, rose.r * 0.2);
+  }
+
+  // Very subtle pencil hints on a few outer petals — barely visible
+  brush.noFill();
+  for (var ri = 0; ri < allOuterPetals.length; ri++) {
+    var petals = allOuterPetals[ri];
+    brush.set('2H', ri % 2 === 0 ? '#6a3038' : '#5a3858', 0.04);
+    for (var pi = 0; pi < petals.length; pi++) {
+      if (pi % 4 !== 0) continue; // Only outline every 4th petal
+      var pts = petals[pi];
+      brush.beginShape(0.15);
+      for (var vi = 0; vi < pts.length; vi++) brush.vertex(pts[vi][0], pts[vi][1]);
+      brush.endShape(true);
+    }
+  }
+
+  // Leaf veins with side branches
+  var leafSpecs = [
+    { cx: 50,  cy: 150, a: 2.2, len: 400, w: 105 },
+    { cx: 980, cy: 200, a: Math.PI-0.4, len: 370, w: 95 },
+    { cx: 10,  cy: 660, a: 2.5, len: 390, w: 100 },
+    { cx: 1040, cy: 610, a: Math.PI-0.6, len: 360, w: 92 },
+    { cx: 70,  cy: 1080, a: 2.0, len: 380, w: 98 },
+    { cx: 1010, cy: 1020, a: Math.PI-0.3, len: 350, w: 88 },
+    { cx: 210, cy: 1420, a: 2.3, len: 360, w: 92 },
+    { cx: 940, cy: 1510, a: Math.PI-0.5, len: 330, w: 85 },
+    { cx: 380, cy: 530, a: 2.6, len: 280, w: 72 },
+    { cx: 700, cy: 900, a: Math.PI-0.7, len: 260, w: 68 },
+    { cx: 600, cy: 1400, a: 2.1, len: 300, w: 78 },
+    { cx: 350, cy: 1650, a: Math.PI-0.2, len: 280, w: 72 },
+    { cx: 820, cy: 1200, a: Math.PI+0.3, len: 240, w: 62 },
+    { cx: 140, cy: 1600, a: 1.8, len: 260, w: 65 },
+    { cx: 900, cy: 1780, a: Math.PI-0.4, len: 220, w: 58 },
+  ];
+  brush.noFill();
+  for (var i = 0; i < leafSpecs.length; i++) {
+    var lf = leafSpecs[i];
+    var ca = Math.cos(lf.a), sa = Math.sin(lf.a);
+    var nx = -sa, ny = ca;
+    // Central vein
+    brush.set('2H', '#406040', 0.08);
+    brush.line(lf.cx, lf.cy, lf.cx + ca * lf.len * 0.9, lf.cy + sa * lf.len * 0.9);
+    // Side veins
+    for (var v = 1; v <= 5; v++) {
+      var t = 0.12 + (v / 6) * 0.7;
+      var vx = lf.cx + ca * t * lf.len;
+      var vy = lf.cy + sa * t * lf.len;
+      var vLen = (lf.w || 80) * 0.35 * Math.sin(t * Math.PI);
+      brush.set('2H', '#507050', 0.05);
+      brush.line(vx, vy, vx + nx*vLen + ca*vLen*0.15, vy + ny*vLen + sa*vLen*0.15);
+      brush.line(vx, vy, vx - nx*vLen*0.5 + ca*vLen*0.1, vy - ny*vLen*0.5 + sa*vLen*0.1);
+    }
+  }
+
+  console.log('Ottoman flowers rendered');
+  window._renderComplete = true;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<!-- بسم الله الرحمن الرحيم -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>عيد مبارك — Floral Typography</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #f2eada; display: flex; justify-content: center; align-items: center; height: 100vh; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="main" width="1080" height="1920"></canvas>
+<script>
+// ============================================================
+// Floral Typography — عيد مبارك made of flowers
+// Canvas2D + Tyler Hobbs watercolor engine
+// ============================================================
+
+const W = 1080, H = 1920;
+const canvas = document.getElementById('main');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+// --- Seeded RNG ---
+let seed = 314159;
+function rand() {
+  seed = (seed * 16807 + 0) % 2147483647;
+  return (seed - 1) / 2147483646;
+}
+function gauss(mean, std) {
+  const u1 = rand(), u2 = rand();
+  return mean + std * Math.sqrt(-2 * Math.log(u1 || 0.001)) * Math.cos(2 * Math.PI * u2);
+}
+function randInt(a, b) { return Math.floor(rand() * (b - a + 1)) + a; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+const TWO_PI = Math.PI * 2;
+
+// ============================================================
+// Value noise
+// ============================================================
+const NOISE_SIZE = 128;
+const noiseGrid = [];
+for (let i = 0; i < NOISE_SIZE * NOISE_SIZE; i++) noiseGrid.push(rand());
+
+function smoothNoise(x, y) {
+  const ix = Math.floor(x) % NOISE_SIZE, iy = Math.floor(y) % NOISE_SIZE;
+  const fx = x - Math.floor(x), fy = y - Math.floor(y);
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  const i00 = noiseGrid[iy * NOISE_SIZE + ix];
+  const i10 = noiseGrid[iy * NOISE_SIZE + (ix + 1) % NOISE_SIZE];
+  const i01 = noiseGrid[((iy + 1) % NOISE_SIZE) * NOISE_SIZE + ix];
+  const i11 = noiseGrid[((iy + 1) % NOISE_SIZE) * NOISE_SIZE + (ix + 1) % NOISE_SIZE];
+  return lerp(lerp(i00, i10, sx), lerp(i01, i11, sx), sy);
+}
+
+function fbmNoise(x, y, octaves) {
+  let val = 0, amp = 1, freq = 1, total = 0;
+  for (let i = 0; i < octaves; i++) {
+    val += amp * smoothNoise(x * freq, y * freq);
+    total += amp; amp *= 0.5; freq *= 2;
+  }
+  return val / total;
+}
+
+// ============================================================
+// Tyler Hobbs Watercolor Engine
+// ============================================================
+function deformOnce(poly, variance) {
+  const result = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], c = poly[(i + 1) % poly.length];
+    result.push([a[0], a[1]]);
+    const bx = (a[0] + c[0]) / 2, by = (a[1] + c[1]) / 2;
+    const dx = c[0] - a[0], dy = c[1] - a[1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.5) continue;
+    const nx = -dy / len, ny = dx / len;
+    const offset = gauss(0, variance * len);
+    result.push([bx + nx * offset, by + ny * offset]);
+  }
+  return result;
+}
+
+function deformN(poly, n, variance) {
+  let p = poly.map(pt => [pt[0], pt[1]]);
+  for (let i = 0; i < n; i++) p = deformOnce(p, variance * Math.pow(0.7, i));
+  return p;
+}
+
+function watercolorFill(polygon, r, g, b, layers, alpha, variance) {
+  const basePoly = deformN(polygon, 5, variance || 0.15);
+  for (let i = 0; i < layers; i++) {
+    const layerPoly = deformN(basePoly, 3, (variance || 0.15) * 0.75);
+    ctx.save();
+    ctx.globalAlpha = alpha / 255;
+    const jr = clamp(Math.round(r + gauss(0, 6)), 0, 255);
+    const jg = clamp(Math.round(g + gauss(0, 5)), 0, 255);
+    const jb = clamp(Math.round(b + gauss(0, 4)), 0, 255);
+    ctx.fillStyle = `rgb(${jr},${jg},${jb})`;
+    ctx.beginPath();
+    ctx.moveTo(layerPoly[0][0], layerPoly[0][1]);
+    for (let j = 1; j < layerPoly.length; j++) ctx.lineTo(layerPoly[j][0], layerPoly[j][1]);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ============================================================
+// Shape generators
+// ============================================================
+function ovalPetal(px, py, angle, len, w) {
+  const pts = [], steps = 20;
+  const ca = Math.cos(angle), sa = Math.sin(angle), nx = -sa, ny = ca;
+  for (let s = 0; s <= steps; s++) {
+    const t = s / steps, theta = t * TWO_PI;
+    const along = Math.cos(theta) * len * 0.5;
+    const across = Math.sin(theta) * w * 0.6;
+    pts.push([px + ca * (along + len * 0.5) + nx * across, py + sa * (along + len * 0.5) + ny * across]);
+  }
+  return pts;
+}
+
+// Crimson rose — multi-ring petal structure
+function drawRose(cx, cy, size, palette) {
+  // Soft wash behind
+  const wash = [];
+  for (let s = 0; s < 14; s++) {
+    const a = (s / 14) * TWO_PI;
+    wash.push([cx + Math.cos(a) * size * 0.65, cy + Math.sin(a) * size * 0.65]);
+  }
+  watercolorFill(wash, ...palette.outer, 18, 5, 0.22);
+
+  const rings = [
+    { n: 6, dist: size * 0.36, len: size * 0.72, w: size * 0.65, color: palette.outer, layers: 25, alpha: 14, variance: 0.20 },
+    { n: 6, dist: size * 0.19, len: size * 0.50, w: size * 0.48, color: palette.mid,   layers: 22, alpha: 15, variance: 0.17 },
+    { n: 5, dist: size * 0.08, len: size * 0.32, w: size * 0.34, color: palette.inner, layers: 18, alpha: 17, variance: 0.14 },
+    { n: 4, dist: size * 0.03, len: size * 0.18, w: size * 0.20, color: palette.center, layers: 14, alpha: 20, variance: 0.12 },
+  ];
+  for (const ring of rings) {
+    for (let i = 0; i < ring.n; i++) {
+      const a = (i / ring.n) * TWO_PI + gauss(0, 0.18);
+      const px = cx + Math.cos(a) * ring.dist;
+      const py = cy + Math.sin(a) * ring.dist;
+      const petal = ovalPetal(px, py, a + gauss(0, 0.15), ring.len, ring.w);
+      watercolorFill(petal, ...ring.color, ring.layers, ring.alpha, ring.variance);
+    }
+  }
+  // Gold center
+  for (let i = 0; i < 15; i++) {
+    const ga = rand() * TWO_PI, gd = rand() * size * 0.10;
+    const gx = cx + Math.cos(ga) * gd, gy = cy + Math.sin(ga) * gd;
+    const ds = 1.5 + rand() * 3;
+    const dot = [];
+    for (let s = 0; s < 6; s++) dot.push([gx + Math.cos((s/6)*TWO_PI)*ds, gy + Math.sin((s/6)*TWO_PI)*ds]);
+    watercolorFill(dot, 218, 185, 78, 10, 20, 0.08);
+  }
+}
+
+// Small rosebud
+function drawBud(cx, cy, size, r, g, b) {
+  const wash = [];
+  for (let s = 0; s < 8; s++) {
+    const a = (s/8)*TWO_PI;
+    wash.push([cx + Math.cos(a)*size*0.45, cy + Math.sin(a)*size*0.45]);
+  }
+  watercolorFill(wash, r, g, b, 10, 5, 0.20);
+  const rings = [
+    { n: 5, dist: size * 0.22, len: size * 0.55, w: size * 0.45 },
+    { n: 4, dist: size * 0.07, len: size * 0.30, w: size * 0.25 },
+  ];
+  for (const ring of rings) {
+    for (let i = 0; i < ring.n; i++) {
+      const a = (i / ring.n) * TWO_PI + gauss(0, 0.2);
+      const px = cx + Math.cos(a) * ring.dist, py = cy + Math.sin(a) * ring.dist;
+      const petal = ovalPetal(px, py, a, ring.len, ring.w);
+      watercolorFill(petal, r, g, b, 25, 11, 0.15);
+    }
+  }
+}
+
+// White jasmine — 5 star petals
+function drawJasmine(cx, cy, size) {
+  const wash = [];
+  for (let s = 0; s < 8; s++) wash.push([cx + Math.cos((s/8)*TWO_PI)*size*0.4, cy + Math.sin((s/8)*TWO_PI)*size*0.4]);
+  watercolorFill(wash, 245, 240, 232, 10, 4, 0.18);
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * TWO_PI - Math.PI/2 + gauss(0, 0.08);
+    const petal = ovalPetal(cx + Math.cos(a)*2, cy + Math.sin(a)*2, a, size*0.40, size*0.20);
+    watercolorFill(petal, 248, 244, 238, 35, 11, 0.08);
+  }
+  // Yellow center
+  for (let i = 0; i < 3; i++) {
+    const a = (i/3)*TWO_PI + gauss(0, 0.5);
+    const petal = ovalPetal(cx, cy, a, size*0.10, size*0.08);
+    watercolorFill(petal, 220, 190, 80, 15, 14, 0.06);
+  }
+}
+
+// Penç filler — tiny 5-petal rosette
+function drawPenc(cx, cy, size) {
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * TWO_PI - Math.PI/2 + gauss(0, 0.1);
+    const petal = ovalPetal(cx + Math.cos(a)*2, cy + Math.sin(a)*2, a, size*0.35, size*0.24);
+    watercolorFill(petal, 200, 50, 75, 22, 12, 0.08);
+  }
+  // Dark center
+  const dot = [];
+  for (let s = 0; s < 6; s++) dot.push([cx + Math.cos((s/6)*TWO_PI)*2, cy + Math.sin((s/6)*TWO_PI)*2]);
+  watercolorFill(dot, 140, 25, 45, 12, 14, 0.07);
+}
+
+// Saz leaf
+function drawSazLeaf(cx, cy, angle, length, maxWidth, r, g, b) {
+  const poly = [];
+  const steps = 18;
+  const ca = Math.cos(angle), sa = Math.sin(angle), nx = -sa, ny = ca;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const w = Math.sin(t * Math.PI) * maxWidth * (0.5 + 0.5 * Math.sin(t * Math.PI * 0.8));
+    const sc = Math.sin(t * Math.PI * 1.2) * maxWidth * 0.15;
+    poly.push([cx + ca*t*length + nx*(w+sc), cy + sa*t*length + ny*(w+sc)]);
+  }
+  for (let i = steps; i >= 0; i--) {
+    const t = i / steps;
+    const w = Math.sin(t * Math.PI) * maxWidth * 0.32;
+    const sc = Math.sin(t * Math.PI * 1.2) * maxWidth * 0.10;
+    poly.push([cx + ca*t*length - nx*(w-sc), cy + sa*t*length - ny*(w-sc)]);
+  }
+  watercolorFill(poly, r, g, b, 15, 7, 0.22);
+  watercolorFill(poly, r, g, b, 25, 13, 0.15);
+}
+
+// Small leaf for thin areas
+function drawSmallLeaf(cx, cy, angle, length, r, g, b) {
+  const poly = [];
+  const ca = Math.cos(angle), sa = Math.sin(angle), nx = -sa, ny = ca;
+  const w = length * 0.25;
+  for (let i = 0; i <= 10; i++) {
+    const t = i / 10;
+    const ww = Math.sin(t * Math.PI) * w;
+    poly.push([cx + ca*t*length + nx*ww, cy + sa*t*length + ny*ww]);
+  }
+  for (let i = 10; i >= 0; i--) {
+    const t = i / 10;
+    const ww = Math.sin(t * Math.PI) * w * 0.3;
+    poly.push([cx + ca*t*length - nx*ww, cy + sa*t*length - ny*ww]);
+  }
+  watercolorFill(poly, r, g, b, 18, 13, 0.14);
+}
+
+// ============================================================
+// Paper background
+// ============================================================
+function drawPaper() {
+  ctx.fillStyle = 'rgb(242, 234, 218)';
+  ctx.fillRect(0, 0, W, H);
+  const imgData = ctx.getImageData(0, 0, W, H);
+  const d = imgData.data;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const idx = (y * W + x) * 4;
+      const grain = gauss(0, 3);
+      const tooth = (fbmNoise(x * 0.15, y * 0.15, 3) - 0.5) * 5;
+      const localVar = (fbmNoise(x * 0.012, y * 0.012, 5) - 0.5) * 12;
+      d[idx]     = clamp(d[idx] + grain + tooth + localVar, 0, 255);
+      d[idx + 1] = clamp(d[idx + 1] + grain + tooth + localVar, 0, 255);
+      d[idx + 2] = clamp(d[idx + 2] + grain + tooth + localVar - 1, 0, 255);
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+// ============================================================
+// Text mask generation
+// ============================================================
+function createTextMask() {
+  const maskCanvas = document.createElement('canvas');
+  maskCanvas.width = W;
+  maskCanvas.height = H;
+  const mctx = maskCanvas.getContext('2d');
+  mctx.fillStyle = '#000';
+  mctx.fillRect(0, 0, W, H);
+  mctx.fillStyle = '#fff';
+  mctx.textAlign = 'center';
+  mctx.textBaseline = 'middle';
+  mctx.font = '700 420px "Aref Ruqaa"';
+  mctx.fillText('عيد', W/2, H * 0.32);
+  mctx.font = '700 280px "Aref Ruqaa"';
+  mctx.fillText('مبارك', W/2, H * 0.54);
+  return mctx.getImageData(0, 0, W, H);
+}
+
+// Compute distance-to-edge field (approximate) and local density
+function analyzeMask(maskData) {
+  const d = maskData.data;
+  // Binary mask with dilation to thicken thin strokes
+  const rawMask = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) {
+    rawMask[i] = d[i * 4] > 128 ? 1 : 0;
+  }
+  // Dilate by 4px to fill thin connecting strokes
+  const mask = new Uint8Array(W * H);
+  const DILATE = 4;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (rawMask[y * W + x]) { mask[y * W + x] = 1; continue; }
+      let found = false;
+      for (let dy = -DILATE; dy <= DILATE && !found; dy++) {
+        for (let dx = -DILATE; dx <= DILATE && !found; dx++) {
+          if (dx*dx + dy*dy > DILATE*DILATE) continue;
+          const nx = x + dx, ny = y + dy;
+          if (nx >= 0 && nx < W && ny >= 0 && ny < H && rawMask[ny * W + nx]) found = true;
+        }
+      }
+      mask[y * W + x] = found ? 1 : 0;
+    }
+  }
+
+  // Compute density at each point (how many white pixels in a radius)
+  // Use downsampled version for speed
+  const DS = 4; // downsample factor
+  const dw = Math.ceil(W / DS), dh = Math.ceil(H / DS);
+  const density = new Float32Array(dw * dh);
+  const R = 8; // radius in downsampled space = 32px in original
+  for (let dy = 0; dy < dh; dy++) {
+    for (let dx = 0; dx < dw; dx++) {
+      let count = 0, total = 0;
+      for (let ky = -R; ky <= R; ky++) {
+        for (let kx = -R; kx <= R; kx++) {
+          if (kx*kx + ky*ky > R*R) continue;
+          const sx = dx + kx, sy = dy + ky;
+          if (sx < 0 || sx >= dw || sy < 0 || sy >= dh) continue;
+          total++;
+          const ox = sx * DS, oy = sy * DS;
+          if (ox < W && oy < H && mask[oy * W + ox]) count++;
+        }
+      }
+      density[dy * dw + dx] = count / Math.max(1, total);
+    }
+  }
+
+  return { mask, density, dw, dh, DS };
+}
+
+function getDensity(analysis, x, y) {
+  const dx = Math.floor(x / analysis.DS);
+  const dy = Math.floor(y / analysis.DS);
+  if (dx < 0 || dx >= analysis.dw || dy < 0 || dy >= analysis.dh) return 0;
+  return analysis.density[dy * analysis.dw + dx];
+}
+
+function isInMask(analysis, x, y) {
+  const ix = Math.round(x), iy = Math.round(y);
+  if (ix < 0 || ix >= W || iy < 0 || iy >= H) return false;
+  return analysis.mask[iy * W + ix] === 1;
+}
+
+// Get approximate gradient direction at a point (points toward center of stroke)
+function getGradientAngle(analysis, x, y) {
+  const r = 12;
+  let gx = 0, gy = 0;
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * TWO_PI;
+    const sx = Math.round(x + Math.cos(a) * r);
+    const sy = Math.round(y + Math.sin(a) * r);
+    const v = isInMask(analysis, sx, sy) ? 1 : 0;
+    gx += Math.cos(a) * v;
+    gy += Math.sin(a) * v;
+  }
+  return Math.atan2(gy, gx);
+}
+
+// ============================================================
+// MAIN RENDER
+// ============================================================
+
+// Wait for font to load
+document.fonts.ready.then(() => {
+  // Small delay to ensure font is fully available
+  setTimeout(render, 200);
+});
+
+function render() {
+  console.log("Starting floral typography render...");
+
+  // 1. Draw paper background
+  drawPaper();
+  console.log("Paper done");
+
+  // 2. Create text mask
+  const maskData = createTextMask();
+  const analysis = analyzeMask(maskData);
+  console.log("Mask analyzed");
+
+  // 3. Collect placement points using Poisson-like jittered grid
+  const placements = [];
+
+  // Multi-scale placement — very dense fill so letters read as solid flower-text
+  const scales = [
+    { gridSize: 42, minSize: 28, maxSize: 44, type: 'rose' },
+    { gridSize: 26, minSize: 14, maxSize: 24, type: 'bud' },
+    { gridSize: 18, minSize: 9, maxSize: 16, type: 'jasmine' },
+    { gridSize: 10, minSize: 5, maxSize: 11, type: 'penc' },
+    { gridSize: 22, minSize: 12, maxSize: 24, type: 'leaf' },
+    { gridSize: 10, minSize: 5, maxSize: 10, type: 'smallleaf' },
+  ];
+
+  for (const scale of scales) {
+    const gs = scale.gridSize;
+    for (let gy = gs/2; gy < H; gy += gs) {
+      for (let gx = gs/2; gx < W; gx += gs) {
+        const x = gx + gauss(0, gs * 0.15);
+        const y = gy + gauss(0, gs * 0.15);
+        if (!isInMask(analysis, x, y)) continue;
+        const density = getDensity(analysis, x, y);
+
+        // Roses in thick areas
+        if (scale.type === 'rose' && density < 0.25) continue;
+        // Leaves mix in everywhere but prefer edges
+        if (scale.type === 'leaf' && rand() < density * 0.5) continue;
+        if (scale.type === 'smallleaf' && rand() < density * 0.4) continue;
+
+        // Keep almost everything
+        let prob = 0.92;
+        if (scale.type === 'rose') prob = 0.78;
+        if (rand() > prob) continue;
+
+        const size = lerp(scale.minSize, scale.maxSize, clamp(density, 0, 1));
+        placements.push({ x, y, size, type: scale.type, density });
+      }
+    }
+  }
+
+  // Sort: large flowers first (roses), then buds, then small
+  const typeOrder = { rose: 0, leaf: 1, bud: 2, jasmine: 3, smallleaf: 4, penc: 5 };
+  placements.sort((a, b) => typeOrder[a.type] - typeOrder[b.type]);
+
+  console.log(`Placing ${placements.length} floral elements...`);
+
+  // 3b. Decorative wreath elements around text — saz leaves and small buds
+  // Find bounding box of text mask
+  let minY = H, maxY = 0, minX = W, maxX = 0;
+  for (let y = 0; y < H; y += 4) {
+    for (let x = 0; x < W; x += 4) {
+      if (isInMask(analysis, x, y)) {
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+      }
+    }
+  }
+  const textCx = (minX + maxX) / 2, textCy = (minY + maxY) / 2;
+  const textRx = (maxX - minX) / 2 + 90, textRy = (maxY - minY) / 2 + 70;
+
+  // Place saz leaves around the text in an elliptical wreath
+  for (let i = 0; i < 36; i++) {
+    const a = (i / 36) * TWO_PI + gauss(0, 0.06);
+    const rx = textRx + gauss(0, 12), ry = textRy + gauss(0, 12);
+    const lx = textCx + Math.cos(a) * rx;
+    const ly = textCy + Math.sin(a) * ry;
+    // Leaves point tangent to the ellipse (along the wreath arc)
+    const leafAngle = a + Math.PI / 2 + gauss(0, 0.25) + (i % 2 === 0 ? 0.15 : -0.15);
+    const greens = [[26, 74, 26], [42, 110, 48], [56, 130, 62], [34, 90, 38]];
+    const gc = greens[randInt(0, greens.length - 1)];
+    const sz = 40 + rand() * 35;
+    drawSazLeaf(lx, ly, leafAngle, sz, sz * 0.25, gc[0], gc[1], gc[2]);
+  }
+  // Small roses at cardinal points on wreath
+  const W_CRIMSON = { outer: [196, 30, 58], mid: [215, 60, 90], inner: [145, 26, 42], center: [100, 18, 30] };
+  const W_PINK    = { outer: [220, 140, 160], mid: [210, 120, 140], inner: [190, 90, 120], center: [170, 70, 100] };
+  const wreathRoseAngles = [0, Math.PI/2, Math.PI, -Math.PI/2, Math.PI/4, -Math.PI/4, 3*Math.PI/4, -3*Math.PI/4];
+  for (const a of wreathRoseAngles) {
+    const rx2 = textRx + gauss(0, 8), ry2 = textRy + gauss(0, 8);
+    const rx3 = textCx + Math.cos(a) * rx2;
+    const ry3 = textCy + Math.sin(a) * ry2;
+    const pal = rand() < 0.6 ? W_CRIMSON : W_PINK;
+    drawRose(rx3, ry3, 26 + rand() * 16, pal);
+  }
+  // Jasmine and buds scattered along wreath
+  for (let i = 0; i < 20; i++) {
+    const a = (i / 20) * TWO_PI + gauss(0, 0.12);
+    const rx = textRx + gauss(0, 18), ry = textRy + gauss(0, 18);
+    const bx = textCx + Math.cos(a) * rx;
+    const by = textCy + Math.sin(a) * ry;
+    if (rand() < 0.5) {
+      drawJasmine(bx, by, 12 + rand() * 10);
+    } else {
+      const colors = [[220, 140, 160], [200, 50, 75], [230, 100, 80]];
+      const c = colors[randInt(0, colors.length - 1)];
+      drawBud(bx, by, 12 + rand() * 10, c[0], c[1], c[2]);
+    }
+  }
+
+  // 4. Draw all floral elements
+  const CRIMSON = { outer: [196, 30, 58], mid: [215, 60, 90], inner: [145, 26, 42], center: [100, 18, 30] };
+  const PINK    = { outer: [220, 140, 160], mid: [210, 120, 140], inner: [190, 90, 120], center: [170, 70, 100] };
+  const CORAL   = { outer: [230, 100, 80], mid: [215, 80, 65], inner: [190, 60, 50], center: [160, 45, 40] };
+
+  const rosePalettes = [CRIMSON, PINK, CORAL];
+
+  for (const p of placements) {
+    switch (p.type) {
+      case 'rose': {
+        const pal = rosePalettes[randInt(0, rosePalettes.length - 1)];
+        drawRose(p.x, p.y, p.size, pal);
+        break;
+      }
+      case 'bud': {
+        const colors = [[220, 140, 160], [196, 30, 58], [230, 100, 80], [200, 50, 75]];
+        const c = colors[randInt(0, colors.length - 1)];
+        drawBud(p.x, p.y, p.size, ...c);
+        break;
+      }
+      case 'jasmine':
+        drawJasmine(p.x, p.y, p.size);
+        break;
+      case 'penc':
+        drawPenc(p.x, p.y, p.size);
+        break;
+      case 'leaf': {
+        const angle = getGradientAngle(analysis, p.x, p.y) + gauss(0, 0.3);
+        const greens = [[26, 74, 26], [42, 110, 48], [56, 130, 62], [34, 90, 38]];
+        const g = greens[randInt(0, greens.length - 1)];
+        drawSazLeaf(p.x, p.y, angle, p.size * 1.5, p.size * 0.5, ...g);
+        break;
+      }
+      case 'smallleaf': {
+        const angle = getGradientAngle(analysis, p.x, p.y) + gauss(0, 0.4);
+        const greens = [[30, 80, 30], [45, 100, 45], [60, 120, 55]];
+        const g = greens[randInt(0, greens.length - 1)];
+        drawSmallLeaf(p.x, p.y, angle, p.size * 1.2, ...g);
+        break;
+      }
+    }
+  }
+
+  // 4b. Overlay leaves ON TOP of flowers — sparse, for green accents peeking through
+  for (let y = 20; y < H; y += 40) {
+    for (let x = 20; x < W; x += 40) {
+      if (!isInMask(analysis, x + gauss(0, 8), y + gauss(0, 8))) continue;
+      if (rand() > 0.35) continue;
+      const angle = getGradientAngle(analysis, x, y) + Math.PI/2 + gauss(0, 0.4);
+      const greens = [[32, 78, 30], [48, 105, 45], [58, 125, 55], [25, 65, 22]];
+      const gc = greens[randInt(0, greens.length - 1)];
+      const sz = 8 + rand() * 14;
+      drawSmallLeaf(x + gauss(0, 6), y + gauss(0, 6), angle, sz, gc[0], gc[1], gc[2]);
+    }
+  }
+
+  // 5. Scattered petals just outside letters for organic feel
+  for (let i = 0; i < 120; i++) {
+    const x = rand() * W, y = rand() * H;
+    // Only place near (but outside) the mask
+    if (isInMask(analysis, x, y)) continue;
+    // Check if near the mask edge (within ~20px)
+    let nearEdge = false;
+    for (let d = 0; d < 8; d++) {
+      const a = (d / 8) * TWO_PI;
+      if (isInMask(analysis, x + Math.cos(a) * 18, y + Math.sin(a) * 18)) { nearEdge = true; break; }
+    }
+    if (!nearEdge) continue;
+    // Scatter a small petal or leaf
+    if (rand() < 0.5) {
+      const angle = rand() * TWO_PI;
+      const greens = [[40, 90, 38], [55, 115, 50], [30, 75, 28]];
+      const gc = greens[randInt(0, 2)];
+      drawSmallLeaf(x, y, angle, 6 + rand() * 10, gc[0], gc[1], gc[2]);
+    } else {
+      const sz = 4 + rand() * 6;
+      const petal = ovalPetal(x, y, rand() * TWO_PI, sz, sz * 0.6);
+      const colors = [[220, 140, 160], [200, 50, 75], [240, 200, 190]];
+      const c = colors[randInt(0, 2)];
+      watercolorFill(petal, c[0], c[1], c[2], 12, 12, 0.10);
+    }
+  }
+
+  // 6. Gold pollen dust scattered over flowers
+  ctx.save();
+  for (let i = 0; i < 300; i++) {
+    const x = rand() * W, y = rand() * H;
+    if (!isInMask(analysis, x, y)) continue;
+    ctx.globalAlpha = 0.15 + rand() * 0.25;
+    ctx.fillStyle = `rgb(${200 + randInt(0,18)}, ${170 + randInt(0,20)}, ${60 + randInt(0,30)})`;
+    ctx.beginPath();
+    ctx.arc(x + gauss(0, 3), y + gauss(0, 3), 1 + rand() * 2.5, 0, TWO_PI);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // 7. Gold ornamental divider between عيد and مبارك
+  const divY = (minY + maxY) / 2 + 10; // midpoint of text area
+  ctx.save();
+  ctx.strokeStyle = '#c4a94e';
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.6;
+  // Curved S-swash divider
+  ctx.beginPath();
+  ctx.moveTo(W/2 - 140, divY);
+  ctx.bezierCurveTo(W/2 - 60, divY - 12, W/2 - 20, divY + 12, W/2, divY);
+  ctx.bezierCurveTo(W/2 + 20, divY - 12, W/2 + 60, divY + 12, W/2 + 140, divY);
+  ctx.stroke();
+  // Mirror
+  ctx.beginPath();
+  ctx.moveTo(W/2 - 140, divY);
+  ctx.bezierCurveTo(W/2 - 60, divY + 12, W/2 - 20, divY - 12, W/2, divY);
+  ctx.bezierCurveTo(W/2 + 20, divY + 12, W/2 + 60, divY - 12, W/2 + 140, divY);
+  ctx.stroke();
+  // Center dot
+  ctx.fillStyle = '#c4a94e';
+  ctx.globalAlpha = 0.7;
+  ctx.beginPath(); ctx.arc(W/2, divY, 4, 0, TWO_PI); ctx.fill();
+  ctx.beginPath(); ctx.arc(W/2 - 80, divY, 2.5, 0, TWO_PI); ctx.fill();
+  ctx.beginPath(); ctx.arc(W/2 + 80, divY, 2.5, 0, TWO_PI); ctx.fill();
+  ctx.restore();
+
+  console.log("Floral typography complete!");
+
+  // 8. Gold border
+  ctx.save();
+  ctx.strokeStyle = '#c4a94e';
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.7;
+  const m = 50;
+  ctx.strokeRect(m, m, W - 2*m, H - 2*m);
+  ctx.strokeStyle = '#dcc06a';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(m + 12, m + 12, W - 2*(m+12), H - 2*(m+12));
+  ctx.restore();
+}
+</script>
+</body>
+</html>

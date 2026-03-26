@@ -1,0 +1,262 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!-- VERIFICATION VERSION: native p5 fill for flowers (brush.polygon in production) -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fatiha — Verify</title>
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+<style>
+  * { margin: 0; padding: 0; }
+  body { background: #f2eada; overflow: hidden; }
+  #tap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 10; cursor: pointer; }
+  #tap span { color: rgba(100,90,70,0.4); font: 16px Georgia, serif; }
+</style>
+</head>
+<body>
+<div id="tap"><span>tap to begin</span></div>
+<script>
+var audioCtx, analyser, audioBuffer, freqData, timeData;
+var isPlaying = false, smoothAmp = 0;
+async function loadAudio() {
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser(); analyser.fftSize = 256; analyser.smoothingTimeConstant = 0.92;
+    freqData = new Uint8Array(analyser.frequencyBinCount); timeData = new Uint8Array(analyser.fftSize);
+    var resp = await fetch('bismillah.mp3'); if (!resp.ok) throw new Error('no audio');
+    audioBuffer = await audioCtx.decodeAudioData(await resp.arrayBuffer());
+  } catch(e) { console.warn('Audio unavailable:', e.message); }
+}
+function startAudio() {
+  if (isPlaying || !audioBuffer) return;
+  var src = audioCtx.createBufferSource(); src.buffer = audioBuffer;
+  src.connect(analyser); analyser.connect(audioCtx.destination); src.start(0);
+  isPlaying = true; src.onended = function() { isPlaying = false; };
+}
+function getAmp() {
+  if (!isPlaying || !timeData) return 0;
+  analyser.getByteTimeDomainData(timeData);
+  var s = 0; for (var i = 0; i < timeData.length; i++) s += Math.abs(timeData[i] - 128);
+  return s / timeData.length / 128;
+}
+
+var W = 1080, H = 1920, cx = W / 2;
+var doorW = 720, doorH = 1500;
+var doorX = (W - doorW) / 2, doorY = (H - doorH) / 2 + 80;
+var archSpringY = doorY + 380, bot = doorY + doorH, halfDW = doorW / 2;
+var panelTop = archSpringY + 15, panelBot = bot - 15, panelH = panelBot - panelTop;
+
+function archY(x) {
+  var co = halfDW * 0.55, R = halfDW + co;
+  if (x <= cx) { var dx = x - (cx + co); var v = R*R - dx*dx; return v > 0 ? archSpringY - Math.sqrt(v) : archSpringY; }
+  else { var dx = x - (cx - co); var v = R*R - dx*dx; return v > 0 ? archSpringY - Math.sqrt(v) : archSpringY; }
+}
+var archPts = [];
+for (var ai = 0; ai <= 40; ai++) { var ax = doorX + (doorW * ai / 40); archPts.push([ax, archY(ax)]); }
+
+function makePetalPoly(bx, by, ang, len, wid, curv) {
+  var pts = [], n = 8, ca = Math.cos(ang), sa = Math.sin(ang);
+  for (var i = 0; i <= n; i++) {
+    var t = i/n, w = Math.sin(t * Math.PI);
+    var along = t * len, across = w * wid * 0.5;
+    var co = curv * Math.sin(t * Math.PI) * len * 0.08;
+    pts.push([bx + along*ca - (across+co)*sa, by + along*sa + (across+co)*ca]);
+  }
+  for (var i = n; i >= 0; i--) {
+    var t = i/n, w = Math.sin(t * Math.PI);
+    var along = t * len, across = -w * wid * 0.5;
+    var co = curv * Math.sin(t * Math.PI) * len * 0.08;
+    pts.push([bx + along*ca - (across+co)*sa, by + along*sa + (across+co)*ca]);
+  }
+  return pts;
+}
+
+function makeSazLeafPoly(bx, by, ang, len, wid, curv) {
+  var pts = [], n = 10, ca = Math.cos(ang), sa = Math.sin(ang);
+  for (var i = 0; i <= n; i++) {
+    var t = i/n, w;
+    if (t < 0.15) w = t / 0.15 * 0.4;
+    else if (t < 0.5) w = 0.4 + (t - 0.15) / 0.35 * 0.6;
+    else if (t < 0.85) w = 1.0 - (t - 0.5) * 1.0;
+    else w = Math.max(0, (1 - t) / 0.15 * 0.15);
+    w = Math.max(0, w + 0.05 * Math.sin(t * 6 * Math.PI));
+    var along = t * len, across = w * wid * 0.5;
+    var sc = curv * Math.sin(t * Math.PI * 1.2) * len * 0.06;
+    pts.push([bx + along*ca - (across+sc)*sa, by + along*sa + (across+sc)*ca]);
+  }
+  for (var i = n; i >= 0; i--) {
+    var t = i/n, w;
+    if (t < 0.15) w = t / 0.15 * 0.4;
+    else if (t < 0.5) w = 0.4 + (t - 0.15) / 0.35 * 0.6;
+    else if (t < 0.85) w = 1.0 - (t - 0.5) * 1.0;
+    else w = Math.max(0, (1 - t) / 0.15 * 0.15);
+    w = Math.max(0, w + 0.05 * Math.sin(t * 6 * Math.PI));
+    var along = t * len, across = -w * wid * 0.5;
+    var sc = curv * Math.sin(t * Math.PI * 1.2) * len * 0.06;
+    pts.push([bx + along*ca - (across+sc)*sa, by + along*sa + (across+sc)*ca]);
+  }
+  return pts;
+}
+
+var flowerElements = [], flowerIdx = 0;
+var PENCIL_END = 300, FLOWER_START = 60, setupDone = false;
+
+function buildFlowers() {
+  var positions = [
+    {x: cx, y: archPts[20][1] - 20, a: -Math.PI/2, s: 0.9},
+    {x: doorX + 15, y: archSpringY + 300, a: Math.PI*0.3, s: 0.7},
+    {x: doorX + doorW - 15, y: archSpringY + 300, a: Math.PI*0.7, s: 0.7}
+  ];
+  var pColors = ['#C0392B','#8B2252','#D4456A'];
+  for (var pi = 0; pi < positions.length; pi++) {
+    var pos = positions[pi], s = pos.s, fcx = pos.x, fcy = pos.y, baseA = pos.a;
+    var pc = pColors[pi];
+    var rings = [{count:4, rad:8*s, pL:14*s, pW:9*s},{count:5, rad:16*s, pL:20*s, pW:12*s},{count:5, rad:26*s, pL:26*s, pW:14*s}];
+    for (var ri = 0; ri < rings.length; ri++) {
+      var ring = rings[ri];
+      for (var p = 0; p < ring.count; p++) {
+        var angle = baseA + (p/ring.count)*Math.PI*2 + (Math.random()-0.5)*0.3;
+        var px = fcx + Math.cos(angle)*ring.rad, py = fcy + Math.sin(angle)*ring.rad;
+        flowerElements.push({color:pc, opacity:80+Math.floor(Math.random()*30), polygon:makePetalPoly(px,py,angle,ring.pL,ring.pW,0.3+Math.random()*0.4)});
+      }
+    }
+    var ca2 = Math.random()*Math.PI*2;
+    flowerElements.push({color:'#B8860B', opacity:90, polygon:makePetalPoly(fcx, fcy, ca2, 7*s, 5*s, 0.5)});
+    var la = baseA + Math.PI;
+    flowerElements.push({color:'#0E4D2E', opacity:85, polygon:makeSazLeafPoly(fcx+Math.cos(la)*25*s, fcy+Math.sin(la)*25*s, la+Math.PI, 35*s, 12*s, 0.6)});
+  }
+}
+
+function buildWashes() {
+  return [
+    {frame:1, color:'#0D3B8E', opacity:80, bleed:0.5, x:doorX+20, y:doorY-10, w:doorW-40, h:archSpringY-doorY+80},
+    {frame:8, color:'#B8860B', opacity:70, bleed:0.45, x:doorX+30, y:archSpringY-30, w:doorW-60, h:300},
+    {frame:16, color:'#0E4D2E', opacity:80, bleed:0.5, x:doorX+20, y:archSpringY+350, w:doorW-40, h:panelBot-archSpringY-320},
+    {frame:24, color:'#3A0C6E', opacity:100, bleed:0.35, x:doorX+50, y:panelTop+panelH*0.15, w:halfDW-80, h:panelH*0.25},
+    {frame:32, color:'#8B1A1A', opacity:90, bleed:0.3, x:cx+30, y:panelTop+panelH*0.55, w:halfDW-80, h:panelH*0.25}
+  ];
+}
+
+var washSchedule, washIdx = 0;
+
+function setup() {
+  createCanvas(W, H, WEBGL); brush.load(); frameRate(30);
+  brush.addField('meditative', function(t, field) {
+    for (var i = 0; i < field.length; i++)
+      for (var j = 0; j < field[i].length; j++)
+        field[i][j] = 100*Math.sin(i*0.012+t*0.4)+50*Math.cos(j*0.008+t*0.25)+30*Math.sin((i+j)*0.006+t*0.15);
+    return field;
+  });
+  translate(-width/2, -height/2);
+  background(242, 234, 218);
+  washSchedule = buildWashes();
+  buildFlowers();
+  console.log('Flower elements: '+flowerElements.length+' | Start: '+FLOWER_START);
+  brush.noFill(); setupDone = true;
+  loadAudio().then(function() {
+    document.getElementById('tap').addEventListener('click', function() {
+      document.getElementById('tap').style.display = 'none';
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      startAudio();
+    });
+  });
+}
+
+function draw() {
+  if (!setupDone) return;
+  translate(-width/2, -height/2);
+  var f = frameCount, rawAmp = getAmp();
+  smoothAmp = lerp(smoothAmp, rawAmp, 0.05);
+  var amp = isPlaying ? smoothAmp : 0.015 + 0.008 * sin(f * 0.003);
+  brush.field('meditative'); brush.refreshField(f * 0.0015); brush.wiggle(0.3 + amp * 2);
+
+  // WASHES at scheduled frames
+  if (washIdx < washSchedule.length && f >= washSchedule[washIdx].frame) {
+    var wash = washSchedule[washIdx];
+    brush.noStroke(); brush.fill(wash.color, wash.opacity);
+    brush.fillBleed(wash.bleed, 'out'); brush.fillTexture(0.5, 0.25);
+    brush.rect(wash.x, wash.y, wash.w, wash.h); brush.noFill(); washIdx++;
+  }
+
+  // PENCIL STAGE 1 (1-120)
+  if (f <= 120) {
+    if (f>=1&&f<=30){var t=(f-1)/29; brush.set('HB','#2A2215',3.5+amp*3); brush.line(doorX,lerp(archSpringY,bot,t),doorX,lerp(archSpringY,bot,min(1,t+0.04)));}
+    if (f>=10&&f<=40){var t=(f-10)/29; brush.set('HB','#2A2215',3.5+amp*3); brush.line(doorX+doorW,lerp(archSpringY,bot,t),doorX+doorW,lerp(archSpringY,bot,min(1,t+0.04)));}
+    if (f>=20&&f<=45){var t=(f-20)/24; brush.set('HB','#2A2215',3.5+amp*3); brush.line(lerp(doorX,doorX+doorW,t),bot,lerp(doorX,doorX+doorW,min(1,t+0.05)),bot);}
+    if (f>=30&&f<=70){var idx=Math.floor(((f-30)/40)*20); if(idx<20&&idx>=0){brush.set('HB','#3A3020',3.0+amp*2); brush.line(archPts[idx][0],archPts[idx][1],archPts[idx+1][0],archPts[idx+1][1]);}}
+    if (f>=50&&f<=90){var idx=20+Math.floor(((f-50)/40)*20); if(idx<40&&idx>=20){brush.set('HB','#3A3020',3.0+amp*2); brush.line(archPts[idx][0],archPts[idx][1],archPts[idx+1][0],archPts[idx+1][1]);}}
+    if (f>=70&&f<=100){var t=(f-70)/29; brush.set('HB','#2A2215',3.0+amp*2); brush.line(cx,lerp(panelTop,panelBot,t),cx,lerp(panelTop,panelBot,min(1,t+0.04)));}
+    if (f>=85&&f<=105){var t=(f-85)/19; brush.set('HB','#3A3020',2.5+amp*2); brush.line(lerp(doorX,doorX+doorW,t),archSpringY,lerp(doorX,doorX+doorW,min(1,t+0.06)),archSpringY);}
+  }
+
+  // PENCIL STAGE 2 (80-200)
+  if (f>=80&&f<=200) {
+    var lx=doorX+25,lw=cx-25-lx,rx=cx+25,rw=doorX+doorW-25-rx,py=panelTop+20,ph=panelH-40;
+    if (f>=80&&f<=130&&f%2===0){var seg=Math.floor((f-80)/2)%25; brush.set('2B','#3A3525',2.0+amp*2);
+      if(seg<7)brush.line(lx+lw*(seg/6),py,lx+lw*((seg+1)/6),py);
+      else if(seg<13){var s=(seg-7)/5;brush.line(lx+lw,py+ph*s,lx+lw,py+ph*(s+1/5));}
+      else if(seg<19){var s=(seg-13)/5;brush.line(lx+lw*(1-s),py+ph,lx+lw*(1-s-1/5),py+ph);}
+      else{var s=(seg-19)/5;brush.line(lx,py+ph*(1-s),lx,py+ph*(1-s-1/5));}
+    }
+    if (f>=100&&f<=150&&f%2===0){var seg=Math.floor((f-100)/2)%25; brush.set('2B','#3A3525',2.0+amp*2);
+      if(seg<7)brush.line(rx+rw*(seg/6),py,rx+rw*((seg+1)/6),py);
+      else if(seg<13){var s=(seg-7)/5;brush.line(rx+rw,py+ph*s,rx+rw,py+ph*(s+1/5));}
+      else if(seg<19){var s=(seg-13)/5;brush.line(rx+rw*(1-s),py+ph,rx+rw*(1-s-1/5),py+ph);}
+      else{var s=(seg-19)/5;brush.line(rx,py+ph*(1-s),rx,py+ph*(1-s-1/5));}
+    }
+    if (f>=140&&f<=180&&f%5===0){brush.set('2B','#4A4535',1.5+amp);var which=Math.floor((f-140)/5);
+      if(which<4){var yOff=py+ph*0.2+(which*ph*0.2),xMid=lx+lw/2;brush.line(xMid-30,yOff-20,xMid+30,yOff+20);brush.line(xMid+30,yOff-20,xMid-30,yOff+20);}
+      else{var idx2=which-4,yOff=py+ph*0.2+(idx2*ph*0.2),xMid=rx+rw/2;brush.line(xMid-30,yOff-20,xMid+30,yOff+20);brush.line(xMid+30,yOff-20,xMid-30,yOff+20);}
+    }
+    if (f>=160&&f<=200&&f%8===0){var which=Math.floor((f-160)/8);brush.set('HB','#3A3525',1.8+amp);
+      if(which===0)brush.line(lx,py+ph/3,lx+lw,py+ph/3);if(which===1)brush.line(lx,py+ph*2/3,lx+lw,py+ph*2/3);
+      if(which===2)brush.line(rx,py+ph/3,rx+rw,py+ph/3);if(which===3)brush.line(rx,py+ph*2/3,rx+rw,py+ph*2/3);
+      if(which===4)brush.line(lx,py+ph/2,lx+lw,py+ph/2);if(which===5)brush.line(rx,py+ph/2,rx+rw,py+ph/2);
+    }
+  }
+
+  // PENCIL STAGE 3 (150-280) — reduced flow lines
+  if (f>=150&&f<=280) {
+    var lx=doorX+25,lw=cx-25-lx,rx=cx+25,rw=doorX+doorW-25-rx,py=panelTop+20,ph=panelH-40;
+    if (f>=150&&f<=180&&f%10===0){try{brush.hatch(12,45+sin(f*0.02)*8,{rand:0.1});brush.hatchStyle('2H','#5A5040',0.8);brush.rect(lx+10,py+10,lw-20,ph/3-10);brush.noHatch();}catch(e){}}
+    if (f>=180&&f<=210&&f%10===0){try{brush.hatch(14,-30+sin(f*0.015)*5,{rand:0.12});brush.hatchStyle('2H','#5A5040',0.8);brush.rect(rx+10,py+ph*2/3+5,rw-20,ph/3-10);brush.noHatch();}catch(e){}}
+    if (f>=180&&f%5===0){brush.set('charcoal','#2A2215',1.5+amp*2);brush.flowLine(doorX+40+random(0,doorW-80),panelTop+40+random(0,panelH-80),random(40,80),random(0,TWO_PI));}
+  }
+
+  // PENCIL STAGE 4 (200-300)
+  if (f>=200&&f<=PENCIL_END) {
+    var lx=doorX+25,lw=cx-25-lx,rx=cx+25,rw=doorX+doorW-25-rx,py=panelTop+20,ph=panelH-40;
+    if (f>=200&&f<=240&&f%6===0){var which=Math.floor((f-200)/6);brush.set('HB','#4A3A20',1.5+amp);if(which<3)brush.circle(lx+lw/2,py+ph/2,30+which*25);else brush.circle(rx+rw/2,py+ph/2,30+(which-3)*25);}
+    if (f>=240&&f<=280&&f%4===0){var which=Math.floor((f-240)/4);brush.set('2H','#5A4A30',1.2+amp);var angle=(which%8)*(TWO_PI/8);if(which<8)brush.line(lx+lw/2,py+ph/2,lx+lw/2+cos(angle)*55,py+ph/2+sin(angle)*55);if(which>=8&&which<16)brush.line(rx+rw/2,py+ph/2,rx+rw/2+cos(angle)*55,py+ph/2+sin(angle)*55);}
+  }
+
+  // FLOWERS: native p5 polygon fill (VERIFICATION ONLY — production uses brush.polygon)
+  // 3 elements per frame to finish faster
+  if (f >= FLOWER_START && flowerIdx < flowerElements.length) {
+    brush.noStroke(); brush.noField(); brush.wiggle(0);
+    for (var fi = 0; fi < 3 && flowerIdx < flowerElements.length; fi++) {
+      var el = flowerElements[flowerIdx];
+      // Parse hex color to RGB
+      var hex = el.color;
+      var r = parseInt(hex.substr(1,2),16), g = parseInt(hex.substr(3,2),16), b = parseInt(hex.substr(5,2),16);
+      fill(r, g, b, el.opacity * 2.55);
+      noStroke();
+      beginShape();
+      for (var vi = 0; vi < el.polygon.length; vi++) {
+        vertex(el.polygon[vi][0], el.polygon[vi][1]);
+      }
+      endShape(CLOSE);
+      flowerIdx++;
+    }
+    // Restore brush field
+    brush.field('meditative');
+    brush.wiggle(0.3 + amp * 2);
+  }
+
+  brush.noField(); brush.wiggle(0);
+}
+</script>
+</body>
+</html>

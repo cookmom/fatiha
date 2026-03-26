@@ -1,0 +1,644 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Ottoman Garden — Animated Painting</title>
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #0d0d0d; display: flex; justify-content: center; align-items: center; height: 100vh; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<script>
+// ============================================================
+// OTTOMAN ROSE — animated stroke-by-stroke like @imcharleslo
+// Accumulative painting: each frame adds to what's already there
+// ============================================================
+
+const OTTOMAN = {
+  crimson: "#c41e3a", crimsonLight: "#d73c5a", crimsonDark: "#911a2a",
+  gold: "#c5a030", goldLight: "#dab94e", goldDark: "#8b7020",
+  forestGreen: "#266428", forestGreenLight: "#3a8a3c", forestGreenDark: "#1a4a1a",
+  earth: "#6b4226", earthLight: "#8b6240", earthDark: "#3a2210",
+};
+
+// Seeded PRNG (no Math.random per handoff rules)
+let _seed = 42;
+function sRand() {
+  _seed = (_seed * 16807) % 2147483647;
+  return (_seed - 1) / 2147483646;
+}
+function sGauss(m, s) {
+  const u1 = sRand(), u2 = sRand();
+  return m + s * Math.sqrt(-2 * Math.log(u1 || 0.001)) * Math.cos(2 * Math.PI * u2);
+}
+
+// Phase timing (frames)
+const P = {
+  BG: [0, 28],
+  VINE: [29, 58],
+  LEAF: [59, 88],
+  OUTER_PETAL: [89, 109],
+  MID_PETAL: [110, 130],
+  INNER_PETAL: [131, 148],
+  CENTER: [149, 164],
+  TAHRIR: [165, 184],
+  DONE: 190
+};
+
+// ============================================================
+// Tyler Hobbs Watercolor Engine
+// ============================================================
+function deformOnce(poly, variances) {
+  const result = [], nv = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], c = poly[(i + 1) % poly.length];
+    result.push([a[0], a[1]]);
+    const v = variances[i];
+    const mx = (a[0]+c[0])/2, my = (a[1]+c[1])/2;
+    const dx = c[0]-a[0], dy = c[1]-a[1];
+    const len = Math.sqrt(dx*dx+dy*dy);
+    if (len < 0.5) { result.push([mx,my]); nv.push(v,v); continue; }
+    const nx = -dy/len, ny = dx/len;
+    const off = sGauss(0, v * len);
+    result.push([mx+nx*off, my+ny*off]);
+    nv.push(v*(0.6+sRand()*0.6), v*(0.6+sRand()*0.6));
+  }
+  return { poly: result, variances: nv };
+}
+function deformN(poly, n, variance) {
+  let p = poly.map(pt => [pt[0], pt[1]]);
+  let vars = poly.map(() => variance);
+  for (let i = 0; i < n; i++) {
+    const r = deformOnce(p, vars);
+    p = r.poly; vars = r.variances;
+  }
+  return p;
+}
+
+let wcGfx;    // 2D watercolor accumulation buffer
+let brushGfx; // 2D line/stroke accumulation buffer
+let frame = 0;
+let vinePoints = [];
+let leafData = [];
+let roseCx, roseCy;
+const rS = 90;
+
+// Pre-computed draw queues
+let bgDone = false;
+let vineSegDrawn = 0;
+let leafQueue = [];    // [{poly, r, g, b, layers, alpha, variance}]
+let leafIdx = 0;
+let petalQueue = [];   // all petals in order
+let petalIdx = 0;
+let centerQueue = [];
+let centerIdx = 0;
+let tahrirDone = false;
+let brushDetailsDone = false;
+
+function hexRgb(h) { return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]; }
+
+function watercolorFill(polygon, r, g, b, layers, alpha, variance) {
+  const basePoly = deformN(polygon, 5, variance || 0.15);
+  const ctx = wcGfx.drawingContext;
+  for (let i = 0; i < layers; i++) {
+    const lp = deformN(basePoly, 3, (variance || 0.15) * 0.7);
+    ctx.save();
+    ctx.globalAlpha = alpha / 255;
+    const jr = Math.max(0,Math.min(255,Math.round(r + sGauss(0,5))));
+    const jg = Math.max(0,Math.min(255,Math.round(g + sGauss(0,4))));
+    const jb = Math.max(0,Math.min(255,Math.round(b + sGauss(0,4))));
+    ctx.fillStyle = `rgb(${jr},${jg},${jb})`;
+    ctx.beginPath();
+    ctx.moveTo(lp[0][0], lp[0][1]);
+    for (let j = 1; j < lp.length; j++) ctx.lineTo(lp[j][0], lp[j][1]);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// Rose petal polygon
+function rosePetal(px, py, angle, len, w) {
+  const pts = [], steps = 24;
+  const ca = Math.cos(angle), sa = Math.sin(angle), nx = -sa, ny = ca;
+  for (let s = 0; s <= steps; s++) {
+    const t = s / steps;
+    const theta = t * Math.PI * 2;
+    const along = Math.cos(theta) * len * 0.5;
+    const across = Math.sin(theta) * w * 0.6;
+    pts.push([
+      px + ca * (along + len*0.5) + nx * across,
+      py + sa * (along + len*0.5) + ny * across
+    ]);
+  }
+  return pts;
+}
+
+// Saz leaf polygon
+function sazPoly(cx, cy, a, len, w) {
+  const pts = [], steps = 18;
+  const ca = Math.cos(a), sa = Math.sin(a), nx = -sa, ny = ca;
+  for (let i = 0; i <= steps; i++) {
+    const t = i/steps;
+    const wf = Math.sin(t*Math.PI) * w * (0.5+0.5*Math.sin(t*Math.PI*0.8));
+    const sc = Math.sin(t*Math.PI*1.2) * w * 0.12;
+    pts.push([cx+ca*t*len+nx*(wf+sc), cy+sa*t*len+ny*(wf+sc)]);
+  }
+  for (let i = steps; i >= 0; i--) {
+    const t = i/steps;
+    const wf = Math.sin(t*Math.PI) * w * 0.3;
+    const sc = Math.sin(t*Math.PI*1.2) * w * 0.08;
+    pts.push([cx+ca*t*len-nx*(wf-sc), cy+sa*t*len-ny*(wf-sc)]);
+  }
+  return pts;
+}
+
+// Draw a sketchy line on a 2D context (organic feel)
+function sketchLine(ctx, x1, y1, x2, y2, color, w, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = w;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x1 + sGauss(0, 0.3), y1 + sGauss(0, 0.3));
+  // Slight midpoint wobble
+  const mx = (x1+x2)/2 + sGauss(0, 1.5);
+  const my = (y1+y2)/2 + sGauss(0, 1.5);
+  ctx.quadraticCurveTo(mx, my, x2 + sGauss(0, 0.3), y2 + sGauss(0, 0.3));
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ============================================================
+// SETUP — pre-compute geometry, set up buffers
+// ============================================================
+function setup() {
+  createCanvas(windowWidth, windowHeight, WEBGL);
+  brush.load();
+  frameRate(30);
+  roseCx = width * 0.48;
+  roseCy = height * 0.36;
+
+  // Register custom brushes
+  brush.add("ottoman_petal", {
+    type: "custom", weight: 8, opacity: 60, spacing: 0.3,
+    pressure: [0.3, 1.2, 0.1], markerTip: false, rotate: "natural",
+    tip: (_m) => {
+      _m.beginShape();
+      _m.vertex(0, -2);
+      _m.vertex(1.5, -1);
+      _m.vertex(2, 0);
+      _m.vertex(1.2, 1.5);
+      _m.vertex(0, 3);
+      _m.vertex(-1.2, 1.5);
+      _m.vertex(-2, 0);
+      _m.vertex(-1.5, -1);
+      _m.endShape(CLOSE);
+    }
+  });
+  brush.add("tahrir", {
+    type: "default", weight: 0.3, scatter: 0.1, sharpness: 0.9,
+    grain: 3, opacity: 180, spacing: 0.08,
+    pressure: [0.8, 1.0, 0.8], rotate: "natural"
+  });
+  brush.add("gold_leaf", {
+    type: "spray", weight: 3, scatter: 2.5, opacity: 100,
+    spacing: 0.6, pressure: [1, 0.5], rotate: "random"
+  });
+
+  wcGfx = createGraphics(width, height);
+  brushGfx = createGraphics(width, height);
+
+  // Pre-compute vine path
+  const vineSegs = 40;
+  const vineEndY = height * 0.44;
+  for (let i = 0; i <= vineSegs; i++) {
+    const t = i / vineSegs;
+    const x = width*0.5 + Math.sin(t * Math.PI * 1.8) * 55 * (1-t*0.4);
+    const y = height*0.92 - t * (height*0.92 - vineEndY);
+    vinePoints.push([x, y]);
+  }
+
+  // Pre-compute leaf geometry
+  const leafConfigs = [
+    { vineT: 0.22, side: -1, angle: -Math.PI*0.38, len: 110, w: 30 },
+    { vineT: 0.45, side: 1,  angle: Math.PI*0.32,  len: 95, w: 26 },
+    { vineT: 0.68, side: -1, angle: -Math.PI*0.42, len: 85, w: 24 },
+  ];
+  // Save seed before leaf generation so it's deterministic
+  const leafSeedStart = _seed;
+  for (const lc of leafConfigs) {
+    const idx = Math.floor(lc.vineT * 40);
+    const [lx, ly] = vinePoints[idx];
+    const baseAngle = Math.atan2(
+      vinePoints[Math.min(idx+1, 40)][1] - ly,
+      vinePoints[Math.min(idx+1, 40)][0] - lx
+    );
+    const leafAngle = baseAngle + lc.angle;
+    const isLight = sRand() > 0.5;
+    const [cr,cg,cb] = hexRgb(isLight ? OTTOMAN.forestGreen : OTTOMAN.forestGreenDark);
+    leafQueue.push({
+      poly: sazPoly(lx, ly, leafAngle, lc.len, lc.w),
+      r: cr, g: cg, b: cb, layers: 35, alpha: 14, variance: 0.13
+    });
+    leafData.push({ x:lx, y:ly, a:leafAngle, len:lc.len, w:lc.w });
+  }
+
+  // Pre-compute petal queue (outer → mid → inner → core)
+  // Outer ring (7 petals)
+  const outerC = hexRgb(OTTOMAN.crimsonLight);
+  for (let i = 0; i < 7; i++) {
+    const a = (i/7)*Math.PI*2 + sGauss(0, 0.15);
+    const px = roseCx + Math.cos(a)*rS*0.35;
+    const py = roseCy + Math.sin(a)*rS*0.35;
+    const ta = a + sGauss(0, 0.15);
+    petalQueue.push({
+      poly: rosePetal(px, py, ta, rS*0.7, rS*0.65),
+      r: outerC[0], g: outerC[1], b: outerC[2], layers: 35, alpha: 13, variance: 0.13,
+      ring: 'outer'
+    });
+  }
+  // Mid ring (8 petals)
+  const midC = hexRgb(OTTOMAN.crimson);
+  for (let i = 0; i < 8; i++) {
+    const a = (i/8)*Math.PI*2 + 0.4 + sGauss(0, 0.12);
+    const px = roseCx + Math.cos(a)*rS*0.18;
+    const py = roseCy + Math.sin(a)*rS*0.18;
+    const ta = a + sGauss(0, 0.12);
+    petalQueue.push({
+      poly: rosePetal(px, py, ta, rS*0.5, rS*0.5),
+      r: midC[0], g: midC[1], b: midC[2], layers: 30, alpha: 14, variance: 0.11,
+      ring: 'mid'
+    });
+  }
+  // Inner ring (6 petals)
+  const innerC = hexRgb(OTTOMAN.crimsonDark);
+  for (let i = 0; i < 6; i++) {
+    const a = (i/6)*Math.PI*2 + 0.25 + sGauss(0, 0.12);
+    const px = roseCx + Math.cos(a)*rS*0.08;
+    const py = roseCy + Math.sin(a)*rS*0.08;
+    const ta = a + sGauss(0, 0.1);
+    petalQueue.push({
+      poly: rosePetal(px, py, ta, rS*0.32, rS*0.35),
+      r: innerC[0], g: innerC[1], b: innerC[2], layers: 25, alpha: 16, variance: 0.10,
+      ring: 'inner'
+    });
+  }
+  // Core (5)
+  for (let i = 0; i < 5; i++) {
+    const a = (i/5)*Math.PI*2 + sGauss(0, 0.2);
+    const px = roseCx + Math.cos(a)*rS*0.04;
+    const py = roseCy + Math.sin(a)*rS*0.04;
+    const ta = a + sGauss(0, 0.15);
+    petalQueue.push({
+      poly: rosePetal(px, py, ta, rS*0.18, rS*0.2),
+      r: 100, g: 22, b: 30, layers: 22, alpha: 18, variance: 0.10,
+      ring: 'core'
+    });
+  }
+
+  // Pre-compute golden center dots
+  const [gr, gg, gb] = hexRgb(OTTOMAN.goldLight);
+  for (let i = 0; i < 30; i++) {
+    const ga = sRand() * Math.PI * 2;
+    const gd = sRand() * 18;
+    const gx = roseCx + Math.cos(ga) * gd;
+    const gy = roseCy + Math.sin(ga) * gd;
+    const dotSize = 3 + sRand() * 5;
+    const dot = [];
+    for (let s = 0; s < 8; s++) {
+      const sa2 = (s/8) * Math.PI * 2;
+      dot.push([gx + Math.cos(sa2)*dotSize, gy + Math.sin(sa2)*dotSize]);
+    }
+    centerQueue.push({ poly: dot, r: gr, g: gg, b: gb, layers: 10, alpha: 25, variance: 0.08 });
+  }
+  // Bright inner dots
+  for (let i = 0; i < 15; i++) {
+    const ga = sRand() * Math.PI * 2;
+    const gd = sRand() * 8;
+    const gx = roseCx + Math.cos(ga) * gd;
+    const gy = roseCy + Math.sin(ga) * gd;
+    const dot = [];
+    for (let s = 0; s < 8; s++) {
+      const sa2 = (s/8) * Math.PI * 2;
+      dot.push([gx + Math.cos(sa2)*3, gy + Math.sin(sa2)*3]);
+    }
+    centerQueue.push({ poly: dot, r: 240, g: 208, b: 96, layers: 8, alpha: 30, variance: 0.06 });
+  }
+
+  console.log("Setup complete. Queued:", petalQueue.length, "petals,", leafQueue.length, "leaves,", centerQueue.length, "center dots");
+}
+
+// ============================================================
+// DRAW — frame-by-frame accumulation
+// ============================================================
+function draw() {
+  translate(-width/2, -height/2);
+
+  // ---- PHASE: Background wash (frames 0-28) ----
+  if (frame >= P.BG[0] && frame <= P.BG[1]) {
+    drawBackground(frame - P.BG[0]);
+  }
+
+  // ---- PHASE: Vine grows (frames 29-58) ----
+  if (frame >= P.VINE[0] && frame <= P.VINE[1]) {
+    const progress = frame - P.VINE[0];
+    const segsPerFrame = Math.ceil(vinePoints.length / (P.VINE[1] - P.VINE[0] + 1));
+    const targetSeg = Math.min((progress + 1) * segsPerFrame, vinePoints.length - 1);
+    const ctx = brushGfx.drawingContext;
+    while (vineSegDrawn < targetSeg) {
+      vineSegDrawn++;
+      const i = vineSegDrawn;
+      // Main vine stroke
+      sketchLine(ctx,
+        vinePoints[i-1][0], vinePoints[i-1][1],
+        vinePoints[i][0], vinePoints[i][1],
+        OTTOMAN.forestGreenDark, 3.0, 0.85
+      );
+      // Thin gold highlight every 4th segment
+      if (i % 4 === 0) {
+        sketchLine(ctx,
+          vinePoints[i-1][0]+1, vinePoints[i-1][1]+0.5,
+          vinePoints[i][0]+1, vinePoints[i][1]+0.5,
+          OTTOMAN.goldDark, 0.5, 0.5
+        );
+      }
+    }
+  }
+
+  // ---- PHASE: Leaves unfurl (frames 59-88) ----
+  if (frame >= P.LEAF[0] && frame <= P.LEAF[1]) {
+    const progress = frame - P.LEAF[0];
+    const framesPerLeaf = Math.floor((P.LEAF[1] - P.LEAF[0] + 1) / leafQueue.length);
+    const targetLeaf = Math.min(Math.floor(progress / framesPerLeaf) + 1, leafQueue.length);
+    const subFrame = progress % framesPerLeaf;
+
+    while (leafIdx < targetLeaf) {
+      const lf = leafQueue[leafIdx];
+      // Draw leaf watercolor fill (all layers at once for this leaf)
+      watercolorFill(lf.poly, lf.r, lf.g, lf.b, lf.layers, lf.alpha, lf.variance);
+
+      // Draw leaf veins on brushGfx
+      const ld = leafData[leafIdx];
+      const ctx = brushGfx.drawingContext;
+      const ca = Math.cos(ld.a), sa = Math.sin(ld.a), nx = -sa, ny = ca;
+      // Central vein
+      sketchLine(ctx, ld.x, ld.y,
+        ld.x+ca*ld.len*0.92, ld.y+sa*ld.len*0.92,
+        OTTOMAN.forestGreenDark, 0.6, 0.7
+      );
+      // Side veins
+      for (let v = 1; v <= 6; v++) {
+        const t = 0.1 + (v/7)*0.75;
+        const vx = ld.x+ca*t*ld.len, vy = ld.y+sa*t*ld.len;
+        const vL = ld.w*0.4*Math.sin(t*Math.PI);
+        sketchLine(ctx, vx, vy, vx+nx*vL+ca*vL*0.2, vy+ny*vL+sa*vL*0.2,
+          OTTOMAN.forestGreenDark, 0.3, 0.5);
+        sketchLine(ctx, vx, vy, vx-nx*vL*0.5, vy-ny*vL*0.5,
+          OTTOMAN.forestGreenDark, 0.25, 0.4);
+      }
+
+      // Small bud near leaf base
+      drawBud(ctx, ld);
+
+      leafIdx++;
+    }
+  }
+
+  // ---- PHASE: Outer petals (frames 89-109) ----
+  if (frame >= P.OUTER_PETAL[0] && frame <= P.OUTER_PETAL[1]) {
+    drawPetalsInRange(frame, P.OUTER_PETAL, 0, 7);
+  }
+
+  // ---- PHASE: Mid petals (frames 110-130) ----
+  if (frame >= P.MID_PETAL[0] && frame <= P.MID_PETAL[1]) {
+    drawPetalsInRange(frame, P.MID_PETAL, 7, 15);
+  }
+
+  // ---- PHASE: Inner petals + core (frames 131-148) ----
+  if (frame >= P.INNER_PETAL[0] && frame <= P.INNER_PETAL[1]) {
+    drawPetalsInRange(frame, P.INNER_PETAL, 15, 26);
+  }
+
+  // ---- PHASE: Golden center (frames 149-164) ----
+  if (frame >= P.CENTER[0] && frame <= P.CENTER[1]) {
+    const progress = frame - P.CENTER[0];
+    const total = P.CENTER[1] - P.CENTER[0] + 1;
+    const dotsPerFrame = Math.ceil(centerQueue.length / total);
+    const targetDot = Math.min((progress + 1) * dotsPerFrame, centerQueue.length);
+    while (centerIdx < targetDot) {
+      const d = centerQueue[centerIdx];
+      watercolorFill(d.poly, d.r, d.g, d.b, d.layers, d.alpha, d.variance);
+      centerIdx++;
+    }
+  }
+
+  // ---- PHASE: Tahrir outlines (frames 165-184) ----
+  if (frame >= P.TAHRIR[0] && frame <= P.TAHRIR[1] && !tahrirDone) {
+    drawTahrir(frame - P.TAHRIR[0], P.TAHRIR[1] - P.TAHRIR[0] + 1);
+  }
+
+  // ---- PHASE: Final p5.brush details (frame 185+) ----
+  if (frame === P.DONE - 3 && !brushDetailsDone) {
+    drawBrushFinish();
+    brushDetailsDone = true;
+  }
+
+  // ---- Composite onto WEBGL canvas ----
+  clear();
+  image(wcGfx, 0, 0);
+  image(brushGfx, 0, 0);
+
+  // After brush finish, draw p5.brush strokes on WEBGL
+  if (brushDetailsDone) {
+    drawP5BrushOverlay();
+  }
+
+  frame++;
+  if (frame > P.DONE) {
+    console.log("Ottoman garden painting complete");
+    noLoop();
+  }
+}
+
+// ============================================================
+// DRAWING HELPERS
+// ============================================================
+
+function drawBackground(subFrame) {
+  const ctx = wcGfx.drawingContext;
+  const total = P.BG[1] - P.BG[0] + 1;
+
+  if (subFrame === 0) {
+    // First frame: solid dark
+    wcGfx.background(13, 13, 13);
+  } else if (subFrame <= 15) {
+    // Gradual warm wash layers
+    const bgCx = width * 0.48, bgCy = height * 0.36;
+    const opacity = 0.06 + subFrame * 0.015;
+    const bgGrad = ctx.createRadialGradient(bgCx, bgCy, 30, bgCx, bgCy, height * 0.6);
+    bgGrad.addColorStop(0, `rgba(28, 16, 18, ${opacity})`);
+    bgGrad.addColorStop(0.5, `rgba(20, 15, 14, ${opacity * 0.6})`);
+    bgGrad.addColorStop(1, `rgba(13, 13, 13, 0)`);
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, width, height);
+  } else {
+    // Noise texture dots
+    const dotsPerFrame = Math.ceil(3000 / (total - 15));
+    for (let i = 0; i < dotsPerFrame; i++) {
+      const nx = sRand() * width;
+      const ny = sRand() * height;
+      const nr = 12 + sGauss(0, 6);
+      const ng = 11 + sGauss(0, 4);
+      const nb = 10 + sGauss(0, 4);
+      ctx.fillStyle = `rgba(${Math.max(0,Math.min(50,Math.round(nr)))},${Math.max(0,Math.min(50,Math.round(ng)))},${Math.max(0,Math.min(50,Math.round(nb)))},0.15)`;
+      ctx.fillRect(nx, ny, 3 + sRand()*8, 3 + sRand()*8);
+    }
+  }
+}
+
+function drawPetalsInRange(frame, phase, startIdx, endIdx) {
+  const progress = frame - phase[0];
+  const total = phase[1] - phase[0] + 1;
+  const count = endIdx - startIdx;
+  const petalsPerFrame = Math.max(1, Math.ceil(count / total));
+  const targetPetal = Math.min(startIdx + (progress + 1) * petalsPerFrame, endIdx);
+  while (petalIdx < targetPetal) {
+    const p = petalQueue[petalIdx];
+    watercolorFill(p.poly, p.r, p.g, p.b, p.layers, p.alpha, p.variance);
+    petalIdx++;
+  }
+}
+
+function drawBud(ctx, ld) {
+  const bx = ld.x + Math.cos(ld.a) * (-5);
+  const by = ld.y + Math.sin(ld.a) * (-5);
+  const ba = ld.a + Math.PI * 0.3;
+  // Small crimson bud
+  ctx.save();
+  ctx.translate(bx, by);
+  ctx.rotate(ba);
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = OTTOMAN.crimsonLight;
+  ctx.beginPath();
+  ctx.moveTo(0,0); ctx.quadraticCurveTo(12,-5,24,0);
+  ctx.quadraticCurveTo(12,5,0,0);
+  ctx.fill();
+  // Green sepal
+  ctx.fillStyle = OTTOMAN.forestGreenDark;
+  ctx.globalAlpha = 0.6;
+  ctx.beginPath();
+  ctx.moveTo(-3,0); ctx.quadraticCurveTo(4,-4,9,0);
+  ctx.quadraticCurveTo(4,4,-3,0);
+  ctx.fill();
+  ctx.restore();
+}
+
+// Tahrir: fine dark outlines, drawn progressively
+let tahrirStep = 0;
+function drawTahrir(subFrame, totalFrames) {
+  const ctx = brushGfx.drawingContext;
+  const stepsPerFrame = 2;
+
+  for (let s = 0; s < stepsPerFrame; s++) {
+    if (tahrirStep < 6) {
+      // Petal tip arcs
+      const i = tahrirStep;
+      const a = (i/6)*Math.PI*2 + 0.2;
+      const outerDist = rS * 0.85;
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      ctx.strokeStyle = OTTOMAN.crimsonDark;
+      ctx.lineWidth = 0.4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (let ss = 0; ss <= 8; ss++) {
+        const t = (ss/8 - 0.5) * 0.3;
+        const px = roseCx + Math.cos(a + t) * outerDist;
+        const py = roseCy + Math.sin(a + t) * outerDist;
+        if (ss === 0) ctx.moveTo(px + sGauss(0,0.3), py + sGauss(0,0.3));
+        else ctx.lineTo(px + sGauss(0,0.3), py + sGauss(0,0.3));
+      }
+      ctx.stroke();
+      ctx.restore();
+    } else if (tahrirStep < 6 + leafData.length) {
+      // Leaf outlines
+      const li = tahrirStep - 6;
+      const ld = leafData[li];
+      const ca = Math.cos(ld.a), sa = Math.sin(ld.a), nx = -sa, ny = ca;
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = OTTOMAN.forestGreenDark;
+      ctx.lineWidth = 0.4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (let ss = 0; ss <= 10; ss++) {
+        const t = ss/10;
+        const wf = Math.sin(t*Math.PI) * ld.w * 0.6;
+        const px = ld.x+ca*t*ld.len+nx*wf + sGauss(0,0.3);
+        const py = ld.y+sa*t*ld.len+ny*wf + sGauss(0,0.3);
+        if (ss === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      ctx.restore();
+    } else {
+      tahrirDone = true;
+    }
+    tahrirStep++;
+  }
+}
+
+// Final brush details using p5.brush (drawn on WEBGL canvas, one-shot)
+function drawBrushFinish() {
+  // This is called once — we'll set a flag and draw in the composite step
+}
+
+let _brushOverlayDrawn = false;
+function drawP5BrushOverlay() {
+  if (_brushOverlayDrawn) return;
+  _brushOverlayDrawn = true;
+
+  // Paper texture — very subtle grain
+  brush.noFill();
+  brush.hatchStyle("2H", "#161412", 0.08);
+  brush.hatch(50, 30, { rand: 0.8 });
+  brush.rect(0, 0, width, height);
+  brush.noHatch();
+
+  // Gold spray center
+  brush.set("gold_leaf", OTTOMAN.goldLight, 5);
+  for (let i = 0; i < 80; i++) {
+    const a = sRand()*Math.PI*2, d = 2 + sRand()*23;
+    brush.line(roseCx+Math.cos(a)*d, roseCy+Math.sin(a)*d,
+              roseCx+Math.cos(a)*(d+6), roseCy+Math.sin(a)*(d+6));
+  }
+  brush.set("gold_leaf", OTTOMAN.gold, 4);
+  for (let i = 0; i < 60; i++) {
+    const a = sRand()*Math.PI*2, d = sRand()*14;
+    brush.line(roseCx+Math.cos(a)*d, roseCy+Math.sin(a)*d,
+              roseCx+Math.cos(a)*(d+4), roseCy+Math.sin(a)*(d+4));
+  }
+  brush.set("gold_leaf", "#f0d060", 6);
+  for (let i = 0; i < 35; i++) {
+    const a = sRand()*Math.PI*2, d = sRand()*7;
+    brush.line(roseCx+Math.cos(a)*d, roseCy+Math.sin(a)*d,
+              roseCx+Math.cos(a)*(d+3), roseCy+Math.sin(a)*(d+3));
+  }
+
+  // Atmospheric glow
+  brush.noStroke();
+  brush.fill(OTTOMAN.crimsonLight, 6);
+  brush.fillBleed(0.9, "out");
+  brush.circle(roseCx, roseCy, rS * 2.0);
+
+  console.log("p5.brush overlay applied");
+}
+</script>
+</body>
+</html>

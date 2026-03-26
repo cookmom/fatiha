@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>p5.brush — Ottoman Rose</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@2/lib/p5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.0-beta"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #0d0d0d; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script>
+function setup() {
+  createCanvas(430, 932, WEBGL);
+  brush.load();
+  translate(-width / 2, -height / 2);
+  background(13, 13, 13);
+  randomSeed(314159);
+  brush.scaleBrushes(1.5);
+
+  const cx = width / 2;
+  const cy = height * 0.40;
+
+  const DEEP_CRIMSON = '#5A0A18';
+  const CRIMSON      = '#8B1A2B';
+  const ROSE         = '#B83050';
+  const BLUSH        = '#D06878';
+  const DARK_CENTER  = '#3A0510';
+  const DARK_GREEN   = '#0E3A0E';
+  const LEAF_GREEN   = '#2A6A1A';
+  const STEM_GREEN   = '#3A5828';
+  const GOLD         = '#D4A030';
+  const PALE_GOLD    = '#E8C050';
+  const VINE_DARK    = '#2A3A18';
+
+  // ═══════════════════════════════════════════
+  //  ATMOSPHERIC BACKGROUND
+  // ═══════════════════════════════════════════
+  brush.noStroke();
+  brush.fill(DEEP_CRIMSON, 25);
+  brush.fillBleed(0.7, "out");
+  brush.fillTexture(0.4, 0.2);
+  brush.circle(cx, cy, 200);
+
+  brush.fill('#2A0810', 30);
+  brush.fillBleed(0.5, "out");
+  brush.fillTexture(0.3, 0.15);
+  brush.circle(cx, cy, 140);
+  brush.noFill();
+
+  // ═══════════════════════════════════════════
+  //  STEM — cpencil green vine
+  // ═══════════════════════════════════════════
+  brush.set("cpencil", STEM_GREEN, 3.5);
+  brush.spline([
+    [cx, cy + 130, 1.3],
+    [cx - 10, cy + 230, 1.1],
+    [cx - 18, cy + 360, 0.9],
+    [cx - 8, cy + 490, 0.7],
+    [cx + 3, cy + 600, 0.5],
+    [cx, cy + 720, 0.3]
+  ], 0.7);
+
+  // Darker accent line
+  brush.set("2B", VINE_DARK, 2);
+  brush.spline([
+    [cx, cy + 135, 1.0],
+    [cx - 10, cy + 235, 0.9],
+    [cx - 18, cy + 365, 0.7],
+    [cx - 8, cy + 495, 0.5],
+    [cx + 3, cy + 605, 0.3],
+    [cx, cy + 725, 0.2]
+  ], 0.7);
+
+  // ═══════════════════════════════════════════
+  //  LEAVES — watercolor circles + spline outlines
+  // ═══════════════════════════════════════════
+  let leafData = [
+    {x: cx+8, y: cy+210, s: 80, a: -0.7},
+    {x: cx-12, y: cy+310, s: 75, a: PI+0.5},
+    {x: cx+5, y: cy+410, s: 60, a: -0.5},
+    {x: cx-10, y: cy+500, s: 50, a: PI+0.6}
+  ];
+  for (let lf of leafData) {
+    // Green watercolor body
+    brush.noStroke();
+    brush.fill(LEAF_GREEN, 80);
+    brush.fillBleed(0.4, "out");
+    brush.fillTexture(0.45, 0.3);
+    brush.circle(lf.x + cos(lf.a)*lf.s*0.3, lf.y + sin(lf.a)*lf.s*0.3, lf.s*0.3);
+
+    // Darker core
+    brush.fill(DARK_GREEN, 60);
+    brush.fillBleed(0.25, "in");
+    brush.fillTexture(0.3, 0.2);
+    brush.circle(lf.x + cos(lf.a)*lf.s*0.35, lf.y + sin(lf.a)*lf.s*0.35, lf.s*0.15);
+    brush.noFill();
+
+    // Central vein + outline
+    let tx = lf.x + cos(lf.a)*lf.s;
+    let ty = lf.y + sin(lf.a)*lf.s;
+    brush.set("2H", VINE_DARK, 0.7);
+    brush.line(lf.x, lf.y, tx, ty);
+    // Leaf edge splines
+    let px = cos(lf.a + HALF_PI);
+    let py = sin(lf.a + HALF_PI);
+    let w = lf.s * 0.22;
+    brush.spline([
+      [lf.x, lf.y, 0.3],
+      [lf.x + cos(lf.a)*lf.s*0.35 + px*w, lf.y + sin(lf.a)*lf.s*0.35 + py*w, 1.0],
+      [tx, ty, 0.1]
+    ], 0.8);
+    brush.spline([
+      [lf.x, lf.y, 0.3],
+      [lf.x + cos(lf.a)*lf.s*0.35 - px*w*0.8, lf.y + sin(lf.a)*lf.s*0.35 - py*w*0.8, 1.0],
+      [tx, ty, 0.1]
+    ], 0.8);
+  }
+
+  // ═══════════════════════════════════════════
+  //  SEPALS — small green circles behind rose
+  // ═══════════════════════════════════════════
+  brush.noStroke();
+  for (let i = 0; i < 5; i++) {
+    let sa = (i/5)*TWO_PI + 0.2;
+    brush.fill(DARK_GREEN, 70);
+    brush.fillBleed(0.35, "out");
+    brush.fillTexture(0.4, 0.3);
+    brush.circle(cx + cos(sa)*60, cy + sin(sa)*50 + 15, 18);
+    brush.noFill();
+  }
+
+  // ═══════════════════════════════════════════
+  //  ROSE — OUTER RING (deep crimson, 8 petals)
+  // ═══════════════════════════════════════════
+  for (let i = 0; i < 8; i++) {
+    let angle = (i/8)*TWO_PI;
+    let px = cx + cos(angle)*52;
+    let py = cy + sin(angle)*44;
+
+    brush.noStroke();
+    brush.fill(CRIMSON, 100);
+    brush.fillBleed(0.4, "out");
+    brush.fillTexture(0.45, 0.3);
+    brush.circle(px, py, 32);
+
+    // Darker wash toward center
+    brush.fill(DEEP_CRIMSON, 55);
+    brush.fillBleed(0.2, "in");
+    brush.fillTexture(0.3, 0.2);
+    brush.circle(cx + cos(angle)*31, cy + sin(angle)*26, 18);
+    brush.noFill();
+  }
+
+  // ── MIDDLE RING (rose pink, 6 petals) ──
+  for (let i = 0; i < 6; i++) {
+    let angle = (i/6)*TWO_PI + 0.3;
+    brush.noStroke();
+    brush.fill(ROSE, 110);
+    brush.fillBleed(0.35, "out");
+    brush.fillTexture(0.4, 0.25);
+    brush.circle(cx + cos(angle)*32, cy + sin(angle)*27, 24);
+    brush.noFill();
+  }
+
+  // Fill budget: ~39 fills used. Keep remaining under 50.
+
+  // ── INNER RING (blush, 4 petals — fewer to stay in budget) ──
+  for (let i = 0; i < 4; i++) {
+    let angle = (i/4)*TWO_PI + 0.7;
+    brush.noStroke();
+    brush.fill(BLUSH, 120);
+    brush.fillBleed(0.25, "out");
+    brush.fillTexture(0.35, 0.2);
+    brush.circle(cx + cos(angle)*16, cy + sin(angle)*14, 16);
+    brush.noFill();
+  }
+  // Total fills: ~43. Safe.
+
+  // ═══════════════════════════════════════════
+  //  CENTER + POLLEN (strokes, not fills)
+  // ═══════════════════════════════════════════
+  brush.noFill();
+  // Dark center
+  brush.set("charcoal", DARK_CENTER, 4);
+  for (let i = 0; i < 8; i++) {
+    let a = (i/8)*TWO_PI;
+    brush.line(cx + cos(a)*2, cy + sin(a)*2, cx + cos(a+0.5)*5, cy + sin(a+0.5)*5);
+  }
+
+  // Gold pollen spray
+  brush.set("spray", GOLD, 1.5);
+  for (let i = 0; i < 12; i++) {
+    let a = (i/12)*TWO_PI;
+    let r = 6 + (i%3)*4;
+    brush.line(cx + cos(a)*r, cy + sin(a)*r, cx + cos(a)*(r+2), cy + sin(a)*(r+2));
+  }
+
+  // Fine gold marker accents
+  brush.set("marker", PALE_GOLD, 0.4);
+  for (let i = 0; i < 6; i++) {
+    let a = (i/6)*TWO_PI + 0.3;
+    brush.line(cx + cos(a)*4, cy + sin(a)*4, cx + cos(a)*13, cy + sin(a)*13);
+  }
+
+  // ═══════════════════════════════════════════
+  //  PETAL OUTLINES — rotring tahrir strokes
+  // ═══════════════════════════════════════════
+  brush.set("rotring", DEEP_CRIMSON, 0.4);
+  for (let i = 0; i < 8; i++) {
+    let angle = (i/8)*TWO_PI;
+    let px = cx + cos(angle)*52;
+    let py = cy + sin(angle)*44;
+    let pts = [];
+    for (let j = 0; j <= 12; j++) {
+      let t = j/12;
+      let a = angle - 0.9 + t * 1.8;
+      pts.push([px + cos(a)*28, py + sin(a)*24, 0.2 + sin(t*PI)*0.8]);
+    }
+    brush.spline(pts, 0.7);
+  }
+
+  brush.set("rotring", '#7A1A2B', 0.3);
+  for (let i = 0; i < 6; i++) {
+    let angle = (i/6)*TWO_PI + 0.3;
+    let px = cx + cos(angle)*32;
+    let py = cy + sin(angle)*27;
+    let pts = [];
+    for (let j = 0; j <= 10; j++) {
+      let t = j/10;
+      let a = angle - 0.7 + t * 1.4;
+      pts.push([px + cos(a)*21, py + sin(a)*18, 0.3 + sin(t*PI)*0.6]);
+    }
+    brush.spline(pts, 0.7);
+  }
+
+  // ═══════════════════════════════════════════
+  //  CROSS-HATCH BACKGROUND TEXTURE
+  // ═══════════════════════════════════════════
+  brush.noFill();
+  brush.noStroke();
+  brush.hatch(25, 45, { rand: 0.3 });
+  brush.hatchStyle("2H", '#150308', 0.15);
+  brush.rect(0, 0, width, height);
+  brush.noHatch();
+
+  // Second hatch layer at perpendicular angle
+  brush.hatch(30, -30, { rand: 0.25 });
+  brush.hatchStyle("2H", '#0A0205', 0.1);
+  brush.rect(0, 0, width, height);
+  brush.noHatch();
+
+  // ═══════════════════════════════════════════
+  //  ATMOSPHERIC GOLD DUST
+  // ═══════════════════════════════════════════
+  brush.set("spray", GOLD, 0.3);
+  for (let i = 0; i < 15; i++) {
+    let a = random(TWO_PI);
+    let r = random(70, 200);
+    brush.line(cx + cos(a)*r, cy + sin(a)*r, cx + cos(a)*(r+8), cy + sin(a)*(r+8));
+  }
+
+  // Charcoal texture strokes in background
+  brush.field("curved");
+  brush.set("charcoal", '#0C0506', 0.6);
+  for (let i = 0; i < 6; i++) {
+    brush.flowLine(random(30, width-30), random(cy+200, height-60), random(40, 100), random(TWO_PI));
+  }
+  brush.noField();
+}
+</script>
+</body>
+</html>

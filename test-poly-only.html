@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+  <style>html,body{margin:0;padding:0;overflow:hidden;background:#1a1a1a;display:flex;justify-content:center;align-items:center;height:100vh}canvas{display:block}</style>
+</head>
+<body>
+<script>
+function setup() {
+  createCanvas(800, 800, WEBGL);
+  brush.load();
+  translate(-width/2, -height/2);
+  randomSeed(42);
+  background(240, 236, 228);
+
+  // Test 1: Simple rectangle polygon
+  brush.noStroke();
+  brush.fill('#1a4a8a', 200);
+  brush.fillBleed(0.15, 'out');
+  brush.fillTexture(0.5, 0.35);
+  brush.polygon([[100, 100], [700, 100], [700, 700], [100, 700]]);
+
+  console.log('Test complete');
+}
+</script>
+</body>
+</html>

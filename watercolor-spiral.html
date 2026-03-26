@@ -1,0 +1,1393 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Watercolor Spiral — Fatiha Garden</title>
+<style>
+  body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
+  canvas { display: block; }
+  #play-btn { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    background: transparent; border: 1px solid rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.4); padding: 14px 32px; border-radius: 10px;
+    font-size: 0.9rem; cursor: pointer; z-index: 10 }
+</style>
+</head>
+<body>
+<button id="play-btn">&#9654;</button>
+<canvas id="c" width="430" height="932"></canvas>
+<script src="mixbox.js"></script>
+<script>
+// ============================================================
+// Watercolor Spiral — Golden ratio path + 10 botanical units
+// Tyler Hobbs deformation pipeline + audio-synced progressive render
+// ============================================================
+
+const W = 430, H = 932;
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+const TOTAL_DUR = 6.0;
+const PHI = 1.618033988749;
+const GOLDEN_ANGLE = 137.508 * Math.PI / 180;
+
+// --- Seeded RNG ---
+let seed = 314159;
+function rand() {
+  seed = (seed * 16807 + 0) % 2147483647;
+  return (seed - 1) / 2147483646;
+}
+function gauss(mean, std) {
+  const u1 = rand(), u2 = rand();
+  return mean + std * Math.sqrt(-2 * Math.log(u1 || 0.001)) * Math.cos(2 * Math.PI * u2);
+}
+function randInt(a, b) { return Math.floor(rand() * (b - a + 1)) + a; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+// ============================================================
+// Value noise for paper texture
+// ============================================================
+const NOISE_SIZE = 128;
+const noiseGrid = [];
+for (let i = 0; i < NOISE_SIZE * NOISE_SIZE; i++) noiseGrid.push(rand());
+
+function smoothNoise(x, y) {
+  const ix = Math.floor(x) % NOISE_SIZE, iy = Math.floor(y) % NOISE_SIZE;
+  const fx = x - Math.floor(x), fy = y - Math.floor(y);
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  const i00 = noiseGrid[iy * NOISE_SIZE + ix];
+  const i10 = noiseGrid[iy * NOISE_SIZE + (ix + 1) % NOISE_SIZE];
+  const i01 = noiseGrid[((iy + 1) % NOISE_SIZE) * NOISE_SIZE + ix];
+  const i11 = noiseGrid[((iy + 1) % NOISE_SIZE) * NOISE_SIZE + (ix + 1) % NOISE_SIZE];
+  return lerp(lerp(i00, i10, sx), lerp(i01, i11, sx), sy);
+}
+
+function fbmNoise(x, y, octaves) {
+  let val = 0, amp = 1, freq = 1, total = 0;
+  for (let i = 0; i < octaves; i++) {
+    val += amp * smoothNoise(x * freq, y * freq);
+    total += amp;
+    amp *= 0.5;
+    freq *= 2;
+  }
+  return val / total;
+}
+
+// ============================================================
+// Paper background
+// ============================================================
+function drawPaperBackground() {
+  ctx.fillStyle = '#f4ede3';
+  ctx.fillRect(0, 0, W, H);
+  const imgData = ctx.getImageData(0, 0, W, H);
+  const d = imgData.data;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const idx = (y * W + x) * 4;
+      const grain = gauss(0, 3.5);
+      const tooth = (fbmNoise(x * 0.15, y * 0.15, 3) - 0.5) * 6;
+      const localVar = (fbmNoise(x * 0.012, y * 0.012, 5) - 0.5) * 16;
+      const fiber = (fbmNoise(x * 0.06, y * 0.012, 4) - 0.5) * 7;
+      const total = grain + tooth + localVar + fiber;
+      d[idx]     = clamp(d[idx] + total, 0, 255);
+      d[idx + 1] = clamp(d[idx + 1] + total, 0, 255);
+      d[idx + 2] = clamp(d[idx + 2] + total - 1.5, 0, 255);
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+// Save paper as ImageData so we can restore it each frame
+drawPaperBackground();
+const paperImageData = ctx.getImageData(0, 0, W, H);
+
+// ============================================================
+// Golden Ratio Spiral — from threejs.html
+// ============================================================
+const curvePoints = [];
+{
+  const M = 24;
+  let gw = W - M * 2, gh = gw * PHI;
+  if (gh > H - M * 2) { gh = H - M * 2; gw = gh / PHI; }
+  const gx = (W - gw) / 2, gy = (H - gh) / 2;
+
+  let rx = gx, ry = gy, rw = gw, rh = gh;
+  const LEVELS = 9;
+  const squares = [];
+  for (let i = 0; i < LEVELS; i++) {
+    const sq = Math.min(rw, rh);
+    const d = i % 4;
+    let sx, sy;
+    if (d === 0) { sx = rx; sy = ry + rh - sq; rh -= sq; }
+    else if (d === 1) { sx = rx; sy = ry; rx += sq; rw -= sq; }
+    else if (d === 2) { sx = rx; sy = ry; ry += sq; rh -= sq; }
+    else { sx = rx + rw - sq; sy = ry; rw -= sq; }
+    squares.push({ sx, sy, sq });
+  }
+
+  const spiralArcs = [];
+  for (let i = 0; i < squares.length; i++) {
+    const { sx, sy, sq } = squares[i];
+    const d = i % 4;
+    let cx, cy, sa, ea;
+    if (d === 0) { cx = sx + sq; cy = sy; sa = 90; ea = 180; }
+    else if (d === 1) { cx = sx + sq; cy = sy + sq; sa = 180; ea = 270; }
+    else if (d === 2) { cx = sx; cy = sy + sq; sa = 270; ea = 360; }
+    else { cx = sx; cy = sy; sa = 0; ea = 90; }
+    spiralArcs.push({ cx, cy, r: sq, sa: sa * Math.PI / 180, ea: ea * Math.PI / 180 });
+  }
+
+  const TARGET = 900;
+  let totalR = 0;
+  for (const a of spiralArcs) totalR += a.r;
+  for (const arc of spiralArcs) {
+    const n = Math.max(6, Math.round(TARGET * arc.r / totalR));
+    for (let j = 0; j < n; j++) {
+      const t = j / n;
+      const angle = arc.sa + (arc.ea - arc.sa) * t;
+      curvePoints.push({ x: arc.cx + Math.cos(angle) * arc.r, y: arc.cy + Math.sin(angle) * arc.r });
+    }
+  }
+  if (spiralArcs.length > 0) {
+    const last = spiralArcs[spiralArcs.length - 1];
+    curvePoints.push({ x: last.cx + Math.cos(last.ea) * last.r, y: last.cy + Math.sin(last.ea) * last.r });
+  }
+}
+const CL = curvePoints.length;
+
+function getNormal(i) {
+  const ni = Math.min(i + 1, CL - 1), pi = Math.max(i - 1, 0);
+  const dx = curvePoints[ni].x - curvePoints[pi].x, dy = curvePoints[ni].y - curvePoints[pi].y;
+  const l = Math.sqrt(dx * dx + dy * dy) || 1;
+  return { x: -dy / l, y: dx / l };
+}
+
+function getTangent(i) {
+  const ni = Math.min(i + 1, CL - 1), pi = Math.max(i - 1, 0);
+  const dx = curvePoints[ni].x - curvePoints[pi].x, dy = curvePoints[ni].y - curvePoints[pi].y;
+  const l = Math.sqrt(dx * dx + dy * dy) || 1;
+  return { x: dx / l, y: dy / l };
+}
+
+// ============================================================
+// Tyler Hobbs Polygon Deformation
+// ============================================================
+function deformOnce(poly, variance) {
+  const result = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i];
+    const c = poly[(i + 1) % poly.length];
+    result.push([a[0], a[1]]);
+    const bx = (a[0] + c[0]) / 2;
+    const by = (a[1] + c[1]) / 2;
+    const dx = c[0] - a[0];
+    const dy = c[1] - a[1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.5) continue;
+    const nx = -dy / len;
+    const ny = dx / len;
+    const offset = gauss(0, variance * len);
+    result.push([bx + nx * offset, by + ny * offset]);
+  }
+  return result;
+}
+
+function deformN(poly, n, variance) {
+  let p = poly.map(pt => [pt[0], pt[1]]);
+  for (let i = 0; i < n; i++) {
+    p = deformOnce(p, variance * Math.pow(0.7, i));
+  }
+  return p;
+}
+
+function makeBase(poly) {
+  return deformN(poly, 5, 0.16);
+}
+
+// ============================================================
+// Shape generators (from watercolor-variations.html)
+// ============================================================
+
+function makePetalPoly(baseX, baseY, angle, length, width, curvature) {
+  const pts = [];
+  const n = 24;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    let w;
+    if (t < 0.08) w = t / 0.08 * 0.2;
+    else if (t < 0.3) w = 0.2 + (t - 0.08) / 0.22 * 0.8;
+    else if (t < 0.75) w = 1.0;
+    else w = Math.cos((t - 0.75) / 0.25 * Math.PI * 0.5);
+    const along = t * length;
+    const across = w * width * 0.5;
+    const curveOffset = curvature * Math.sin(t * Math.PI) * length * 0.08;
+    const x = baseX + along * Math.cos(angle) - (across + curveOffset) * Math.sin(angle);
+    const y = baseY + along * Math.sin(angle) + (across + curveOffset) * Math.cos(angle);
+    pts.push([x, y]);
+  }
+  for (let i = n; i >= 0; i--) {
+    const t = i / n;
+    let w;
+    if (t < 0.08) w = t / 0.08 * 0.2;
+    else if (t < 0.3) w = 0.2 + (t - 0.08) / 0.22 * 0.8;
+    else if (t < 0.75) w = 1.0;
+    else w = Math.cos((t - 0.75) / 0.25 * Math.PI * 0.5);
+    const along = t * length;
+    const across = -w * width * 0.5;
+    const curveOffset = curvature * Math.sin(t * Math.PI) * length * 0.08;
+    const x = baseX + along * Math.cos(angle) - (across + curveOffset) * Math.sin(angle);
+    const y = baseY + along * Math.sin(angle) + (across + curveOffset) * Math.cos(angle);
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
+function makeBudPetalPoly(baseX, baseY, angle, length, width, curvature) {
+  const pts = [];
+  const n = 24;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    let w;
+    if (t < 0.1) w = t / 0.1 * 0.15;
+    else if (t < 0.4) w = 0.15 + (t - 0.1) / 0.3 * 0.85;
+    else if (t < 0.6) w = 1.0;
+    else w = Math.cos((t - 0.6) / 0.4 * Math.PI * 0.5);
+    const along = t * length;
+    const across = w * width * 0.5;
+    const curveOffset = curvature * Math.sin(t * Math.PI) * length * 0.06;
+    const x = baseX + along * Math.cos(angle) - (across + curveOffset) * Math.sin(angle);
+    const y = baseY + along * Math.sin(angle) + (across + curveOffset) * Math.cos(angle);
+    pts.push([x, y]);
+  }
+  for (let i = n; i >= 0; i--) {
+    const t = i / n;
+    let w;
+    if (t < 0.1) w = t / 0.1 * 0.15;
+    else if (t < 0.4) w = 0.15 + (t - 0.1) / 0.3 * 0.85;
+    else if (t < 0.6) w = 1.0;
+    else w = Math.cos((t - 0.6) / 0.4 * Math.PI * 0.5);
+    const along = t * length;
+    const across = -w * width * 0.5;
+    const curveOffset = curvature * Math.sin(t * Math.PI) * length * 0.06;
+    const x = baseX + along * Math.cos(angle) - (across + curveOffset) * Math.sin(angle);
+    const y = baseY + along * Math.sin(angle) + (across + curveOffset) * Math.cos(angle);
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
+function makeTulipPetalPoly(baseX, baseY, angle, length, width, curvature) {
+  const pts = [];
+  const n = 28;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    let w;
+    if (t < 0.05) w = t / 0.05 * 0.1;
+    else if (t < 0.25) w = 0.1 + (t - 0.05) / 0.2 * 0.9;
+    else if (t < 0.55) w = 1.0 - (t - 0.25) * 0.15;
+    else if (t < 0.85) w = (1.0 - (t - 0.25) * 0.15) * (1 - (t - 0.55) / 0.3 * 0.3);
+    else w = Math.max(0, Math.cos((t - 0.85) / 0.15 * Math.PI * 0.5) * 0.4);
+    const along = t * length;
+    const across = w * width * 0.5;
+    const sCurve = Math.sin(t * Math.PI * 1.3) * curvature * length * 0.06;
+    const x = baseX + along * Math.cos(angle) - (across + sCurve) * Math.sin(angle);
+    const y = baseY + along * Math.sin(angle) + (across + sCurve) * Math.cos(angle);
+    pts.push([x, y]);
+  }
+  for (let i = n; i >= 0; i--) {
+    const t = i / n;
+    let w;
+    if (t < 0.05) w = t / 0.05 * 0.1;
+    else if (t < 0.25) w = 0.1 + (t - 0.05) / 0.2 * 0.9;
+    else if (t < 0.55) w = 1.0 - (t - 0.25) * 0.15;
+    else if (t < 0.85) w = (1.0 - (t - 0.25) * 0.15) * (1 - (t - 0.55) / 0.3 * 0.3);
+    else w = Math.max(0, Math.cos((t - 0.85) / 0.15 * Math.PI * 0.5) * 0.4);
+    const along = t * length;
+    const across = -w * width * 0.5;
+    const sCurve = Math.sin(t * Math.PI * 1.3) * curvature * length * 0.06;
+    const x = baseX + along * Math.cos(angle) - (across + sCurve) * Math.sin(angle);
+    const y = baseY + along * Math.sin(angle) + (across + sCurve) * Math.cos(angle);
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
+function makeHyacinthBellPoly(baseX, baseY, angle, length, width) {
+  const pts = [];
+  const n = 24;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    let w;
+    if (t < 0.15) w = 0.3 + t / 0.15 * 0.15;
+    else if (t < 0.5) w = 0.45 + (t - 0.15) / 0.35 * 0.1;
+    else if (t < 0.75) w = 0.55 + (t - 0.5) / 0.25 * 0.45;
+    else w = 1.0 - (t - 0.75) / 0.25 * 0.15;
+    const along = t * length;
+    const across = w * width * 0.5;
+    const x = baseX + along * Math.cos(angle) - across * Math.sin(angle);
+    const y = baseY + along * Math.sin(angle) + across * Math.cos(angle);
+    pts.push([x, y]);
+  }
+  for (let i = n; i >= 0; i--) {
+    const t = i / n;
+    let w;
+    if (t < 0.15) w = 0.3 + t / 0.15 * 0.15;
+    else if (t < 0.5) w = 0.45 + (t - 0.15) / 0.35 * 0.1;
+    else if (t < 0.75) w = 0.55 + (t - 0.5) / 0.25 * 0.45;
+    else w = 1.0 - (t - 0.75) / 0.25 * 0.15;
+    const along = t * length;
+    const across = -w * width * 0.5;
+    const x = baseX + along * Math.cos(angle) - across * Math.sin(angle);
+    const y = baseY + along * Math.sin(angle) + across * Math.cos(angle);
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
+function makeCarnationPoly(cx, cy, radius, ruffleAmp, numRuffles) {
+  const pts = [];
+  const n = 120;
+  for (let i = 0; i < n; i++) {
+    const angle = (i / n) * Math.PI * 2;
+    const ruffle1 = Math.sin(angle * numRuffles) * ruffleAmp;
+    const ruffle2 = Math.sin(angle * numRuffles * 2.3 + 1.5) * ruffleAmp * 0.4;
+    const ruffle3 = Math.sin(angle * numRuffles * 0.7 + 3.1) * ruffleAmp * 0.6;
+    const r = radius + ruffle1 + ruffle2 + ruffle3 + gauss(0, ruffleAmp * 0.3);
+    pts.push([cx + Math.cos(angle) * r, cy + Math.sin(angle) * r]);
+  }
+  return pts;
+}
+
+function makeCirclePoly(cx, cy, radius, n) {
+  const pts = [];
+  n = n || 24;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    pts.push([cx + Math.cos(a) * radius, cy + Math.sin(a) * radius]);
+  }
+  return pts;
+}
+
+function makeJasmineLeafPoly(baseX, baseY, angle, length, width) {
+  const pts = [];
+  const n = 16;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const w = Math.sin(t * Math.PI);
+    const along = t * length;
+    const across = w * width * 0.5;
+    pts.push([baseX + along * Math.cos(angle) - across * Math.sin(angle),
+              baseY + along * Math.sin(angle) + across * Math.cos(angle)]);
+  }
+  for (let i = n; i >= 0; i--) {
+    const t = i / n;
+    const w = Math.sin(t * Math.PI);
+    const along = t * length;
+    const across = -w * width * 0.5;
+    pts.push([baseX + along * Math.cos(angle) - across * Math.sin(angle),
+              baseY + along * Math.sin(angle) + across * Math.cos(angle)]);
+  }
+  return pts;
+}
+
+function makeTulipLeafPoly(baseX, baseY, angle, length, width) {
+  const pts = [];
+  const n = 28;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    let w;
+    if (t < 0.15) w = t / 0.15 * 0.6;
+    else if (t < 0.5) w = 0.6 + (t - 0.15) / 0.35 * 0.4;
+    else if (t < 0.85) w = 1.0 - (t - 0.5) / 0.35 * 0.5;
+    else w = Math.max(0, (1 - t) / 0.15 * 0.5);
+    const along = t * length;
+    const twist = Math.sin(t * Math.PI * 0.8) * width * 0.12;
+    const across = w * width * 0.5 + twist;
+    pts.push([baseX + along * Math.cos(angle) - across * Math.sin(angle),
+              baseY + along * Math.sin(angle) + across * Math.cos(angle)]);
+  }
+  for (let i = n; i >= 0; i--) {
+    const t = i / n;
+    let w;
+    if (t < 0.15) w = t / 0.15 * 0.6;
+    else if (t < 0.5) w = 0.6 + (t - 0.15) / 0.35 * 0.4;
+    else if (t < 0.85) w = 1.0 - (t - 0.5) / 0.35 * 0.5;
+    else w = Math.max(0, (1 - t) / 0.15 * 0.5);
+    const along = t * length;
+    const twist = Math.sin(t * Math.PI * 0.8) * width * 0.12;
+    const across = -(w * width * 0.5) + twist;
+    pts.push([baseX + along * Math.cos(angle) - across * Math.sin(angle),
+              baseY + along * Math.sin(angle) + across * Math.cos(angle)]);
+  }
+  return pts;
+}
+
+// ============================================================
+// Color helpers
+// ============================================================
+function varyColor(base, spread) {
+  const s = spread || 8;
+  const shift = gauss(0, s);
+  return [
+    clamp(Math.round(base[0] + shift), 0, 255),
+    clamp(Math.round(base[1] + shift * 0.4), 0, 255),
+    clamp(Math.round(base[2] + shift * 0.6), 0, 255)
+  ];
+}
+
+// Ottoman palette
+const PALETTE = {
+  goldenRose:  { outer: [230, 175, 55], mid: [210, 145, 40], inner: [185, 110, 25], center: [155, 75, 15] },
+  rose:        { outer: [220, 60, 90], mid: [180, 35, 65], inner: [140, 20, 50], center: [100, 15, 35] },
+  tulip:       { outer: [210, 65, 20], inner: [240, 180, 40] },
+  carnation:   { outer: [195, 30, 50], mid: [175, 25, 45], inner: [155, 20, 38], center: [120, 15, 30] },
+  hyacinth:    { bell: [40, 60, 140] },
+  jasmine:     { petal: [245, 240, 235], center: [220, 190, 80] },
+  penc:        { outer: [200, 50, 75], inner: [140, 25, 45] },
+  berry:       { body: [100, 20, 35], highlight: [150, 45, 55] },
+  leaf:        [[38, 100, 45], [55, 120, 48], [30, 85, 38], [48, 110, 52], [60, 125, 55]],
+  stem:        [[35, 88, 35], [45, 98, 40], [50, 80, 32]]
+};
+
+// ============================================================
+// Texture masking setup
+// ============================================================
+const NUM_MASKS = 4;
+const maskData = [];
+for (let m = 0; m < NUM_MASKS; m++) {
+  const circles = [];
+  for (let j = 0; j < 300; j++) {
+    circles.push([rand() * W, rand() * H, Math.abs(gauss(W * 0.06, W * 0.025))]);
+  }
+  maskData.push(circles);
+}
+
+const offCanvas = document.createElement('canvas');
+offCanvas.width = W;
+offCanvas.height = H;
+const offCtx = offCanvas.getContext('2d');
+
+function strokePoly(tCtx, poly) {
+  tCtx.beginPath();
+  tCtx.moveTo(poly[0][0], poly[0][1]);
+  for (let i = 1; i < poly.length; i++) tCtx.lineTo(poly[i][0], poly[i][1]);
+  tCtx.closePath();
+  tCtx.stroke();
+}
+
+// ============================================================
+// Audio setup (from threejs.html)
+// ============================================================
+let audioCtx, analyser, audio, timeData, isPlaying = false, smoothAmp = 0;
+let waveformData = null;
+fetch('bismillah-wave.json').then(r => r.json()).then(d => { waveformData = d; }).catch(() => {});
+
+function getAmp() {
+  if (analyser && timeData) {
+    analyser.getByteTimeDomainData(timeData);
+    let rms = 0;
+    for (let i = 0; i < timeData.length; i++) { const v = (timeData[i] - 128) / 128; rms += v * v; }
+    const live = Math.sqrt(rms / timeData.length);
+    if (live > .005) return live;
+  }
+  if (waveformData) {
+    const t = (typeof window._synthTime === 'number') ? window._synthTime / TOTAL_DUR : (audio ? audio.currentTime / TOTAL_DUR : 0);
+    if (t > 0) return waveformData[Math.min(Math.floor(t * waveformData.length), waveformData.length - 1)] || 0;
+  }
+  return 0;
+}
+
+function getTime() {
+  if (typeof window._synthTime === 'number') return window._synthTime;
+  if (audio && isPlaying) return audio.currentTime;
+  return 0;
+}
+
+function getProgress() {
+  return clamp(getTime() / TOTAL_DUR, 0, 1);
+}
+
+// ============================================================
+// Tajweed events — flower mapping along spiral
+// ============================================================
+const TAJWEED = [
+  // Early spiral: buds + small fillers
+  { t: 0.05, type: 'bud',       size: 0.3,  side: -1 },
+  { t: 0.12, type: 'penc',      size: 0.4,  side: 1 },
+  { t: 0.20, type: 'leaf',      size: 0.3,  side: -1 },
+  { t: 0.28, type: 'berry',     size: 0.35, side: 1 },
+  { t: 0.35, type: 'jasmine',   size: 0.4,  side: -1 },
+  { t: 0.42, type: 'leaf',      size: 0.25, side: 1 },
+  // Mid spiral: supporting flowers
+  { t: 0.50, type: 'hyacinth',  size: 0.5,  side: -1 },
+  { t: 0.58, type: 'bud',       size: 0.35, side: 1 },
+  { t: 0.65, type: 'tulip',     size: 0.6,  side: -1 },
+  { t: 0.72, type: 'leaf',      size: 0.35, side: 1 },
+  { t: 0.78, type: 'carnation', size: 0.55, side: -1 },
+  // Allah event — golden rose (the hero)
+  { t: 0.85, type: 'golden_rose', size: 1.0, side: 1 },
+  // Late spiral: full blooms
+  { t: 0.92, type: 'penc',      size: 0.4,  side: -1 },
+  { t: 0.98, type: 'leaf',      size: 0.3,  side: 1 },
+  { t: 1.05, type: 'berry',     size: 0.3,  side: -1 },
+  { t: 1.15, type: 'rose',      size: 0.8,  side: 1 },
+  { t: 1.25, type: 'jasmine',   size: 0.45, side: -1 },
+  { t: 1.35, type: 'leaf',      size: 0.2,  side: 1 },
+  { t: 1.48, type: 'tulip',     size: 0.5,  side: -1 },
+  { t: 1.60, type: 'rose',      size: 0.7,  side: 1 },
+  { t: 1.72, type: 'hyacinth',  size: 0.45, side: -1 },
+  { t: 1.85, type: 'bud',       size: 0.4,  side: 1 },
+  { t: 1.98, type: 'carnation', size: 0.5,  side: -1 },
+  { t: 2.10, type: 'leaf',      size: 0.25, side: 1 },
+  { t: 2.22, type: 'penc',      size: 0.35, side: -1 },
+  { t: 2.35, type: 'berry',     size: 0.35, side: 1 },
+  { t: 2.48, type: 'jasmine',   size: 0.4,  side: -1 },
+  { t: 2.60, type: 'leaf',      size: 0.3,  side: 1 },
+  { t: 2.75, type: 'tulip',     size: 0.55, side: -1 },
+  { t: 2.88, type: 'rose',      size: 0.65, side: 1 },
+  { t: 3.05, type: 'leaf',      size: 0.25, side: -1 },
+  { t: 3.20, type: 'hyacinth',  size: 0.4,  side: 1 },
+  { t: 3.35, type: 'carnation', size: 0.45, side: -1 },
+  { t: 3.50, type: 'penc',      size: 0.4,  side: 1 },
+  { t: 3.65, type: 'berry',     size: 0.3,  side: -1 },
+  { t: 3.80, type: 'bud',       size: 0.3,  side: 1 },
+  { t: 3.95, type: 'jasmine',   size: 0.35, side: -1 },
+  { t: 4.15, type: 'leaf',      size: 0.35, side: 1 },
+  { t: 4.35, type: 'tulip',     size: 0.45, side: -1 },
+  { t: 4.55, type: 'rose',      size: 0.6,  side: 1 },
+  { t: 4.75, type: 'carnation', size: 0.4,  side: -1 },
+  { t: 4.95, type: 'leaf',      size: 0.2,  side: 1 },
+  { t: 5.15, type: 'penc',      size: 0.35, side: -1 },
+  { t: 5.35, type: 'berry',     size: 0.25, side: 1 },
+  { t: 5.50, type: 'bud',       size: 0.25, side: -1 },
+];
+
+// ============================================================
+// Watercolor element list — built progressively
+// ============================================================
+const elements = [];
+const TARGET_LAYERS = 30;
+const LAYER_ALPHA = 0.07;
+
+function addElement(poly, color, opts) {
+  const el = {
+    base: opts.skipDeform ? poly : makeBase(poly),
+    color: color,
+    layerVariance: opts.layerVariance || 0.08,
+    alphaScale: opts.alphaScale || 1.0,
+    priority: opts.priority || 0,
+    index: elements.length,
+    spawnTime: opts.spawnTime || 0,
+    _preDeformed: [],
+    _layersRendered: 0,
+    _done: false
+  };
+  // Pre-compute 2 deformed variants
+  for (let d = 0; d < 2; d++) {
+    el._preDeformed.push(deformN(el.base, 1, el.layerVariance || 0.08));
+  }
+  elements.push(el);
+  return el;
+}
+
+// ============================================================
+// Flower builders — place at position along spiral
+// ============================================================
+
+function buildGoldenRose(cx, cy, scale) {
+  const S = scale;
+  const els = [];
+  // Outer petals
+  for (let i = 0; i < 7; i++) {
+    const angle = (i / 7) * Math.PI * 2 + gauss(0, 0.15) + 0.4;
+    const dist = 25 * S;
+    const bx = cx + Math.cos(angle) * dist;
+    const by = cy + Math.sin(angle) * dist;
+    const sv = 0.9 + rand() * 0.3;
+    els.push({ poly: makePetalPoly(bx, by, angle + gauss(0, 0.25), 55 * sv * S, 40 * sv * S, gauss(0, 1.0)),
+      color: varyColor(PALETTE.goldenRose.outer, 12), opts: { layerVariance: 0.12, alphaScale: 1.6, priority: 1 } });
+  }
+  // Mid petals
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2 + gauss(0, 0.15) + 0.15;
+    const dist = 14 * S;
+    const bx = cx + Math.cos(angle) * dist;
+    const by = cy + Math.sin(angle) * dist;
+    els.push({ poly: makePetalPoly(bx, by, angle + gauss(0, 0.2), 34 * S, 24 * S, gauss(0, 0.6)),
+      color: varyColor(PALETTE.goldenRose.mid, 10), opts: { layerVariance: 0.10, alphaScale: 1.3, priority: 2 } });
+  }
+  // Inner petals
+  for (let i = 0; i < 3; i++) {
+    const angle = (i / 3) * Math.PI * 2 + gauss(0, 0.3);
+    els.push({ poly: makePetalPoly(cx + gauss(0, 2), cy + gauss(0, 2), angle, 18 * S, 13 * S, gauss(0, 0.4)),
+      color: varyColor(PALETTE.goldenRose.inner, 8), opts: { layerVariance: 0.08, alphaScale: 1.1, priority: 3 } });
+  }
+  // Center
+  for (let i = 0; i < 3; i++) {
+    const angle = (i / 3) * Math.PI * 2 + gauss(0, 0.4);
+    els.push({ poly: makePetalPoly(cx + gauss(0, 1), cy + gauss(0, 1), angle, 7 * S, 5 * S, gauss(0, 0.3)),
+      color: varyColor(PALETTE.goldenRose.center, 6), opts: { layerVariance: 0.07, alphaScale: 1.0, priority: 4 } });
+  }
+  return els;
+}
+
+function buildRose(cx, cy, scale) {
+  const S = scale;
+  const els = [];
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2 + gauss(0, 0.15) + 0.3;
+    const dist = 22 * S;
+    const bx = cx + Math.cos(angle) * dist;
+    const by = cy + Math.sin(angle) * dist;
+    const sv = 0.9 + rand() * 0.3;
+    els.push({ poly: makePetalPoly(bx, by, angle + gauss(0, 0.25), 48 * sv * S, 36 * sv * S, gauss(0, 1.0)),
+      color: varyColor(PALETTE.rose.outer, 10), opts: { layerVariance: 0.12, alphaScale: 1.5, priority: 1 } });
+  }
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2 + gauss(0, 0.15) + 0.2;
+    const dist = 12 * S;
+    const bx = cx + Math.cos(angle) * dist;
+    const by = cy + Math.sin(angle) * dist;
+    els.push({ poly: makePetalPoly(bx, by, angle + gauss(0, 0.2), 32 * S, 22 * S, gauss(0, 0.7)),
+      color: varyColor(PALETTE.rose.mid, 8), opts: { layerVariance: 0.10, alphaScale: 1.3, priority: 2 } });
+  }
+  for (let i = 0; i < 4; i++) {
+    const angle = (i / 4) * Math.PI * 2 + gauss(0, 0.3);
+    els.push({ poly: makePetalPoly(cx + gauss(0, 1), cy + gauss(0, 1), angle, 18 * S, 14 * S, gauss(0, 0.5)),
+      color: varyColor(PALETTE.rose.inner, 6), opts: { layerVariance: 0.09, alphaScale: 1.2, priority: 3 } });
+  }
+  for (let i = 0; i < 2; i++) {
+    const angle = (i / 2) * Math.PI * 2 + gauss(0, 0.5);
+    els.push({ poly: makePetalPoly(cx + gauss(0, 1), cy + gauss(0, 1), angle, 8 * S, 5 * S, gauss(0, 0.3)),
+      color: varyColor(PALETTE.rose.center, 5), opts: { layerVariance: 0.07, alphaScale: 1.0, priority: 4 } });
+  }
+  return els;
+}
+
+function buildTulip(cx, cy, scale) {
+  const S = scale;
+  const els = [];
+  const petalAngles = [-0.35, -0.12, 0.12, 0.35];
+  for (let i = 0; i < 4; i++) {
+    const angle = -Math.PI / 2 + petalAngles[i] + gauss(0, 0.05);
+    const dist = 4 + Math.abs(petalAngles[i]) * 8;
+    const bx = cx + Math.cos(angle + Math.PI / 2) * dist * 0.5 * S;
+    const by = cy + 6 * S;
+    const isOuter = (i === 0 || i === 3);
+    els.push({ poly: makeTulipPetalPoly(bx, by, angle, 45 * S * (isOuter ? 0.9 : 1.0), 14 * S * (isOuter ? 1.15 : 1.0), gauss(0.5, 0.3) * (i < 2 ? 1 : -1)),
+      color: varyColor(isOuter ? PALETTE.tulip.outer : [230, 85, 25], 10), opts: { layerVariance: 0.16, alphaScale: 1.6, priority: isOuter ? 1 : 2 } });
+  }
+  return els;
+}
+
+function buildCarnation(cx, cy, scale) {
+  const S = scale;
+  const els = [];
+  els.push({ poly: makeCarnationPoly(cx, cy, 28 * S, 5 * S, 14),
+    color: varyColor(PALETTE.carnation.outer), opts: { layerVariance: 0.18, alphaScale: 1.6, priority: 1 } });
+  els.push({ poly: makeCarnationPoly(cx + gauss(0, 1), cy + gauss(0, 1), 22 * S, 4 * S, 12),
+    color: varyColor(PALETTE.carnation.mid), opts: { layerVariance: 0.16, alphaScale: 1.4, priority: 2 } });
+  els.push({ poly: makeCarnationPoly(cx + gauss(0, 1), cy + gauss(0, 1), 15 * S, 3 * S, 10),
+    color: varyColor(PALETTE.carnation.inner), opts: { layerVariance: 0.14, alphaScale: 1.3, priority: 3 } });
+  els.push({ poly: makeCarnationPoly(cx + gauss(0, 1), cy + gauss(0, 1), 8 * S, 1.5 * S, 8),
+    color: varyColor(PALETTE.carnation.center), opts: { layerVariance: 0.10, alphaScale: 1.1, priority: 4 } });
+  return els;
+}
+
+function buildHyacinth(cx, cy, scale) {
+  const S = scale;
+  const els = [];
+  const numRows = 8;
+  const spikeLen = 50 * S;
+  for (let i = 0; i < numRows; i++) {
+    const t = i / (numRows - 1);
+    const fy = cy - t * spikeLen;
+    const bellScale = 0.5 + 0.5 * (1 - t * 0.4);
+    const bellLen = 12 * S * bellScale;
+    const bellWid = 5 * S * bellScale;
+    const bellsInRow = (i < 2 || i > numRows - 2) ? 2 : 3;
+    for (let j = 0; j < bellsInRow; j++) {
+      const spread = (j - (bellsInRow - 1) / 2) * (0.35 + gauss(0, 0.05));
+      const bellAngle = Math.PI / 2 + spread;
+      const fx = cx + Math.cos(bellAngle) * 2 * S + gauss(0, 0.8);
+      els.push({ poly: makeHyacinthBellPoly(fx, fy, bellAngle, bellLen, bellWid),
+        color: varyColor(PALETTE.hyacinth.bell, 10), opts: { layerVariance: 0.10, alphaScale: 1.4, priority: 2 } });
+    }
+  }
+  return els;
+}
+
+function buildJasmine(cx, cy, scale) {
+  const S = scale;
+  const els = [];
+  const numPetals = 5;
+  for (let i = 0; i < numPetals; i++) {
+    const angle = (i / numPetals) * Math.PI * 2 - Math.PI / 2 + gauss(0, 0.08);
+    const bx = cx + Math.cos(angle) * 3;
+    const by = cy + Math.sin(angle) * 3;
+    els.push({ poly: makePetalPoly(bx, by, angle + gauss(0, 0.1), 35 * S, 14 * S, gauss(0, 0.2)),
+      color: varyColor(PALETTE.jasmine.petal, 4), opts: { layerVariance: 0.09, alphaScale: 1.8, priority: 2 } });
+  }
+  for (let i = 0; i < 2; i++) {
+    const angle = (i / 2) * Math.PI * 2 + gauss(0, 0.5);
+    els.push({ poly: makePetalPoly(cx + gauss(0, 1), cy + gauss(0, 1), angle, 6 * S, 5 * S, gauss(0, 0.2)),
+      color: varyColor(PALETTE.jasmine.center, 6), opts: { layerVariance: 0.06, alphaScale: 1.2, priority: 4 } });
+  }
+  return els;
+}
+
+function buildPenc(cx, cy, scale) {
+  const S = scale;
+  const els = [];
+  const numPetals = 5;
+  for (let i = 0; i < numPetals; i++) {
+    const angle = (i / numPetals) * Math.PI * 2 - Math.PI / 2 + gauss(0, 0.1);
+    const bx = cx + Math.cos(angle) * 3;
+    const by = cy + Math.sin(angle) * 3;
+    els.push({ poly: makePetalPoly(bx, by, angle + gauss(0, 0.1), 22 * S, 16 * S, gauss(0, 0.15)),
+      color: varyColor(PALETTE.penc.outer, 8), opts: { layerVariance: 0.09, alphaScale: 1.5, priority: 2 } });
+  }
+  for (let i = 0; i < 2; i++) {
+    const angle = (i / 2) * Math.PI * 2 + gauss(0, 0.5);
+    els.push({ poly: makePetalPoly(cx + gauss(0, 1), cy + gauss(0, 1), angle, 8 * S, 7 * S, gauss(0, 0.2)),
+      color: varyColor(PALETTE.penc.inner, 5), opts: { layerVariance: 0.07, alphaScale: 1.2, priority: 4 } });
+  }
+  return els;
+}
+
+function buildBerry(cx, cy, scale) {
+  const S = scale;
+  const els = [];
+  const numBerries = 5;
+  const clusterR = 12 * S;
+  for (let i = 0; i < numBerries; i++) {
+    let bx, by;
+    if (i === 0) { bx = cx; by = cy; }
+    else {
+      const angle = ((i - 1) / (numBerries - 1)) * Math.PI * 2 + gauss(0, 0.2);
+      bx = cx + Math.cos(angle) * clusterR + gauss(0, 1);
+      by = cy + Math.sin(angle) * clusterR + gauss(0, 1);
+    }
+    const berryR = (7 + gauss(0, 1)) * S;
+    els.push({ poly: makeCirclePoly(bx, by, berryR, 24),
+      color: varyColor(PALETTE.berry.body, 8), opts: { layerVariance: 0.10, alphaScale: 1.5, priority: 2 } });
+    // Highlight
+    const hlR = berryR * 0.3;
+    els.push({ poly: makeCirclePoly(bx - berryR * 0.25, by - berryR * 0.25, hlR, 12),
+      color: varyColor(PALETTE.berry.highlight, 6), opts: { layerVariance: 0.06, alphaScale: 0.6, priority: 3 } });
+  }
+  return els;
+}
+
+function buildBud(cx, cy, scale) {
+  const S = scale;
+  const els = [];
+  for (let i = 0; i < 4; i++) {
+    const angle = (i / 4) * Math.PI * 2 + gauss(0, 0.2);
+    const dist = 2 * S;
+    const bx = cx + Math.cos(angle) * dist;
+    const by = cy + Math.sin(angle) * dist;
+    els.push({ poly: makeBudPetalPoly(bx, by, angle + gauss(0, 0.2), 20 * S, 10 * S, gauss(0, 0.3)),
+      color: varyColor(PALETTE.rose.outer), opts: { layerVariance: 0.10, alphaScale: 1.3, priority: 2 } });
+  }
+  for (let i = 0; i < 2; i++) {
+    const angle = (i / 2) * Math.PI * 2 + gauss(0, 0.4);
+    els.push({ poly: makeBudPetalPoly(cx + gauss(0, 1), cy + gauss(0, 1), angle, 7 * S, 4 * S, gauss(0, 0.3)),
+      color: varyColor(PALETTE.rose.inner), opts: { layerVariance: 0.08, alphaScale: 1.0, priority: 3 } });
+  }
+  return els;
+}
+
+function buildLeaf(cx, cy, scale, side) {
+  const S = scale;
+  const els = [];
+  const leafColor = PALETTE.leaf[Math.floor(rand() * PALETTE.leaf.length)];
+  // 2-3 leaves fanning outward from attachment point
+  const numLeaves = 2 + (rand() > 0.5 ? 1 : 0);
+  for (let i = 0; i < numLeaves; i++) {
+    const baseAngle = -Math.PI / 2 + side * (0.2 + i * 0.35 + gauss(0, 0.1));
+    const len = (30 + gauss(0, 4)) * S;
+    const wid = (10 + gauss(0, 1.5)) * S;
+    els.push({ poly: makeTulipLeafPoly(cx, cy, baseAngle, len, wid),
+      color: varyColor(leafColor, 6), opts: { layerVariance: 0.08, alphaScale: 1.2, priority: 0 } });
+  }
+  return els;
+}
+
+// ============================================================
+// Spawn flower at spiral position
+// ============================================================
+const spawnedFlowers = [];
+let tajweedIdx = 0;
+
+function getFlowerScale(type, eventSize) {
+  // Scale hierarchy: hero > supporting > filler
+  // Scale down as we move inward on spiral (smaller squares)
+  const base = eventSize;
+  switch (type) {
+    case 'golden_rose': return base * 1.6;   // Biggest — the hero
+    case 'rose':        return base * 1.2;
+    case 'tulip':       return base * 1.0;
+    case 'carnation':   return base * 0.95;
+    case 'hyacinth':    return base * 0.85;
+    case 'jasmine':     return base * 0.75;
+    case 'penc':        return base * 0.65;
+    case 'berry':       return base * 0.65;
+    case 'bud':         return base * 0.6;
+    case 'leaf':        return base * 0.8;
+    default:            return base * 0.65;
+  }
+}
+
+function spawnFlowerAtSpiral(evt, time) {
+  const progress = clamp(time / TOTAL_DUR, 0, 1);
+  const ci = Math.min(Math.floor(progress * (CL - 1)), CL - 1);
+  const pt = curvePoints[ci];
+  const normal = getNormal(ci);
+  const tangent = getTangent(ci);
+
+  // Offset from spiral based on side and flower size
+  // Flowers further from center (early spiral) get more offset; inner spiral a bit smaller
+  const spiralProgress = progress;
+  const scale = getFlowerScale(evt.type, evt.size) * lerp(1.0, 0.75, spiralProgress);
+  const offsetDist = 18 + scale * 30;
+  const fx = pt.x + normal.x * offsetDist * evt.side;
+  const fy = pt.y + normal.y * offsetDist * evt.side;
+
+  let flowerParts;
+  switch (evt.type) {
+    case 'golden_rose': flowerParts = buildGoldenRose(fx, fy, scale); break;
+    case 'rose':        flowerParts = buildRose(fx, fy, scale); break;
+    case 'tulip':       flowerParts = buildTulip(fx, fy, scale); break;
+    case 'carnation':   flowerParts = buildCarnation(fx, fy, scale); break;
+    case 'hyacinth':    flowerParts = buildHyacinth(fx, fy, scale); break;
+    case 'jasmine':     flowerParts = buildJasmine(fx, fy, scale); break;
+    case 'penc':        flowerParts = buildPenc(fx, fy, scale); break;
+    case 'berry':       flowerParts = buildBerry(fx, fy, scale); break;
+    case 'bud':         flowerParts = buildBud(fx, fy, scale); break;
+    case 'leaf':        flowerParts = buildLeaf(fx, fy, scale, evt.side); break;
+    default: return;
+  }
+
+  // Add a curved stem connecting flower to spiral
+  if (evt.type !== 'leaf') {
+    const stemColor = PALETTE.stem[Math.floor(rand() * PALETTE.stem.length)];
+    const stemWidth = 2.0 + scale * 2.0;
+    const n = 16;
+    const right = [], left = [];
+    // Curve the stem slightly for organic feel
+    const midX = (pt.x + fx) / 2 + gauss(0, 5) * evt.side;
+    const midY = (pt.y + fy) / 2 + gauss(0, 5);
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      // Quadratic bezier interpolation
+      const u = 1 - t;
+      const sx = u * u * pt.x + 2 * u * t * midX + t * t * fx;
+      const sy = u * u * pt.y + 2 * u * t * midY + t * t * fy;
+      const w = lerp(stemWidth, stemWidth * 0.4, t);
+      // Approximate normal from neighboring points
+      const dt = 0.02;
+      const t0 = Math.max(0, t - dt), t1 = Math.min(1, t + dt);
+      const u0 = 1 - t0, u1 = 1 - t1;
+      const dx = (u1 * u1 * pt.x + 2 * u1 * t1 * midX + t1 * t1 * fx) - (u0 * u0 * pt.x + 2 * u0 * t0 * midX + t0 * t0 * fx);
+      const dy = (u1 * u1 * pt.y + 2 * u1 * t1 * midY + t1 * t1 * fy) - (u0 * u0 * pt.y + 2 * u0 * t0 * midY + t0 * t0 * fy);
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const nx = -dy / len, ny = dx / len;
+      right.push([sx + nx * w, sy + ny * w]);
+      left.push([sx - nx * w, sy - ny * w]);
+    }
+    addElement([...right, ...left.reverse()], stemColor, {
+      layerVariance: 0.05, alphaScale: 1.0, priority: 0, spawnTime: time
+    });
+  }
+
+  // Add flower elements
+  for (const part of flowerParts) {
+    addElement(part.poly, part.color, { ...part.opts, spawnTime: time });
+  }
+
+  spawnedFlowers.push({ type: evt.type, ci, time });
+}
+
+// ============================================================
+// Vine/stalk along the spiral
+// ============================================================
+let lastVineCI = 0;
+
+function buildVineSegment(fromCI, toCI, spawnTime) {
+  if (fromCI >= toCI) return;
+  const segLen = toCI - fromCI;
+  // Build a ribbon polygon along the curve
+  const right = [], left = [];
+  for (let i = fromCI; i <= toCI; i++) {
+    const t = (i - fromCI) / segLen;
+    const pt = curvePoints[i];
+    const n = getNormal(i);
+    // Width tapers from thick at base to thin at tip
+    const progressOnSpiral = i / CL;
+    const w = lerp(4.5, 1.5, progressOnSpiral);
+    right.push([pt.x + n.x * w, pt.y + n.y * w]);
+    left.push([pt.x - n.x * w, pt.y - n.y * w]);
+  }
+  if (right.length < 2) return;
+
+  // Split into chunks for manageable polygons
+  const chunkSize = 80;
+  for (let c = 0; c < right.length - 1; c += chunkSize) {
+    const end = Math.min(c + chunkSize + 1, right.length);
+    const rSlice = right.slice(c, end);
+    const lSlice = left.slice(c, end).slice().reverse();
+    const poly = [...rSlice, ...lSlice];
+    if (poly.length < 4) continue;
+
+    const colorIdx = Math.floor(rand() * PALETTE.stem.length);
+    addElement(poly, PALETTE.stem[colorIdx], {
+      layerVariance: 0.04, alphaScale: 1.0, priority: -1, spawnTime: spawnTime, skipDeform: false
+    });
+  }
+}
+
+// ============================================================
+// Watercolor rendering — draw textured layer
+// ============================================================
+function drawTexturedLayer(el, layerIdx) {
+  const progress = layerIdx / TARGET_LAYERS;
+  const varianceScale = Math.pow(progress, 0.7);
+  const baseVariance = el.layerVariance || 0.08;
+  const [r, g, b] = el.color;
+
+  // Frame 0: crisp outline
+  if (layerIdx === 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.2 * (el.alphaScale || 1.0);
+    ctx.strokeStyle = `rgb(${r},${g},${b})`;
+    ctx.lineWidth = 0.8;
+    ctx.lineJoin = 'round';
+    strokePoly(ctx, el.base);
+    ctx.restore();
+    ctx.globalAlpha = 1.0;
+    return;
+  }
+
+  const sourcePoly = varianceScale < 0.3
+    ? el.base
+    : el._preDeformed[layerIdx % 2];
+  const layerPoly = deformOnce(sourcePoly, baseVariance * 0.7 * varianceScale);
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const [px, py] of layerPoly) {
+    if (px < minX) minX = px; if (px > maxX) maxX = px;
+    if (py < minY) minY = py; if (py > maxY) maxY = py;
+  }
+  const bx = Math.max(0, Math.floor(minX) - 2);
+  const by = Math.max(0, Math.floor(minY) - 2);
+  const bw = Math.min(W, Math.ceil(maxX) + 2) - bx;
+  const bh = Math.min(H, Math.ceil(maxY) + 2) - by;
+  if (bw <= 0 || bh <= 0) return;
+
+  offCtx.clearRect(bx, by, bw, bh);
+  offCtx.globalCompositeOperation = 'source-over';
+  offCtx.globalAlpha = 1.0;
+  offCtx.fillStyle = `rgb(${r},${g},${b})`;
+  offCtx.beginPath();
+  offCtx.moveTo(layerPoly[0][0], layerPoly[0][1]);
+  for (let i = 1; i < layerPoly.length; i++) offCtx.lineTo(layerPoly[i][0], layerPoly[i][1]);
+  offCtx.closePath();
+  offCtx.fill();
+
+  offCtx.globalCompositeOperation = 'destination-out';
+  offCtx.globalAlpha = 0.08;
+  const circles = maskData[layerIdx % NUM_MASKS];
+  for (let j = 0; j < circles.length; j++) {
+    const ccx = circles[j][0], ccy = circles[j][1], cr = circles[j][2];
+    if (ccx + cr < minX || ccx - cr > maxX || ccy + cr < minY || ccy - cr > maxY) continue;
+    offCtx.beginPath();
+    offCtx.arc(ccx, ccy, cr, 0, Math.PI * 2);
+    offCtx.fill();
+  }
+
+  ctx.save();
+  ctx.globalAlpha = LAYER_ALPHA * (el.alphaScale || 1.0);
+  ctx.drawImage(offCanvas, bx, by, bw, bh, bx, by, bw, bh);
+  ctx.restore();
+  ctx.globalAlpha = 1.0;
+}
+
+// ============================================================
+// Post-processing
+// ============================================================
+function doPostProcessing() {
+  for (const el of elements) {
+    if (el.priority < 1) continue;
+    const [r, g, b] = el.color;
+    const dr = Math.max(0, Math.round(r * 0.55));
+    const dg = Math.max(0, Math.round(g * 0.50));
+    const db = Math.max(0, Math.round(b * 0.55));
+    for (let pass = 0; pass < 2; pass++) {
+      const haloPoly = deformN(el.base, 5, 0.04 + pass * 0.008);
+      ctx.globalAlpha = (0.06 - pass * 0.015) * 0.3;
+      ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
+      ctx.lineWidth = 0.8;
+      ctx.lineJoin = 'round';
+      strokePoly(ctx, haloPoly);
+    }
+    ctx.globalAlpha = 1.0;
+  }
+
+  // Mixbox pigment blending
+  if (typeof mixbox !== 'undefined') {
+    const imgData = ctx.getImageData(0, 0, W, H);
+    const d = imgData.data;
+    const paperR = 244, paperG = 237, paperB = 227;
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], g = d[i + 1], b = d[i + 2];
+      const dr2 = paperR - r, dg2 = paperG - g, db2 = paperB - b;
+      const dev = Math.sqrt(dr2 * dr2 + dg2 * dg2 + db2 * db2);
+      if (dev > 25) {
+        const mixed = mixbox.lerp(
+          [r, g, b, 255],
+          [Math.max(0, r - 12), Math.max(0, g - 8), Math.max(0, b - 12), 255],
+          0.12
+        );
+        d[i] = mixed[0]; d[i + 1] = mixed[1]; d[i + 2] = mixed[2];
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
+}
+
+// ============================================================
+// Draw spiral guide line (faint golden ratio overlay)
+// ============================================================
+function drawSpiralGuide(progress) {
+  const endIdx = Math.floor(progress * (CL - 1));
+  if (endIdx < 2) return;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(curvePoints[0].x, curvePoints[0].y);
+  for (let i = 1; i <= endIdx; i++) {
+    ctx.lineTo(curvePoints[i].x, curvePoints[i].y);
+  }
+  ctx.strokeStyle = 'rgba(180, 150, 100, 0.08)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ============================================================
+// Main progressive render loop
+// ============================================================
+window._renderComplete = false;
+window._renderProgress = 0;
+let started = false;
+let frameCount = 0;
+
+function tick() {
+  if (!started) {
+    requestAnimationFrame(tick);
+    return;
+  }
+
+  const time = getTime();
+  const progress = getProgress();
+
+  // Spawn tajweed events that have passed
+  while (tajweedIdx < TAJWEED.length && TAJWEED[tajweedIdx].t <= time) {
+    spawnFlowerAtSpiral(TAJWEED[tajweedIdx], TAJWEED[tajweedIdx].t);
+    tajweedIdx++;
+  }
+
+  // Grow vine along spiral up to current progress
+  const targetCI = Math.min(Math.floor(progress * (CL - 1)), CL - 1);
+  if (targetCI > lastVineCI + 10) {
+    buildVineSegment(lastVineCI, targetCI, time);
+    lastVineCI = targetCI;
+  }
+
+  // Restore paper background
+  ctx.putImageData(paperImageData, 0, 0);
+
+  // Draw faint spiral guide
+  drawSpiralGuide(progress);
+
+  // Sort elements: vine first (priority -1,0), then flowers by priority
+  elements.sort((a, b) => a.priority - b.priority || a.index - b.index);
+
+  // Progressive watercolor: each element gets more layers over time
+  for (const el of elements) {
+    if (el._done) continue;
+
+    // How long since this element spawned? Determines how many layers it should have
+    const age = time - el.spawnTime;
+    const ageFraction = clamp(age / 2.0, 0, 1); // 2 seconds to fully watercolor
+    const targetForEl = Math.floor(ageFraction * TARGET_LAYERS);
+
+    // Render up to 3 new layers per frame for performance
+    let layersThisFrame = 0;
+    while (el._layersRendered < targetForEl && layersThisFrame < 3) {
+      drawTexturedLayer(el, el._layersRendered);
+      el._layersRendered++;
+      layersThisFrame++;
+    }
+
+    if (el._layersRendered >= TARGET_LAYERS) el._done = true;
+
+    // Also draw what we've already rendered (the texture is cumulative on paper)
+    // Actually, we restored paper — need to re-render all layers
+  }
+
+  // Since we restore paper each frame, we need to re-render all accumulated layers
+  // This is expensive but correct for overlapping watercolor.
+  // Optimization: batch render — only re-render layers that exist
+
+  // Actually, let's use a smarter approach:
+  // Keep a separate canvas with all accumulated watercolor, composite onto paper each frame
+
+  frameCount++;
+  window._renderProgress = progress;
+
+  if (progress >= 1.0 && elements.every(el => el._done)) {
+    doPostProcessing();
+    window._renderComplete = true;
+    console.log('Watercolor spiral complete — ' + frameCount + ' frames, ' + elements.length + ' elements');
+  }
+
+  requestAnimationFrame(tick);
+}
+
+// ============================================================
+// REVISED APPROACH: Accumulative watercolor canvas
+// We maintain a separate canvas that accumulates all watercolor
+// marks, then composite it over the paper each frame.
+// This avoids re-rendering all layers every frame.
+// ============================================================
+
+const wcCanvas = document.createElement('canvas');
+wcCanvas.width = W;
+wcCanvas.height = H;
+const wcCtx = wcCanvas.getContext('2d', { willReadFrequently: true });
+
+// Override drawTexturedLayer to draw on wcCanvas instead
+function drawTexturedLayerAccum(el, layerIdx) {
+  const progress = layerIdx / TARGET_LAYERS;
+  const varianceScale = Math.pow(progress, 0.7);
+  const baseVariance = el.layerVariance || 0.08;
+  const [r, g, b] = el.color;
+
+  if (layerIdx === 0) {
+    wcCtx.save();
+    wcCtx.globalAlpha = 0.2 * (el.alphaScale || 1.0);
+    wcCtx.strokeStyle = `rgb(${r},${g},${b})`;
+    wcCtx.lineWidth = 0.8;
+    wcCtx.lineJoin = 'round';
+    wcCtx.beginPath();
+    wcCtx.moveTo(el.base[0][0], el.base[0][1]);
+    for (let i = 1; i < el.base.length; i++) wcCtx.lineTo(el.base[i][0], el.base[i][1]);
+    wcCtx.closePath();
+    wcCtx.stroke();
+    wcCtx.restore();
+    return;
+  }
+
+  const sourcePoly = varianceScale < 0.3
+    ? el.base
+    : el._preDeformed[layerIdx % 2];
+  const layerPoly = deformOnce(sourcePoly, baseVariance * 0.7 * varianceScale);
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const [px, py] of layerPoly) {
+    if (px < minX) minX = px; if (px > maxX) maxX = px;
+    if (py < minY) minY = py; if (py > maxY) maxY = py;
+  }
+  const bx = Math.max(0, Math.floor(minX) - 2);
+  const by = Math.max(0, Math.floor(minY) - 2);
+  const bw = Math.min(W, Math.ceil(maxX) + 2) - bx;
+  const bh = Math.min(H, Math.ceil(maxY) + 2) - by;
+  if (bw <= 0 || bh <= 0) return;
+
+  offCtx.clearRect(bx, by, bw, bh);
+  offCtx.globalCompositeOperation = 'source-over';
+  offCtx.globalAlpha = 1.0;
+  offCtx.fillStyle = `rgb(${r},${g},${b})`;
+  offCtx.beginPath();
+  offCtx.moveTo(layerPoly[0][0], layerPoly[0][1]);
+  for (let i = 1; i < layerPoly.length; i++) offCtx.lineTo(layerPoly[i][0], layerPoly[i][1]);
+  offCtx.closePath();
+  offCtx.fill();
+
+  offCtx.globalCompositeOperation = 'destination-out';
+  offCtx.globalAlpha = 0.08;
+  const circles = maskData[layerIdx % NUM_MASKS];
+  for (let j = 0; j < circles.length; j++) {
+    const ccx = circles[j][0], ccy = circles[j][1], cr = circles[j][2];
+    if (ccx + cr < minX || ccx - cr > maxX || ccy + cr < minY || ccy - cr > maxY) continue;
+    offCtx.beginPath();
+    offCtx.arc(ccx, ccy, cr, 0, Math.PI * 2);
+    offCtx.fill();
+  }
+
+  // Accumulate onto watercolor canvas
+  wcCtx.save();
+  wcCtx.globalAlpha = LAYER_ALPHA * (el.alphaScale || 1.0);
+  wcCtx.drawImage(offCanvas, bx, by, bw, bh, bx, by, bw, bh);
+  wcCtx.restore();
+}
+
+// ============================================================
+// Actual render loop (accumulative approach)
+// ============================================================
+function tickAccum() {
+  if (!started) {
+    requestAnimationFrame(tickAccum);
+    return;
+  }
+
+  const time = getTime();
+  const progress = getProgress();
+
+  // Spawn tajweed events that have passed
+  while (tajweedIdx < TAJWEED.length && TAJWEED[tajweedIdx].t <= time) {
+    spawnFlowerAtSpiral(TAJWEED[tajweedIdx], TAJWEED[tajweedIdx].t);
+    tajweedIdx++;
+  }
+
+  // Grow vine along spiral up to current progress
+  const targetCI = Math.min(Math.floor(progress * (CL - 1)), CL - 1);
+  if (targetCI > lastVineCI + 5) {
+    buildVineSegment(lastVineCI, targetCI, time);
+    lastVineCI = targetCI;
+  }
+
+  // Progressive watercolor layers on accumulation canvas
+  // Sort so vine (-1, 0 priority) renders first, flowers on top
+  elements.sort((a, b) => a.priority - b.priority || a.index - b.index);
+
+  for (const el of elements) {
+    if (el._done) continue;
+
+    const age = time - el.spawnTime;
+    const ageFraction = clamp(age / 1.5, 0, 1); // 1.5 seconds to fully watercolor
+    const targetForEl = Math.floor(ageFraction * TARGET_LAYERS);
+
+    let layersThisFrame = 0;
+    while (el._layersRendered < targetForEl && layersThisFrame < 8) {
+      drawTexturedLayerAccum(el, el._layersRendered);
+      el._layersRendered++;
+      layersThisFrame++;
+    }
+
+    if (el._layersRendered >= TARGET_LAYERS) el._done = true;
+  }
+
+  // Composite: paper + watercolor accumulation
+  ctx.putImageData(paperImageData, 0, 0);
+
+  // Draw faint spiral guide
+  drawSpiralGuide(progress);
+
+  // Draw accumulated watercolor on top
+  ctx.drawImage(wcCanvas, 0, 0);
+
+  frameCount++;
+  window._renderProgress = progress;
+
+  if (progress >= 1.0 && elements.every(el => el._done || el._layersRendered >= TARGET_LAYERS)) {
+    if (!window._renderComplete) {
+      doPostProcessingAccum();
+      window._renderComplete = true;
+      console.log('Watercolor spiral complete — ' + frameCount + ' frames, ' + elements.length + ' elements');
+    }
+  }
+
+  requestAnimationFrame(tickAccum);
+}
+
+function doPostProcessingAccum() {
+  // Post-process on the main canvas (already has paper + watercolor)
+  for (const el of elements) {
+    if (el.priority < 1) continue;
+    const [r, g, b] = el.color;
+    const dr = Math.max(0, Math.round(r * 0.55));
+    const dg = Math.max(0, Math.round(g * 0.50));
+    const db = Math.max(0, Math.round(b * 0.55));
+    for (let pass = 0; pass < 2; pass++) {
+      const haloPoly = deformN(el.base, 5, 0.04 + pass * 0.008);
+      ctx.globalAlpha = (0.06 - pass * 0.015) * 0.3;
+      ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
+      ctx.lineWidth = 0.8;
+      ctx.lineJoin = 'round';
+      strokePoly(ctx, haloPoly);
+    }
+    ctx.globalAlpha = 1.0;
+  }
+
+  if (typeof mixbox !== 'undefined') {
+    const imgData = ctx.getImageData(0, 0, W, H);
+    const d = imgData.data;
+    const paperR = 244, paperG = 237, paperB = 227;
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], g = d[i + 1], b = d[i + 2];
+      const dr2 = paperR - r, dg2 = paperG - g, db2 = paperB - b;
+      const dev = Math.sqrt(dr2 * dr2 + dg2 * dg2 + db2 * db2);
+      if (dev > 25) {
+        const mixed = mixbox.lerp(
+          [r, g, b, 255],
+          [Math.max(0, r - 12), Math.max(0, g - 8), Math.max(0, b - 12), 255],
+          0.12
+        );
+        d[i] = mixed[0]; d[i + 1] = mixed[1]; d[i + 2] = mixed[2];
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
+}
+
+// ============================================================
+// Play button + start
+// ============================================================
+const playBtn = document.getElementById('play-btn');
+
+function startAudio() {
+  if (isPlaying) return;
+  playBtn.style.display = 'none';
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  timeData = new Uint8Array(analyser.fftSize);
+
+  audio = new Audio('bismillah.mp3');
+  audio.crossOrigin = 'anonymous';
+  const source = audioCtx.createMediaElementSource(audio);
+  source.connect(analyser);
+  analyser.connect(audioCtx.destination);
+  audio.play().catch(() => {});
+  isPlaying = true;
+  started = true;
+}
+
+playBtn.addEventListener('click', startAudio);
+
+// Headless / synth mode: start immediately if _synthTime is used
+if (typeof window._synthTime === 'number' || window._synthTime === undefined) {
+  // For headless capture: start rendering when _synthTime is first set
+  const origDesc = Object.getOwnPropertyDescriptor(window, '_synthTime');
+  let _synthVal = window._synthTime;
+  Object.defineProperty(window, '_synthTime', {
+    get() { return _synthVal; },
+    set(v) {
+      _synthVal = v;
+      if (!started && typeof v === 'number') {
+        playBtn.style.display = 'none';
+        started = true;
+      }
+    },
+    configurable: true
+  });
+}
+
+requestAnimationFrame(tickAccum);
+</script>
+</body>
+</html>

@@ -1,0 +1,963 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Fatiha — fatiha.brush Ottoman Garden</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0d0d0d; display:flex; justify-content:center; align-items:center;
+         height:100vh; overflow:hidden; font-family:sans-serif; }
+  canvas { display:block; }
+  #playBtn { position:fixed; bottom:40px; left:50%; transform:translateX(-50%);
+    background:rgba(139,26,43,0.85); color:#fff; border:none; border-radius:28px;
+    padding:14px 36px; font-size:16px; cursor:pointer; z-index:10;
+    letter-spacing:1px; transition:opacity 0.4s; }
+  #playBtn:hover { background:rgba(180,40,60,0.95); }
+  #playBtn.hidden { opacity:0; pointer-events:none; }
+  #stats { position:fixed; top:10px; left:10px; color:#555; font-size:11px;
+    font-family:monospace; z-index:10; pointer-events:none; }
+</style>
+</head>
+<body>
+<button id="playBtn">&#9654; Bismillah</button>
+<div id="stats"></div>
+
+<!-- Mixbox pigment blending — local copy for proper GLSL integration -->
+<script src="mixbox.js"></script>
+<script src="fatiha-brush.js"></script>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  FATIHA — Ottoman Garden Demo using fatiha.brush v2
+// ══════════════════════════════════════════════════════════════
+
+const CW = 430, CH = 932;
+const PHI = 1.618033988749;
+const TOTAL_DUR = 6.0;
+const BG = '#0d0d0d';
+
+// ── COLOR PALETTE — Deep Ottoman Illumination ───────────────
+// Muted, rich tones inspired by hatai reference — NOT neon candy
+const CRIMSON      = '#8B1A2B';   // deep Ottoman crimson
+const DEEP_CRIMSON = '#5A0A18';   // near-black maroon
+const ROSE_PINK    = '#B83050';   // muted rose
+const HOT_PINK     = '#D04868';   // warm pink (muted)
+const AMBER        = '#C47820';   // warm amber
+const GOLD         = '#D4A030';   // Ottoman gold
+const DARK_GOLD    = '#8A6818';   // dark gold/brown
+const PALE_GOLD    = '#E8C050';   // light gold
+const LEAF_GREEN   = '#2A6A1A';   // deep leaf green
+const DARK_GREEN   = '#0E3A0E';   // very dark green
+const FOREST_GREEN = '#1A4A12';   // forest
+const STEM_GREEN   = '#3A5828';   // olive-green with warm undertone
+const LIGHT_GREEN  = '#4A7A2A';   // muted light green
+const VINE_DARK    = '#2A3A18';   // dark olive-brown
+
+const PETAL_HUES = [
+  '#B83050','#9A2840','#7A1A2B','#C04060','#8B1A2B',
+  '#A02840','#C05050','#9A2030','#7A1820','#B84060',
+  '#9A2840','#8B1830','#C06040','#A04028','#8A2020'
+];
+const GREENS = [LEAF_GREEN, LIGHT_GREEN, FOREST_GREEN, DARK_GREEN];
+
+// ── TAJWEED EVENTS ───────────────────────────────────────────
+const TAJWEED = [
+  {t:0.05,type:'bud',size:0.35,side:-1},
+  {t:0.10,type:'leaf',size:0.45,side:1},
+  {t:0.15,type:'leaf',size:0.5,side:-1},
+  {t:0.22,type:'leaf',size:0.4,side:1},
+  {t:0.28,type:'thorn',size:0.35,side:1},
+  {t:0.33,type:'leaf',size:0.45,side:-1},
+  {t:0.38,type:'leaf',size:0.5,side:1},
+  {t:0.44,type:'bud',size:0.3,side:-1},
+  {t:0.50,type:'ghunnah',size:0.5,side:-1},
+  {t:0.55,type:'leaf',size:0.45,side:1},
+  {t:0.58,type:'bud',size:0.3,side:1},
+  {t:0.63,type:'leaf',size:0.5,side:-1},
+  {t:0.68,type:'leaf',size:0.4,side:1},
+  {t:0.73,type:'leaf',size:0.45,side:-1},
+  {t:0.78,type:'bud',size:0.3,side:1},
+  {t:0.82,type:'leaf',size:0.5,side:-1},
+  {t:0.85,type:'golden_rose',size:1.0,side:1},
+  {t:0.90,type:'leaf',size:0.55,side:-1},
+  {t:0.95,type:'vine_tendril',size:0.5,side:-1},
+  {t:1.00,type:'leaf',size:0.5,side:1},
+  {t:1.05,type:'leaf',size:0.45,side:-1},
+  {t:1.08,type:'leaf',size:0.55,side:1},
+  {t:1.14,type:'bud',size:0.3,side:-1},
+  {t:1.18,type:'leaf',size:0.5,side:-1},
+  {t:1.24,type:'leaf',size:0.4,side:1},
+  {t:1.30,type:'bud',size:0.25,side:-1},
+  {t:1.35,type:'leaf',size:0.45,side:1},
+  {t:1.38,type:'leaf',size:0.4,side:-1},
+  {t:1.44,type:'leaf',size:0.5,side:1},
+  {t:1.52,type:'leaf',size:0.45,side:-1},
+  {t:1.56,type:'leaf',size:0.4,side:1},
+  {t:1.60,type:'rose',size:0.8,side:1},
+  {t:1.65,type:'leaf',size:0.5,side:-1},
+  {t:1.72,type:'leaf',size:0.55,side:-1},
+  {t:1.78,type:'leaf',size:0.45,side:1},
+  {t:1.85,type:'bud',size:0.4,side:1},
+  {t:1.90,type:'leaf',size:0.5,side:-1},
+  {t:1.98,type:'thorn',size:0.3,side:-1},
+  {t:2.02,type:'leaf',size:0.45,side:1},
+  {t:2.08,type:'leaf',size:0.5,side:-1},
+  {t:2.14,type:'leaf',size:0.4,side:1},
+  {t:2.18,type:'ghunnah',size:0.55,side:-1},
+  {t:2.24,type:'leaf',size:0.45,side:1},
+  {t:2.28,type:'vine_tendril',size:0.75,side:1},
+  {t:2.35,type:'leaf',size:0.5,side:-1},
+  {t:2.42,type:'leaf',size:0.55,side:-1},
+  {t:2.48,type:'leaf',size:0.45,side:1},
+  {t:2.55,type:'leaf',size:0.5,side:1},
+  {t:2.62,type:'leaf',size:0.4,side:-1},
+  {t:2.68,type:'ghunnah',size:0.45,side:-1},
+  {t:2.73,type:'leaf',size:0.5,side:1},
+  {t:2.78,type:'bud',size:0.3,side:1},
+  {t:2.83,type:'leaf',size:0.45,side:-1},
+  {t:2.88,type:'leaf',size:0.4,side:1},
+  {t:2.95,type:'leaf',size:0.5,side:-1},
+  {t:3.05,type:'leaf',size:0.45,side:1},
+  {t:3.10,type:'leaf',size:0.4,side:-1},
+  {t:3.15,type:'rose',size:0.7,side:-1},
+  {t:3.22,type:'leaf',size:0.5,side:1},
+  {t:3.28,type:'leaf',size:0.45,side:-1},
+  {t:3.35,type:'leaf',size:0.4,side:1},
+  {t:3.40,type:'bud',size:0.35,side:-1},
+  {t:3.48,type:'leaf',size:0.5,side:1},
+  {t:3.55,type:'bud',size:0.25,side:1},
+  {t:3.62,type:'leaf',size:0.45,side:-1},
+  {t:3.65,type:'leaf',size:0.4,side:1},
+  {t:3.72,type:'leaf',size:0.5,side:-1},
+  {t:3.78,type:'vine_tendril',size:1.0,side:1},
+  {t:3.85,type:'leaf',size:0.55,side:-1},
+  {t:3.95,type:'leaf',size:0.5,side:1},
+  {t:4.05,type:'leaf',size:0.45,side:-1},
+  {t:4.15,type:'leaf',size:0.5,side:1},
+  {t:4.25,type:'leaf',size:0.45,side:-1},
+  {t:4.35,type:'leaf',size:0.4,side:1},
+  {t:4.45,type:'leaf',size:0.5,side:-1},
+  {t:4.55,type:'bud',size:0.3,side:1},
+  {t:4.62,type:'leaf',size:0.45,side:-1},
+  {t:4.75,type:'ghunnah',size:0.4,side:-1},
+  {t:4.82,type:'leaf',size:0.45,side:1},
+  {t:4.88,type:'bud',size:0.3,side:1},
+  {t:4.95,type:'leaf',size:0.4,side:-1},
+  {t:5.00,type:'leaf',size:0.45,side:1},
+  {t:5.08,type:'leaf',size:0.4,side:-1},
+  {t:5.15,type:'bloom',size:0.7,side:1},
+  {t:5.22,type:'leaf',size:0.45,side:-1},
+  {t:5.35,type:'leaf',size:0.4,side:1},
+  {t:5.42,type:'leaf',size:0.35,side:-1},
+  {t:5.50,type:'leaf',size:0.3,side:1}
+];
+
+// ══════════════════════════════════════════════════════════════
+//  GOLDEN SPIRAL GEOMETRY
+// ══════════════════════════════════════════════════════════════
+
+function buildSpiralPoints() {
+  const margin = 24;
+  const avW = CW - margin * 2;
+  const avH = CH - margin * 2;
+  let gw, gh;
+  if (avW * PHI <= avH) { gw = avW; gh = avW * PHI; }
+  else { gh = avH; gw = avH / PHI; }
+  const ox = (CW - gw) / 2;
+  const oy = (CH - gh) / 2;
+
+  const arcs = [];
+  let rx = ox, ry = oy, rw = gw, rh = gh;
+  for (let i = 0; i < 9; i++) {
+    const d = i % 4;
+    const sq = Math.min(rw, rh);
+    let cx, cy, sa, ea;
+    if (d === 0)      { cx = rx + sq; cy = ry;       sa = Math.PI/2;   ea = Math.PI; }
+    else if (d === 1) { cx = rx + sq; cy = ry + sq;   sa = Math.PI;     ea = 3*Math.PI/2; }
+    else if (d === 2) { cx = rx;      cy = ry + sq;   sa = 3*Math.PI/2; ea = 2*Math.PI; }
+    else              { cx = rx;      cy = ry;         sa = 0;           ea = Math.PI/2; }
+    arcs.push({ cx, cy, r: sq, sa, ea });
+    if (d === 0)      { ry += sq; rh -= sq; }
+    else if (d === 1) { rw -= sq; }
+    else if (d === 2) { rh -= sq; }
+    else              { rx += sq; ry += sq; rw -= sq; rh -= sq; }
+  }
+
+  const totalR = arcs.reduce((s, a) => s + a.r, 0);
+  const TARGET = 900;
+  const pts = [];
+  for (const arc of arcs) {
+    const n = Math.max(6, Math.round(TARGET * arc.r / totalR));
+    for (let j = 0; j <= n; j++) {
+      const t = j / n;
+      const angle = arc.sa + (arc.ea - arc.sa) * t;
+      pts.push({
+        x: arc.cx + arc.r * Math.cos(angle),
+        y: arc.cy + arc.r * Math.sin(angle)
+      });
+    }
+  }
+  return pts;
+}
+
+function getAngleAt(pts, idx) {
+  const i = Math.max(1, Math.min(idx, pts.length - 2));
+  const dx = pts[i + 1].x - pts[i - 1].x;
+  const dy = pts[i + 1].y - pts[i - 1].y;
+  return Math.atan2(dy, dx);
+}
+
+function getNormal(pts, idx) {
+  const i = Math.max(1, Math.min(idx, pts.length - 2));
+  const dx = pts[i + 1].x - pts[i - 1].x;
+  const dy = pts[i + 1].y - pts[i - 1].y;
+  const l = Math.sqrt(dx * dx + dy * dy) || 1;
+  return { x: -dy / l, y: dx / l };
+}
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// ══════════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════════
+
+let fb;                // FatihaBrush instance
+let spiralPts;
+let audio, audioCtx, analyser, timeData;
+let isPlaying = false;
+let tajweedIdx = 0;
+let drawnVineIdx = 0;
+let fallingPetals = [];
+let frameCount = 0;
+let lastTime = 0;
+
+function getTime() {
+  if (typeof window._synthTime === 'number') return window._synthTime;
+  if (audio) return audio.currentTime;
+  return 0;
+}
+function isFinished() {
+  if (typeof window._synthTime === 'number') return window._synthTime >= TOTAL_DUR;
+  if (audio) return audio.ended || audio.currentTime >= TOTAL_DUR;
+  return false;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  GARDEN ELEMENT DRAWING — precise polygon geometry + watercolor fill + tahrir outline
+//  Pipeline: 1) PRECISE polygon shape  2) watercolor() fill  3) tahrir outline stroke
+// ══════════════════════════════════════════════════════════════
+
+// Build a precise saz leaf polygon — long pointed almond with characteristic curve
+function makeSazLeafPolygon(x, y, size, angle, side) {
+  const leafLen = size * 1.2;
+  const leafWidth = size * 0.28;
+  const leafCurve = side * 0.15;
+  const steps = 24;
+  const pts = [];
+
+  // Right side: base to tip
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const along = leafLen * t;
+    const width = Math.sin(t * Math.PI) * leafWidth * (1 - t * 0.3);
+    const curveOff = Math.sin(t * Math.PI) * leafCurve * leafLen;
+    const ax = angle + curveOff / leafLen;
+    pts.push({
+      x: x + Math.cos(ax) * along + Math.cos(ax + Math.PI / 2) * width,
+      y: y + Math.sin(ax) * along + Math.sin(ax + Math.PI / 2) * width
+    });
+  }
+  // Left side: tip back to base
+  for (let i = steps; i >= 0; i--) {
+    const t = i / steps;
+    const along = leafLen * t;
+    const width = Math.sin(t * Math.PI) * leafWidth * (1 - t * 0.3);
+    const curveOff = Math.sin(t * Math.PI) * leafCurve * leafLen;
+    const ax = angle + curveOff / leafLen;
+    pts.push({
+      x: x + Math.cos(ax) * along + Math.cos(ax - Math.PI / 2) * width,
+      y: y + Math.sin(ax) * along + Math.sin(ax - Math.PI / 2) * width
+    });
+  }
+  return pts;
+}
+
+// Build a precise ogee/almond petal polygon for roses and buds
+function makeOgeePetalPolygon(cx, cy, petalLen, petalWidth, angle) {
+  const steps = 14;
+  const pts = [];
+  // Right side
+  for (let j = 0; j <= steps; j++) {
+    const t = j / steps;
+    const r = petalLen * t;
+    const bulge = Math.sin(t * Math.PI) * petalWidth;
+    pts.push({
+      x: cx + Math.cos(angle) * r + Math.cos(angle + Math.PI / 2) * bulge,
+      y: cy + Math.sin(angle) * r + Math.sin(angle + Math.PI / 2) * bulge
+    });
+  }
+  // Left side back
+  for (let j = steps; j >= 0; j--) {
+    const t = j / steps;
+    const r = petalLen * t;
+    const bulge = Math.sin(t * Math.PI) * petalWidth;
+    pts.push({
+      x: cx + Math.cos(angle) * r + Math.cos(angle - Math.PI / 2) * bulge,
+      y: cy + Math.sin(angle) * r + Math.sin(angle - Math.PI / 2) * bulge
+    });
+  }
+  return pts;
+}
+
+// Build a precise teardrop polygon for buds
+function makeTeardropPolygon(cx, cy, radius, angle) {
+  const steps = 20;
+  const pts = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const a = t * Math.PI * 2;
+    // Teardrop: circle squashed at bottom, pointed at top
+    const r = radius * (1 + 0.3 * Math.cos(a));
+    const px = Math.sin(a) * r * 0.6;
+    const py = -Math.cos(a) * r;
+    // Rotate into desired angle
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    pts.push({
+      x: cx + px * cos - py * sin,
+      y: cy + px * sin + py * cos
+    });
+  }
+  return pts;
+}
+
+function drawLeaf(x, y, size, tangent, side) {
+  const s = 75 * size;
+  const leafAngle = tangent + side * 0.5;
+  const green = pick(GREENS);
+
+  // 1) PRECISE saz leaf polygon
+  const leafPoly = makeSazLeafPolygon(x, y, s, leafAngle, side);
+
+  // 2) WET WATERCOLOR FILL — progressive "paint drying" deformation
+  fb.wetWatercolor(leafPoly, {
+    color: green, layers: 55, opacity: 0.035,
+    peakBaseRounds: 7, peakLayerRounds: 5, variance: 0.4,
+    maxWetness: 60, layer: 'garden', concentratePigment: true
+  });
+
+  // Darker core wash along center
+  const leafLen = s * 1.2;
+  const leafCurve = side * 0.15;
+  const spinePoly = [];
+  const steps = 16;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const along = leafLen * t;
+    const curveOff = Math.sin(t * Math.PI) * leafCurve * leafLen;
+    const ax = leafAngle + curveOff / leafLen;
+    const w = s * 0.08 * Math.sin(t * Math.PI);
+    spinePoly.push({
+      x: x + Math.cos(ax) * along + Math.cos(ax + Math.PI/2) * w,
+      y: y + Math.sin(ax) * along + Math.sin(ax + Math.PI/2) * w
+    });
+  }
+  for (let i = steps; i >= 0; i--) {
+    const t = i / steps;
+    const along = leafLen * t;
+    const curveOff = Math.sin(t * Math.PI) * leafCurve * leafLen;
+    const ax = leafAngle + curveOff / leafLen;
+    const w = s * 0.08 * Math.sin(t * Math.PI);
+    spinePoly.push({
+      x: x + Math.cos(ax) * along - Math.cos(ax + Math.PI/2) * w,
+      y: y + Math.sin(ax) * along - Math.sin(ax + Math.PI/2) * w
+    });
+  }
+  fb.wetWatercolor(spinePoly, {
+    color: DARK_GREEN, layers: 20, opacity: 0.04,
+    peakBaseRounds: 5, peakLayerRounds: 3, variance: 0.3,
+    maxWetness: 40, layer: 'garden'
+  });
+
+  // 3) TAHRIR OUTLINE — clean sharp stroke on top
+  fb.drawStroke(leafPoly, {
+    color: VINE_DARK, weight: 1.8, alpha: 0.4,
+    spacing: 0.25, scatter: 0.02, grain: 0.4,
+    pressureStart: 0.5, pressureEnd: 0.5, pressurePeak: 0.95,
+    layer: 'garden'
+  });
+
+  // Central vein tahrir
+  const veinPts = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const along = leafLen * t;
+    const curveOff = Math.sin(t * Math.PI) * leafCurve * leafLen;
+    const ax = leafAngle + curveOff / leafLen;
+    veinPts.push({ x: x + Math.cos(ax) * along, y: y + Math.sin(ax) * along });
+  }
+  fb.drawStroke(veinPts, {
+    color: VINE_DARK, weight: 1.2, alpha: 0.45,
+    spacing: 0.3, scatter: 0.02, grain: 0.5,
+    pressureStart: 0.7, pressureEnd: 0.05, pressurePeak: 0.95,
+    layer: 'garden'
+  });
+}
+
+function drawBud(x, y, size, tangent) {
+  const s = 28 * size;
+  const color = pick(PETAL_HUES);
+
+  // 1) PRECISE teardrop polygon
+  const budPoly = makeTeardropPolygon(x, y, s * 0.5, tangent);
+
+  // 2) WET WATERCOLOR FILL — progressive deformation
+  fb.wetWatercolor(budPoly, {
+    color, layers: 40, opacity: 0.04,
+    peakBaseRounds: 6, peakLayerRounds: 4, variance: 0.4,
+    maxWetness: 50, layer: 'garden', concentratePigment: true
+  });
+
+  // Deeper center concentration
+  const innerPoly = makeTeardropPolygon(x, y, s * 0.2, tangent);
+  fb.wetWatercolor(innerPoly, {
+    color: DEEP_CRIMSON, layers: 18, opacity: 0.04,
+    peakBaseRounds: 4, peakLayerRounds: 2, variance: 0.25,
+    maxWetness: 30, layer: 'garden'
+  });
+
+  // Small ogee petal overlays — progressive watercolor
+  for (let i = 0; i < 5; i++) {
+    const a = tangent + (i / 5) * Math.PI * 2;
+    const petalPoly = makeOgeePetalPolygon(x, y, s * 0.35, s * 0.12, a);
+    fb.wetWatercolor(petalPoly, {
+      color, layers: 15, opacity: 0.04,
+      peakBaseRounds: 5, peakLayerRounds: 3, variance: 0.3,
+      maxWetness: 35, layer: 'garden'
+    });
+  }
+
+  // 3) TAHRIR OUTLINE — clean sharp strokes on top
+  fb.drawStroke(budPoly, {
+    color: DEEP_CRIMSON, weight: 1.5, alpha: 0.4,
+    spacing: 0.25, scatter: 0.02, grain: 0.4,
+    pressureStart: 0.5, pressureEnd: 0.5, pressurePeak: 0.95,
+    layer: 'garden'
+  });
+
+  // Sepal tahrir lines
+  const sepalLen = s * 1.2;
+  for (let dx = -1; dx <= 1; dx += 2) {
+    const sepalPoly = makeOgeePetalPolygon(
+      x + dx * 2, y + s * 0.3, sepalLen * 0.4, s * 0.06,
+      tangent + Math.PI / 2 + dx * 0.3
+    );
+    fb.wetWatercolor(sepalPoly, {
+      color: DARK_GREEN, layers: 12, opacity: 0.04,
+      peakBaseRounds: 4, peakLayerRounds: 2, variance: 0.25,
+      maxWetness: 25, layer: 'garden'
+    });
+    fb.drawStroke(sepalPoly, {
+      color: VINE_DARK, weight: 1.0, alpha: 0.35,
+      spacing: 0.3, scatter: 0.02, grain: 0.5,
+      layer: 'garden'
+    });
+  }
+}
+
+function drawRose(x, y, size, isGolden) {
+  const s = (isGolden ? 55 : 50) * size;
+  const rings = isGolden ? 6 : 4;
+  const petalCounts = [8, 7, 6, 5, 5, 4];
+
+  // 1) PRECISE POLYGON PETALS per ring — each petal is a clean ogee shape
+  // Collect all petal polygons first, then watercolor fill, then tahrir outline
+
+  const allPetals = []; // {poly, fillColor, strokeColor, ring}
+
+  for (let ring = 0; ring < rings; ring++) {
+    const lr = s * (1 - ring * 0.14);
+    const petalCount = petalCounts[ring] || 5;
+
+    let fillColor, strokeColor;
+    if (isGolden) {
+      fillColor = [DARK_GOLD, GOLD, GOLD, AMBER, PALE_GOLD, '#E8C850'][ring];
+      strokeColor = ['#5A4008', '#6A5010', '#7A6018', '#8A7020', '#A08028', '#B09038'][ring];
+    } else {
+      fillColor = ['#D07888', '#C06070', '#B04858', '#9A3040', '#8B2030'][ring];
+      strokeColor = DEEP_CRIMSON;
+    }
+
+    for (let i = 0; i < petalCount; i++) {
+      const a = (i / petalCount) * Math.PI * 2 + ring * 0.35;
+      const petalPoly = makeOgeePetalPolygon(x, y, lr * 0.45, lr * 0.22, a);
+      allPetals.push({ poly: petalPoly, fillColor, strokeColor, ring });
+    }
+  }
+
+  // 2) WET WATERCOLOR FILL — progressive deformation for rich watercolor
+  // Outer halo wash first
+  const haloPoly = FatihaBrush.makePolygon('circle', x, y, s * 0.9, { points: 16 });
+  fb.wetWatercolor(haloPoly, {
+    color: isGolden ? GOLD : ROSE_PINK,
+    layers: 35, opacity: 0.035,
+    peakBaseRounds: 7, peakLayerRounds: 5, variance: 0.5,
+    maxWetness: 70, layer: 'garden'
+  });
+
+  // Paint petals — progressive watercolor with more layers for inner rings
+  for (const petal of allPetals) {
+    fb.wetWatercolor(petal.poly, {
+      color: petal.fillColor,
+      layers: 25 + petal.ring * 5, opacity: 0.035 + petal.ring * 0.005,
+      peakBaseRounds: 6, peakLayerRounds: 4, variance: 0.35,
+      maxWetness: 55 + petal.ring * 5, layer: 'garden', concentratePigment: true
+    });
+  }
+
+  // Center highlight
+  const centerPoly = FatihaBrush.makePolygon('circle', x, y, s * 0.12, { points: 10 });
+  fb.wetWatercolor(centerPoly, {
+    color: isGolden ? '#E8D070' : '#D06080',
+    layers: 20, opacity: 0.04,
+    peakBaseRounds: 4, peakLayerRounds: 2, variance: 0.25,
+    maxWetness: 30, layer: 'garden'
+  });
+
+  // 3) TAHRIR OUTLINES — clean sharp strokes on top of every petal
+  for (const petal of allPetals) {
+    fb.drawStroke(petal.poly, {
+      color: petal.strokeColor, weight: 1.4, alpha: 0.35,
+      spacing: 0.25, scatter: 0.02, grain: 0.4,
+      pressureStart: 0.5, pressureEnd: 0.5, pressurePeak: 0.95,
+      layer: 'garden'
+    });
+  }
+
+  // Pollen spray
+  for (let i = 0; i < 14; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const r = Math.random() * s * 0.2;
+    fb.addStamp({
+      x: x + Math.cos(a) * r, y: y + Math.sin(a) * r,
+      color: isGolden ? PALE_GOLD : ROSE_PINK,
+      a: 0.22, rotation: a,
+      scaleX: 3 + Math.random() * 4, scaleY: 3 + Math.random() * 4,
+      texture: 'spray', layer: 'garden'
+    });
+  }
+}
+
+function drawBloom(x, y, size) {
+  const s = 40 * size;
+
+  // 1) PRECISE ogee petal polygons
+  const petalPolys = [];
+  for (let i = 0; i < 6; i++) {
+    const a = i * Math.PI / 3;
+    petalPolys.push(makeOgeePetalPolygon(x, y, s * 0.4, s * 0.16, a));
+  }
+
+  // 2) WET WATERCOLOR FILL — progressive deformation
+  // Outer atmospheric halo
+  const haloPoly = FatihaBrush.makePolygon('circle', x, y, s * 0.7, { points: 12 });
+  fb.wetWatercolor(haloPoly, {
+    color: ROSE_PINK, layers: 30, opacity: 0.035,
+    peakBaseRounds: 7, peakLayerRounds: 5, variance: 0.45,
+    maxWetness: 65, layer: 'garden'
+  });
+
+  // Paint each petal — progressive watercolor
+  for (const poly of petalPolys) {
+    fb.wetWatercolor(poly, {
+      color: pick(PETAL_HUES), layers: 30, opacity: 0.035,
+      peakBaseRounds: 6, peakLayerRounds: 4, variance: 0.35,
+      maxWetness: 55, layer: 'garden', concentratePigment: true
+    });
+  }
+
+  // Core center
+  const corePoly = FatihaBrush.makePolygon('circle', x, y, s * 0.1, { points: 8 });
+  fb.wetWatercolor(corePoly, {
+    color: '#D06080', layers: 15, opacity: 0.04,
+    peakBaseRounds: 4, peakLayerRounds: 2, variance: 0.25,
+    maxWetness: 25, layer: 'garden'
+  });
+
+  // 3) TAHRIR OUTLINES
+  for (const poly of petalPolys) {
+    fb.drawStroke(poly, {
+      color: DEEP_CRIMSON, weight: 1.3, alpha: 0.35,
+      spacing: 0.25, scatter: 0.02, grain: 0.4,
+      pressureStart: 0.5, pressureEnd: 0.5, pressurePeak: 0.95,
+      layer: 'garden'
+    });
+  }
+}
+
+function drawGhunnah(x, y, size) {
+  const s = 45 * size;
+
+  // Ghunnah is an ethereal resonance — progressive watercolor on glow layer
+  // 1) Outer halo — large soft watercolor circle
+  const outerPoly = FatihaBrush.makePolygon('circle', x, y, s * 0.5, { points: 14 });
+  fb.wetWatercolor(outerPoly, {
+    color: HOT_PINK, layers: 15, opacity: 0.02,
+    peakBaseRounds: 6, peakLayerRounds: 4, variance: 0.55,
+    maxWetness: 70, layer: 'glow'
+  });
+
+  // Inner warm glow
+  const innerPoly = FatihaBrush.makePolygon('circle', x, y, s * 0.25, { points: 10 });
+  fb.wetWatercolor(innerPoly, {
+    color: AMBER, layers: 10, opacity: 0.025,
+    peakBaseRounds: 4, peakLayerRounds: 3, variance: 0.45,
+    maxWetness: 50, layer: 'glow'
+  });
+
+  // Spray particles radiating outward — softer
+  for (let i = 0; i < 10; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const r = Math.random() * s * 0.5;
+    fb.addStamp({
+      x: x + Math.cos(a) * r, y: y + Math.sin(a) * r,
+      color: pick(PETAL_HUES), a: 0.08,
+      rotation: a, scaleX: 3 + Math.random() * 5, scaleY: 3 + Math.random() * 5,
+      texture: 'spray', layer: 'glow'
+    });
+  }
+}
+
+function drawThorn(px, py, size, tangent, side) {
+  const s = 12 * size;
+  const thornAngle = tangent + side * Math.PI / 2;
+  const tx = px + Math.cos(thornAngle) * s;
+  const ty = py + Math.sin(thornAngle) * s;
+
+  // 1) Precise triangle polygon for thorn
+  const perpAngle = thornAngle + Math.PI / 2;
+  const baseW = s * 0.2;
+  const thornPoly = [
+    { x: px + Math.cos(perpAngle) * baseW, y: py + Math.sin(perpAngle) * baseW },
+    { x: px - Math.cos(perpAngle) * baseW, y: py - Math.sin(perpAngle) * baseW },
+    { x: tx, y: ty }
+  ];
+
+  // 2) Wet watercolor fill — quick dry for small shapes
+  fb.wetWatercolor(thornPoly, {
+    color: DARK_GREEN, layers: 12, opacity: 0.04,
+    peakBaseRounds: 5, peakLayerRounds: 3, variance: 0.25,
+    maxWetness: 20, layer: 'garden'
+  });
+
+  // 3) Tahrir outline
+  fb.drawStroke(thornPoly.concat([thornPoly[0]]), {
+    color: VINE_DARK, weight: 1.0, alpha: 0.4,
+    spacing: 0.25, scatter: 0.02, grain: 0.4,
+    layer: 'garden'
+  });
+}
+
+function drawVineTendril(x, y, size, tangent) {
+  const s = 50 * size;
+  const steps = 24;
+
+  for (let branch = 0; branch < 3; branch++) {
+    const angleOff = [0, 0.5, -0.7][branch];
+    const len = s * [1.0, 0.6, 0.4][branch];
+    const color = [STEM_GREEN, LIGHT_GREEN, DARK_GREEN][branch];
+    const weight = [3.0, 2.0, 1.2][branch];
+
+    // Build curving path points
+    const branchPts = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const curl = Math.sin(t * Math.PI * 2.5) * len * 0.08;
+      const mainAngle = tangent + angleOff + t * 0.4;
+      branchPts.push({
+        x: x + Math.cos(mainAngle) * len * t + Math.cos(mainAngle + Math.PI / 2) * curl,
+        y: y + Math.sin(mainAngle) * len * t + Math.sin(mainAngle + Math.PI / 2) * curl
+      });
+    }
+
+    // Base stroke for the vine tendril — warm green
+    fb.drawStroke(branchPts, {
+      color: STEM_GREEN, weight: weight * 1.3, alpha: 0.3,
+      spacing: 0.2, scatter: 0.05, grain: 0.5,
+      pressureStart: 0.7, pressureEnd: 0.05, pressurePeak: 1.0,
+      pressureCenter: 0.2, layer: 'garden'
+    });
+
+    // richWash blobs along the tendril for painted feel
+    const blobInterval = 4;
+    for (let i = 0; i < branchPts.length; i += blobInterval) {
+      const pt = branchPts[i];
+      const t = i / branchPts.length;
+      const blobR = (weight * 2.0) * (1 - t * 0.6);
+      fb.richWash(pt.x, pt.y, blobR, {
+        color, layers: 10, opacity: 0.06,
+        variance: 0.3, edgeStipple: 0,
+        shape: 'circle', layer: 'garden'
+      });
+    }
+  }
+
+  // Tiny leaf at tendril tip — precise petal polygon + watercolor
+  const tipX = x + Math.cos(tangent) * s * 0.75;
+  const tipY = y + Math.sin(tangent) * s * 0.75;
+  const tipLeafPoly = FatihaBrush.makePolygon('petal', tipX, tipY, 6 * size, {
+    rotation: tangent, aspect: 0.5
+  });
+  fb.wetWatercolor(tipLeafPoly, {
+    color: LEAF_GREEN, layers: 15, opacity: 0.04,
+    peakBaseRounds: 5, peakLayerRounds: 3, variance: 0.35,
+    maxWetness: 30, layer: 'garden'
+  });
+  fb.drawStroke(tipLeafPoly, {
+    color: DARK_GREEN, weight: 1.0, alpha: 0.35,
+    spacing: 0.25, scatter: 0.02, grain: 0.4,
+    layer: 'garden'
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  VINE DRAWING — overlapping washes for continuous organic line
+// ══════════════════════════════════════════════════════════════
+
+function drawVineSegment(startIdx, endIdx, energy) {
+  // Collect segment points for drawStroke
+  const pts = [];
+  for (let i = startIdx; i <= Math.min(endIdx, spiralPts.length - 1); i++) {
+    pts.push(spiralPts[i]);
+  }
+  if (pts.length < 2) return;
+
+  const globalT = startIdx / spiralPts.length;
+  const baseWeight = (5 + energy * 6) * (1.0 - globalT * 0.5);
+
+  // Warm green ribbon base — visible continuous vine
+  fb.drawStroke(pts, {
+    color: STEM_GREEN, weight: baseWeight * 1.2, alpha: 0.35,
+    spacing: 0.2, scatter: 0.04, grain: 0.6,
+    pressureStart: 0.3, pressureEnd: 0.15, pressurePeak: 1.0,
+    layer: 'garden'
+  });
+
+  // richWash blobs along the vine for painted watercolor feel
+  const blobInterval = Math.max(2, Math.floor(pts.length / 12));
+  for (let i = 0; i < pts.length; i += blobInterval) {
+    const pt = pts[i];
+    const blobR = baseWeight * 2.0;
+    fb.richWash(pt.x, pt.y, blobR, {
+      color: STEM_GREEN, layers: 12, opacity: 0.06,
+      variance: 0.35, edgeStipple: 0,
+      shape: 'circle', layer: 'garden'
+    });
+  }
+
+  // Darker center detail line on top
+  fb.drawStroke(pts, {
+    color: VINE_DARK, weight: baseWeight * 0.5, alpha: 0.3,
+    spacing: 0.3, scatter: 0.03, grain: 0.4,
+    pressureStart: 0.2, pressureEnd: 0.1, pressurePeak: 0.9,
+    layer: 'garden'
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  FALLING PETALS
+// ══════════════════════════════════════════════════════════════
+
+function spawnPetal() {
+  const ptIdx = Math.floor(Math.random() * drawnVineIdx);
+  if (ptIdx <= 0 || ptIdx >= spiralPts.length) return;
+  fallingPetals.push({
+    x: spiralPts[ptIdx].x + (Math.random() - 0.5) * 40,
+    y: spiralPts[ptIdx].y,
+    vx: (Math.random() - 0.5) * 1.5,
+    vy: Math.random() * 2 + 1,
+    rot: Math.random() * Math.PI * 2,
+    life: 50,
+    color: pick(PETAL_HUES)
+  });
+}
+
+function updatePetals() {
+  for (let i = fallingPetals.length - 1; i >= 0; i--) {
+    const p = fallingPetals[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.rot += 0.05;
+    p.life--;
+
+    if (p.life > 20) {
+      const alpha = Math.min(1, (p.life - 20) / 20) * 0.2;
+      fb.addStamp({
+        x: p.x, y: p.y, color: p.color,
+        a: alpha, rotation: p.rot,
+        scaleX: 3, scaleY: 4,
+        texture: 'petal', layer: 'petals',
+        lifetime: 8
+      });
+    }
+    if (p.life <= 0) fallingPetals.splice(i, 1);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  AUDIO
+// ══════════════════════════════════════════════════════════════
+
+function initAudio() {
+  audio = new Audio('bismillah.mp3');
+  audioCtx = new AudioContext();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0.85;
+  timeData = new Uint8Array(2048);
+  const source = audioCtx.createMediaElementSource(audio);
+  source.connect(analyser);
+  analyser.connect(audioCtx.destination);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════════════
+
+const canvas = document.createElement('canvas');
+document.body.appendChild(canvas);
+
+fb = new FatihaBrush(canvas, {
+  maxStamps: 262144,
+  layers: ['garden', 'glow', 'petals'],
+  background: BG,
+  width: CW,
+  height: CH,
+  grainStrength: 0.5,
+  colorJitter: 0.06
+});
+
+fb.setLayerBlend('glow', 'additive');
+fb.setLayerOpacity('glow', 0.35);
+fb.setLayerOpacity('petals', 0.9);
+
+spiralPts = buildSpiralPoints();
+
+// Auto-start for headless capture
+if (typeof window._synthTime === 'number') {
+  isPlaying = true;
+  document.getElementById('playBtn').classList.add('hidden');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MAIN LOOP
+// ══════════════════════════════════════════════════════════════
+
+function loop() {
+  requestAnimationFrame(loop);
+  frameCount++;
+
+  if (typeof window._synthTime === 'number' && !isPlaying) {
+    isPlaying = true;
+  }
+
+  let progress = 0;
+  let energy = 0.6;
+
+  if (isPlaying) {
+    const time = getTime();
+    progress = Math.min(time / TOTAL_DUR, 1);
+
+    // Update audio
+    if (analyser && timeData) {
+      fb.updateAudio(analyser, timeData);
+      energy = fb.audio.energy;
+    }
+
+    // ── VINE GROWTH ──────────────────────────────────────
+    const targetIdx = Math.floor(progress * spiralPts.length);
+    if (targetIdx > drawnVineIdx && drawnVineIdx < spiralPts.length - 1) {
+      const segEnd = Math.min(spiralPts.length - 1, targetIdx);
+      drawVineSegment(Math.max(0, drawnVineIdx - 1), segEnd, energy);
+      drawnVineIdx = segEnd;
+    }
+
+    // ── TAJWEED EVENTS ───────────────────────────────────
+    while (tajweedIdx < TAJWEED.length && time >= TAJWEED[tajweedIdx].t) {
+      const el = TAJWEED[tajweedIdx];
+      const spiralT = el.t / TOTAL_DUR;
+      const ptIdx = Math.floor(spiralT * (spiralPts.length - 1));
+
+      if (ptIdx >= 1 && ptIdx < spiralPts.length - 1) {
+        const pt = spiralPts[ptIdx];
+        const norm = getNormal(spiralPts, ptIdx);
+        const offDist = 25 * el.size * el.side;
+        const ex = pt.x + norm.x * offDist;
+        const ey = pt.y + norm.y * offDist;
+        const tangent = getAngleAt(spiralPts, ptIdx);
+
+        switch (el.type) {
+          case 'leaf':         drawLeaf(ex, ey, el.size, tangent, el.side); break;
+          case 'bud':          drawBud(ex, ey, el.size, tangent); break;
+          case 'bloom':        drawBloom(ex, ey, el.size); break;
+          case 'rose':         drawRose(ex, ey, el.size, false); break;
+          case 'golden_rose':  drawRose(ex, ey, el.size, true); break;
+          case 'ghunnah':      drawGhunnah(ex, ey, el.size); break;
+          case 'thorn':        drawThorn(pt.x, pt.y, el.size, tangent, el.side); break;
+          case 'vine_tendril': drawVineTendril(ex, ey, el.size, tangent); break;
+        }
+      }
+      tajweedIdx++;
+    }
+
+    // ── FALLING PETALS ───────────────────────────────────
+    if (energy > 0.3 && frameCount % 20 === 0) {
+      spawnPetal();
+    }
+    updatePetals();
+
+    // ── FINISHED ─────────────────────────────────────────
+    if (isFinished()) {
+      isPlaying = false;
+      document.getElementById('playBtn').classList.remove('hidden');
+    }
+  }
+
+  // ── RENDER ───────────────────────────────────────────────
+  fb.update(1);
+  fb.render();
+
+  // Stats
+  if (frameCount % 30 === 0) {
+    document.getElementById('stats').textContent =
+      `stamps: ${fb.stampCount} | wet: ${fb._wetElements.length} | fps: ${Math.round(1000 / Math.max(1, performance.now() - lastTime))}`;
+  }
+  lastTime = performance.now();
+}
+
+loop();
+
+// ══════════════════════════════════════════════════════════════
+//  PLAY BUTTON
+// ══════════════════════════════════════════════════════════════
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  if (!audio) initAudio();
+
+  // Reset
+  drawnVineIdx = 0;
+  tajweedIdx = 0;
+  fallingPetals = [];
+  fb.clearAll();
+
+  audio.currentTime = 0;
+  audio.play().then(() => {
+    isPlaying = true;
+    document.getElementById('playBtn').classList.add('hidden');
+  });
+});
+</script>
+</body>
+</html>

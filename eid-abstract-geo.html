@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Abstract Emanation</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.0-beta"></script>
+  <script src="mixbox.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script>
+function mx(c1, c2, t) {
+  let a = color(c1), b = color(c2);
+  let m = mixbox.lerp([red(a),green(a),blue(a)], [red(b),green(b),blue(b)], t);
+  return `rgb(${m[0]},${m[1]},${m[2]})`;
+}
+
+function setup() {
+  createCanvas(1080, 1920, WEBGL);
+  brush.load();
+  translate(-width / 2, -height / 2);
+  randomSeed(808);
+  noiseSeed(303);
+
+  let W = 1080, H = 1920;
+
+  const LAPIS     = "#1B3A6B";
+  const LAPIS_LT  = "#3A6AAE";
+  const VERM      = "#C84127";
+  const VERM_DEEP = "#7B1818";
+  const GOLD      = "#C4953A";
+  const GOLD_BRT  = "#E8C55A";
+  const TERRE     = "#3A6241";
+  const TERRE_DK  = "#1E3E1E";
+  const BLACK     = "#141210";
+  const OCHRE     = "#B8860B";
+  const INDIGO    = "#1A0E3E";
+  const UMBER     = "#4A3728";
+
+  let cx = W * 0.46, cy = H * 0.38;
+  let cx2 = W * 0.72, cy2 = H * 0.62;
+  let cx3 = W * 0.22, cy3 = H * 0.72;
+
+  background(248, 243, 232);
+
+  // =============================================
+  // LAYER 1: BIG COLOR WASHES — the painting's soul
+  // =============================================
+  brush.noStroke();
+
+  // Lapis field — dominant upper zone
+  brush.fill(LAPIS, 75);
+  brush.fillBleed(0.85, "out");
+  brush.fillTexture(0.55, 0.25);
+  brush.beginShape(0.7);
+  brush.vertex(cx - 300, cy - 400);
+  brush.vertex(cx + 350, cy - 320);
+  brush.vertex(cx + 280, cy + 280);
+  brush.vertex(cx - 220, cy + 200);
+  brush.endShape(true);
+
+  // Vermillion bloom — hot, lower center
+  brush.fill(VERM, 65);
+  brush.fillBleed(0.75, "out");
+  brush.fillTexture(0.5, 0.3);
+  brush.circle(cx + 180, cy + 320, 340);
+
+  // Terre verte — left, cool counterpoint
+  brush.fill(TERRE, 55);
+  brush.fillBleed(0.7, "out");
+  brush.fillTexture(0.4, 0.2);
+  brush.circle(cx3 - 30, cy3 + 50, 360);
+
+  // Ochre warmth — upper right
+  brush.fill(OCHRE, 60);
+  brush.fillBleed(0.6, "out");
+  brush.fillTexture(0.35, 0.2);
+  brush.circle(cx2 + 80, cy2 - 380, 260);
+
+  // Indigo dark pool — deep lower
+  brush.fill(INDIGO, 50);
+  brush.fillBleed(0.9, "out");
+  brush.fillTexture(0.5, 0.35);
+  brush.circle(cx, cy + 580, 300);
+
+  // WET-ON-WET: Mixbox blends where washes overlap
+  brush.fill(mx(LAPIS, VERM, 0.4), 55);
+  brush.fillBleed(0.65, "out");
+  brush.fillTexture(0.45, 0.3);
+  brush.circle(cx + 60, cy + 100, 250);
+
+  brush.fill(mx(TERRE, LAPIS_LT, 0.5), 50);
+  brush.fillBleed(0.55, "out");
+  brush.circle(cx - 200, cy + 120, 220);
+
+  brush.fill(mx(VERM, GOLD, 0.3), 45);
+  brush.fillBleed(0.5, "out");
+  brush.circle(cx2, cy2, 200);
+
+  // Second lapis pass — deeper, shifted
+  brush.fill(LAPIS_LT, 40);
+  brush.fillBleed(0.7, "out");
+  brush.fillTexture(0.4, 0.2);
+  brush.circle(cx + 100, cy - 150, 200);
+
+  brush.noFill();
+
+  // =============================================
+  // LAYER 2: BOLD MARKER COLOR FIELDS — FIRST
+  // Big flat strokes OVER washes — Frankenthaler energy
+  // =============================================
+  brush.wiggle(3);
+
+  // Three massive lapis horizontals — BOLD PRESENCE
+  brush.set("marker", LAPIS, 30);
+  brush.line(W * 0.02, cy - 60, W * 0.58, cy - 90);
+  brush.set("marker", LAPIS, 20);
+  brush.line(W * 0.25, cy + 30, W * 0.78, cy + 0);
+  brush.set("marker", LAPIS_LT, 15);
+  brush.line(W * 0.12, cy - 200, W * 0.65, cy - 220);
+
+  // Vermillion diagonals — slashing energy
+  brush.set("marker", VERM, 25);
+  brush.line(cx - 120, cy + 180, cx + 280, cy + 380);
+  brush.set("marker", VERM, 18);
+  brush.line(cx + 30, cy + 120, cx + 320, cy + 80);
+
+  // Terre verte — grounding
+  brush.set("marker", TERRE, 20);
+  brush.line(cx3 - 120, cy3 - 60, cx3 + 150, cy3 + 80);
+
+  // Gold marker — warm diagonal
+  brush.set("marker", GOLD, 15);
+  brush.spline([
+    [W * 0.18, H * 0.18],
+    [cx + 40, cy - 80, 1.5],
+    [W * 0.72, H * 0.42, 1],
+  ], 0.5);
+
+  // Deep vermillion — secondary zone
+  brush.set("marker", VERM_DEEP, 12);
+  brush.line(cx2 - 80, cy2 + 40, cx2 + 120, cy2 + 200);
+
+  // Umber — earth anchor
+  brush.set("marker", UMBER, 10);
+  brush.line(W * 0.35, H * 0.68, W * 0.68, H * 0.66);
+
+  // =============================================
+  // LAYER 3: CHARCOAL EMANATIONS — structural
+  // Fewer, BOLD. Yazdi's radial DNA.
+  // =============================================
+
+  // Primary center — 8 strong rays
+  for (let i = 0; i < 8; i++) {
+    let angle = (TWO_PI / 8) * i + random(-0.15, 0.15);
+    let len = random(200, 550);
+    let wt = i % 2 === 0 ? random(4, 7) : random(2, 4);
+    let col = i % 3 === 0 ? LAPIS : (i % 3 === 1 ? BLACK : VERM_DEEP);
+    brush.set("charcoal", col, wt);
+    let startR = random(20, 50);
+    brush.line(
+      cx + cos(angle) * startR, cy + sin(angle) * startR,
+      cx + cos(angle) * len + random(-25, 25),
+      cy + sin(angle) * len + random(-25, 25)
+    );
+  }
+
+  // Secondary center — 5 rays
+  for (let i = 0; i < 5; i++) {
+    let angle = (TWO_PI / 5) * i + random(-0.2, 0.2);
+    let len = random(100, 280);
+    brush.set("charcoal", i % 2 === 0 ? INDIGO : UMBER, random(2, 4));
+    brush.line(cx2 + cos(angle) * 15, cy2 + sin(angle) * 15,
+               cx2 + cos(angle) * len, cy2 + sin(angle) * len);
+  }
+
+  // Tertiary — whispers
+  for (let i = 0; i < 4; i++) {
+    let angle = (TWO_PI / 4) * i + random(-0.15, 0.15);
+    brush.set("charcoal", UMBER, random(1, 2.5));
+    brush.line(cx3, cy3, cx3 + cos(angle) * random(50, 160), cy3 + sin(angle) * random(50, 160));
+  }
+
+  // =============================================
+  // LAYER 4: BIG SWEEPING SPLINES — Twombly arcs
+  // =============================================
+  brush.wiggle(6);
+
+  // Giant arc — top-left to lower-right
+  brush.set("charcoal", BLACK, 6);
+  brush.spline([
+    [W * 0.06, H * 0.1],
+    [W * 0.32, H * 0.26, 3.0],
+    [W * 0.56, H * 0.5, 4.0],
+    [W * 0.82, H * 0.72, 1.5],
+  ], 0.65);
+
+  // Counter-arc — LAPIS, crossing
+  brush.set("charcoal", LAPIS, 5);
+  brush.spline([
+    [W * 0.9, H * 0.15],
+    [W * 0.6, H * 0.32, 2.5],
+    [W * 0.32, H * 0.55, 3.0],
+    [W * 0.08, H * 0.72, 1.2],
+  ], 0.55);
+
+  // Vermillion vertical surge
+  brush.set("charcoal", VERM_DEEP, 4);
+  brush.spline([
+    [cx - 20, H * 0.08],
+    [cx + 30, H * 0.32, 2.5],
+    [cx - 40, cy + 150, 3.0],
+    [cx + 20, H * 0.72, 1.2],
+  ], 0.45);
+
+  // =============================================
+  // LAYER 5: PENCIL GEOMETRIC GHOSTS — subliminal
+  // =============================================
+
+  // Pentagon ghost
+  brush.set("2H", "#888", 0.4);
+  let pentPts = [];
+  for (let i = 0; i < 5; i++) {
+    let a = (TWO_PI / 5) * i - HALF_PI + 0.08;
+    pentPts.push([cx + cos(a) * 200 + random(-10, 10), cy + sin(a) * 200 + random(-10, 10)]);
+  }
+  for (let i = 0; i < 5; i++) {
+    if (random() < 0.65) {
+      let j = (i + 1) % 5;
+      brush.line(pentPts[i][0], pentPts[i][1], pentPts[j][0], pentPts[j][1]);
+    }
+  }
+
+  // Hexagon ghost
+  brush.set("2H", "#999", 0.35);
+  for (let i = 0; i < 6; i++) {
+    if (random() < 0.5) {
+      let a1 = (TWO_PI / 6) * i + 0.12;
+      let a2 = (TWO_PI / 6) * ((i + 1) % 6) + 0.12;
+      brush.line(cx + 40 + cos(a1) * 300, cy - 20 + sin(a1) * 300,
+                 cx + 40 + cos(a2) * 300, cy - 20 + sin(a2) * 300);
+    }
+  }
+
+  // Octagon ghost — large
+  brush.set("2H", "#AAA", 0.25);
+  for (let i = 0; i < 8; i++) {
+    if (random() < 0.4) {
+      let a1 = (TWO_PI / 8) * i;
+      let a2 = (TWO_PI / 8) * ((i + 1) % 8);
+      brush.line(cx - 30 + cos(a1) * 420, cy + 60 + sin(a1) * 420,
+                 cx - 30 + cos(a2) * 420, cy + 60 + sin(a2) * 420);
+    }
+  }
+
+  // 10-fold construction radials
+  brush.set("HB", "#777", 0.3);
+  for (let i = 0; i < 10; i++) {
+    let a = (TWO_PI / 10) * i;
+    brush.line(cx + cos(a) * 80, cy + sin(a) * 80,
+               cx + cos(a) * random(400, 600), cy + sin(a) * random(400, 600));
+  }
+
+  // Compass arc ghosts
+  brush.set("2H", "#888", 0.3);
+  for (let i = 0; i < 12; i++) {
+    let acx = cx + random(-250, 250);
+    let acy = cy + random(-250, 350);
+    brush.arc(acx, acy, random(50, 200), random(TWO_PI), random(TWO_PI) + random(PI*0.3, PI));
+  }
+
+  // =============================================
+  // LAYER 6: GOLD ACCENTS — concentrated energy
+  // =============================================
+
+  // Gold radial burst at primary center
+  brush.set("pen", GOLD_BRT, 4);
+  for (let i = 0; i < 16; i++) {
+    let a = random(TWO_PI);
+    let r1 = random(20, 70);
+    let r2 = r1 + random(50, 200);
+    brush.line(cx + cos(a) * r1, cy + sin(a) * r1,
+               cx + cos(a) * r2, cy + sin(a) * r2);
+  }
+
+  // Gold at secondary — fewer, stronger
+  brush.set("pen", GOLD, 3);
+  for (let i = 0; i < 8; i++) {
+    let a = random(TWO_PI);
+    let r1 = random(10, 40);
+    let r2 = r1 + random(30, 100);
+    brush.line(cx2 + cos(a) * r1, cy2 + sin(a) * r1,
+               cx2 + cos(a) * r2, cy2 + sin(a) * r2);
+  }
+
+  // Gold arcs — precious geometry
+  brush.set("pen", GOLD_BRT, 4);
+  brush.arc(cx, cy, 150, -HALF_PI, -HALF_PI + PI * 0.45);
+  brush.arc(cx, cy, 150, HALF_PI + 0.2, HALF_PI + PI * 0.35);
+  brush.set("pen", GOLD, 3);
+  brush.arc(cx2, cy2, 120, PI * 0.05, PI * 0.55);
+  brush.arc(cx, cy, 250, PI * 0.7, PI * 1.1);
+
+  // Gold rotring sparks
+  brush.set("rotring", GOLD_BRT, 1.5);
+  for (let i = 0; i < 20; i++) {
+    let x = cx + random(-380, 380);
+    let y = cy + random(-320, 620);
+    let len = random(12, 45);
+    let a = random(TWO_PI);
+    brush.line(x, y, x + cos(a) * len, y + sin(a) * len);
+  }
+
+  // =============================================
+  // LAYER 7: SPRAY — concentrated atmosphere
+  // =============================================
+
+  // Dense spray near primary center
+  brush.set("spray", LAPIS_LT, 6);
+  for (let i = 0; i < 25; i++) {
+    let a = random(TWO_PI);
+    let r = random(50, 250);
+    brush.flowLine(cx + cos(a) * r, cy + sin(a) * r, random(40, 120), a + random(-0.5, 0.5));
+  }
+
+  // Vermillion spray in hot zone
+  brush.set("spray", VERM, 5);
+  for (let i = 0; i < 15; i++) {
+    let x = cx + random(-100, 300);
+    let y = cy + random(100, 450);
+    brush.flowLine(x, y, random(30, 80), random(TWO_PI));
+  }
+
+  // Gold spray at nexus
+  brush.set("spray", GOLD, 4);
+  for (let i = 0; i < 10; i++) {
+    let a = random(TWO_PI);
+    let r = random(20, 120);
+    brush.flowLine(cx + cos(a) * r, cy + sin(a) * r, random(20, 60), a);
+  }
+
+  // Indigo spray — lower
+  brush.set("spray", INDIGO, 4);
+  for (let i = 0; i < 10; i++) {
+    let x = cx + random(-200, 200);
+    let y = H * 0.65 + random(0, H * 0.2);
+    brush.flowLine(x, y, random(30, 70), random(TWO_PI));
+  }
+
+  // =============================================
+  // LAYER 8: FINAL BOLD MARKS
+  // =============================================
+  brush.wiggle(8);
+
+  // === MASSIVE HERO MARKS — charcoal for width ===
+
+  // Lapis MEGA slash — multiple overlapping charcoal strokes
+  for (let i = -2; i <= 2; i++) {
+    brush.set("charcoal", LAPIS, 8);
+    brush.spline([
+      [W * 0.03, H * 0.33 + i * 8],
+      [W * 0.45, H * 0.36 + i * 8, 3],
+      [W * 0.75, H * 0.31 + i * 8, 2],
+    ], 0.4);
+  }
+
+  // Vermillion MEGA response — crossing it
+  for (let i = -2; i <= 2; i++) {
+    brush.set("charcoal", VERM, 7);
+    brush.line(W * 0.18, H * 0.54 + i * 7, W * 0.72, H * 0.5 + i * 7);
+  }
+
+  // Gold bold gesture — charcoal in upper zone, triple-layered
+  brush.set("charcoal", GOLD_BRT, 6);
+  brush.line(W * 0.18, H * 0.2, W * 0.64, H * 0.16);
+  brush.set("charcoal", GOLD, 5);
+  brush.line(W * 0.2, H * 0.21, W * 0.6, H * 0.18);
+  brush.set("charcoal", OCHRE, 4);
+  brush.line(W * 0.22, H * 0.19, W * 0.58, H * 0.17);
+
+  // Terre verte mark in lower left
+  brush.set("charcoal", TERRE, 4);
+  brush.line(W * 0.08, H * 0.75, W * 0.35, H * 0.7);
+  brush.set("charcoal", TERRE_DK, 3);
+  brush.line(W * 0.1, H * 0.76, W * 0.32, H * 0.72);
+
+  // =============================================
+  // BREATHING — bottom third is quiet
+  // =============================================
+  brush.noFill();
+  brush.set("2H", "#BBB", 0.2);
+  for (let i = 0; i < 5; i++) {
+    let x = random(150, W - 150);
+    let y = H * 0.8 + random(0, H * 0.12);
+    let a = random(TWO_PI);
+    brush.line(x, y, x + cos(a) * random(80, 200), y + sin(a) * random(80, 200));
+  }
+
+  // Gold whisper below
+  brush.set("pen", GOLD, 2);
+  brush.arc(W * 0.5, H * 0.86, 130, 0.2, 2.3);
+  brush.set("pen", GOLD_BRT, 1.5);
+  brush.arc(W * 0.4, H * 0.82, 80, 1.0, 3.0);
+
+  console.log("PAINTING COMPLETE");
+}
+</script>
+</body>
+</html>

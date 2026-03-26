@@ -1,0 +1,841 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!-- WREATH IN FULL CONTEXT — washes + pencil door + v3 wreath -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Wreath in Full Context</title>
+<script src="p5.min.js"></script>
+<script src="p5.brush.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; }
+  body { background: #f2eada; overflow: hidden; }
+</style>
+</head>
+<body>
+<script>
+var W = 1080, H = 1920, cx = W / 2;
+var doorW = 720, doorH = 1500;
+var doorX = (W - doorW) / 2, doorY = (H - doorH) / 2 + 80;
+var archSpringY = doorY + 380, bot = doorY + doorH, halfDW = doorW / 2;
+var panelTop = archSpringY + 15, panelBot = bot - 15, panelH = panelBot - panelTop;
+
+function archY(x) {
+  var co = halfDW * 0.55, R = halfDW + co;
+  if (x <= cx) { var dx = x - (cx + co); var v = R*R - dx*dx; return v > 0 ? archSpringY - Math.sqrt(v) : archSpringY; }
+  else { var dx = x - (cx - co); var v = R*R - dx*dx; return v > 0 ? archSpringY - Math.sqrt(v) : archSpringY; }
+}
+var archPts = [];
+for (var ai = 0; ai <= 40; ai++) { var ax = doorX + (doorW * ai / 40); archPts.push([ax, archY(ax)]); }
+
+// --- Polygon builders ---
+function makePetalPoly(bx, by, ang, len, wid, curv) {
+  var pts = [], n = 8, ca = Math.cos(ang), sa = Math.sin(ang);
+  for (var i = 0; i <= n; i++) {
+    var t = i/n, w = Math.sin(t * Math.PI);
+    var along = t * len, across = w * wid * 0.5;
+    var co = curv * Math.sin(t * Math.PI) * len * 0.08;
+    pts.push([bx + along*ca - (across+co)*sa, by + along*sa + (across+co)*ca]);
+  }
+  for (var i = n; i >= 0; i--) {
+    var t = i/n, w = Math.sin(t * Math.PI);
+    var along = t * len, across = -w * wid * 0.5;
+    var co = curv * Math.sin(t * Math.PI) * len * 0.08;
+    pts.push([bx + along*ca - (across+co)*sa, by + along*sa + (across+co)*ca]);
+  }
+  return pts;
+}
+
+function makeSazLeafPoly(bx, by, ang, len, wid, curv) {
+  var pts = [], n = 10, ca = Math.cos(ang), sa = Math.sin(ang);
+  for (var i = 0; i <= n; i++) {
+    var t = i/n, w;
+    if (t < 0.15) w = t / 0.15 * 0.4;
+    else if (t < 0.5) w = 0.4 + (t - 0.15) / 0.35 * 0.6;
+    else if (t < 0.85) w = 1.0 - (t - 0.5) * 1.0;
+    else w = Math.max(0, (1 - t) / 0.15 * 0.15);
+    w = Math.max(0, w + 0.05 * Math.sin(t * 6 * Math.PI));
+    var along = t * len, across = w * wid * 0.5;
+    var sc = curv * Math.sin(t * Math.PI * 1.2) * len * 0.06;
+    pts.push([bx + along*ca - (across+sc)*sa, by + along*sa + (across+sc)*ca]);
+  }
+  for (var i = n; i >= 0; i--) {
+    var t = i/n, w;
+    if (t < 0.15) w = t / 0.15 * 0.4;
+    else if (t < 0.5) w = 0.4 + (t - 0.15) / 0.35 * 0.6;
+    else if (t < 0.85) w = 1.0 - (t - 0.5) * 1.0;
+    else w = Math.max(0, (1 - t) / 0.15 * 0.15);
+    w = Math.max(0, w + 0.05 * Math.sin(t * 6 * Math.PI));
+    var along = t * len, across = -w * wid * 0.5;
+    var sc = curv * Math.sin(t * Math.PI * 1.2) * len * 0.06;
+    pts.push([bx + along*ca - (across+sc)*sa, by + along*sa + (across+sc)*ca]);
+  }
+  return pts;
+}
+
+function samplePathEvenly(pts, n) {
+  var dists = [0];
+  for (var i = 1; i < pts.length; i++) {
+    var dx = pts[i][0] - pts[i-1][0], dy = pts[i][1] - pts[i-1][1];
+    dists.push(dists[i-1] + Math.sqrt(dx*dx + dy*dy));
+  }
+  var total = dists[dists.length - 1], result = [];
+  for (var si = 0; si < n; si++) {
+    var target = (si / Math.max(1, n - 1)) * total, seg = 0;
+    for (var j = 1; j < dists.length; j++) { if (dists[j] >= target) { seg = j - 1; break; } }
+    if (seg >= pts.length - 1) seg = pts.length - 2;
+    var segLen = dists[seg+1] - dists[seg];
+    var t = segLen > 0 ? (target - dists[seg]) / segLen : 0;
+    result.push({x: pts[seg][0] + t * (pts[seg+1][0] - pts[seg][0]), y: pts[seg][1] + t * (pts[seg+1][1] - pts[seg][1])});
+  }
+  return result;
+}
+
+// --- Build vine paths ---
+var leftVinePath = [], rightVinePath = [];
+
+function buildVinePaths() {
+  var leftRaw = [], rightRaw = [];
+  var m = 35;
+  var dcy = (archPts[20][1] + panelBot) / 2;
+
+  for (var i = 0; i <= 6; i++) {
+    var t = i / 6;
+    leftRaw.push([cx*(1-t) + (doorX+m)*t, panelBot - 4*Math.sin(t*Math.PI)]);
+    rightRaw.push([cx*(1-t) + (doorX+doorW-m)*t, panelBot - 4*Math.sin(t*Math.PI)]);
+  }
+  for (var i = 1; i <= 20; i++) {
+    var t = i/20, y = panelBot*(1-t) + archSpringY*t;
+    var wobble = Math.sin(t * 5.5 + 0.5) * 30;
+    leftRaw.push([doorX + wobble, y]);
+    rightRaw.push([doorX + doorW - wobble, y]);
+  }
+  for (var i = 1; i <= 20; i++) {
+    var ax = archPts[i][0], ay = archPts[i][1];
+    var dx = cx - ax, dy = dcy - ay, d = Math.sqrt(dx*dx+dy*dy);
+    if (d > 0) leftRaw.push([ax + dx/d*m, ay + dy/d*m]);
+    else leftRaw.push([ax, ay + m]);
+  }
+  for (var i = 39; i >= 20; i--) {
+    var ax = archPts[i][0], ay = archPts[i][1];
+    var dx = cx - ax, dy = dcy - ay, d = Math.sqrt(dx*dx+dy*dy);
+    if (d > 0) rightRaw.push([ax + dx/d*m, ay + dy/d*m]);
+    else rightRaw.push([ax, ay + m]);
+  }
+
+  leftVinePath = samplePathEvenly(leftRaw, 80);
+  rightVinePath = samplePathEvenly(rightRaw, 80);
+}
+
+// ============================================================
+// 9 FLOWER TYPES
+// ============================================================
+
+function buildType1(fcx, fcy, s) {
+  var f = {x:fcx, y:fcy, petals:[], gold:true, goldR:14*s};
+  var ba = Math.random()*Math.PI*2;
+  var rings = [
+    {n:7, len:55*s, w:38*s, col:'#8a1020', op:200},
+    {n:6, len:42*s, w:30*s, col:'#a01828', op:190},
+    {n:4, len:28*s, w:22*s, col:'#c03050', op:180}
+  ];
+  for (var r=0;r<rings.length;r++) {
+    var ring=rings[r];
+    for (var p=0;p<ring.n;p++) {
+      var a=(p/ring.n)*Math.PI*2+ba+r*0.3+(Math.random()-0.5)*0.15;
+      f.petals.push({col:ring.col, op:ring.op, pts:makePetalPoly(fcx,fcy,a,ring.len,ring.w,0.3)});
+    }
+  }
+  return f;
+}
+
+function buildType2(fcx, fcy, s) {
+  var f = {x:fcx, y:fcy, petals:[], gold:true, goldR:12*s};
+  var ba = Math.random()*Math.PI*2;
+  var rings = [
+    {n:8, len:50*s, w:34*s, col:'#6a0818', op:210},
+    {n:7, len:40*s, w:28*s, col:'#8a1020', op:200},
+    {n:6, len:30*s, w:22*s, col:'#b02040', op:185},
+    {n:4, len:20*s, w:16*s, col:'#c04060', op:175}
+  ];
+  for (var r=0;r<rings.length;r++) {
+    var ring=rings[r];
+    for (var p=0;p<ring.n;p++) {
+      var a=(p/ring.n)*Math.PI*2+ba+r*0.35+(Math.random()-0.5)*0.12;
+      f.petals.push({col:ring.col, op:ring.op, pts:makePetalPoly(fcx,fcy,a,ring.len,ring.w,0.35)});
+    }
+  }
+  return f;
+}
+
+function buildType3(fcx, fcy, s) {
+  var f = {x:fcx, y:fcy, petals:[], gold:true, goldR:10*s};
+  var ba = Math.random()*Math.PI*2;
+  var rings = [
+    {n:6, len:36*s, w:26*s, col:'#c03050', op:185},
+    {n:5, len:24*s, w:18*s, col:'#d06080', op:170}
+  ];
+  for (var r=0;r<rings.length;r++) {
+    var ring=rings[r];
+    for (var p=0;p<ring.n;p++) {
+      var a=(p/ring.n)*Math.PI*2+ba+r*0.4+(Math.random()-0.5)*0.15;
+      f.petals.push({col:ring.col, op:ring.op, pts:makePetalPoly(fcx,fcy,a,ring.len,ring.w,0.3)});
+    }
+  }
+  return f;
+}
+
+function buildType4(fcx, fcy, s) {
+  var f = {x:fcx, y:fcy, petals:[], gold:true, goldR:8*s};
+  var ba = Math.random()*Math.PI*2;
+  for (var p=0;p<5;p++) {
+    var a=(p/5)*Math.PI*2+ba+(Math.random()-0.5)*0.1;
+    f.petals.push({col:'#e080a0', op:165, pts:makePetalPoly(fcx,fcy,a,28*s,20*s,0.25)});
+  }
+  return f;
+}
+
+function buildType5(fcx, fcy, s) {
+  var f = {x:fcx, y:fcy, petals:[], gold:true, goldR:13*s};
+  var ba = Math.random()*Math.PI*2;
+  for (var p=0;p<5;p++) {
+    var a=(p/5)*Math.PI*2+ba;
+    f.petals.push({col:'#8a1020', op:200, pts:makePetalPoly(fcx,fcy,a,52*s,40*s,0.3)});
+  }
+  for (var p=0;p<5;p++) {
+    var a=(p/5)*Math.PI*2+ba+Math.PI/5+(Math.random()-0.5)*0.1;
+    f.petals.push({col:'#6a0818', op:190, pts:makePetalPoly(fcx,fcy,a,38*s,28*s,0.35)});
+  }
+  return f;
+}
+
+function buildType6(fcx, fcy, s) {
+  var f = {x:fcx, y:fcy, petals:[], gold:false, goldR:0};
+  var ba = Math.random()*Math.PI*2;
+  for (var p=0;p<3;p++) {
+    var a=ba+(p-1)*0.5;
+    f.petals.push({col: p===1?'#d06080':'#b03050', op:160+p*15, pts:makePetalPoly(fcx,fcy,a,18*s,8*s,0.4)});
+  }
+  return f;
+}
+
+function buildType7(fcx, fcy, s) {
+  var f = {x:fcx, y:fcy, petals:[], gold:true, goldR:10*s};
+  var ba = Math.random()*Math.PI*2;
+  var rings = [
+    {n:7, len:38*s, w:28*s, col:'#c03050', op:180},
+    {n:6, len:28*s, w:20*s, col:'#d06080', op:170},
+    {n:4, len:18*s, w:14*s, col:'#e890b0', op:160}
+  ];
+  for (var r=0;r<rings.length;r++) {
+    var ring=rings[r];
+    for (var p=0;p<ring.n;p++) {
+      var a=(p/ring.n)*Math.PI*2+ba+r*0.3+(Math.random()-0.5)*0.12;
+      f.petals.push({col:ring.col, op:ring.op, pts:makePetalPoly(fcx,fcy,a,ring.len,ring.w,0.3)});
+    }
+  }
+  return f;
+}
+
+function buildType8(fcx, fcy, s) {
+  var f = {x:fcx, y:fcy, petals:[], gold:true, goldR:11*s};
+  var ba = Math.random()*Math.PI*2;
+  for (var p=0;p<8;p++) {
+    var a=(p/8)*Math.PI*2+ba+(Math.random()-0.5)*0.1;
+    f.petals.push({col:'#8a1020', op:200, pts:makePetalPoly(fcx,fcy,a,48*s,16*s,0.25)});
+  }
+  return f;
+}
+
+function buildType9(fcx, fcy, s) {
+  var f = {x:fcx, y:fcy, petals:[], gold:true, goldR:6*s};
+  var ba = Math.random()*Math.PI*2;
+  for (var p=0;p<4;p++) {
+    var a=(p/4)*Math.PI*2+ba+(Math.random()-0.5)*0.15;
+    f.petals.push({col:'#d080a0', op:165, pts:makePetalPoly(fcx,fcy,a,20*s,16*s,0.3)});
+  }
+  return f;
+}
+
+var builders = [buildType1, buildType2, buildType3, buildType4, buildType5, buildType6, buildType7, buildType8, buildType9];
+
+// ============================================================
+// SETUP — ALL LAYERS STATIC
+// ============================================================
+function setup() {
+  createCanvas(W, H, WEBGL);
+  brush.load();
+  translate(-width/2, -height/2);
+  background(242, 234, 218); // cream paper
+
+  randomSeed(42);
+  brush.wiggle(1.5); // slight hand-drawn jitter on all lines
+  buildVinePaths();
+
+  // ════════════════════════════════════════════
+  // LAYER 1: WATERCOLOR WASHES (from v8-approved)
+  // ════════════════════════════════════════════
+  brush.noStroke();
+
+  // Deep lapis blue wash — upper arch area
+  brush.fill('#0D3B8E', 80);
+  brush.fillBleed(0.5, 'out');
+  brush.fillTexture(0.5, 0.25);
+  brush.rect(doorX + 20, doorY - 10, doorW - 40, archSpringY - doorY + 80);
+
+  // Gold wash — middle band
+  brush.fill('#B8860B', 70);
+  brush.fillBleed(0.45, 'out');
+  brush.fillTexture(0.4, 0.2);
+  brush.rect(doorX + 30, archSpringY - 30, doorW - 60, 300);
+
+  // Deep terre verte — lower panels
+  brush.fill('#0E4D2E', 80);
+  brush.fillBleed(0.5, 'out');
+  brush.fillTexture(0.5, 0.25);
+  brush.rect(doorX + 20, archSpringY + 350, doorW - 40, panelBot - archSpringY - 320);
+
+  // Jewel accent — left panel center
+  brush.fill('#3A0C6E', 100);
+  brush.fillBleed(0.35, 'out');
+  brush.fillTexture(0.3, 0.15);
+  brush.rect(doorX + 50, panelTop + panelH * 0.15, halfDW - 80, panelH * 0.25);
+
+  // Ruby accent — right panel lower
+  brush.fill('#8B1A1A', 90);
+  brush.fillBleed(0.3, 'out');
+  brush.fillTexture(0.3, 0.15);
+  brush.rect(cx + 30, panelTop + panelH * 0.55, halfDW - 80, panelH * 0.25);
+
+  brush.noFill();
+
+  // ════════════════════════════════════════════
+  // LAYER 2: ISLAMIC GEOMETRIC DOOR (research-based)
+  // ════════════════════════════════════════════
+
+  // --- Helper: 8-fold Khatam star rosette ---
+  // Based on {8/3} star polygon + inner octagon
+  // From research: inner octagon radius = r × (√2 − 1) ≈ 0.414r
+  function draw8FoldStar(scx, scy, r) {
+    var pts = [];
+    for (var i = 0; i < 8; i++) {
+      var a = i * Math.PI / 4 - Math.PI / 2;
+      pts.push({ x: scx + r * Math.cos(a), y: scy + r * Math.sin(a) });
+    }
+    // {8/3} star — connect every 3rd vertex (creates 8-pointed star)
+    brush.set('2H', '#3A3020', 1.4);
+    for (var i = 0; i < 8; i++) {
+      var j = (i + 3) % 8;
+      brush.line(pts[i].x, pts[i].y, pts[j].x, pts[j].y);
+    }
+    // Inner octagon at r × (√2 − 1)
+    var innerR = r * (Math.sqrt(2) - 1);
+    var innerPts = [];
+    for (var i = 0; i < 8; i++) {
+      var a = i * Math.PI / 4 - Math.PI / 2 + Math.PI / 8; // offset 22.5°
+      innerPts.push({ x: scx + innerR * Math.cos(a), y: scy + innerR * Math.sin(a) });
+    }
+    brush.set('2H', '#4A4030', 1.2);
+    for (var i = 0; i < 8; i++) {
+      brush.line(innerPts[i].x, innerPts[i].y, innerPts[(i+1)%8].x, innerPts[(i+1)%8].y);
+    }
+    // Outer octagon (connecting midpoints of star sides)
+    var outerR = r * Math.cos(Math.PI / 8);
+    var outerPts = [];
+    for (var i = 0; i < 8; i++) {
+      var a = i * Math.PI / 4 - Math.PI / 2 + Math.PI / 8;
+      outerPts.push({ x: scx + outerR * Math.cos(a), y: scy + outerR * Math.sin(a) });
+    }
+    brush.set('2H', '#4A4030', 1.0);
+    for (var i = 0; i < 8; i++) {
+      brush.line(outerPts[i].x, outerPts[i].y, outerPts[(i+1)%8].x, outerPts[(i+1)%8].y);
+    }
+    // Radial lines connecting inner octagon to star tips
+    brush.set('2H', '#5A5040', 0.9);
+    for (var i = 0; i < 8; i++) {
+      brush.line(innerPts[i].x, innerPts[i].y, pts[i].x, pts[i].y);
+      brush.line(innerPts[i].x, innerPts[i].y, pts[(i+1)%8].x, pts[(i+1)%8].y);
+    }
+    // Enclosing circle
+    brush.set('2H', '#4A4030', 1.0);
+    brush.circle(scx, scy, r);
+  }
+
+  // --- Helper: 12-fold star rosette ---
+  // {12/5} star polygon for larger panels
+  function draw12FoldStar(scx, scy, r) {
+    var pts = [];
+    for (var i = 0; i < 12; i++) {
+      var a = i * Math.PI / 6 - Math.PI / 2;
+      pts.push({ x: scx + r * Math.cos(a), y: scy + r * Math.sin(a) });
+    }
+    // {12/5} star — connect every 5th vertex
+    brush.set('2H', '#3A3020', 1.3);
+    for (var i = 0; i < 12; i++) {
+      var j = (i + 5) % 12;
+      brush.line(pts[i].x, pts[i].y, pts[j].x, pts[j].y);
+    }
+    // Inner dodecagon at r × (2 − √3) ≈ 0.268r
+    var innerR = r * (2 - Math.sqrt(3));
+    var innerPts = [];
+    for (var i = 0; i < 12; i++) {
+      var a = i * Math.PI / 6 - Math.PI / 2 + Math.PI / 12;
+      innerPts.push({ x: scx + innerR * Math.cos(a), y: scy + innerR * Math.sin(a) });
+    }
+    brush.set('2H', '#4A4030', 1.0);
+    for (var i = 0; i < 12; i++) {
+      brush.line(innerPts[i].x, innerPts[i].y, innerPts[(i+1)%12].x, innerPts[(i+1)%12].y);
+    }
+    // Middle ring — hexagonal symmetry overlay
+    var midR = r * 0.58;
+    var midPts = [];
+    for (var i = 0; i < 12; i++) {
+      var a = i * Math.PI / 6 - Math.PI / 2 + Math.PI / 12;
+      midPts.push({ x: scx + midR * Math.cos(a), y: scy + midR * Math.sin(a) });
+    }
+    brush.set('2H', '#4A4030', 0.9);
+    for (var i = 0; i < 12; i++) {
+      brush.line(midPts[i].x, midPts[i].y, midPts[(i+1)%12].x, midPts[(i+1)%12].y);
+    }
+    // Radial connections from inner to star tips
+    brush.set('2H', '#5A5040', 0.8);
+    for (var i = 0; i < 12; i++) {
+      brush.line(innerPts[i].x, innerPts[i].y, pts[i].x, pts[i].y);
+    }
+    brush.set('2H', '#4A4030', 1.0);
+    brush.circle(scx, scy, r);
+  }
+
+  // --- Helper: arabesque border band ---
+  // Interlocking zigzag chain pattern (60° angles, √3 repeat)
+  function drawBorderBand(bx1, by1, bx2, by2, bandW) {
+    var dx = bx2 - bx1, dy = by2 - by1;
+    var len = Math.sqrt(dx*dx + dy*dy);
+    if (len < 10) return;
+    var ux = dx/len, uy = dy/len; // unit along band
+    var nx = -uy, ny = ux; // unit perpendicular
+    var hw = bandW / 2;
+    // Draw border edges
+    brush.set('2H', '#3A3020', 1.2);
+    brush.line(bx1 + nx*hw, by1 + ny*hw, bx2 + nx*hw, by2 + ny*hw);
+    brush.line(bx1 - nx*hw, by1 - ny*hw, bx2 - nx*hw, by2 - ny*hw);
+    // Zigzag interlace: repeat unit = bandW × √3
+    var repeatLen = bandW * 1.732;
+    var nRepeats = Math.floor(len / repeatLen);
+    if (nRepeats < 1) return;
+    var actualRepeat = len / nRepeats;
+    brush.set('2H', '#4A4030', 1.0);
+    for (var i = 0; i < nRepeats; i++) {
+      var t0 = i * actualRepeat;
+      var t1 = t0 + actualRepeat * 0.5;
+      var t2 = t0 + actualRepeat;
+      // Zigzag line 1: bottom-left to top-mid to bottom-right
+      var x0 = bx1 + ux*t0 - nx*hw*0.7, y0 = by1 + uy*t0 - ny*hw*0.7;
+      var x1 = bx1 + ux*t1 + nx*hw*0.7, y1 = by1 + uy*t1 + ny*hw*0.7;
+      var x2 = bx1 + ux*t2 - nx*hw*0.7, y2 = by1 + uy*t2 - ny*hw*0.7;
+      brush.line(x0, y0, x1, y1);
+      brush.line(x1, y1, x2, y2);
+      // Zigzag line 2 (counter-phase): top-left to bottom-mid to top-right
+      var x3 = bx1 + ux*t0 + nx*hw*0.7, y3 = by1 + uy*t0 + ny*hw*0.7;
+      var x4 = bx1 + ux*t1 - nx*hw*0.7, y4 = by1 + uy*t1 - ny*hw*0.7;
+      var x5 = bx1 + ux*t2 + nx*hw*0.7, y5 = by1 + uy*t2 + ny*hw*0.7;
+      brush.line(x3, y3, x4, y4);
+      brush.line(x4, y4, x5, y5);
+    }
+  }
+
+  // --- Helper: hexagonal nail/stud grid ---
+  function drawStudGrid(sx, sy, sw, sh, spacing) {
+    var row = 0;
+    for (var yy = sy + spacing; yy < sy + sh - spacing/2; yy += spacing * 0.866) {
+      var xOffset = (row % 2 === 1) ? spacing * 0.5 : 0;
+      for (var xx = sx + spacing + xOffset; xx < sx + sw - spacing/2; xx += spacing) {
+        // Dome-headed stud: circle + cross highlight
+        brush.set('2H', '#3A3020', 1.5);
+        var sr = 4;
+        for (var si = 0; si < 8; si++) {
+          var a1 = si * Math.PI/4, a2 = (si+1) * Math.PI/4;
+          brush.line(xx + sr*Math.cos(a1), yy + sr*Math.sin(a1),
+                     xx + sr*Math.cos(a2), yy + sr*Math.sin(a2));
+        }
+        // Highlight dot
+        brush.set('2H', '#5A5040', 0.8);
+        brush.line(xx - 1.5, yy - 1.5, xx + 1.5, yy + 1.5);
+      }
+      row++;
+    }
+  }
+
+  // --- Helper: door knocker ring ---
+  function drawKnocker(kx, ky, ringR, plateR) {
+    // Star-shaped plate (8-pointed, small)
+    brush.set('2H', '#3A3020', 1.5);
+    var platePts = [];
+    for (var i = 0; i < 16; i++) {
+      var a = i * Math.PI / 8 - Math.PI / 2;
+      var pr = (i % 2 === 0) ? plateR : plateR * 0.65;
+      platePts.push({ x: kx + pr * Math.cos(a), y: ky + pr * Math.sin(a) });
+    }
+    for (var i = 0; i < 16; i++) {
+      brush.line(platePts[i].x, platePts[i].y, platePts[(i+1)%16].x, platePts[(i+1)%16].y);
+    }
+    // Hanging ring (lower half visible)
+    brush.set('2H', '#2A2215', 2.0);
+    var ringSegs = 20;
+    for (var i = 0; i < ringSegs; i++) {
+      var a1 = Math.PI * 0.15 + (i / ringSegs) * Math.PI * 0.7;
+      var a2 = Math.PI * 0.15 + ((i+1) / ringSegs) * Math.PI * 0.7;
+      brush.line(kx + ringR * Math.cos(a1), ky + ringR * Math.sin(a1),
+                 kx + ringR * Math.cos(a2), ky + ringR * Math.sin(a2));
+    }
+    // Inner ring line (slightly smaller for thickness illusion)
+    brush.set('2H', '#4A3A20', 1.2);
+    var innerRingR = ringR * 0.8;
+    for (var i = 0; i < ringSegs; i++) {
+      var a1 = Math.PI * 0.15 + (i / ringSegs) * Math.PI * 0.7;
+      var a2 = Math.PI * 0.15 + ((i+1) / ringSegs) * Math.PI * 0.7;
+      brush.line(kx + innerRingR * Math.cos(a1), ky + innerRingR * Math.sin(a1),
+                 kx + innerRingR * Math.cos(a2), ky + innerRingR * Math.sin(a2));
+    }
+  }
+
+  // ---- DRAW THE DOOR ----
+
+  // --- Door frame outline ---
+  brush.set('HB', '#2A2215', 3.5);
+  brush.line(doorX, archSpringY, doorX, bot);
+  brush.line(doorX + doorW, archSpringY, doorX + doorW, bot);
+  brush.line(doorX, bot, doorX + doorW, bot);
+
+  // --- Pointed arch (existing horseshoe-pointed — architecturally sound) ---
+  brush.set('HB', '#3A3020', 3.0);
+  for (var i = 0; i < 40; i++) {
+    brush.line(archPts[i][0], archPts[i][1], archPts[i+1][0], archPts[i+1][1]);
+  }
+  // Double arch line (inner arch, slightly inset)
+  brush.set('2H', '#4A4030', 2.0);
+  var archInset = 12;
+  for (var i = 1; i < 39; i++) {
+    var ax1 = archPts[i][0], ay1 = archPts[i][1];
+    var ax2 = archPts[i+1][0], ay2 = archPts[i+1][1];
+    // Offset inward toward center
+    var adx1 = cx - ax1, ady1 = ((archPts[20][1] + panelBot)/2) - ay1;
+    var ad1 = Math.sqrt(adx1*adx1 + ady1*ady1);
+    var adx2 = cx - ax2, ady2 = ((archPts[20][1] + panelBot)/2) - ay2;
+    var ad2 = Math.sqrt(adx2*adx2 + ady2*ady2);
+    if (ad1 > 1 && ad2 > 1) {
+      brush.line(ax1 + adx1/ad1*archInset, ay1 + ady1/ad1*archInset,
+                 ax2 + adx2/ad2*archInset, ay2 + ady2/ad2*archInset);
+    }
+  }
+
+  // --- Spring line ---
+  brush.set('HB', '#3A3020', 2.5);
+  brush.line(doorX, archSpringY, doorX + doorW, archSpringY);
+
+  // --- Center divider (two doors) ---
+  brush.set('HB', '#2A2215', 3.0);
+  brush.line(cx, panelTop, cx, panelBot);
+  // Double line for center divider
+  brush.set('2H', '#3A3020', 1.5);
+  brush.line(cx - 4, panelTop + 5, cx - 4, panelBot - 5);
+  brush.line(cx + 4, panelTop + 5, cx + 4, panelBot - 5);
+
+  // --- Panel layout ---
+  // Each door half: 3 panels (upper square, middle tall, lower) + border bands
+  var lx = doorX + 25, lw = cx - 25 - lx;
+  var rx = cx + 25, rw = doorX + doorW - 25 - rx;
+  var py = panelTop + 20;
+  var totalPH = panelBot - py - 20;
+  var bandH = 18; // border band height
+  // Upper panel: square-ish (rosette with 12-fold star)
+  var upH = lw * 0.85;
+  // Middle panel: taller (rosette with 8-fold star)
+  var midH = totalPH - upH - bandH * 2 - lw * 0.55;
+  // Lower panel: short (stud grid)
+  var lowH = lw * 0.55;
+
+  var upY = py;
+  var band1Y = upY + upH;
+  var midY = band1Y + bandH;
+  var band2Y = midY + midH;
+  var lowY = band2Y + bandH;
+
+  // --- Draw panel frames ---
+  brush.set('2H', '#3A3525', 2.0);
+  // Left panels
+  brush.line(lx, upY, lx+lw, upY); brush.line(lx+lw, upY, lx+lw, upY+upH);
+  brush.line(lx+lw, upY+upH, lx, upY+upH); brush.line(lx, upY+upH, lx, upY);
+  brush.line(lx, midY, lx+lw, midY); brush.line(lx+lw, midY, lx+lw, midY+midH);
+  brush.line(lx+lw, midY+midH, lx, midY+midH); brush.line(lx, midY+midH, lx, midY);
+  brush.line(lx, lowY, lx+lw, lowY); brush.line(lx+lw, lowY, lx+lw, lowY+lowH);
+  brush.line(lx+lw, lowY+lowH, lx, lowY+lowH); brush.line(lx, lowY+lowH, lx, lowY);
+  // Right panels
+  brush.line(rx, upY, rx+rw, upY); brush.line(rx+rw, upY, rx+rw, upY+upH);
+  brush.line(rx+rw, upY+upH, rx, upY+upH); brush.line(rx, upY+upH, rx, upY);
+  brush.line(rx, midY, rx+rw, midY); brush.line(rx+rw, midY, rx+rw, midY+midH);
+  brush.line(rx+rw, midY+midH, rx, midY+midH); brush.line(rx, midY+midH, rx, midY);
+  brush.line(rx, lowY, rx+rw, lowY); brush.line(rx+rw, lowY, rx+rw, lowY+lowH);
+  brush.line(rx+rw, lowY+lowH, rx, lowY+lowH); brush.line(rx, lowY+lowH, rx, lowY);
+
+  // --- Inner frame lines (double-ruled panels) ---
+  var inset = 8;
+  brush.set('2H', '#4A4535', 1.0);
+  // Left upper inner frame
+  brush.line(lx+inset, upY+inset, lx+lw-inset, upY+inset);
+  brush.line(lx+lw-inset, upY+inset, lx+lw-inset, upY+upH-inset);
+  brush.line(lx+lw-inset, upY+upH-inset, lx+inset, upY+upH-inset);
+  brush.line(lx+inset, upY+upH-inset, lx+inset, upY+inset);
+  // Left middle inner frame
+  brush.line(lx+inset, midY+inset, lx+lw-inset, midY+inset);
+  brush.line(lx+lw-inset, midY+inset, lx+lw-inset, midY+midH-inset);
+  brush.line(lx+lw-inset, midY+midH-inset, lx+inset, midY+midH-inset);
+  brush.line(lx+inset, midY+midH-inset, lx+inset, midY+inset);
+  // Right upper inner frame
+  brush.line(rx+inset, upY+inset, rx+rw-inset, upY+inset);
+  brush.line(rx+rw-inset, upY+inset, rx+rw-inset, upY+upH-inset);
+  brush.line(rx+rw-inset, upY+upH-inset, rx+inset, upY+upH-inset);
+  brush.line(rx+inset, upY+upH-inset, rx+inset, upY+inset);
+  // Right middle inner frame
+  brush.line(rx+inset, midY+inset, rx+rw-inset, midY+inset);
+  brush.line(rx+rw-inset, midY+inset, rx+rw-inset, midY+midH-inset);
+  brush.line(rx+rw-inset, midY+midH-inset, rx+inset, midY+midH-inset);
+  brush.line(rx+inset, midY+midH-inset, rx+inset, midY+inset);
+
+  // --- 12-fold star rosettes in UPPER panels ---
+  var upCx = lx + lw/2, upCy = upY + upH/2;
+  var upR = Math.min(lw, upH) * 0.38;
+  draw12FoldStar(upCx, upCy, upR);
+  draw12FoldStar(rx + rw/2, upCy, upR);
+
+  // --- 8-fold Khatam star rosettes in MIDDLE panels ---
+  var midCx = lx + lw/2, midCy = midY + midH/2;
+  var midR = Math.min(lw, midH) * 0.35;
+  draw8FoldStar(midCx, midCy, midR);
+  draw8FoldStar(rx + rw/2, midCy, midR);
+  // Smaller satellite 8-fold stars above and below main rosette
+  var satR = midR * 0.35;
+  draw8FoldStar(midCx, midCy - midR * 1.25, satR);
+  draw8FoldStar(midCx, midCy + midR * 1.25, satR);
+  draw8FoldStar(rx + rw/2, midCy - midR * 1.25, satR);
+  draw8FoldStar(rx + rw/2, midCy + midR * 1.25, satR);
+
+  // --- Arabesque border bands between panels ---
+  drawBorderBand(lx, band1Y + bandH/2, lx + lw, band1Y + bandH/2, bandH);
+  drawBorderBand(rx, band1Y + bandH/2, rx + rw, band1Y + bandH/2, bandH);
+  drawBorderBand(lx, band2Y + bandH/2, lx + lw, band2Y + bandH/2, bandH);
+  drawBorderBand(rx, band2Y + bandH/2, rx + rw, band2Y + bandH/2, bandH);
+
+  // --- Vertical decorative lines on door frame edges ---
+  brush.set('2H', '#4A4030', 1.0);
+  // Double-ruled frame edges (inside the main frame)
+  brush.line(doorX + 8, archSpringY + 5, doorX + 8, bot - 5);
+  brush.line(doorX + doorW - 8, archSpringY + 5, doorX + doorW - 8, bot - 5);
+  // Decorative tick marks along frame (like carved molding)
+  brush.set('2H', '#5A5040', 0.7);
+  for (var ti = 0; ti < 20; ti++) {
+    var ty = archSpringY + 20 + ti * ((bot - archSpringY - 40) / 19);
+    brush.line(doorX + 3, ty, doorX + 12, ty);
+    brush.line(doorX + doorW - 12, ty, doorX + doorW - 3, ty);
+  }
+
+  // --- Hexagonal nail/stud grid in LOWER panels ---
+  drawStudGrid(lx, lowY, lw, lowH, 28);
+  drawStudGrid(rx, lowY, rw, lowH, 28);
+
+  // --- Door knockers (centered on each door half, at ~60% down) ---
+  var knockerY = midCy + midR * 0.4;
+  drawKnocker(lx + lw/2, knockerY, 22, 16);
+  drawKnocker(rx + rw/2, knockerY, 22, 16);
+
+  // --- Arch tympanum fill: radial geometric lines ---
+  brush.set('2H', '#4A4030', 1.0);
+  var archApexY = archPts[20][1];
+  // Radial lines from arch apex, fan out to spring line
+  for (var ri = 0; ri < 16; ri++) {
+    var t = ri / 15;
+    var targetX = doorX + 30 + t * (doorW - 60);
+    var targetY = archSpringY - 5;
+    // Only draw if the line stays inside the arch
+    var midXr = (cx + targetX) / 2, midYr = (archApexY + 20 + targetY) / 2;
+    var archAtMid = archY(midXr);
+    if (midYr > archAtMid + 5) {
+      brush.line(cx, archApexY + 20, targetX, targetY);
+    }
+  }
+  // 8-fold star at arch apex (prominent)
+  draw8FoldStar(cx, archApexY + 55, 40);
+  // Smaller accent stars in arch spandrels
+  draw8FoldStar(cx - 120, archSpringY - 60, 22);
+  draw8FoldStar(cx + 120, archSpringY - 60, 22);
+
+  // --- Arch border: small circles along arch curve ---
+  brush.set('2H', '#5A5040', 0.8);
+  for (var i = 2; i < 38; i += 3) {
+    var acx2 = archPts[i][0], acy2 = archPts[i][1];
+    brush.circle(acx2, acy2 + 20, 6);
+  }
+
+  // ════════════════════════════════════════════
+  // LAYER 3: V3 WREATH (from test-wreath-packed)
+  // ════════════════════════════════════════════
+
+  // --- Build flower + leaf data ---
+  var allFlowers = [];
+  var S = 1.5;
+
+  function pathLength(path) {
+    var total = 0;
+    for (var i = 1; i < path.length; i++) {
+      var dx = path[i].x - path[i-1].x, dy = path[i].y - path[i-1].y;
+      total += Math.sqrt(dx*dx + dy*dy);
+    }
+    return total;
+  }
+
+  function pointAtDist(path, targetDist, sideSign) {
+    var accum = 0;
+    for (var i = 1; i < path.length; i++) {
+      var dx = path[i].x - path[i-1].x, dy = path[i].y - path[i-1].y;
+      var segLen = Math.sqrt(dx*dx + dy*dy);
+      if (accum + segLen >= targetDist) {
+        var t = segLen > 0 ? (targetDist - accum) / segLen : 0;
+        var px = path[i-1].x + t * dx, py2 = path[i-1].y + t * dy;
+        var d = segLen > 0.01 ? segLen : 1;
+        var nx = -dy/d * sideSign, ny = dx/d * sideSign;
+        return {x: px, y: py2, nx: nx, ny: ny};
+      }
+      accum += segLen;
+    }
+    var last = path[path.length-1];
+    return {x: last.x, y: last.y, nx: 0, ny: 0};
+  }
+
+  var sizeSeq = [0.8, 0.45, 0.65, 0.4, 0.75, 0.45, 0.6, 0.4, 0.7, 0.45, 0.65, 0.4, 0.55];
+  var baseFlowerRadius = 52;
+
+  function placeFlowersAlongPath(path, sideSign, typeOffset) {
+    var total = pathLength(path);
+    var dist = 20;
+    var idx = 0;
+    while (dist < total - 20) {
+      var sz = sizeSeq[idx % sizeSeq.length];
+      var flowerR = baseFlowerRadius * sz * S;
+      var pt = pointAtDist(path, dist, sideSign);
+      var fx = pt.x + pt.nx * 5 + (Math.random()-0.5)*5;
+      var fy = pt.y + pt.ny * 5 + (Math.random()-0.5)*5;
+      var bld = builders[(idx + typeOffset) % 9];
+      allFlowers.push(bld(fx, fy, sz * S));
+      var nextSz = sizeSeq[(idx+1) % sizeSeq.length];
+      var nextR = baseFlowerRadius * nextSz * S;
+      dist += (flowerR + nextR) * 0.92;
+      idx++;
+    }
+  }
+
+  placeFlowersAlongPath(leftVinePath, 1, 0);
+  placeFlowersAlongPath(rightVinePath, -1, 4);
+
+  // --- Leaves ---
+  var allLeaves = [];
+  for (var fi = 0; fi < allFlowers.length - 1; fi++) {
+    var f1 = allFlowers[fi], f2 = allFlowers[fi+1];
+    var dx = f2.x - f1.x, dy = f2.y - f1.y;
+    var gap = Math.sqrt(dx*dx + dy*dy);
+    if (gap < 20 || gap > 300) continue;
+    var mx = (f1.x + f2.x)/2, my = (f1.y + f2.y)/2;
+    var ang = Math.atan2(dy, dx);
+    var nLeaves = gap > 100 ? 2 : 1;
+    for (var li = 0; li < nLeaves; li++) {
+      var leafAng = ang + (li === 0 ? 0.6 : -0.6) + (Math.random()-0.5)*0.3;
+      var leafLen = 50 + Math.random()*40;
+      var leafW = 16 + Math.random()*10;
+      var ox = (Math.random()-0.5)*15, oy = (Math.random()-0.5)*15;
+      allLeaves.push({pts: makeSazLeafPoly(mx+ox, my+oy, leafAng, leafLen, leafW, 0.4)});
+    }
+  }
+  for (var i = 5; i < leftVinePath.length - 5; i += 12) {
+    var lp = leftVinePath[i], rp = rightVinePath[i];
+    var lNext = leftVinePath[Math.min(i+3,79)], rNext = rightVinePath[Math.min(i+3,79)];
+    var lAng = Math.atan2(lNext.y-lp.y, lNext.x-lp.x);
+    var rAng = Math.atan2(rNext.y-rp.y, rNext.x-rp.x);
+    var s = 0.4 + Math.random()*0.3;
+    allLeaves.push({pts: makeSazLeafPoly(lp.x, lp.y, lAng+0.5, 80*s, 24*s, 0.4)});
+    allLeaves.push({pts: makeSazLeafPoly(rp.x, rp.y, rAng-0.5, 80*s, 24*s, 0.4)});
+  }
+
+  // --- DRAW WREATH ---
+
+  // Vine
+  brush.set('2H', '#5a8a50', 0.2);
+  brush.strokeWeight(2.2);
+  for (var i = 0; i < leftVinePath.length - 1; i++) {
+    brush.line(leftVinePath[i].x, leftVinePath[i].y, leftVinePath[i+1].x, leftVinePath[i+1].y);
+  }
+  for (var i = 0; i < rightVinePath.length - 1; i++) {
+    brush.line(rightVinePath[i].x, rightVinePath[i].y, rightVinePath[i+1].x, rightVinePath[i+1].y);
+  }
+  brush.set('2H', '#7a9a70', 0.12);
+  brush.strokeWeight(1.2);
+  for (var i = 0; i < leftVinePath.length - 1; i++) {
+    brush.line(leftVinePath[i].x+2, leftVinePath[i].y+1, leftVinePath[i+1].x+2, leftVinePath[i+1].y+1);
+  }
+  for (var i = 0; i < rightVinePath.length - 1; i++) {
+    brush.line(rightVinePath[i].x-2, rightVinePath[i].y+1, rightVinePath[i+1].x-2, rightVinePath[i+1].y+1);
+  }
+
+  // Leaf fills
+  brush.noStroke();
+  var leafColors = ['#1a4a2e', '#0e4a22'];
+  for (var i = 0; i < allLeaves.length; i++) {
+    brush.fill(leafColors[i % 2], 160);
+    brush.fillBleed(0.2, 'out');
+    brush.fillTexture(0.35, 0.2);
+    brush.polygon(allLeaves[i].pts);
+  }
+
+  // Flower fills
+  brush.noStroke();
+  for (var i = 0; i < allFlowers.length; i++) {
+    var fl = allFlowers[i];
+    for (var j = fl.petals.length - 1; j >= 0; j--) {
+      var p = fl.petals[j];
+      brush.fill(p.col, p.op);
+      brush.fillBleed(0.2, 'out');
+      brush.fillTexture(0.45, 0.3);
+      brush.polygon(p.pts);
+    }
+  }
+
+  // Gold centers
+  function makeCirclePoly(cx2, cy2, r, n) {
+    var pts = [];
+    for (var i = 0; i < n; i++) {
+      var a = (i / n) * Math.PI * 2;
+      pts.push([cx2 + Math.cos(a) * r, cy2 + Math.sin(a) * r]);
+    }
+    return pts;
+  }
+  brush.noStroke();
+  for (var i = 0; i < allFlowers.length; i++) {
+    var fl = allFlowers[i];
+    if (fl.gold && fl.goldR >= 5) {
+      brush.fill('#c4a040', 200);
+      brush.fillBleed(0.2, 'out');
+      brush.fillTexture(0.3, 0.2);
+      brush.polygon(makeCirclePoly(fl.x, fl.y, fl.goldR, 16));
+      brush.fill('#e8c060', 150);
+      brush.fillBleed(0.1, 'out');
+      brush.polygon(makeCirclePoly(fl.x, fl.y, fl.goldR * 0.45, 12));
+    }
+  }
+
+  noLoop();
+  console.log('WREATH IN CONTEXT DONE');
+  window._renderComplete = true;
+}
+
+function draw() {}
+</script>
+</body>
+</html>

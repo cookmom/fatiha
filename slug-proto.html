@@ -1,0 +1,405 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Slug Calligraphy — Al-Fatiha</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0d0d12; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #info {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    color: rgba(255,255,255,0.4); font: 12px monospace; z-index: 10;
+  }
+</style>
+</head>
+<body>
+<div id="info">Loading...</div>
+<div id="tap" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:20;cursor:pointer;">
+  <div style="color:rgba(255,255,255,0.5);font:18px 'Georgia',serif;letter-spacing:2px;">tap to begin</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.172.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.172.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+// --- Scene setup ---
+const W = window.innerWidth, H = window.innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x0d0d12);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.OrthographicCamera(-W/2, W/2, H/2, -H/2, -1000, 1000);
+camera.position.z = 10;
+
+// --- Load pre-shaped curve data ---
+const data = await fetch('fatiha-curves.json').then(r => r.json());
+console.log('Loaded:', data.totalCurves, 'curves across', data.verses.length, 'verses');
+
+// --- Layout: Mihrab arch ---
+// Pointed arch shape: wider at top, narrowing toward base
+// Bismillah crowns the keystone, verses flow down inside the arch
+const totalVerses = data.verses.length; // 8 lines (verse 7 split)
+const archTopY = H * 0.40;    // top of arch
+const archBottomY = -H * 0.38; // bottom
+const archHeight = archTopY - archBottomY;
+const archMaxWidth = W * 0.88; // widest point
+const archMinWidth = W * 0.55; // narrowest (keep readable)
+
+// Mihrab arch width: gentle narrowing, text stays readable
+function archWidthAt(t) {
+  // t: 0 = top, 1 = bottom
+  // Very gentle S-curve narrowing — keeps lower verses readable
+  const ease = Math.pow(t, 1.5) * 0.6; // much gentler
+  return archMaxWidth * (1 - ease) + archMinWidth * ease;
+}
+
+const lineSpacing = archHeight / (totalVerses + 0.5);
+
+const verseLayouts = [];
+for (let v = 0; v < totalVerses; v++) {
+  const verse = data.verses[v];
+  const t = v / (totalVerses - 1); // 0 at top, 1 at bottom
+  const availWidth = archWidthAt(t);
+  let scale = Math.min(availWidth / verse.width, 1.8);
+
+  const scaledW = verse.width * scale;
+  const ox = -scaledW * 0.5;
+  const oy = archTopY - v * lineSpacing;
+
+  verseLayouts.push({ scale, ox, oy, verse });
+}
+
+// --- Pack all curves into GPU texture ---
+let allCurves = [];
+const verseBoundsData = [];
+const verseRangesData = [];
+
+for (let v = 0; v < verseLayouts.length; v++) {
+  const { scale, ox, oy, verse } = verseLayouts[v];
+  const startIdx = allCurves.length;
+
+  for (const c of verse.curves) {
+    allCurves.push({
+      p1x: c[0] * scale + ox, p1y: c[1] * scale + oy,
+      p2x: c[2] * scale + ox, p2y: c[3] * scale + oy,
+      p3x: c[4] * scale + ox, p3y: c[5] * scale + oy
+    });
+  }
+
+  const endIdx = allCurves.length;
+  verseRangesData.push(startIdx, endIdx);
+
+  // Bounding box
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (let i = startIdx; i < endIdx; i++) {
+    const c = allCurves[i];
+    minX = Math.min(minX, c.p1x, c.p2x, c.p3x);
+    maxX = Math.max(maxX, c.p1x, c.p2x, c.p3x);
+    minY = Math.min(minY, c.p1y, c.p2y, c.p3y);
+    maxY = Math.max(maxY, c.p1y, c.p2y, c.p3y);
+  }
+  const cx = (minX + maxX) * 0.5;
+  const cy = (minY + maxY) * 0.5;
+  const hw = (maxX - minX) * 0.5 + 8;
+  const hh = (maxY - minY) * 0.5 + 8;
+  verseBoundsData.push(cx, cy, hw, hh);
+}
+
+console.log('Total GPU curves:', allCurves.length);
+
+// Create float texture
+const texWidth = 4096;
+const numTexels = allCurves.length * 2;
+const texHeight = Math.ceil(numTexels / texWidth) || 1;
+const texData = new Float32Array(texWidth * texHeight * 4);
+
+for (let i = 0; i < allCurves.length; i++) {
+  const c = allCurves[i];
+  const base = i * 2 * 4;
+  texData[base + 0] = c.p1x; texData[base + 1] = c.p1y;
+  texData[base + 2] = c.p2x; texData[base + 3] = c.p2y;
+  texData[base + 4] = c.p3x; texData[base + 5] = c.p3y;
+}
+
+const curveTexture = new THREE.DataTexture(texData, texWidth, texHeight, THREE.RGBAFormat, THREE.FloatType);
+curveTexture.needsUpdate = true;
+
+// --- Shaders ---
+const vertexShader = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const fragmentShader = `
+  precision highp float;
+
+  uniform sampler2D curveData;
+  uniform int curveCount;
+  uniform float texWidth;
+  uniform vec2 resolution;
+  uniform float time;
+  uniform vec3 inkColor;
+  uniform vec4 verseBounds[8];
+  uniform vec2 verseRanges[8];
+  uniform float verseReveal[8]; // 0..1 per verse
+
+  varying vec2 vUv;
+
+  vec4 fetchTexel(int idx) {
+    int y = idx / int(texWidth);
+    int x = idx - y * int(texWidth);
+    return texelFetch(curveData, ivec2(x, y), 0);
+  }
+
+  uint calcRootCode(float y1, float y2, float y3) {
+    uint i1 = floatBitsToUint(y1) >> 31u;
+    uint i2 = floatBitsToUint(y2) >> 30u;
+    uint i3 = floatBitsToUint(y3) >> 29u;
+    uint shift = (i2 & 2u) | (i1 & ~2u);
+    shift = (i3 & 4u) | (shift & ~4u);
+    return ((0x2E74u >> shift) & 0x0101u);
+  }
+
+  vec2 solveHorizPoly(vec4 p12, vec2 p3) {
+    vec2 a = p12.xy - p12.zw * 2.0 + p3;
+    vec2 b = p12.xy - p12.zw;
+    float ra = 1.0 / a.y;
+    float rb = 0.5 / b.y;
+    float d = sqrt(max(b.y * b.y - a.y * p12.y, 0.0));
+    float t1 = (b.y - d) * ra;
+    float t2 = (b.y + d) * ra;
+    if (abs(a.y) < 1.0 / 65536.0) { t1 = p12.y * rb; t2 = t1; }
+    return vec2(
+      (a.x * t1 - b.x * 2.0) * t1 + p12.x,
+      (a.x * t2 - b.x * 2.0) * t2 + p12.x
+    );
+  }
+
+  void main() {
+    vec2 fragPos = (vUv - 0.5) * resolution;
+    float pixelSize = 2.0;
+    float winding = 0.0;
+
+    for (int v = 0; v < 8; v++) {
+      vec4 vb = verseBounds[v];
+      vec2 d = abs(fragPos - vb.xy) - vb.zw;
+      if (d.x > pixelSize * 2.0 || d.y > pixelSize * 2.0) continue;
+
+      int startC = int(verseRanges[v].x);
+      int totalC = int(verseRanges[v].y) - startC;
+      int endC = startC + int(float(totalC) * verseReveal[v]);
+
+      for (int i = 0; i < 4000; i++) {
+        if (i + startC >= endC) break;
+        int ci = i + startC;
+
+        vec4 t0 = fetchTexel(ci * 2);
+        vec4 t1 = fetchTexel(ci * 2 + 1);
+
+        vec4 p12 = vec4(t0.xy - fragPos, t0.zw - fragPos);
+        vec2 p3 = t1.xy - fragPos;
+
+        uint code = calcRootCode(p12.y, p12.w, p3.y);
+        if (code != 0u) {
+          vec2 r = solveHorizPoly(p12, p3);
+          if ((code & 1u) != 0u) {
+            winding += clamp(r.x / pixelSize + 0.5, 0.0, 1.0);
+          }
+          if (code > 1u) {
+            winding -= clamp(r.y / pixelSize + 0.5, 0.0, 1.0);
+          }
+        }
+      }
+    } // end verse loop
+
+    float coverage = clamp(abs(winding), 0.0, 1.0);
+
+    // Soft watercolor edges
+    float soft = smoothstep(0.0, 0.12, coverage);
+
+    // Subtle ink texture
+    float noise = fract(sin(dot(fragPos * 0.1, vec2(12.9898, 78.233))) * 43758.5453);
+    soft *= 0.88 + 0.12 * noise;
+
+    vec3 color = inkColor * soft;
+
+    // Warm glow at edges
+    float edge = smoothstep(0.7, 0.2, coverage) * 0.12;
+    color += vec3(0.4, 0.25, 0.08) * edge;
+
+    gl_FragColor = vec4(color, soft);
+  }
+`;
+
+// --- Build mesh ---
+const geo = new THREE.PlaneGeometry(W, H);
+const mat = new THREE.ShaderMaterial({
+  vertexShader, fragmentShader,
+  uniforms: {
+    curveData: { value: curveTexture },
+    curveCount: { value: allCurves.length },
+    texWidth: { value: texWidth },
+    resolution: { value: new THREE.Vector2(W, H) },
+    time: { value: 0 },
+    inkColor: { value: new THREE.Color(0.95, 0.88, 0.75) },
+    verseBounds: { value: [] },
+    verseRanges: { value: [] },
+    verseReveal: { value: new Array(8).fill(0.0) }
+  },
+  transparent: true,
+  depthWrite: false
+});
+
+// Set verse uniforms
+const vbArr = [], vrArr = [];
+for (let i = 0; i < 8; i++) {
+  const bi = i * 4;
+  vbArr.push(new THREE.Vector4(
+    verseBoundsData[bi] || 0, verseBoundsData[bi+1] || 0,
+    verseBoundsData[bi+2] || 0, verseBoundsData[bi+3] || 0
+  ));
+  const ri = i * 2;
+  vrArr.push(new THREE.Vector2(verseRangesData[ri] || 0, verseRangesData[ri+1] || 0));
+}
+mat.uniforms.verseBounds.value = vbArr;
+mat.uniforms.verseRanges.value = vrArr;
+
+scene.add(new THREE.Mesh(geo, mat));
+
+// --- Audio: Mishary Al-Fatiha recitation ---
+// Ayah timestamps (seconds): start time for each verse
+const AYAH_TIMES = [0, 5.5, 11.5, 16.0, 21.0, 28.0, 34.0, 34.0]; // line 7&8 are same verse
+const TOTAL_DUR = 46.0;
+
+// Create audio element
+const audio = new Audio('mishary-fatiha.mp3');
+audio.preload = 'auto';
+let audioStarted = false;
+
+// Tap to start
+document.addEventListener('click', () => {
+  if (!audioStarted) {
+    audio.play();
+    audioStarted = true;
+    document.getElementById('tap').style.display = 'none';
+  }
+}, { once: true });
+
+// --- Mihrab arch outline (proper pointed arch) ---
+// Islamic pointed arch: two circular arcs with centers offset inward
+const archPoints = [];
+const archSegs = 100;
+const archW = archMaxWidth * 0.52; // half-width at base
+const archH = archHeight * 0.55;   // height of arch
+const archBaseY = archBottomY + archHeight * 0.1;
+const archPeakY = archBaseY + archH;
+
+// Pointed arch: each side is a circular arc
+// Arc center is offset inward from the base corner
+const inset = archW * 0.3; // how pointed (smaller = more pointed)
+const R = Math.sqrt((archW - inset) * (archW - inset) + archH * archH);
+
+for (let i = 0; i <= archSegs; i++) {
+  const t = i / archSegs;
+  let x, y;
+
+  if (t <= 0.5) {
+    // Left arc: center at (-inset, archBaseY)
+    const s = t * 2;
+    const startAngle = Math.atan2(0, -(archW - inset)); // pointing left
+    const endAngle = Math.atan2(archH, inset); // pointing to peak
+    const angle = startAngle + s * (endAngle - startAngle);
+    x = -inset + R * Math.cos(angle);
+    y = archBaseY + R * Math.sin(angle);
+  } else {
+    // Right arc: center at (inset, archBaseY)
+    const s = (t - 0.5) * 2;
+    const startAngle = Math.atan2(archH, -inset); // from peak
+    const endAngle = Math.atan2(0, (archW - inset)); // pointing right
+    const angle = startAngle + s * (endAngle - startAngle);
+    x = inset + R * Math.cos(angle);
+    y = archBaseY + R * Math.sin(angle);
+  }
+
+  archPoints.push(new THREE.Vector3(x, y, 0));
+}
+
+// Close the bottom
+archPoints.push(new THREE.Vector3(archW, archBaseY, 0));
+archPoints.push(new THREE.Vector3(-archW, archBaseY, 0));
+
+const archGeo = new THREE.BufferGeometry().setFromPoints(archPoints);
+const archMat = new THREE.LineBasicMaterial({
+  color: 0xd4a86a,
+  transparent: true,
+  opacity: 0.08
+});
+scene.add(new THREE.Line(archGeo, archMat));
+
+// Post-processing
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(W, H), 0.25, 0.2, 0.92));
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const t = window._synthTime !== undefined ? window._synthTime : (audioStarted ? audio.currentTime : 0);
+
+  // Auto-hide overlay when using synthetic time
+  if (window._synthTime !== undefined && window._synthTime > 0) {
+    const tap = document.getElementById('tap');
+    const info = document.getElementById('info');
+    if (tap) tap.style.display = 'none';
+    if (info) info.style.display = 'none';
+  }
+  mat.uniforms.time.value = t;
+
+  // Per-verse reveal based on audio position
+  const reveal = mat.uniforms.verseReveal.value;
+  for (let v = 0; v < 8; v++) {
+    const verseStart = AYAH_TIMES[v];
+    const verseEnd = (v < 7) ? AYAH_TIMES[v + 1] : TOTAL_DUR;
+    const verseDur = verseEnd - verseStart;
+
+    if (t < verseStart) {
+      reveal[v] = 0.0;
+    } else if (t >= verseEnd) {
+      reveal[v] = 1.0;
+    } else {
+      // Ease-out for natural stroke feel
+      const raw = (t - verseStart) / verseDur;
+      reveal[v] = 1.0 - Math.pow(1.0 - raw, 2.0); // ease-out quadratic
+    }
+  }
+
+  composer.render();
+}
+animate();
+
+document.getElementById('info').textContent =
+  `Slug — ${allCurves.length} curves, ${data.verses.length} verses (HarfBuzz shaped)`;
+</script>
+</body>
+</html>
