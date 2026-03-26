@@ -90,56 +90,56 @@ var STEPS=[
    bbox:[969,327,1073,418],
    draw:function(p){
       brush.set('2H','#5a5248',0.6);if(pts_dome_10){var n=Math.max(3,Math.round(p*pts_dome_10.length));var sub=pts_dome_10.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);}
-      if(p>0.4){var edges=_data['edges_dome_10'];if(edges){brush.set('2H','#8a8278',0.3);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}
+      if(p>0.4){var edges=_data['edges_dome_10'];if(edges){brush.set('2H','#8a8278',0.3);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}}
       return[1022,373];
    }},
   {name:'STAR POLYGON 2',formula:'star_polygon | background_domes (wt=1.2)',dur:1.42,
    bbox:[181,1203,898,1600],
    draw:function(p){
       brush.set('2H','#5a5248',1.2);var c=_data['contour_star_polygon_2'];if(c&&c.length>=3){var n=Math.max(3,Math.round(p*c.length));var pts=[];for(var i=0;i<n;i++)pts.push([c[i][0],c[i][1],0.3+0.7*Math.sin(Math.PI*i/c.length)]);if(pts.length>=2)brush.spline(pts,0.3);}
-      if(p>0.4){var edges=_data['edges_star_polygon_2'];if(edges){brush.set('2H','#8a8278',0.6);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}
+      if(p>0.4){var edges=_data['edges_star_polygon_2'];if(edges){brush.set('2H','#8a8278',0.6);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}}
       return[540,1402];
    }},
   {name:'STAR POLYGON 3',formula:'star_polygon | background_domes (wt=1.2)',dur:1.42,
    bbox:[181,1203,902,1600],
    draw:function(p){
       brush.set('2H','#5a5248',1.2);var c=_data['contour_star_polygon_3'];if(c&&c.length>=3){var n=Math.max(3,Math.round(p*c.length));var pts=[];for(var i=0;i<n;i++)pts.push([c[i][0],c[i][1],0.3+0.7*Math.sin(Math.PI*i/c.length)]);if(pts.length>=2)brush.spline(pts,0.3);}
-      if(p>0.4){var edges=_data['edges_star_polygon_3'];if(edges){brush.set('2H','#8a8278',0.6);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}
+      if(p>0.4){var edges=_data['edges_star_polygon_3'];if(edges){brush.set('2H','#8a8278',0.6);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}}
       return[542,1402];
    }},
   {name:'DOME 8',formula:'onion h/d=1.395 | wt=1.2',dur:1.08,
    bbox:[475,1413,607,1600],
    draw:function(p){
       brush.set('2H','#5a5248',1.2);if(pts_dome_8){var n=Math.max(3,Math.round(p*pts_dome_8.length));var sub=pts_dome_8.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);}
-      if(p>0.4){var edges=_data['edges_dome_8'];if(edges){brush.set('2H','#8a8278',0.6);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}
+      if(p>0.4){var edges=_data['edges_dome_8'];if(edges){brush.set('2H','#8a8278',0.6);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}}
       return[542,1507];
    }},
   {name:'OPENWORK 9',formula:'openwork | background_domes (wt=1.2)',dur:1.42,
    bbox:[456,1379,628,1600],
    draw:function(p){
       brush.set('2H','#5a5248',1.2);var c=_data['contour_openwork_9'];if(c&&c.length>=3){var n=Math.max(3,Math.round(p*c.length));var pts=[];for(var i=0;i<n;i++)pts.push([c[i][0],c[i][1],0.3+0.7*Math.sin(Math.PI*i/c.length)]);if(pts.length>=2)brush.spline(pts,0.3);}
-      if(p>0.4){var edges=_data['edges_openwork_9'];if(edges){brush.set('2H','#8a8278',0.6);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}
+      if(p>0.4){var edges=_data['edges_openwork_9'];if(edges){brush.set('2H','#8a8278',0.6);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}}
       return[542,1490];
    }},
   {name:'POINTED ARCH 11',formula:'slightly_pointed rise/span=0.711 | wt=1.2',dur:1.42,
    bbox:[706,1464,769,1600],
    draw:function(p){
       brush.set('2H','#5a5248',1.2);if(pts_pointed_arch_11){var n=Math.max(3,Math.round(p*pts_pointed_arch_11.length));var sub=pts_pointed_arch_11.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);}if(p>0.8){brush.line(707,1601,707,1628);brush.line(769,1601,769,1628);}
-      if(p>0.4){var edges=_data['edges_pointed_arch_11'];if(edges){brush.set('2H','#8a8278',0.6);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}
+      if(p>0.4){var edges=_data['edges_pointed_arch_11'];if(edges){brush.set('2H','#8a8278',0.6);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}}
       return[738,1533];
    }},
   {name:'POINTED ARCH 12',formula:'lancet rise/span=1.297 | wt=1.2',dur:1.42,
    bbox:[317,1464,378,1600],
    draw:function(p){
       brush.set('2H','#5a5248',1.2);if(pts_pointed_arch_12){var n=Math.max(3,Math.round(p*pts_pointed_arch_12.length));var sub=pts_pointed_arch_12.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);}if(p>0.8){brush.line(317,1601,317,1628);brush.line(378,1601,378,1628);}
-      if(p>0.4){var edges=_data['edges_pointed_arch_12'];if(edges){brush.set('2H','#8a8278',0.6);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}
+      if(p>0.4){var edges=_data['edges_pointed_arch_12'];if(edges){brush.set('2H','#8a8278',0.6);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}}
       return[348,1533];
    }},
   {name:'TALL ARCH 1',formula:'lancet rise/span=1.386 | wt=1.8',dur:1.42,
    bbox:[161,488,918,1600],
    draw:function(p){
       brush.set('2H','#5a5248',1.8);if(pts_tall_arch_1){var n=Math.max(3,Math.round(p*pts_tall_arch_1.length));var sub=pts_tall_arch_1.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);}if(p>0.8){brush.line(162,1601,162,1823);brush.line(918,1601,918,1823);}
-      if(p>0.4){var edges=_data['edges_tall_arch_1'];if(edges){brush.set('2H','#8a8278',1.2);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}
+      if(p>0.4){var edges=_data['edges_tall_arch_1'];if(edges){brush.set('2H','#8a8278',1.2);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}}
       return[540,1045];
    }},
   {name:'WALL 6',formula:'wall | mid_facade (wt=1.8)',dur:1.42,
@@ -151,28 +151,28 @@ var STEPS=[
       if(rp>0.25&&rp<=0.5){brush.line(401,909,686,909);brush.line(686,909,686,1204);}
       if(rp>0.5&&rp<=0.75){brush.line(401,909,686,909);brush.line(686,909,686,1204);brush.line(686,1204,401,1204);}
       if(rp>0.75){brush.line(401,909,686,909);brush.line(686,909,686,1204);brush.line(686,1204,401,1204);brush.line(401,1204,401,909);}
-      if(p>0.4){var edges=_data['edges_wall_6'];if(edges){brush.set('2H','#8a8278',1.2);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}
+      if(p>0.4){var edges=_data['edges_wall_6'];if(edges){brush.set('2H','#8a8278',1.2);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}}
       return[543,1056];
    }},
   {name:'HORSESHOE ARCH 7',formula:'slightly_pointed rise/span=0.586 | wt=1.8',dur:1.33,
    bbox:[402,919,682,1157],
    draw:function(p){
       brush.set('2H','#5a5248',1.8);if(pts_horseshoe_arch_7){var n=Math.max(3,Math.round(p*pts_horseshoe_arch_7.length));var sub=pts_horseshoe_arch_7.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);}if(p>0.8){brush.line(402,1157,402,1204);brush.line(683,1157,683,1204);}
-      if(p>0.4){var edges=_data['edges_horseshoe_arch_7'];if(edges){brush.set('2H','#8a8278',1.2);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}
+      if(p>0.4){var edges=_data['edges_horseshoe_arch_7'];if(edges){brush.set('2H','#8a8278',1.2);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}}
       return[542,1038];
    }},
   {name:'OPENWORK 4',formula:'openwork | foreground_frame (wt=2.5)',dur:1.42,
    bbox:[182,455,903,1089],
    draw:function(p){
       brush.set('2H','#5a5248',2.5);var c=_data['contour_openwork_4'];if(c&&c.length>=3){var n=Math.max(3,Math.round(p*c.length));var pts=[];for(var i=0;i<n;i++)pts.push([c[i][0],c[i][1],0.3+0.7*Math.sin(Math.PI*i/c.length)]);if(pts.length>=2)brush.spline(pts,0.3);}
-      if(p>0.4){var edges=_data['edges_openwork_4'];if(edges){brush.set('2H','#8a8278',1.9);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}
+      if(p>0.4){var edges=_data['edges_openwork_4'];if(edges){brush.set('2H','#8a8278',1.9);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}}
       return[543,772];
    }},
   {name:'OGEE ARCH 5',formula:'slightly_pointed rise/span=0.644 | wt=2.5',dur:1.42,
    bbox:[328,620,762,1033],
    draw:function(p){
       brush.set('2H','#5a5248',2.5);if(pts_ogee_arch_5){var n=Math.max(3,Math.round(p*pts_ogee_arch_5.length));var sub=pts_ogee_arch_5.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);}if(p>0.8){brush.line(328,1034,328,1116);brush.line(763,1034,763,1116);}
-      if(p>0.4){var edges=_data['edges_ogee_arch_5'];if(edges){brush.set('2H','#8a8278',1.9);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}
+      if(p>0.4){var edges=_data['edges_ogee_arch_5'];if(edges){brush.set('2H','#8a8278',1.9);var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){var path=edges[ei];if(path&&path.length>=2){var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}}
       return[546,827];
    }},
   {name:'STAR POLYGON 2 WASH',formula:'#D4C5B0 α=20',dur:0.05,
