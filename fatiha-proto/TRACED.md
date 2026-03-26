@@ -86,6 +86,13 @@ Nobody has built **photo → parametric proportional skeleton → animated proce
 ## Architecture Principle
 **Keypoints > Segmentation.** Architects don't segment — they locate landmark points and derive proportions. Our tool works the same way. Click 20 keypoints → get the full proportional system → generate the drawing.
 
+## Future: Browser-Side Inference
+- SAM 2/3 have ONNX export paths — investigate running in-browser via ONNX Runtime Web / WebGPU
+- Transformers.js supports SAM 2 (check model size feasibility)
+- WebGPU on Tawfeeq's A6000s would give GPU inference in Chrome
+- Goal: entire Traced pipeline runs client-side, no server, no Python — just a webpage
+- This would make Traced a shareable tool anyone can use
+
 ## Future Stages (Not Yet Built)
 - **Auto-keypoint detection** — CV finds keypoints automatically (dome peaks, arch springings, symmetry intersections)
 - **Template library** — save proportional skeletons for reuse (Ottoman mosque template, Gothic cathedral template, etc.)
