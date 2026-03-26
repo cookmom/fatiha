@@ -39,25 +39,10 @@ var W=1080,H=1920,cx=W/2;
       var y=1303.1054824925814-_a_sub_wall_2_arch_32*(Math.cosh(1.5)-Math.cosh(nx));
       pts_sub_wall_2_arch_32.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}
 
-    // sub_star_polygon_3_arch_42: catenary arch (span=89, rise/span=2.000)
-    var pts_sub_star_polygon_3_arch_42 = [];
-    var _a_sub_star_polygon_3_arch_42=178.6202321661721/(Math.cosh(1.5)-1);
-    for(var i=0;i<=30;i++){var t=i/30;
-      var x=849.7559643916914-44.65505804154302+44.65505804154302*2*t;
-      var nx=(t-0.5)*3;
-      var y=1303.1054824925814-_a_sub_star_polygon_3_arch_42*(Math.cosh(1.5)-Math.cosh(nx));
-      pts_sub_star_polygon_3_arch_42.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // wall_2: rectangle
-
-    // pointed_arch_16: catenary arch (span=101, rise/span=0.765)
-    var pts_pointed_arch_16 = [];
-    var _a_pointed_arch_16=77.55482553131507/(Math.cosh(1.5)-1);
-    for(var i=0;i<=30;i++){var t=i/30;
-      var x=330.90207715133545-50.70502936201781+50.70502936201781*2*t;
-      var nx=(t-0.5)*3;
-      var y=1431.7078587537094-_a_pointed_arch_16*(Math.cosh(1.5)-Math.cosh(nx));
-      pts_pointed_arch_16.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}
+    // sub_star_polygon_3_dome_35: pointed dome (R=82)
+    var pts_sub_star_polygon_3_dome_35 = [];
+    for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
+      pts_sub_star_polygon_3_dome_35.push([545.2763347181008+81.73901483679526*Math.cos(a), 1462.3822433234423-81.73901483679526*1.2*Math.pow(Math.sin(a),0.85), 0.3+0.7*Math.sin(Math.PI*t)]);}
 
     // pointed_arch_17: catenary arch (span=83, rise/span=1.132)
     var pts_pointed_arch_17 = [];
@@ -68,173 +53,38 @@ var W=1080,H=1920,cx=W/2;
       var y=1511.0096629080117-_a_pointed_arch_17*(Math.cosh(1.5)-Math.cosh(nx));
       pts_pointed_arch_17.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}
 
-    // sub_dome_like_1_pointed_arch_12: catenary arch (span=128, rise/span=1.456)
-    var pts_sub_dome_like_1_pointed_arch_12 = [];
-    var _a_sub_dome_like_1_pointed_arch_12=186.60605341246293/(Math.cosh(1.5)-1);
-    for(var i=0;i<=30;i++){var t=i/30;
-      var x=541.6023738872403-64.09495548961425+64.09495548961425*2*t;
-      var nx=(t-0.5)*3;
-      var y=1597.933884328635-_a_sub_dome_like_1_pointed_arch_12*(Math.cosh(1.5)-Math.cosh(nx));
-      pts_sub_dome_like_1_pointed_arch_12.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_dome_like_1_wall_15: rectangle
-
-    // sub_wall_2_pointed_arch_21: elliptical arch (span=101, rise/span=0.765)
-    var pts_sub_wall_2_pointed_arch_21 = [];
-    for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
-      pts_sub_wall_2_pointed_arch_21.push([759.6505922848661+50.70502936201781*Math.cos(a),1431.6964136498518-77.55482553131507*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_wall_2_pointed_arch_25: catenary arch (span=128, rise/span=1.443)
-    var pts_sub_wall_2_pointed_arch_25 = [];
-    var _a_sub_wall_2_pointed_arch_25=184.97804154302673/(Math.cosh(1.5)-1);
-    for(var i=0;i<=30;i++){var t=i/30;
-      var x=541.6023738872403-64.09495548961425+64.09495548961425*2*t;
-      var nx=(t-0.5)*3;
-      var y=1600.0158757696588-_a_sub_wall_2_pointed_arch_25*(Math.cosh(1.5)-Math.cosh(nx));
-      pts_sub_wall_2_pointed_arch_25.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_wall_2_pointed_arch_26: elliptical arch (span=85, rise/span=0.780)
-    var pts_sub_wall_2_pointed_arch_26 = [];
-    for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
-      pts_sub_wall_2_pointed_arch_26.push([759.6505922848661+42.528581305637985*Math.cos(a),1431.6964136498518-66.34462936537656*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_wall_2_pointed_arch_27: catenary arch (span=71, rise/span=1.176)
-    var pts_sub_wall_2_pointed_arch_27 = [];
-    var _a_sub_wall_2_pointed_arch_27=83.91126850997915/(Math.cosh(1.5)-1);
-    for(var i=0;i<=30;i++){var t=i/30;
-      var x=759.6505922848661-35.685655637982194+35.685655637982194*2*t;
-      var nx=(t-0.5)*3;
-      var y=1511.0096629080117-_a_sub_wall_2_pointed_arch_27*(Math.cosh(1.5)-Math.cosh(nx));
-      pts_sub_wall_2_pointed_arch_27.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_star_polygon_3_dome_35: pointed dome (R=82)
-    var pts_sub_star_polygon_3_dome_35 = [];
-    for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
-      pts_sub_star_polygon_3_dome_35.push([545.2763347181008+81.73901483679526*Math.cos(a), 1462.3822433234423-81.73901483679526*1.2*Math.pow(Math.sin(a),0.85), 0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_star_polygon_3_pointed_arch_37: catenary arch (span=73, rise/span=1.319)
-    var pts_sub_star_polygon_3_pointed_arch_37 = [];
-    var _a_sub_star_polygon_3_pointed_arch_37=96.28975045433307/(Math.cosh(1.5)-1);
-    for(var i=0;i<=30;i++){var t=i/30;
-      var x=759.6505922848661-36.48997321958457+36.48997321958457*2*t;
-      var nx=(t-0.5)*3;
-      var y=1558.0784534124627-_a_sub_star_polygon_3_pointed_arch_37*(Math.cosh(1.5)-Math.cosh(nx));
-      pts_sub_star_polygon_3_pointed_arch_37.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_star_polygon_3_pointed_arch_38: catenary arch (span=65, rise/span=1.445)
-    var pts_sub_star_polygon_3_pointed_arch_38 = [];
-    var _a_sub_star_polygon_3_pointed_arch_38=94.43189327399128/(Math.cosh(1.5)-1);
-    for(var i=0;i<=30;i++){var t=i/30;
-      var x=759.6505922848661-32.666351594955486+32.666351594955486*2*t;
-      var nx=(t-0.5)*3;
-      var y=1600.0158757696588-_a_sub_star_polygon_3_pointed_arch_38*(Math.cosh(1.5)-Math.cosh(nx));
-      pts_sub_star_polygon_3_pointed_arch_38.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // dome_like_1: hemisphere dome (R=366)
-    var pts_dome_like_1 = [];
-    for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
-      pts_dome_like_1.push([545.2763347181008+366.20265685459947*Math.cos(a), 1096.528189910979-366.20265685459947*Math.sin(a), 0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // horseshoe_arch_7: elliptical arch (span=294, rise/span=1.124)
-    var pts_horseshoe_arch_7 = [];
-    for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
-      pts_horseshoe_arch_7.push([550.2494955489615+147.1528650445104*Math.cos(a),1200.0320308605342-330.9314895871393*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // arch_8: elliptical arch (span=288, rise/span=1.027)
-    var pts_arch_8 = [];
-    for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
-      pts_arch_8.push([545.7775477744808+143.9461175074184*Math.cos(a),1200.6360308605342-295.6054437753543*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
-
     // dome_9: onion dome (R=123)
     var pts_dome_9 = [];
     for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
       var r_mod = 122.75811988130565 * (1 + 0.15*Math.sin(a*2)); // bulge
       pts_dome_9.push([545.2763347181008+r_mod*Math.cos(a), 1051.047881305638-122.75811988130565*1.1*Math.sin(a), 0.3+0.7*Math.sin(Math.PI*t)]);}
 
+    // sub_openwork_4_dome_45: pointed dome (R=88)
+    var pts_sub_openwork_4_dome_45 = [];
+    for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
+      pts_sub_openwork_4_dome_45.push([545.2763347181008+88.16773887240356*Math.cos(a), 1000.8309080118695-88.16773887240356*1.2*Math.pow(Math.sin(a),0.85), 0.3+0.7*Math.sin(Math.PI*t)]);}
+
     // sub_openwork_0_wall_3: rectangle
+
+    // horseshoe_arch_7: elliptical arch (span=294, rise/span=1.124)
+    var pts_horseshoe_arch_7 = [];
+    for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
+      pts_horseshoe_arch_7.push([550.2494955489615+147.1528650445104*Math.cos(a),1200.0320308605342-330.9314895871393*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
 
     // sub_openwork_0_arch_7: elliptical arch (span=288, rise/span=1.098)
     var pts_sub_openwork_0_arch_7 = [];
     for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
       pts_sub_openwork_0_arch_7.push([541.9247477744808+143.98034421364986*Math.cos(a),1200.9380308605341-316.1290029692581*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
 
-    // sub_openwork_0_tall_arch_9: tudor arch (span=713, rise/span=1.043)
-    var pts_sub_openwork_0_tall_arch_9 = [];
-    for(var i=0;i<=40;i++){var t=i/40;
-      var x=544.8832-356.5052695548962+356.5052695548962*2*t;
-      var y;
-      if(t<0.2||t>0.8){var nt=t<0.2?t/0.2:(1-t)/0.2;y=1593.7699014465877-743.9609005914701*0.4*Math.sin(Math.PI/2*nt);}
-      else{var nt=(t-0.2)/0.6;y=1593.7699014465877-743.9609005914701*(0.4+0.6*Math.sin(Math.PI*nt));}
-      pts_sub_openwork_0_tall_arch_9.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_openwork_0_horseshoe_arch_10: elliptical arch (span=366, rise/span=0.602)
-    var pts_sub_openwork_0_horseshoe_arch_10 = [];
+    // sub_openwork_0_dome_like_6: hemisphere dome (R=217)
+    var pts_sub_openwork_0_dome_like_6 = [];
     for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
-      pts_sub_openwork_0_horseshoe_arch_10.push([545.5507086053411+183.19991928783384*Math.cos(a),1120.1595151335312-220.61227400511814*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
+      pts_sub_openwork_0_dome_like_6.push([545.2763347181008+217.12166172106825*Math.cos(a), 861.6803798219585-217.12166172106825*Math.sin(a), 0.3+0.7*Math.sin(Math.PI*t)]);}
 
-    // sub_dome_like_1_arch_13: elliptical arch (span=288, rise/span=1.055)
-    var pts_sub_dome_like_1_arch_13 = [];
+    // sub_horseshoe_arch_7_dome_60: hemisphere dome (R=51)
+    var pts_sub_horseshoe_arch_7_dome_60 = [];
     for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
-      pts_sub_dome_like_1_arch_13.push([544.4527477744808+143.96665353115728*Math.cos(a),1200.9380308605341-303.80649441404586*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_dome_like_1_horseshoe_arch_19: elliptical arch (span=294, rise/span=0.946)
-    var pts_sub_dome_like_1_horseshoe_arch_19 = [];
-    for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
-      pts_sub_dome_like_1_horseshoe_arch_19.push([542.4227608308606+146.8495741246291*Math.cos(a),1116.3498587537092-277.96451008095244*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_openwork_4_dome_45: pointed dome (R=88)
-    var pts_sub_openwork_4_dome_45 = [];
-    for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
-      pts_sub_openwork_4_dome_45.push([545.2763347181008+88.16773887240356*Math.cos(a), 1000.8309080118695-88.16773887240356*1.2*Math.pow(Math.sin(a),0.85), 0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_openwork_4_horseshoe_arch_47: tudor arch (span=294, rise/span=0.946)
-    var pts_sub_openwork_4_horseshoe_arch_47 = [];
-    for(var i=0;i<=40;i++){var t=i/40;
-      var x=548.1299086053409-146.8495741246291+146.8495741246291*2*t;
-      var y;
-      if(t<0.2||t>0.8){var nt=t<0.2?t/0.2:(1-t)/0.2;y=1114.0500608308605-277.96451008095244*0.4*Math.sin(Math.PI/2*nt);}
-      else{var nt=(t-0.2)/0.6;y=1114.0500608308605-277.96451008095244*(0.4+0.6*Math.sin(Math.PI*nt));}
-      pts_sub_openwork_4_horseshoe_arch_47.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_star_polygon_5_horseshoe_arch_50: cusped arch (span=282)
-    var pts_sub_star_polygon_5_horseshoe_arch_50 = [];
-    for(var i=0;i<=40;i++){var t=i/40;
-      var x = 545.7583477744807 - 141.24220771513353 + 141.24220771513353*2*t;
-      var base = Math.sin(Math.PI*t);
-      var cusps = 0.08*Math.sin(Math.PI*t*5); // small scallops
-      pts_sub_star_polygon_5_horseshoe_arch_50.push([x, 1111.7236884272995-261.75005933768546*(base+cusps), 0.3+0.7*base]);}
-
-    // sub_star_polygon_5_horseshoe_arch_53: cusped arch (span=285)
-    var pts_sub_star_polygon_5_horseshoe_arch_53 = [];
-    for(var i=0;i<=40;i++){var t=i/40;
-      var x = 543.2047477744808 - 142.6112759643917 + 142.6112759643917*2*t;
-      var base = Math.sin(Math.PI*t);
-      var cusps = 0.08*Math.sin(Math.PI*t*5); // small scallops
-      pts_sub_star_polygon_5_horseshoe_arch_53.push([x, 1111.2858326965875-270.7332462908012*(base+cusps), 0.3+0.7*base]);}
-
-    // sub_dome_like_6_horseshoe_arch_56: pointed arch (span=255, rise/span=0.443)
-    var pts_sub_dome_like_6_horseshoe_arch_56 = [];
-    for(var i=0;i<=30;i++){var t=i/30;var x,y;
-      if(t<=0.5){var tt=t*2;x=543.6067608308606-127.3887240356083+127.3887240356083*tt;y=1028.1241305637982-112.86640949554896*Math.sin(Math.PI/2*tt);}
-      else{var tt=(t-0.5)*2;x=543.6067608308606+127.3887240356083*tt;y=1028.1241305637982-112.86640949554896+112.86640949554896*(1-Math.cos(Math.PI/2*tt));}
-      pts_sub_dome_like_6_horseshoe_arch_56.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_dome_like_6_horseshoe_arch_57: pointed arch (span=253, rise/span=0.420)
-    var pts_sub_dome_like_6_horseshoe_arch_57 = [];
-    for(var i=0;i<=30;i++){var t=i/30;var x,y;
-      if(t<=0.5){var tt=t*2;x=544.4463477744807-126.58753709198814+126.58753709198814*tt;y=1028.1241305637982-106.43480118694363*Math.sin(Math.PI/2*tt);}
-      else{var tt=(t-0.5)*2;x=544.4463477744807+126.58753709198814*tt;y=1028.1241305637982-106.43480118694363+106.43480118694363*(1-Math.cos(Math.PI/2*tt));}
-      pts_sub_dome_like_6_horseshoe_arch_57.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_horseshoe_arch_7_horseshoe_arch_62: elliptical arch (span=300, rise/span=0.820)
-    var pts_sub_horseshoe_arch_7_horseshoe_arch_62 = [];
-    for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
-      pts_sub_horseshoe_arch_7_horseshoe_arch_62.push([541.541934718101+149.85582623145405*Math.cos(a),1111.2858326965875-245.841480049225*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // dome_like_6: hemisphere dome (R=211)
-    var pts_dome_like_6 = [];
-    for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
-      pts_dome_like_6.push([545.2763347181008+211.2573322255193*Math.cos(a), 806.9422195845699-211.2573322255193*Math.sin(a), 0.3+0.7*Math.sin(Math.PI*t)]);}
+      pts_sub_horseshoe_arch_7_dome_60.push([617.7175074183976+51.37363228486647*Math.cos(a), 893.2671097922849-51.37363228486647*Math.sin(a), 0.3+0.7*Math.sin(Math.PI*t)]);}
 
     // horseshoe_arch_14: catenary arch (span=65, rise/span=1.445)
     var pts_horseshoe_arch_14 = [];
@@ -244,85 +94,6 @@ var W=1080,H=1920,cx=W/2;
       var nx=(t-0.5)*3;
       var y=1587.5875356824927-_a_horseshoe_arch_14*(Math.cosh(1.5)-Math.cosh(nx));
       pts_horseshoe_arch_14.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // horseshoe_arch_18: tudor arch (span=84, rise/span=1.020)
-    var pts_horseshoe_arch_18 = [];
-    for(var i=0;i<=40;i++){var t=i/40;
-      var x=759.6505922848661-41.822690741839764+41.822690741839764*2*t;
-      var y;
-      if(t<0.2||t>0.8){var nt=t<0.2?t/0.2:(1-t)/0.2;y=1297.8129922848664-85.28738214489489*0.4*Math.sin(Math.PI/2*nt);}
-      else{var nt=(t-0.2)/0.6;y=1297.8129922848664-85.28738214489489*(0.4+0.6*Math.sin(Math.PI*nt));}
-      pts_horseshoe_arch_18.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // horseshoe_arch_19: tudor arch (span=95, rise/span=0.977)
-    var pts_horseshoe_arch_19 = [];
-    for(var i=0;i<=40;i++){var t=i/40;
-      var x=759.6505922848661-47.39595382789318+47.39595382789318*2*t;
-      var y;
-      if(t<0.2||t>0.8){var nt=t<0.2?t/0.2:(1-t)/0.2;y=1262.408562611276-92.58297183168357*0.4*Math.sin(Math.PI/2*nt);}
-      else{var nt=(t-0.2)/0.6;y=1262.408562611276-92.58297183168357*(0.4+0.6*Math.sin(Math.PI*nt));}
-      pts_horseshoe_arch_19.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_openwork_0_ogee_arch_4: tudor arch (span=366, rise/span=0.602)
-    var pts_sub_openwork_0_ogee_arch_4 = [];
-    for(var i=0;i<=40;i++){var t=i/40;
-      var x=545.0019608308604-183.19991928783384+183.19991928783384*2*t;
-      var y;
-      if(t<0.2||t>0.8){var nt=t<0.2?t/0.2:(1-t)/0.2;y=1127.025165875371-220.61227400511814*0.4*Math.sin(Math.PI/2*nt);}
-      else{var nt=(t-0.2)/0.6;y=1127.025165875371-220.61227400511814*(0.4+0.6*Math.sin(Math.PI*nt));}
-      pts_sub_openwork_0_ogee_arch_4.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_openwork_0_dome_like_6: hemisphere dome (R=217)
-    var pts_sub_openwork_0_dome_like_6 = [];
-    for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
-      pts_sub_openwork_0_dome_like_6.push([545.2763347181008+217.12166172106825*Math.cos(a), 861.6803798219585-217.12166172106825*Math.sin(a), 0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_dome_like_1_horseshoe_arch_14: ogee arch (span=419)
-    var pts_sub_dome_like_1_horseshoe_arch_14 = [];
-    for(var i=0;i<=40;i++){var t=i/40;
-      var x = 546.3710955489614 - 209.64875394658753 + 209.64875394658753*2*t;
-      var nt = t <= 0.5 ? t*2 : (1-t)*2;
-      var y = 991.0324605341243 - 239.30818246491918*(0.5*Math.sin(Math.PI*nt) + 0.5*Math.pow(Math.sin(Math.PI*t),0.6));
-      pts_sub_dome_like_1_horseshoe_arch_14.push([x, y, 0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_dome_like_1_dome_like_17: hemisphere dome (R=213)
-    var pts_sub_dome_like_1_dome_like_17 = [];
-    for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
-      pts_sub_dome_like_1_dome_like_17.push([545.2763347181008+212.97376949554896*Math.cos(a), 812.5001543026708-212.97376949554896*Math.sin(a), 0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_dome_like_1_horseshoe_arch_20: cusped arch (span=128)
-    var pts_sub_dome_like_1_horseshoe_arch_20 = [];
-    for(var i=0;i<=40;i++){var t=i/40;
-      var x = 759.6505922848661 - 64.18750299703265 + 64.18750299703265*2*t;
-      var base = Math.sin(Math.PI*t);
-      var cusps = 0.08*Math.sin(Math.PI*t*5); // small scallops
-      pts_sub_dome_like_1_horseshoe_arch_20.push([x, 1262.408562611276-137.16731387334434*(base+cusps), 0.3+0.7*base]);}
-
-    // sub_openwork_4_ogee_arch_46: ogee arch (span=426)
-    var pts_sub_openwork_4_ogee_arch_46 = [];
-    for(var i=0;i<=40;i++){var t=i/40;
-      var x = 546.5147347181008 - 212.96334765578635 + 212.96334765578635*2*t;
-      var nt = t <= 0.5 ? t*2 : (1-t)*2;
-      var y = 1029.4663881305637 - 275.5899052276188*(0.5*Math.sin(Math.PI*nt) + 0.5*Math.pow(Math.sin(Math.PI*t),0.6));
-      pts_sub_openwork_4_ogee_arch_46.push([x, y, 0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_openwork_4_arch_48: ogee arch (span=422)
-    var pts_sub_openwork_4_arch_48 = [];
-    for(var i=0;i<=40;i++){var t=i/40;
-      var x = 543.2851086053413 - 210.9519325816024 + 210.9519325816024*2*t;
-      var nt = t <= 0.5 ? t*2 : (1-t)*2;
-      var y = 1112.5993998887238 - 365.75183594090356*(0.5*Math.sin(Math.PI*nt) + 0.5*Math.pow(Math.sin(Math.PI*t),0.6));
-      pts_sub_openwork_4_arch_48.push([x, y, 0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_horseshoe_arch_7_dome_59: hemisphere dome (R=50)
-    var pts_sub_horseshoe_arch_7_dome_59 = [];
-    for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
-      pts_sub_horseshoe_arch_7_dome_59.push([619.3255074183977+49.67359050445104*Math.cos(a), 891.1059228486647-49.67359050445104*Math.sin(a), 0.3+0.7*Math.sin(Math.PI*t)]);}
-
-    // sub_horseshoe_arch_7_dome_60: hemisphere dome (R=51)
-    var pts_sub_horseshoe_arch_7_dome_60 = [];
-    for(var i=0;i<=30;i++){var t=i/30;var a=Math.PI*(1-t);
-      pts_sub_horseshoe_arch_7_dome_60.push([617.7175074183976+51.37363228486647*Math.cos(a), 893.2671097922849-51.37363228486647*Math.sin(a), 0.3+0.7*Math.sin(Math.PI*t)]);}
 
 var ANNOT_FONT=13,_dimLabels=[],_lastDimStep=-1;
 function clearDimLabels(){for(var i=0;i<_dimLabels.length;i++)_dimLabels[i].remove();_dimLabels=[];}
@@ -343,40 +114,17 @@ var STEPS=[
       brush.line(899,1303,899,1316);}
       return[856,1010];
    }},
-  {name:'SUB STAR POLYGON 3 ARCH 42',formula:'catenary rise/span=2.000 | distant_sky wt=0.6',dur:0.8,
-   bbox:[795,1114,904,1323],
-   draw:function(p){
-      brush.set('2H','#5a5248',0.6);
-      if(pts_sub_star_polygon_3_arch_42){var n=Math.max(3,Math.round(p*0.8*pts_sub_star_polygon_3_arch_42.length));
-      var sub=pts_sub_star_polygon_3_arch_42.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(850,1303,tip[0],tip[1]);brush.circle(850,1303,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',0.6);
-      brush.line(805,1303,805,1317);
-      brush.line(894,1303,894,1317);}
-      return[850,1010];
-   }},
-  {name:'WALL 2',formula:'rectangle 722×399 | background_domes wt=1.2',dur:0.6,
-   bbox:[176,1196,909,1605],
+  {name:'SUB STAR POLYGON 3 DOME 35',formula:'pointed R=81.7 | background_domes wt=1.2',dur:1.2,
+   bbox:[453,1218,637,1472],
    draw:function(p){
       brush.set('2H','#5a5248',1.2);
-      var rp=p;
-      if(rp>0)brush.line(182,1202,904,1202);
-      if(rp>0.25)brush.line(904,1202,904,1601);
-      if(rp>0.5)brush.line(904,1601,182,1601);
-      if(rp>0.75)brush.line(182,1601,182,1202);
-      return[543,1401];
-   }},
-  {name:'POINTED ARCH 16',formula:'catenary rise/span=0.765 | background_domes wt=1.2',dur:0.8,
-   bbox:[270,1344,391,1451],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.2);
-      if(pts_pointed_arch_16){var n=Math.max(3,Math.round(p*0.8*pts_pointed_arch_16.length));
-      var sub=pts_pointed_arch_16.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(331,1432,tip[0],tip[1]);brush.circle(331,1432,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.2);
-      brush.line(280,1432,280,1447);
-      brush.line(382,1432,382,1447);}
-      return[331,1010];
+      if(pts_sub_star_polygon_3_dome_35){var n=Math.max(3,Math.round(p*pts_sub_star_polygon_3_dome_35.length));
+      var sub=pts_sub_star_polygon_3_dome_35.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
+      var tip=sub[sub.length-1];
+      if(p<0.9){brush.set('2H','#a09888',0.5);brush.line(545,1462,tip[0],tip[1]);brush.circle(545,1462,4);}}
+      if(p>0.85){brush.set('2H','#5a5248',1.0);
+      brush.line(476,1462,615,1462);}
+      return[545,1462];
    }},
   {name:'POINTED ARCH 17',formula:'catenary rise/span=1.132 | background_domes wt=1.2',dur:0.8,
    bbox:[707,1406,811,1531],
@@ -390,149 +138,6 @@ var STEPS=[
       brush.line(801,1511,801,1524);}
       return[760,1010];
    }},
-  {name:'SUB DOME LIKE 1 POINTED ARCH 12',formula:'catenary rise/span=1.456 | background_domes wt=1.2',dur:0.8,
-   bbox:[467,1401,615,1617],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.2);
-      if(pts_sub_dome_like_1_pointed_arch_12){var n=Math.max(3,Math.round(p*0.8*pts_sub_dome_like_1_pointed_arch_12.length));
-      var sub=pts_sub_dome_like_1_pointed_arch_12.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(542,1598,tip[0],tip[1]);brush.circle(542,1598,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.2);
-      brush.line(478,1598,478,1617);
-      brush.line(606,1598,606,1617);}
-      return[542,1010];
-   }},
-  {name:'SUB DOME LIKE 1 WALL 15',formula:'rectangle 717×397 | background_domes wt=1.2',dur:0.6,
-   bbox:[176,1197,903,1605],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.2);
-      var rp=p;
-      if(rp>0)brush.line(181,1203,898,1203);
-      if(rp>0.25)brush.line(898,1203,898,1600);
-      if(rp>0.5)brush.line(898,1600,181,1600);
-      if(rp>0.75)brush.line(181,1600,181,1203);
-      return[540,1401];
-   }},
-  {name:'SUB WALL 2 POINTED ARCH 21',formula:'elliptical rise/span=0.765 | background_domes wt=1.2',dur:0.8,
-   bbox:[698,1344,820,1451],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.2);
-      if(pts_sub_wall_2_pointed_arch_21){var n=Math.max(3,Math.round(p*0.8*pts_sub_wall_2_pointed_arch_21.length));
-      var sub=pts_sub_wall_2_pointed_arch_21.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(760,1432,tip[0],tip[1]);brush.circle(760,1432,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.2);
-      brush.line(709,1432,709,1447);
-      brush.line(810,1432,810,1447);}
-      return[760,1010];
-   }},
-  {name:'SUB WALL 2 POINTED ARCH 25',formula:'catenary rise/span=1.443 | background_domes wt=1.2',dur:0.8,
-   bbox:[467,1405,615,1620],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.2);
-      if(pts_sub_wall_2_pointed_arch_25){var n=Math.max(3,Math.round(p*0.8*pts_sub_wall_2_pointed_arch_25.length));
-      var sub=pts_sub_wall_2_pointed_arch_25.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(542,1600,tip[0],tip[1]);brush.circle(542,1600,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.2);
-      brush.line(478,1600,478,1619);
-      brush.line(606,1600,606,1619);}
-      return[542,1010];
-   }},
-  {name:'SUB WALL 2 POINTED ARCH 26',formula:'elliptical rise/span=0.780 | background_domes wt=1.2',dur:0.8,
-   bbox:[707,1355,812,1451],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.2);
-      if(pts_sub_wall_2_pointed_arch_26){var n=Math.max(3,Math.round(p*0.8*pts_sub_wall_2_pointed_arch_26.length));
-      var sub=pts_sub_wall_2_pointed_arch_26.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(760,1432,tip[0],tip[1]);brush.circle(760,1432,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.2);
-      brush.line(717,1432,717,1444);
-      brush.line(802,1432,802,1444);}
-      return[760,1010];
-   }},
-  {name:'SUB WALL 2 POINTED ARCH 27',formula:'catenary rise/span=1.176 | background_domes wt=1.2',dur:0.8,
-   bbox:[713,1417,805,1531],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.2);
-      if(pts_sub_wall_2_pointed_arch_27){var n=Math.max(3,Math.round(p*0.8*pts_sub_wall_2_pointed_arch_27.length));
-      var sub=pts_sub_wall_2_pointed_arch_27.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(760,1511,tip[0],tip[1]);brush.circle(760,1511,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.2);
-      brush.line(724,1511,724,1522);
-      brush.line(795,1511,795,1522);}
-      return[760,1010];
-   }},
-  {name:'SUB STAR POLYGON 3 DOME 35',formula:'pointed R=81.7 | background_domes wt=1.2',dur:1.2,
-   bbox:[453,1218,637,1472],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.2);
-      if(pts_sub_star_polygon_3_dome_35){var n=Math.max(3,Math.round(p*pts_sub_star_polygon_3_dome_35.length));
-      var sub=pts_sub_star_polygon_3_dome_35.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      var tip=sub[sub.length-1];
-      if(p<0.9){brush.set('2H','#a09888',0.5);brush.line(545,1462,tip[0],tip[1]);brush.circle(545,1462,4);}}
-      if(p>0.85){brush.set('2H','#5a5248',1.0);
-      brush.line(476,1462,615,1462);}
-      return[545,1462];
-   }},
-  {name:'SUB STAR POLYGON 3 POINTED ARCH 37',formula:'catenary rise/span=1.319 | background_domes wt=1.2',dur:0.8,
-   bbox:[713,1451,806,1578],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.2);
-      if(pts_sub_star_polygon_3_pointed_arch_37){var n=Math.max(3,Math.round(p*0.8*pts_sub_star_polygon_3_pointed_arch_37.length));
-      var sub=pts_sub_star_polygon_3_pointed_arch_37.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(760,1558,tip[0],tip[1]);brush.circle(760,1558,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.2);
-      brush.line(723,1558,723,1569);
-      brush.line(796,1558,796,1569);}
-      return[760,1010];
-   }},
-  {name:'SUB STAR POLYGON 3 POINTED ARCH 38',formula:'catenary rise/span=1.445 | background_domes wt=1.2',dur:0.8,
-   bbox:[716,1495,802,1620],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.2);
-      if(pts_sub_star_polygon_3_pointed_arch_38){var n=Math.max(3,Math.round(p*0.8*pts_sub_star_polygon_3_pointed_arch_38.length));
-      var sub=pts_sub_star_polygon_3_pointed_arch_38.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(760,1600,tip[0],tip[1]);brush.circle(760,1600,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.2);
-      brush.line(727,1600,727,1610);
-      brush.line(792,1600,792,1610);}
-      return[760,1010];
-   }},
-  {name:'DOME LIKE 1',formula:'bulbous R=366.2 | mid_facade wt=1.8',dur:1.2,
-   bbox:[169,9,921,1106],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.8);
-      if(pts_dome_like_1){var n=Math.max(3,Math.round(p*pts_dome_like_1.length));
-      var sub=pts_dome_like_1.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      var tip=sub[sub.length-1];
-      if(p<0.9){brush.set('2H','#a09888',0.5);brush.line(545,1097,tip[0],tip[1]);brush.circle(545,1097,4);}}
-      if(p>0.85){brush.set('2H','#5a5248',1.4);
-      brush.line(234,1097,857,1097);}
-      return[545,1097];
-   }},
-  {name:'HORSESHOE ARCH 7',formula:'elliptical rise/span=1.124 | mid_facade wt=1.8',dur:1.4,
-   bbox:[393,859,707,1220],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.8);
-      if(pts_horseshoe_arch_7){var n=Math.max(3,Math.round(p*0.8*pts_horseshoe_arch_7.length));
-      var sub=pts_horseshoe_arch_7.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(550,1200,tip[0],tip[1]);brush.circle(550,1200,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.8);
-      brush.line(403,1200,403,1244);
-      brush.line(697,1200,697,1244);}
-      return[550,1010];
-   }},
-  {name:'ARCH 8',formula:'elliptical rise/span=1.027 | mid_facade wt=1.8',dur:1.4,
-   bbox:[391,895,699,1220],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.8);
-      if(pts_arch_8){var n=Math.max(3,Math.round(p*0.8*pts_arch_8.length));
-      var sub=pts_arch_8.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(546,1201,tip[0],tip[1]);brush.circle(546,1201,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.8);
-      brush.line(402,1201,402,1244);
-      brush.line(690,1201,690,1244);}
-      return[546,1010];
-   }},
   {name:'DOME 9',formula:'onion R=122.8 | mid_facade wt=1.8',dur:1.2,
    bbox:[412,860,678,1061],
    draw:function(p){
@@ -544,77 +149,6 @@ var STEPS=[
       if(p>0.85){brush.set('2H','#5a5248',1.4);
       brush.line(441,1051,650,1051);}
       return[545,1051];
-   }},
-  {name:'SUB OPENWORK 0 WALL 3',formula:'rectangle 304×354 | mid_facade wt=1.8',dur:0.6,
-   bbox:[399,933,713,1297],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.8);
-      var rp=p;
-      if(rp>0)brush.line(404,939,709,939);
-      if(rp>0.25)brush.line(709,939,709,1292);
-      if(rp>0.5)brush.line(709,1292,404,1292);
-      if(rp>0.75)brush.line(404,1292,404,939);
-      return[557,1116];
-   }},
-  {name:'SUB OPENWORK 0 ARCH 7',formula:'elliptical rise/span=1.098 | mid_facade wt=1.8',dur:1.4,
-   bbox:[387,874,695,1220],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.8);
-      if(pts_sub_openwork_0_arch_7){var n=Math.max(3,Math.round(p*0.8*pts_sub_openwork_0_arch_7.length));
-      var sub=pts_sub_openwork_0_arch_7.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(542,1201,tip[0],tip[1]);brush.circle(542,1201,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.8);
-      brush.line(398,1201,398,1244);
-      brush.line(686,1201,686,1244);}
-      return[542,1010];
-   }},
-  {name:'SUB OPENWORK 0 TALL ARCH 9',formula:'tudor rise/span=1.043 | mid_facade wt=1.8',dur:1.4,
-   bbox:[178,839,911,1613],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.8);
-      if(pts_sub_openwork_0_tall_arch_9){var n=Math.max(3,Math.round(p*0.8*pts_sub_openwork_0_tall_arch_9.length));
-      var sub=pts_sub_openwork_0_tall_arch_9.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(545,1594,tip[0],tip[1]);brush.circle(545,1594,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.8);
-      brush.line(188,1594,188,1701);
-      brush.line(901,1594,901,1701);}
-      return[545,1010];
-   }},
-  {name:'SUB OPENWORK 0 HORSESHOE ARCH 10',formula:'elliptical rise/span=0.602 | mid_facade wt=1.8',dur:1.4,
-   bbox:[352,889,738,1140],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.8);
-      if(pts_sub_openwork_0_horseshoe_arch_10){var n=Math.max(3,Math.round(p*0.8*pts_sub_openwork_0_horseshoe_arch_10.length));
-      var sub=pts_sub_openwork_0_horseshoe_arch_10.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(546,1120,tip[0],tip[1]);brush.circle(546,1120,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.8);
-      brush.line(362,1120,362,1175);
-      brush.line(729,1120,729,1175);}
-      return[546,1010];
-   }},
-  {name:'SUB DOME LIKE 1 ARCH 13',formula:'elliptical rise/span=1.055 | mid_facade wt=1.8',dur:1.4,
-   bbox:[390,887,698,1220],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.8);
-      if(pts_sub_dome_like_1_arch_13){var n=Math.max(3,Math.round(p*0.8*pts_sub_dome_like_1_arch_13.length));
-      var sub=pts_sub_dome_like_1_arch_13.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(544,1201,tip[0],tip[1]);brush.circle(544,1201,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.8);
-      brush.line(400,1201,400,1244);
-      brush.line(688,1201,688,1244);}
-      return[544,1010];
-   }},
-  {name:'SUB DOME LIKE 1 HORSESHOE ARCH 19',formula:'elliptical rise/span=0.946 | mid_facade wt=1.8',dur:1.4,
-   bbox:[385,828,699,1136],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.8);
-      if(pts_sub_dome_like_1_horseshoe_arch_19){var n=Math.max(3,Math.round(p*0.8*pts_sub_dome_like_1_horseshoe_arch_19.length));
-      var sub=pts_sub_dome_like_1_horseshoe_arch_19.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(542,1116,tip[0],tip[1]);brush.circle(542,1116,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.8);
-      brush.line(396,1116,396,1160);
-      brush.line(689,1116,689,1160);}
-      return[542,1010];
    }},
   {name:'SUB OPENWORK 4 DOME 45',formula:'pointed R=88.2 | mid_facade wt=1.8',dur:1.2,
    bbox:[447,883,643,1010],
@@ -628,137 +162,40 @@ var STEPS=[
       brush.line(470,1001,620,1001);}
       return[545,1001];
    }},
-  {name:'SUB OPENWORK 4 HORSESHOE ARCH 47',formula:'tudor rise/span=0.946 | mid_facade wt=1.8',dur:1.4,
-   bbox:[391,826,704,1134],
+  {name:'SUB OPENWORK 0 WALL 3',formula:'rectangle 304×354 | mid_facade wt=1.8',dur:0.6,
+   bbox:[399,933,713,1297],
    draw:function(p){
       brush.set('2H','#5a5248',1.8);
-      if(pts_sub_openwork_4_horseshoe_arch_47){var n=Math.max(3,Math.round(p*0.8*pts_sub_openwork_4_horseshoe_arch_47.length));
-      var sub=pts_sub_openwork_4_horseshoe_arch_47.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(548,1114,tip[0],tip[1]);brush.circle(548,1114,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.8);
-      brush.line(401,1114,401,1158);
-      brush.line(695,1114,695,1158);}
-      return[548,1010];
+      var rp=p;
+      if(rp>0)brush.line(404,939,709,939);
+      if(rp>0.25)brush.line(709,939,709,1292);
+      if(rp>0.5)brush.line(709,1292,404,1292);
+      if(rp>0.75)brush.line(404,1292,404,939);
+      return[557,1116];
    }},
-  {name:'SUB STAR POLYGON 5 HORSESHOE ARCH 50',formula:'cusped rise/span=0.927 | mid_facade wt=1.8',dur:1.4,
-   bbox:[394,839,697,1131],
+  {name:'HORSESHOE ARCH 7',formula:'elliptical rise/span=1.124 | mid_facade wt=1.8',dur:1.4,
+   bbox:[393,859,707,1220],
    draw:function(p){
       brush.set('2H','#5a5248',1.8);
-      if(pts_sub_star_polygon_5_horseshoe_arch_50){var n=Math.max(3,Math.round(p*0.8*pts_sub_star_polygon_5_horseshoe_arch_50.length));
-      var sub=pts_sub_star_polygon_5_horseshoe_arch_50.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(546,1112,tip[0],tip[1]);brush.circle(546,1112,4);}}
+      if(pts_horseshoe_arch_7){var n=Math.max(3,Math.round(p*0.8*pts_horseshoe_arch_7.length));
+      var sub=pts_horseshoe_arch_7.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
+      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(550,1200,tip[0],tip[1]);brush.circle(550,1200,4);}}
       if(p>0.8){brush.set('2H','#5a5248',1.8);
-      brush.line(405,1112,405,1154);
-      brush.line(687,1112,687,1154);}
-      return[546,1010];
+      brush.line(403,1200,403,1244);
+      brush.line(697,1200,697,1244);}
+      return[550,1010];
    }},
-  {name:'SUB STAR POLYGON 5 HORSESHOE ARCH 53',formula:'cusped rise/span=0.949 | mid_facade wt=1.8',dur:1.4,
-   bbox:[390,830,695,1131],
+  {name:'SUB OPENWORK 0 ARCH 7',formula:'elliptical rise/span=1.098 | mid_facade wt=1.8',dur:1.4,
+   bbox:[387,874,695,1220],
    draw:function(p){
       brush.set('2H','#5a5248',1.8);
-      if(pts_sub_star_polygon_5_horseshoe_arch_53){var n=Math.max(3,Math.round(p*0.8*pts_sub_star_polygon_5_horseshoe_arch_53.length));
-      var sub=pts_sub_star_polygon_5_horseshoe_arch_53.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(543,1111,tip[0],tip[1]);brush.circle(543,1111,4);}}
+      if(pts_sub_openwork_0_arch_7){var n=Math.max(3,Math.round(p*0.8*pts_sub_openwork_0_arch_7.length));
+      var sub=pts_sub_openwork_0_arch_7.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
+      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(542,1201,tip[0],tip[1]);brush.circle(542,1201,4);}}
       if(p>0.8){brush.set('2H','#5a5248',1.8);
-      brush.line(401,1111,401,1154);
-      brush.line(686,1111,686,1154);}
-      return[543,1010];
-   }},
-  {name:'SUB DOME LIKE 6 HORSESHOE ARCH 56',formula:'pointed rise/span=0.443 | mid_facade wt=1.8',dur:1.4,
-   bbox:[406,905,680,1048],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.8);
-      if(pts_sub_dome_like_6_horseshoe_arch_56){var n=Math.max(3,Math.round(p*0.8*pts_sub_dome_like_6_horseshoe_arch_56.length));
-      var sub=pts_sub_dome_like_6_horseshoe_arch_56.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(544,1028,tip[0],tip[1]);brush.circle(544,1028,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.8);
-      brush.line(416,1028,416,1066);
-      brush.line(671,1028,671,1066);}
-      return[544,1010];
-   }},
-  {name:'SUB DOME LIKE 6 HORSESHOE ARCH 57',formula:'pointed rise/span=0.420 | mid_facade wt=1.8',dur:1.4,
-   bbox:[407,911,681,1048],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.8);
-      if(pts_sub_dome_like_6_horseshoe_arch_57){var n=Math.max(3,Math.round(p*0.8*pts_sub_dome_like_6_horseshoe_arch_57.length));
-      var sub=pts_sub_dome_like_6_horseshoe_arch_57.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(544,1028,tip[0],tip[1]);brush.circle(544,1028,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.8);
-      brush.line(418,1028,418,1066);
-      brush.line(671,1028,671,1066);}
-      return[544,1010];
-   }},
-  {name:'SUB HORSESHOE ARCH 7 HORSESHOE ARCH 62',formula:'elliptical rise/span=0.820 | mid_facade wt=1.8',dur:1.4,
-   bbox:[381,855,701,1131],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.8);
-      if(pts_sub_horseshoe_arch_7_horseshoe_arch_62){var n=Math.max(3,Math.round(p*0.8*pts_sub_horseshoe_arch_7_horseshoe_arch_62.length));
-      var sub=pts_sub_horseshoe_arch_7_horseshoe_arch_62.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(542,1111,tip[0],tip[1]);brush.circle(542,1111,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',1.8);
-      brush.line(392,1111,392,1156);
-      brush.line(691,1111,691,1156);}
+      brush.line(398,1201,398,1244);
+      brush.line(686,1201,686,1244);}
       return[542,1010];
-   }},
-  {name:'DOME LIKE 6',formula:'saucer R=211.3 | foreground_frame wt=2.5',dur:1.2,
-   bbox:[324,481,766,816],
-   draw:function(p){
-      brush.set('2H','#5a5248',2.5);
-      if(pts_dome_like_6){var n=Math.max(3,Math.round(p*pts_dome_like_6.length));
-      var sub=pts_dome_like_6.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      var tip=sub[sub.length-1];
-      if(p<0.9){brush.set('2H','#a09888',0.5);brush.line(545,807,tip[0],tip[1]);brush.circle(545,807,4);}}
-      if(p>0.85){brush.set('2H','#5a5248',2.0);
-      brush.line(366,807,725,807);}
-      return[545,807];
-   }},
-  {name:'HORSESHOE ARCH 14',formula:'catenary rise/span=1.445 | foreground_frame wt=2.5',dur:0.8,
-   bbox:[288,1483,373,1607],
-   draw:function(p){
-      brush.set('2H','#5a5248',2.5);
-      if(pts_horseshoe_arch_14){var n=Math.max(3,Math.round(p*0.8*pts_horseshoe_arch_14.length));
-      var sub=pts_horseshoe_arch_14.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(331,1588,tip[0],tip[1]);brush.circle(331,1588,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',2.5);
-      brush.line(298,1588,298,1597);
-      brush.line(364,1588,364,1597);}
-      return[331,1010];
-   }},
-  {name:'HORSESHOE ARCH 18',formula:'tudor rise/span=1.020 | foreground_frame wt=2.5',dur:0.8,
-   bbox:[707,1202,811,1317],
-   draw:function(p){
-      brush.set('2H','#5a5248',2.5);
-      if(pts_horseshoe_arch_18){var n=Math.max(3,Math.round(p*0.8*pts_horseshoe_arch_18.length));
-      var sub=pts_horseshoe_arch_18.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(760,1298,tip[0],tip[1]);brush.circle(760,1298,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',2.5);
-      brush.line(718,1298,718,1310);
-      brush.line(801,1298,801,1310);}
-      return[760,1010];
-   }},
-  {name:'HORSESHOE ARCH 19',formula:'tudor rise/span=0.977 | foreground_frame wt=2.5',dur:0.8,
-   bbox:[702,1159,817,1282],
-   draw:function(p){
-      brush.set('2H','#5a5248',2.5);
-      if(pts_horseshoe_arch_19){var n=Math.max(3,Math.round(p*0.8*pts_horseshoe_arch_19.length));
-      var sub=pts_horseshoe_arch_19.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(760,1262,tip[0],tip[1]);brush.circle(760,1262,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',2.5);
-      brush.line(712,1262,712,1277);
-      brush.line(807,1262,807,1277);}
-      return[760,1010];
-   }},
-  {name:'SUB OPENWORK 0 OGEE ARCH 4',formula:'tudor rise/span=0.602 | foreground_frame wt=2.5',dur:1.4,
-   bbox:[351,896,738,1147],
-   draw:function(p){
-      brush.set('2H','#5a5248',2.5);
-      if(pts_sub_openwork_0_ogee_arch_4){var n=Math.max(3,Math.round(p*0.8*pts_sub_openwork_0_ogee_arch_4.length));
-      var sub=pts_sub_openwork_0_ogee_arch_4.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(545,1127,tip[0],tip[1]);brush.circle(545,1127,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',2.5);
-      brush.line(362,1127,362,1182);
-      brush.line(728,1127,728,1182);}
-      return[545,1010];
    }},
   {name:'SUB OPENWORK 0 DOME LIKE 6',formula:'saucer R=217.1 | foreground_frame wt=2.5',dur:1.2,
    bbox:[318,457,772,871],
@@ -772,76 +209,6 @@ var STEPS=[
       brush.line(361,862,730,862);}
       return[545,862];
    }},
-  {name:'SUB DOME LIKE 1 HORSESHOE ARCH 14',formula:'ogee rise/span=0.571 | foreground_frame wt=2.5',dur:1.4,
-   bbox:[326,741,766,1011],
-   draw:function(p){
-      brush.set('2H','#5a5248',2.5);
-      if(pts_sub_dome_like_1_horseshoe_arch_14){var n=Math.max(3,Math.round(p*0.8*pts_sub_dome_like_1_horseshoe_arch_14.length));
-      var sub=pts_sub_dome_like_1_horseshoe_arch_14.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(546,991,tip[0],tip[1]);brush.circle(546,991,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',2.5);
-      brush.line(337,991,337,1054);
-      brush.line(756,991,756,1054);}
-      return[546,1010];
-   }},
-  {name:'SUB DOME LIKE 1 DOME LIKE 17',formula:'saucer R=213.0 | foreground_frame wt=2.5',dur:1.2,
-   bbox:[322,483,768,822],
-   draw:function(p){
-      brush.set('2H','#5a5248',2.5);
-      if(pts_sub_dome_like_1_dome_like_17){var n=Math.max(3,Math.round(p*pts_sub_dome_like_1_dome_like_17.length));
-      var sub=pts_sub_dome_like_1_dome_like_17.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      var tip=sub[sub.length-1];
-      if(p<0.9){brush.set('2H','#a09888',0.5);brush.line(545,813,tip[0],tip[1]);brush.circle(545,813,4);}}
-      if(p>0.85){brush.set('2H','#5a5248',2.0);
-      brush.line(364,813,726,813);}
-      return[545,813];
-   }},
-  {name:'SUB DOME LIKE 1 HORSESHOE ARCH 20',formula:'cusped rise/span=1.068 | foreground_frame wt=2.5',dur:0.8,
-   bbox:[685,1115,833,1282],
-   draw:function(p){
-      brush.set('2H','#5a5248',2.5);
-      if(pts_sub_dome_like_1_horseshoe_arch_20){var n=Math.max(3,Math.round(p*0.8*pts_sub_dome_like_1_horseshoe_arch_20.length));
-      var sub=pts_sub_dome_like_1_horseshoe_arch_20.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(760,1262,tip[0],tip[1]);brush.circle(760,1262,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',2.5);
-      brush.line(695,1262,695,1282);
-      brush.line(824,1262,824,1282);}
-      return[760,1010];
-   }},
-  {name:'SUB OPENWORK 4 OGEE ARCH 46',formula:'ogee rise/span=0.647 | foreground_frame wt=2.5',dur:1.4,
-   bbox:[323,743,769,1049],
-   draw:function(p){
-      brush.set('2H','#5a5248',2.5);
-      if(pts_sub_openwork_4_ogee_arch_46){var n=Math.max(3,Math.round(p*0.8*pts_sub_openwork_4_ogee_arch_46.length));
-      var sub=pts_sub_openwork_4_ogee_arch_46.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(547,1029,tip[0],tip[1]);brush.circle(547,1029,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',2.5);
-      brush.line(334,1029,334,1093);
-      brush.line(759,1029,759,1093);}
-      return[547,1010];
-   }},
-  {name:'SUB OPENWORK 4 ARCH 48',formula:'ogee rise/span=0.867 | foreground_frame wt=2.5',dur:1.4,
-   bbox:[322,736,764,1132],
-   draw:function(p){
-      brush.set('2H','#5a5248',2.5);
-      if(pts_sub_openwork_4_arch_48){var n=Math.max(3,Math.round(p*0.8*pts_sub_openwork_4_arch_48.length));
-      var sub=pts_sub_openwork_4_arch_48.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(543,1113,tip[0],tip[1]);brush.circle(543,1113,4);}}
-      if(p>0.8){brush.set('2H','#5a5248',2.5);
-      brush.line(332,1113,332,1176);
-      brush.line(754,1113,754,1176);}
-      return[543,1010];
-   }},
-  {name:'SUB HORSESHOE ARCH 7 DOME 59',formula:'saucer R=49.7 | foreground_frame wt=2.5',dur:1.2,
-   bbox:[559,796,678,901],
-   draw:function(p){
-      brush.set('2H','#5a5248',2.5);
-      if(pts_sub_horseshoe_arch_7_dome_59){var n=Math.max(3,Math.round(p*pts_sub_horseshoe_arch_7_dome_59.length));
-      var sub=pts_sub_horseshoe_arch_7_dome_59.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      var tip=sub[sub.length-1];
-      if(p<0.9){brush.set('2H','#a09888',0.5);brush.line(619,891,tip[0],tip[1]);brush.circle(619,891,4);}}
-      return[619,891];
-   }},
   {name:'SUB HORSESHOE ARCH 7 DOME 60',formula:'saucer R=51.4 | foreground_frame wt=2.5',dur:1.2,
    bbox:[556,794,679,903],
    draw:function(p){
@@ -853,6 +220,18 @@ var STEPS=[
       if(p>0.85){brush.set('2H','#5a5248',2.0);
       brush.line(574,893,661,893);}
       return[618,893];
+   }},
+  {name:'HORSESHOE ARCH 14',formula:'catenary rise/span=1.445 | foreground_frame wt=2.5',dur:0.8,
+   bbox:[288,1483,373,1607],
+   draw:function(p){
+      brush.set('2H','#5a5248',2.5);
+      if(pts_horseshoe_arch_14){var n=Math.max(3,Math.round(p*0.8*pts_horseshoe_arch_14.length));
+      var sub=pts_horseshoe_arch_14.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
+      if(p<0.85){brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line(331,1588,tip[0],tip[1]);brush.circle(331,1588,4);}}
+      if(p>0.8){brush.set('2H','#5a5248',2.5);
+      brush.line(298,1588,298,1597);
+      brush.line(364,1588,364,1597);}
+      return[331,1010];
    }},
   {name:'GROUND LINE',formula:'base',dur:0.3,bbox:[138,1705,951,1715],draw:function(p){brush.set('2H','#5a5248',2.0);brush.line(138,1711,138+(951-138)*p,1711);return[951,1711];}},
   {name:'COL 1',formula:'column',dur:0.3,bbox:[392,1200,413,1710],draw:function(p){brush.set('2H','#5a5248',1.8);var ey=1711-(1711-1200)*p;brush.line(399,1711,399,ey);brush.line(407,1711,407,ey);return[403,ey];}},
@@ -943,56 +322,32 @@ var STEPS=[
   {name:'CORNICE',formula:'y=1511',dur:0.2,bbox:[717,1508,801,1514],draw:function(p){brush.set('2H','#8a8278',0.72);brush.line(718,1511,718+(801-718)*p,1511);return[801,1511];}},
   {name:'CORNICE',formula:'y=1558',dur:0.2,bbox:[298,1555,796,1561],draw:function(p){brush.set('2H','#8a8278',0.72);brush.line(298,1558,298+(796-298)*p,1558);return[796,1558];}},
   {name:'CORNICE',formula:'y=1588',dur:0.2,bbox:[188,1584,901,1590],draw:function(p){brush.set('2H','#8a8278',1.5);brush.line(188,1588,188+(901-188)*p,1588);return[901,1588];}},
-  {name:'WALL 2 WASH',formula:'#D4C5B0 α=20',dur:0.05,
-   bbox:[181,1201,904,1600],
-   draw:function(p){if(p>=0){randomSeed(7002);brush.noStroke();brush.fill('#D4C5B0',20);brush.fillBleed(0.001);brush.fillTexture(0,0);
-   brush.rect(182,1202,722,399);brush.noFill();}return[543,1401];}},
-  {name:'SUB DOME LIKE 1 WALL 15 WASH',formula:'#D4C5B0 α=20',dur:0.05,
-   bbox:[181,1202,898,1600],
-   draw:function(p){if(p>=0){randomSeed(7006);brush.noStroke();brush.fill('#D4C5B0',20);brush.fillBleed(0.001);brush.fillTexture(0,0);
-   brush.rect(181,1203,717,397);brush.noFill();}return[540,1401];}},
   {name:'SUB STAR POLYGON 3 DOME 35 WASH',formula:'#D4C5B0 α=20',dur:0.05,
    bbox:[463,1380,627,1544],
-   draw:function(p){if(p>=0){randomSeed(7011);brush.noStroke();brush.fill('#D4C5B0',20);brush.fillBleed(0.001);brush.fillTexture(0,0);
+   draw:function(p){if(p>=0){randomSeed(7001);brush.noStroke();brush.fill('#D4C5B0',20);brush.fillBleed(0.001);brush.fillTexture(0,0);
    if(pts_sub_star_polygon_3_dome_35)brush.polygon(pts_sub_star_polygon_3_dome_35.map(function(pt){return[pt[0],pt[1]]}));brush.noFill();}return[545,1462];}},
-  {name:'DOME LIKE 1 WASH',formula:'#4A5568 α=15',dur:0.05,
-   bbox:[179,730,911,1462],
-   draw:function(p){if(p>=0){randomSeed(7014);brush.noStroke();brush.fill('#4A5568',15);brush.fillBleed(0.001);brush.fillTexture(0,0);
-   if(pts_dome_like_1)brush.polygon(pts_dome_like_1.map(function(pt){return[pt[0],pt[1]]}));brush.noFill();}return[545,1097];}},
   {name:'DOME 9 WASH',formula:'#4A5568 α=15',dur:0.05,
    bbox:[422,928,668,1173],
-   draw:function(p){if(p>=0){randomSeed(7017);brush.noStroke();brush.fill('#4A5568',15);brush.fillBleed(0.001);brush.fillTexture(0,0);
+   draw:function(p){if(p>=0){randomSeed(7003);brush.noStroke();brush.fill('#4A5568',15);brush.fillBleed(0.001);brush.fillTexture(0,0);
    if(pts_dome_9)brush.polygon(pts_dome_9.map(function(pt){return[pt[0],pt[1]]}));brush.noFill();}return[545,1051];}},
-  {name:'SUB OPENWORK 0 WALL 3 WASH',formula:'#4A5568 α=15',dur:0.05,
-   bbox:[404,938,708,1292],
-   draw:function(p){if(p>=0){randomSeed(7018);brush.noStroke();brush.fill('#4A5568',15);brush.fillBleed(0.001);brush.fillTexture(0,0);
-   brush.rect(404,939,304,354);brush.noFill();}return[557,1116];}},
   {name:'SUB OPENWORK 4 DOME 45 WASH',formula:'#4A5568 α=15',dur:0.05,
    bbox:[457,912,633,1088],
-   draw:function(p){if(p>=0){randomSeed(7024);brush.noStroke();brush.fill('#4A5568',15);brush.fillBleed(0.001);brush.fillTexture(0,0);
+   draw:function(p){if(p>=0){randomSeed(7004);brush.noStroke();brush.fill('#4A5568',15);brush.fillBleed(0.001);brush.fillTexture(0,0);
    if(pts_sub_openwork_4_dome_45)brush.polygon(pts_sub_openwork_4_dome_45.map(function(pt){return[pt[0],pt[1]]}));brush.noFill();}return[545,1001];}},
-  {name:'DOME LIKE 6 WASH',formula:'#C4B89A α=25',dur:0.05,
-   bbox:[334,595,756,1018],
-   draw:function(p){if(p>=0){randomSeed(7031);brush.noStroke();brush.fill('#C4B89A',25);brush.fillBleed(0.001);brush.fillTexture(0,0);
-   if(pts_dome_like_6)brush.polygon(pts_dome_like_6.map(function(pt){return[pt[0],pt[1]]}));brush.noFill();}return[545,807];}},
+  {name:'SUB OPENWORK 0 WALL 3 WASH',formula:'#4A5568 α=15',dur:0.05,
+   bbox:[404,938,708,1292],
+   draw:function(p){if(p>=0){randomSeed(7005);brush.noStroke();brush.fill('#4A5568',15);brush.fillBleed(0.001);brush.fillTexture(0,0);
+   brush.rect(404,939,304,354);brush.noFill();}return[557,1116];}},
   {name:'SUB OPENWORK 0 DOME LIKE 6 WASH',formula:'#C4B89A α=25',dur:0.05,
    bbox:[328,644,762,1078],
-   draw:function(p){if(p>=0){randomSeed(7036);brush.noStroke();brush.fill('#C4B89A',25);brush.fillBleed(0.001);brush.fillTexture(0,0);
+   draw:function(p){if(p>=0){randomSeed(7008);brush.noStroke();brush.fill('#C4B89A',25);brush.fillBleed(0.001);brush.fillTexture(0,0);
    if(pts_sub_openwork_0_dome_like_6)brush.polygon(pts_sub_openwork_0_dome_like_6.map(function(pt){return[pt[0],pt[1]]}));brush.noFill();}return[545,862];}},
-  {name:'SUB DOME LIKE 1 DOME LIKE 17 WASH',formula:'#C4B89A α=25',dur:0.05,
-   bbox:[332,599,758,1025],
-   draw:function(p){if(p>=0){randomSeed(7038);brush.noStroke();brush.fill('#C4B89A',25);brush.fillBleed(0.001);brush.fillTexture(0,0);
-   if(pts_sub_dome_like_1_dome_like_17)brush.polygon(pts_sub_dome_like_1_dome_like_17.map(function(pt){return[pt[0],pt[1]]}));brush.noFill();}return[545,813];}},
-  {name:'SUB HORSESHOE ARCH 7 DOME 59 WASH',formula:'#C4B89A α=25',dur:0.05,
-   bbox:[569,841,668,940],
-   draw:function(p){if(p>=0){randomSeed(7042);brush.noStroke();brush.fill('#C4B89A',25);brush.fillBleed(0.001);brush.fillTexture(0,0);
-   if(pts_sub_horseshoe_arch_7_dome_59)brush.polygon(pts_sub_horseshoe_arch_7_dome_59.map(function(pt){return[pt[0],pt[1]]}));brush.noFill();}return[619,891];}},
   {name:'SUB HORSESHOE ARCH 7 DOME 60 WASH',formula:'#C4B89A α=25',dur:0.05,
    bbox:[566,841,669,944],
-   draw:function(p){if(p>=0){randomSeed(7043);brush.noStroke();brush.fill('#C4B89A',25);brush.fillBleed(0.001);brush.fillTexture(0,0);
+   draw:function(p){if(p>=0){randomSeed(7009);brush.noStroke();brush.fill('#C4B89A',25);brush.fillBleed(0.001);brush.fillTexture(0,0);
    if(pts_sub_horseshoe_arch_7_dome_60)brush.polygon(pts_sub_horseshoe_arch_7_dome_60.map(function(pt){return[pt[0],pt[1]]}));brush.noFill();}return[618,893];}},
 ];
-var PAUSE_S=0.14,WASH_START=133;
+var PAUSE_S=0.14,WASH_START=100;
 var frameStarts=[],frameEnds=[],f2=0;
 for(var i=0;i<STEPS.length;i++){frameStarts.push(Math.round(f2));f2+=STEPS[i].dur*FPS;frameEnds.push(Math.round(f2));if(i<STEPS.length-1&&i<WASH_START-1)f2+=PAUSE_S*FPS;}
 var totalAnimFrames=Math.round(f2);
